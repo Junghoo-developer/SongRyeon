@@ -1,6 +1,10 @@
 # SongRyeon Core
 
+[![smoke-test](https://github.com/Junghoo-developer/SongRyeon/actions/workflows/smoke-test.yml/badge.svg)](https://github.com/Junghoo-developer/SongRyeon/actions/workflows/smoke-test.yml)
+
 [한국어 README](README.ko.md)
+
+**Keywords:** LLM agents, provenance, runtime honesty, traceability, local-first AI, smoke-tested agent architecture.
 
 SongRyeon Core is a tiny agent runtime that forces an LLM to separate **what the code verified** from **what the model inferred**.
 
@@ -70,6 +74,21 @@ SongRyeon Core is my small, local-first attempt to make those questions visible 
 - Recent turn capsule and raw-conversation alignment packets.
 - Relative/mixed semantic information split with smoke coverage.
 - Pretty runtime output that exposes generator, info class, source IDs, and judgment status.
+
+## Suggested GitHub Topics
+
+If you are viewing this on GitHub, the repository is easiest to discover with these topics:
+
+```text
+llm
+agents
+python
+local-first
+provenance
+traceability
+runtime
+agent-architecture
+```
 
 ## Quick Start
 

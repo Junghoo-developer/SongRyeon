@@ -1,5 +1,9 @@
 # 송련 코어
 
+[![smoke-test](https://github.com/Junghoo-developer/SongRyeon/actions/workflows/smoke-test.yml/badge.svg)](https://github.com/Junghoo-developer/SongRyeon/actions/workflows/smoke-test.yml)
+
+**키워드:** LLM 에이전트, 출처 추적, 런타임 정직성, traceability, 로컬 우선 AI, smoke-tested agent architecture.
+
 송련 코어는 LLM 에이전트가 **코드가 확인한 사실**과 **모델이 해석한 말**을 섞어 말하지 않게 만드는 작은 런타임 실험입니다.
 
 목표는 단순합니다.
@@ -73,6 +77,21 @@ LLM 판단은 LLM 판단으로 둔다.
 - 최근 턴 capsule과 raw conversation alignment packet.
 - 상대정보/혼합정보 분리 및 smoke-test.
 - pretty runtime 출력에서 생성자, 정보 등급, source ID, 의미 판단 상태 표시.
+
+## 추천 GitHub Topics
+
+GitHub 저장소 오른쪽 About 영역에 아래 topics를 붙이면 검색과 유입에 도움이 됩니다.
+
+```text
+llm
+agents
+python
+local-first
+provenance
+traceability
+runtime
+agent-architecture
+```
 
 ## 빠른 실행
 
