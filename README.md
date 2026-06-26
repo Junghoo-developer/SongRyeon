@@ -2,21 +2,53 @@
 
 [한국어 README](README.ko.md)
 
-SongRyeon Core is a small, local-first agent runtime experiment.
+SongRyeon Core is a tiny agent runtime that forces an LLM to separate **what the code verified** from **what the model inferred**.
 
-The project asks one practical question:
+The goal is simple: when an agent answers, it should not blur facts, guesses, summaries, tool results, and internal routing decisions into one confident-looking paragraph.
 
-> How can an LLM-based agent explain what it knows, what it inferred, and what the code actually verified?
+## The Difference
 
-Instead of treating every generated sentence as the same kind of output, SongRyeon Core separates runtime information into explicit classes:
+A normal agent might say:
+
+```text
+I read 3 documents and found enough evidence.
+```
+
+SongRyeon Core tries to say something closer to:
+
+```text
+Code-verified counts:
+- reportable_documents = 2
+- raw_extract_records = 3
+- empty_extract_records = 1
+
+LLM judgment:
+- The answer can only be partial because two readable documents were available.
+
+Runtime honesty:
+- The top-level L reroute request was blocked by policy.
+- The visible report uses the latest L run, not a stale legacy ID.
+```
+
+That is the heart of the project.
+
+## What It Tracks
+
+SongRyeon Core separates runtime information into three buckets:
 
 - **Absolute information**: values the system can verify from code, schema, files, trace events, or data records.
 - **Relative information**: a semantic judgment grounded in one specific source record or field.
 - **Mixed information**: a semantic judgment synthesized from a source bundle, where pinning it to one source would be misleading.
 
-This repository is intentionally small. It is a practice-grade core for studying traceable agent architecture before building a larger assistant.
+In shorter terms:
 
-## Why This Exists
+```text
+Code facts stay code facts.
+LLM judgments stay LLM judgments.
+Multi-source synthesis must say it is multi-source synthesis.
+```
+
+## Why I Built This
 
 Most agent demos look good until you ask:
 
@@ -26,32 +58,18 @@ Most agent demos look good until you ask:
 - Did a report use the latest loop run, or an older stale record?
 - When a count appears in the final answer, did the LLM count it or did code count it?
 
-SongRyeon Core explores those questions with schemas, trace records, runtime labels, and smoke tests.
+SongRyeon Core is my small, local-first attempt to make those questions visible in the runtime itself.
 
-## Current Capabilities
+## Current Highlights
 
-- Node-based runtime skeleton: `node_0`, `node_1`, `L loop`, `node_2`, `node_3`, `node_4`.
 - TraceStore and DataStore for event and payload provenance.
-- L loop for internal document search and evidence gathering.
+- Internal document-search L loop with evidence gathering.
 - Code-generated grounding counts for final reports.
 - Router fallback honesty: failed LLM routing and policy fallback are recorded separately.
 - Same-turn L reroute guard: default one L run, policy-enabled second run, third run blocked.
 - Recent turn capsule and raw-conversation alignment packets.
 - Relative/mixed semantic information split with smoke coverage.
 - Pretty runtime output that exposes generator, info class, source IDs, and judgment status.
-
-## Repository Map
-
-- `songryeon_core/core/`: schemas, trace store, data store, registry, failure signals.
-- `songryeon_core/state/`: zero state, unified state, turn capsule helpers.
-- `songryeon_core/nodes/`: node implementations.
-- `songryeon_core/loops/`: L loop runtime and loop policies.
-- `songryeon_core/tools/`: document tools, hash embedding search, tool result distillation.
-- `songryeon_core/llm/`: LLM adapter interface, fake adapter, Qwen/Ollama adapter.
-- `songryeon_core/runtime/`: dry run, user turn, terminal view, smoke tests, replay.
-- `songryeon_core/prompts/`: node prompt files.
-- `Administrative_Reform_1/`: design notes, maps, orders, execution records.
-- `main.py`: CLI entrypoint.
 
 ## Quick Start
 
@@ -112,6 +130,19 @@ As of 2026-06-26:
 - Source-bundle planner claims remain mixed information.
 - Node 3 report grounding counts are code-supplied.
 - Node 4 can block unsafe or mismatched reports.
+
+## Repository Map
+
+- `songryeon_core/core/`: schemas, trace store, data store, registry, failure signals.
+- `songryeon_core/state/`: zero state, unified state, turn capsule helpers.
+- `songryeon_core/nodes/`: node implementations.
+- `songryeon_core/loops/`: L loop runtime and loop policies.
+- `songryeon_core/tools/`: document tools, hash embedding search, tool result distillation.
+- `songryeon_core/llm/`: LLM adapter interface, fake adapter, Qwen/Ollama adapter.
+- `songryeon_core/runtime/`: dry run, user turn, terminal view, smoke tests, replay.
+- `songryeon_core/prompts/`: node prompt files.
+- `Administrative_Reform_1/`: design notes, maps, orders, execution records.
+- `main.py`: CLI entrypoint.
 
 ## Notes
 
