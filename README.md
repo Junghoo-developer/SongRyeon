@@ -1,5 +1,7 @@
 # SongRyeon Core
 
+[한국어 README](README.ko.md)
+
 SongRyeon Core is a small, local-first agent runtime experiment.
 
 The project asks one practical question:
