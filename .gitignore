@@ -1,0 +1,29 @@
+# Python runtime artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Local cache and generated runtime indexes
+.songryeon_core_cache/
+
+# Generated local artifacts
+output/
+tmp/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Editor and OS noise
+.vscode/
+.idea/
+desktop.ini
+
+# Local secrets or environment overrides
+.env
+.env.*
+*.local
+
+# Large or disposable runtime exports
+Administrative_Reform_1/05_Execution_Records/runtime_runs/
