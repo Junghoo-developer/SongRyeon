@@ -18,6 +18,7 @@ from songryeon_core.nodes.node_2_handoff import node3_brief_llm_payload
 
 
 NODE4_GATEKEEPER_FRAME_DATA_ID = "node_4:gatekeeper_frame"
+RECENT_MEMORY_INTERNAL_ID_LEAK = "CODE_STATUS:recent_memory_internal_id_leak"
 
 
 def run_node4_gatekeeper(
@@ -43,18 +44,29 @@ def run_node4_gatekeeper(
     )
     prompt_ref = "songryeon_core/prompts/node_4_gatekeeper_v0.md"
     prompt = Path(prompt_ref).read_text(encoding="utf-8")
+    brief_payload = node3_brief_llm_payload(brief_frame)
     llm_result = LLMNodeExecutor(adapter).run(
         node_id="node_4",
         prompt=prompt,
         input_payload={
             "rendered_markdown": rendered_markdown[:5000],
-            "node3_input_brief": node3_brief_llm_payload(brief_frame),
+            "node3_input_brief": brief_payload,
+            "selected_recent_memory_contexts": brief_payload.get(
+                "selected_recent_memory_contexts",
+                [],
+            ),
+            "selected_recent_memory_context_frame_id": (
+                _selected_recent_memory_context_frame_id(brief_frame)
+            ),
+            "memory_selection_status": _memory_selection_status(brief_frame),
+            "memory_selection_info_class": _memory_selection_info_class(brief_frame),
             "checks": [
                 "보고문이 node3_input_brief 밖의 사실을 단정했는지 확인한다.",
                 "보고문이 '근거 기준:' 블록으로 시작하고 count가 brief와 맞는지 확인한다.",
                 "검색 후보 문서를 읽은 문서처럼 말하는지 확인한다.",
                 "문서 추출이 있는데 없다고 말하는 모순이 있는지 확인한다.",
                 "내부 추적용 식별자나 장부용 필드명이 노출됐는지 확인한다.",
+                "최근 기억 발화가 selected_recent_memory_contexts 범위를 벗어나는지 확인한다.",
             ],
         },
         trace_store=trace_store,
@@ -107,6 +119,29 @@ def run_node4_gatekeeper(
             ]
         )
 
+    recent_memory_guard = _recent_memory_code_guard(
+        rendered_markdown=rendered_markdown,
+        brief_frame=brief_frame,
+    )
+    if recent_memory_guard["status"] == "needs_revision":
+        if gate_status == "pass":
+            gate_status = "needs_revision"
+        if "CODE:RECENT_MEMORY_INTERNAL_ID_GUARD" not in gate_generation_source:
+            gate_generation_source = (
+                f"{gate_generation_source}+CODE:RECENT_MEMORY_INTERNAL_ID_GUARD"
+            )
+        for reason_code in recent_memory_guard["reason_codes"]:
+            reason = _append_reason(reason, reason_code)
+        checked_claims = _unique_strings([*checked_claims, "recent_memory_internal_id_guard"])
+        unsupported_claims = _unique_strings(
+            [*unsupported_claims, *recent_memory_guard["reason_codes"]]
+        )
+        revision_targets = _unique_strings(
+            [*revision_targets, *recent_memory_guard["revision_targets"]]
+        )
+    elif recent_memory_guard["status"] == "pass":
+        checked_claims = _unique_strings([*checked_claims, "recent_memory_internal_id_guard"])
+
     frame_source_trace_ids = list(input_ref)
     if llm_result.trace_event_id:
         frame_source_trace_ids.append(llm_result.trace_event_id)
@@ -126,6 +161,16 @@ def run_node4_gatekeeper(
         unsupported_claims=unsupported_claims,
         contradictions=contradictions,
         revision_targets=revision_targets,
+        recent_memory_guard_status=str(recent_memory_guard["status"]),
+        recent_memory_guard_reason_codes=list(recent_memory_guard["reason_codes"]),
+        recent_memory_claim_count=int(recent_memory_guard["claim_count"]),
+        unsupported_recent_memory_claim_count=int(
+            recent_memory_guard["unsupported_claim_count"]
+        ),
+        recent_memory_internal_id_leak_count=int(
+            recent_memory_guard["internal_id_leak_count"]
+        ),
+        recent_memory_revision_targets=list(recent_memory_guard["revision_targets"]),
         source_trace_ids=_unique_strings(frame_source_trace_ids),
         source_data_ids=frame_source_data_ids,
     )
@@ -186,6 +231,69 @@ def _grounding_count(rendered_markdown: str, label: str) -> int | None:
     if match is None:
         return None
     return int(match.group(1))
+
+
+def _recent_memory_code_guard(
+    *,
+    rendered_markdown: str,
+    brief_frame: Node3InputBriefFrame,
+) -> dict[str, object]:
+    _ = brief_frame
+    internal_id_leak_count = _internal_id_leak_count(rendered_markdown)
+    reason_codes: list[str] = []
+    revision_targets: list[str] = []
+
+    if internal_id_leak_count:
+        reason_codes.append(RECENT_MEMORY_INTERNAL_ID_LEAK)
+        revision_targets.append("최종 답변에서 raw internal id를 제거한다.")
+
+    unique_reason_codes = _unique_strings(reason_codes)
+    return {
+        "status": "needs_revision" if unique_reason_codes else "pass",
+        "reason_codes": unique_reason_codes,
+        "claim_count": 0,
+        "unsupported_claim_count": 0,
+        "internal_id_leak_count": internal_id_leak_count,
+        "revision_targets": _unique_strings(revision_targets),
+    }
+
+
+def _internal_id_leak_count(rendered_markdown: str) -> int:
+    patterns = [
+        r"memory_packet:[A-Za-z0-9_:\-]+",
+        r"trace_\d{6}",
+        r"turn_prev_\d{3}",
+        r"turn_chat_\d{4}",
+        r"selected_recent_memory_context",
+        r"raw_memory_compression_candidate",
+    ]
+    return sum(
+        len(re.findall(pattern, rendered_markdown))
+        for pattern in patterns
+    )
+
+
+def _selected_recent_memory_context_frame_id(
+    brief_frame: Node3InputBriefFrame,
+) -> str | None:
+    for data_id in brief_frame.source_data_ids:
+        if "selected_recent_memory_context" in data_id:
+            return data_id
+    return None
+
+
+def _memory_selection_status(brief_frame: Node3InputBriefFrame) -> str:
+    material = brief_frame.memory_selection_material
+    if material is None:
+        return "not_recorded"
+    return material.memory_selection_status
+
+
+def _memory_selection_info_class(brief_frame: Node3InputBriefFrame) -> str:
+    material = brief_frame.memory_selection_material
+    if material is None:
+        return ""
+    return material.memory_selection_info_class
 
 
 def _append_reason(reason: str, addition: str) -> str:

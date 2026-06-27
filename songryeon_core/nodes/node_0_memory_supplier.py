@@ -8,6 +8,8 @@ from songryeon_core.core.schemas import (
     MemoryItem,
     MemoryPacketFrom0,
     MemoryPacketPayload,
+    MemoryRelevanceCandidateFrame,
+    RawMemoryCompressionCandidateFrame,
     ZeroState,
     validate_l_loop_return_summary_frame,
     validate_memory_packet_payload,
@@ -21,6 +23,16 @@ RECENT_TURN_CAPSULE_READ_WINDOW = 3
 # 학습 메모: 이 값은 장기기억 크기가 아니라, 최근 원문 대화와 capsule 좌표를 대응시켜
 # 이번 턴의 pre_route_report packet에 복사할 후보 창 크기다.
 RECENT_RAW_CONVERSATION_ALIGNMENT_WINDOW = 8
+# 학습 메모: 관련성 후보 창은 ORDER_101의 raw-capsule alignment 창을 그대로 따른다.
+# 여기서 후보는 "판단 결과"가 아니라 "나중에 판단할 수 있는 좌표"다.
+RECENT_MEMORY_RELEVANCE_CANDIDATE_WINDOW = RECENT_RAW_CONVERSATION_ALIGNMENT_WINDOW
+# 학습 메모: 아래 네 값은 원문 기억을 삭제하는 보관 정책이 아니라,
+# node_5가 나중에 압축할 후보 좌표를 나누는 node_0 공급 정책이다.
+RAW_MEMORY_WINDOW_POLICY_ID = "RAW_MEMORY_WINDOW_POLICY_V0"
+RECENT_RAW_CONVERSATION_MAX_WINDOW = 8
+RECENT_RAW_CONVERSATION_MIN_GUARANTEE = 3
+RAW_MEMORY_POST_COMPRESSION_KEEP = 5
+RAW_MEMORY_COMPRESSION_BATCH_SIZE = 4
 L3_CONTINUATION_SUMMARY_MODE = "l3_continuation_summary_for_L2"
 L_LOOP_RETURN_SUMMARY_FRAME_DATA_ID = "L:return_summary_frame"
 
@@ -196,6 +208,131 @@ def build_recent_raw_conversation_capsule_alignment_items(
     return items
 
 
+def build_recent_memory_relevance_candidate_frames(
+    *,
+    zero_state: ZeroState,
+    packet_id: str,
+    turn_id: str,
+    read_window: int = RECENT_MEMORY_RELEVANCE_CANDIDATE_WINDOW,
+) -> list[MemoryRelevanceCandidateFrame]:
+    """최근 raw-capsule 대응표를 나중의 관련성 판단 후보 frame으로 만든다."""
+
+    if read_window <= 0:
+        return []
+
+    capsules_by_turn_id = {
+        capsule.turn_id: capsule
+        for capsule in zero_state.previous_turn_capsules
+    }
+    recent_raw_entries = zero_state.recent_raw_conversation[-read_window:]
+
+    frames: list[MemoryRelevanceCandidateFrame] = []
+    for raw_entry in recent_raw_entries:
+        candidate_turn_id = _raw_conversation_text(raw_entry, "turn_id")
+        if candidate_turn_id is None:
+            continue
+        capsule = capsules_by_turn_id.get(candidate_turn_id)
+        if capsule is None:
+            continue
+
+        user_input_trace_id = _existing_capsule_trace_id(
+            capsule.trace_event_ids,
+            capsule.user_input_trace_id,
+        )
+        final_response_trace_id = _existing_capsule_trace_id(
+            capsule.trace_event_ids,
+            capsule.final_response_trace_id,
+        )
+        frame_index = len(frames) + 1
+        frames.append(
+            MemoryRelevanceCandidateFrame(
+                frame_id=f"{packet_id}:memory_relevance_candidate:{frame_index:03d}",
+                turn_id=turn_id,
+                candidate_turn_id=candidate_turn_id,
+                source_memory_item_id=(
+                    f"{packet_id}:recent_raw_conversation_capsule_alignment:"
+                    f"{frame_index:03d}"
+                ),
+                source_trace_ids=_unique_strings(
+                    [user_input_trace_id, final_response_trace_id]
+                ),
+                source_data_ids=[],
+                judgement_status="not_run",
+            )
+        )
+    return frames
+
+
+def build_raw_memory_window_policy_frame(
+    *,
+    zero_state: ZeroState,
+    packet_id: str,
+    turn_id: str,
+    max_raw_window: int = RECENT_RAW_CONVERSATION_MAX_WINDOW,
+    min_raw_guarantee: int = RECENT_RAW_CONVERSATION_MIN_GUARANTEE,
+    post_compression_keep: int = RAW_MEMORY_POST_COMPRESSION_KEEP,
+    compression_batch_size: int = RAW_MEMORY_COMPRESSION_BATCH_SIZE,
+) -> RawMemoryCompressionCandidateFrame:
+    """최근 raw 원문 창을 retained window와 node_5 압축 후보 좌표로 나눈다."""
+
+    raw_entries = list(zero_state.recent_raw_conversation)
+    raw_count = len(raw_entries)
+    frame_id = f"{packet_id}:raw_memory_compression_candidate:001"
+
+    if raw_count <= max_raw_window:
+        retained_entries = raw_entries
+        candidate_entries: list[dict[str, str]] = []
+        candidate_status = "not_needed"
+        older_unmanaged_raw_turn_count = 0
+    else:
+        retained_entries = raw_entries[-post_compression_keep:]
+        candidate_start = max(0, raw_count - post_compression_keep - compression_batch_size)
+        candidate_end = raw_count - post_compression_keep
+        candidate_entries = raw_entries[candidate_start:candidate_end]
+        candidate_status = "pending_node5_compression"
+        older_unmanaged_raw_turn_count = candidate_start
+
+    return RawMemoryCompressionCandidateFrame(
+        frame_id=frame_id,
+        turn_id=turn_id,
+        policy_id=RAW_MEMORY_WINDOW_POLICY_ID,
+        raw_conversation_count=raw_count,
+        max_raw_window=max_raw_window,
+        min_raw_guarantee=min_raw_guarantee,
+        post_compression_keep=post_compression_keep,
+        compression_batch_size=compression_batch_size,
+        candidate_status=candidate_status,
+        candidate_turn_ids=_raw_conversation_turn_ids(candidate_entries),
+        candidate_raw_entry_count=len(candidate_entries),
+        retained_raw_turn_ids=_raw_conversation_turn_ids(retained_entries),
+        retained_raw_entry_count=len(retained_entries),
+        older_unmanaged_raw_turn_count=older_unmanaged_raw_turn_count,
+        source_memory_item_ids=[],
+        source_trace_ids=[],
+        source_data_ids=[],
+        generated_by="CODE:RAW_MEMORY_WINDOW_POLICY",
+        info_class="absolute_policy_decision",
+        semantic_judgement_status="not_run",
+        node5_compression_status="not_run",
+        node4_approval_status="not_run",
+    )
+
+
+def build_recent_raw_conversation_compression_candidate(
+    *,
+    zero_state: ZeroState,
+    packet_id: str,
+    turn_id: str,
+) -> RawMemoryCompressionCandidateFrame:
+    """ORDER_107 이름에 맞춘 thin wrapper."""
+
+    return build_raw_memory_window_policy_frame(
+        zero_state=zero_state,
+        packet_id=packet_id,
+        turn_id=turn_id,
+    )
+
+
 def build_pre_route_memory_items(
     *,
     zero_state: ZeroState,
@@ -237,6 +374,8 @@ def record_memory_packet(
     compression_summary: str = "CODE_STATUS:trace_evidence_ids_supplied",
     operation_label: str = "CODE_STATUS:trace_evidence_ids_supplied",
     memory_items: list[MemoryItem] | None = None,
+    relevance_candidate_frames: list[MemoryRelevanceCandidateFrame] | None = None,
+    compression_candidate_frames: list[RawMemoryCompressionCandidateFrame] | None = None,
     id_namespace: LRunIds | None = None,
 ) -> str:
     """MemoryPacketFrom0이 만들어졌다는 사실을 trace로 기록한다."""
@@ -282,6 +421,8 @@ def record_memory_packet(
                     source_data_ids=source_data_ids or [],
                 )
             ],
+            relevance_candidate_frames=relevance_candidate_frames or [],
+            compression_candidate_frames=compression_candidate_frames or [],
         )
         validate_memory_packet_payload(payload)
         data_store.create_record(
@@ -893,6 +1034,16 @@ def _raw_conversation_text(entry: dict[str, str], field_kind: str) -> str | None
         if isinstance(value, str):
             return value
     return None
+
+
+def _raw_conversation_turn_ids(entries: list[dict[str, str]]) -> list[str]:
+    turn_ids: list[str] = []
+    for entry in entries:
+        turn_id = _raw_conversation_text(entry, "turn_id")
+        if turn_id is None:
+            continue
+        turn_ids.append(turn_id)
+    return turn_ids
 
 
 def _bool_text(value: bool) -> str:

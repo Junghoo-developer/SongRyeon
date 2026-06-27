@@ -11,8 +11,9 @@ from songryeon_core.core.schemas import (
     validate_node2_input_frame,
     validate_turn_outcome_frame,
 )
-from songryeon_core.core.trace_store import TraceStore
+from songryeon_core.core.trace_store import TraceEventSink, TraceStore
 from songryeon_core.llm.base import LLMAdapter
+from songryeon_core.llm.fake import MemoryRelevanceNoneSelectedFakeLLMAdapter
 from songryeon_core.runtime.artifact_export import export_runtime_artifacts
 from songryeon_core.runtime.defaults import (
     DEFAULT_DOCUMENT_ROOT,
@@ -49,13 +50,23 @@ from songryeon_core.state.zero_state import (
 )
 from songryeon_core.core.registry import build_default_prompt_registry, build_default_schema_registry
 from songryeon_core.nodes.node_0_memory_supplier import (
+    RAW_MEMORY_COMPRESSION_BATCH_SIZE,
+    RAW_MEMORY_POST_COMPRESSION_KEEP,
+    RECENT_RAW_CONVERSATION_MAX_WINDOW,
+    RECENT_RAW_CONVERSATION_MIN_GUARANTEE,
+    RECENT_MEMORY_RELEVANCE_CANDIDATE_WINDOW,
     RECENT_RAW_CONVERSATION_ALIGNMENT_WINDOW,
     RECENT_TURN_CAPSULE_READ_WINDOW,
     build_pre_route_memory_items,
+    build_recent_raw_conversation_compression_candidate,
+    build_recent_memory_relevance_candidate_frames,
     memory_packet_data_id,
     record_l_loop_return_summary_for_node1,
     record_memory_packet,
     supply_memory,
+)
+from songryeon_core.nodes.memory_relevance_selector import (
+    run_recent_memory_relevance_selector,
 )
 from songryeon_core.nodes.node_1_router import (
     ROUTER_FALLBACK_POLICY_DEV_SMOKE,
@@ -70,7 +81,11 @@ from songryeon_core.nodes.node_2_metainfo_boundary import (
     record_boundary,
     run_node2_boundary_review,
 )
-from songryeon_core.nodes.node_2_handoff import record_node3_input_brief, record_route2_handoff
+from songryeon_core.nodes.node_2_handoff import (
+    record_node3_input_brief,
+    record_route2_handoff,
+    record_selected_recent_memory_context,
+)
 from songryeon_core.nodes.node_3_reporter import record_report, render_report, render_report_with_llm
 from songryeon_core.nodes.node_4_gatekeeper import run_node4_gatekeeper
 
@@ -78,8 +93,10 @@ from songryeon_core.nodes.node_4_gatekeeper import run_node4_gatekeeper
 def run_dry_turn(
     user_input: str = "내부 문서 기억 검색 후 보고해줘",
     *,
+    turn_id: str | None = None,
     export_dir: str | None = None,
     node_1_router_adapter: LLMAdapter | None = None,
+    memory_relevance_selector_adapter: LLMAdapter | None = None,
     l1_goal_adapter: LLMAdapter | None = None,
     l2_query_planner_adapter: LLMAdapter | None = None,
     l3_result_adapter: LLMAdapter | None = None,
@@ -99,6 +116,7 @@ def run_dry_turn(
     node_1_router_fallback_policy: str = ROUTER_FALLBACK_POLICY_DEV_SMOKE,
     previous_turn_capsules: list[TurnStateCapsule] | None = None,
     recent_raw_conversation: list[dict[str, str]] | None = None,
+    live_trace_sink: TraceEventSink | None = None,
 ) -> dict[str, object]:
     """한 턴의 구조 흐름을 trace/data로 실행한다.
 
@@ -106,8 +124,8 @@ def run_dry_turn(
     그래서 이 함수는 현재 MVP의 중앙 배선도에 가깝다.
     """
 
-    turn_id = DEFAULT_TURN_ID
-    trace_store = TraceStore()
+    turn_id = turn_id or DEFAULT_TURN_ID
+    trace_store = TraceStore(on_event=live_trace_sink)
     data_store = DataStore()
     zero_state = ZeroState(
         recent_raw_conversation=list(recent_raw_conversation or []),
@@ -161,6 +179,16 @@ def run_dry_turn(
         packet_id=node0_pre_data_id,
         packet=packet_for_1,
     )
+    node0_pre_relevance_candidate_frames = build_recent_memory_relevance_candidate_frames(
+        zero_state=zero_state,
+        packet_id=node0_pre_data_id,
+        turn_id=turn_id,
+    )
+    node0_pre_compression_candidate_frame = build_recent_raw_conversation_compression_candidate(
+        zero_state=zero_state,
+        packet_id=node0_pre_data_id,
+        turn_id=turn_id,
+    )
     previous_turn_capsules_read_count = sum(
         1
         for item in node0_pre_memory_items
@@ -179,6 +207,8 @@ def run_dry_turn(
         mode="pre_route_report",
         input_ref=[user_event.event_id],
         memory_items=node0_pre_memory_items,
+        relevance_candidate_frames=node0_pre_relevance_candidate_frames,
+        compression_candidate_frames=[node0_pre_compression_candidate_frame],
     )
     movements.append(
         make_node_movement(
@@ -193,7 +223,65 @@ def run_dry_turn(
         )
     )
 
+    selector_adapter = memory_relevance_selector_adapter
+    if selector_adapter is None and node0_pre_relevance_candidate_frames:
+        selector_adapter = MemoryRelevanceNoneSelectedFakeLLMAdapter()
+    (
+        memory_relevance_selection_trace_id,
+        memory_relevance_selection_data_id,
+        memory_relevance_selection_frame,
+    ) = run_recent_memory_relevance_selector(
+        trace_store=trace_store,
+        data_store=data_store,
+        turn_id=turn_id,
+        current_user_input=user_input,
+        current_user_input_trace_id=user_event.event_id,
+        source_memory_packet_id=node0_pre_data_id,
+        selector_target_node="node_1",
+        adapter=selector_adapter,
+        recent_raw_conversation=zero_state.recent_raw_conversation,
+    )
+    movements.append(
+        make_node_movement(
+            movement_id="move_002",
+            turn_id=turn_id,
+            step_index=2,
+            node_id="memory_relevance_selector",
+            mode="recent_memory_relevance_selection",
+            input_trace_ids=[node0_pre_trace_id],
+            output_trace_ids=[memory_relevance_selection_trace_id],
+            input_data_ids=[node0_pre_data_id],
+            output_data_ids=[memory_relevance_selection_data_id],
+            status="completed",
+        )
+    )
+    (
+        selected_memory_context_trace_id,
+        selected_memory_context_data_id,
+        selected_memory_context_frame,
+    ) = record_selected_recent_memory_context(
+        trace_store=trace_store,
+        data_store=data_store,
+        turn_id=turn_id,
+        zero_state=zero_state,
+        selection_frame_id=memory_relevance_selection_data_id,
+    )
+
     # 3. 1이 route를 고른다.
+    node1_route_input_refs = _unique_strings(
+        [
+            node0_pre_trace_id,
+            memory_relevance_selection_trace_id,
+            selected_memory_context_trace_id,
+        ]
+    )
+    node1_route_source_data_ids = _unique_strings(
+        [
+            node0_pre_data_id,
+            memory_relevance_selection_data_id,
+            selected_memory_context_data_id,
+        ]
+    )
     if node_1_router_adapter is not None and not force_l_route:
         decision = route_next_with_llm_or_policy_fallback(
             user_input=user_input,
@@ -203,8 +291,8 @@ def run_dry_turn(
             trace_store=trace_store,
             data_store=data_store,
             turn_id=turn_id,
-            input_ref=[node0_pre_trace_id],
-            source_data_ids=[node0_pre_data_id],
+            input_ref=node1_route_input_refs,
+            source_data_ids=node1_route_source_data_ids,
             force_l_route=force_l_route,
             fallback_policy=node_1_router_fallback_policy,
             fallback_allowed_by_runtime_policy=allow_node_1_router_fallback,
@@ -216,8 +304,8 @@ def run_dry_turn(
             schema_registry=schema_registry,
             force_l_route=force_l_route,
         )
-    route_input_ref = _unique_strings([node0_pre_trace_id, decision.llm_trace_event_id])
-    route_source_data_ids = _unique_strings([node0_pre_data_id, decision.llm_call_data_id])
+    route_input_ref = _unique_strings([*node1_route_input_refs, decision.llm_trace_event_id])
+    route_source_data_ids = _unique_strings([*node1_route_source_data_ids, decision.llm_call_data_id])
     route_trace_id = record_routing(
         trace_store=trace_store,
         data_store=data_store,
@@ -232,9 +320,9 @@ def run_dry_turn(
     set_active_schema(unified_state, decision.required_schema)
     movements.append(
         make_node_movement(
-            movement_id="move_002",
+            movement_id="move_003",
             turn_id=turn_id,
-            step_index=2,
+            step_index=3,
             node_id="node_1",
             mode="routing",
             input_trace_ids=route_input_ref,
@@ -243,7 +331,7 @@ def run_dry_turn(
         )
     )
 
-    next_step_index = 3
+    next_step_index = 4
 
     def append_movement(
         *,
@@ -594,6 +682,8 @@ def run_dry_turn(
     node2_source_data_ids = _unique_strings(
         [
             node0_pre_data_id,
+            memory_relevance_selection_data_id,
+            selected_memory_context_data_id,
             *route_data_ids,
             *node0_l_data_ids,
             *l_loop_output_ids,
@@ -652,6 +742,8 @@ def run_dry_turn(
         turn_outcome_id=outcome_id,
         route_ids=_unique_strings(route_data_ids),
         l_loop_output_ids=_unique_strings(l_loop_output_ids),
+        memory_relevance_selection_frame_id=memory_relevance_selection_data_id,
+        selected_recent_memory_context_frame_id=selected_memory_context_data_id,
         id_namespace=l_run_ids,
     )
     append_movement(
@@ -659,7 +751,7 @@ def run_dry_turn(
         mode="route2_handoff",
         input_trace_ids=[node2_input_trace.event_id],
         output_trace_ids=[handoff_trace_id],
-        input_data_ids=[node2_input_id],
+        input_data_ids=[node2_input_id, memory_relevance_selection_data_id, selected_memory_context_data_id],
         output_data_ids=[handoff_data_id],
     )
 
@@ -694,12 +786,13 @@ def run_dry_turn(
             boundary=boundary,
             adapter=node_2_boundary_adapter,
             input_ref=[boundary_trace_id],
-            source_data_ids=[boundary_id, node2_input_id, handoff_data_id],
+            source_data_ids=[boundary_id, node2_input_id, handoff_data_id, selected_memory_context_data_id],
         )
         node2_review_data_id = "node_2:boundary_review"
     set_metainfo_boundary_id(unified_state, boundary_id)
     assigned_model_by_node = _assigned_model_by_node(
         node_1_router_adapter=node_1_router_adapter,
+        memory_relevance_selector_label=memory_relevance_selection_frame.generated_by,
         l1_goal_adapter=l1_goal_adapter,
         l2_query_planner_adapter=l2_query_planner_adapter,
         l3_result_adapter=l3_result_adapter,
@@ -727,7 +820,7 @@ def run_dry_turn(
         handoff_frame_id=handoff_data_id,
         boundary=boundary,
         input_trace_ids=_unique_strings([handoff_trace_id, boundary_trace_id, node2_review_trace_id]),
-        source_data_ids=_unique_strings([node2_input_id, handoff_data_id, boundary_id, node2_review_data_id]),
+        source_data_ids=_unique_strings([node2_input_id, handoff_data_id, boundary_id, node2_review_data_id, selected_memory_context_data_id]),
         runtime_movements=[*movements, node2_brief_preview_movement],
         assigned_model_by_node=assigned_model_by_node,
         id_namespace=l_run_ids,
@@ -743,7 +836,7 @@ def run_dry_turn(
 
     # 10. 3이 내부 ID를 제거한 node_3용 브리프를 보고 답변한다.
     report_source_trace_ids = [brief_trace_id]
-    report_source_data_ids = _unique_strings([brief_data_id, handoff_data_id, boundary_id, outcome_id, node2_input_id, node2_review_data_id])
+    report_source_data_ids = _unique_strings([brief_data_id, handoff_data_id, boundary_id, outcome_id, node2_input_id, node2_review_data_id, selected_memory_context_data_id])
     report_generation_source = "CODE/RENDERER"
     llm_reporter_status = "not_run"
     if node_3_reporter_adapter is not None:
@@ -863,10 +956,50 @@ def run_dry_turn(
         "task_result_count": task_counts["task_result_count"],
         "current_route": unified_state.current_route,
         "capsule_trace_count": len(capsule.trace_event_ids),
+        "turn_capsule": asdict(capsule),
         "recent_capsule_read_window": RECENT_TURN_CAPSULE_READ_WINDOW,
         "recent_capsules_read_count": previous_turn_capsules_read_count,
         "recent_raw_conversation_alignment_window": RECENT_RAW_CONVERSATION_ALIGNMENT_WINDOW,
         "recent_raw_conversation_alignment_count": recent_raw_conversation_alignment_count,
+        "recent_raw_conversation_max_window": RECENT_RAW_CONVERSATION_MAX_WINDOW,
+        "recent_raw_conversation_min_guarantee": RECENT_RAW_CONVERSATION_MIN_GUARANTEE,
+        "raw_memory_post_compression_keep": RAW_MEMORY_POST_COMPRESSION_KEEP,
+        "raw_memory_compression_batch_size": RAW_MEMORY_COMPRESSION_BATCH_SIZE,
+        "raw_memory_compression_candidate_frame_id": (
+            node0_pre_compression_candidate_frame.frame_id
+        ),
+        "raw_memory_compression_candidate_status": (
+            node0_pre_compression_candidate_frame.candidate_status
+        ),
+        "raw_memory_compression_candidate_turn_ids": (
+            node0_pre_compression_candidate_frame.candidate_turn_ids
+        ),
+        "raw_memory_retained_raw_turn_ids": (
+            node0_pre_compression_candidate_frame.retained_raw_turn_ids
+        ),
+        "older_unmanaged_raw_turn_count": (
+            node0_pre_compression_candidate_frame.older_unmanaged_raw_turn_count
+        ),
+        "recent_memory_relevance_candidate_window": RECENT_MEMORY_RELEVANCE_CANDIDATE_WINDOW,
+        "recent_memory_relevance_candidate_count": len(node0_pre_relevance_candidate_frames),
+        "recent_memory_relevance_selection_frame_id": memory_relevance_selection_data_id,
+        "recent_memory_relevance_selection_status": memory_relevance_selection_frame.selection_status,
+        "recent_memory_relevance_selection_candidate_count": len(
+            memory_relevance_selection_frame.candidate_frame_ids
+        ),
+        "recent_memory_relevance_selection_selected_count": len(
+            memory_relevance_selection_frame.selected_candidate_frame_ids
+        ),
+        "recent_memory_relevance_selection_llm_call_data_id": (
+            memory_relevance_selection_frame.llm_call_data_id
+        ),
+        "selected_recent_memory_context_frame_id": selected_memory_context_data_id,
+        "selected_recent_memory_context_count": (
+            selected_memory_context_frame.selected_turn_count
+        ),
+        "missing_selected_memory_context_count": (
+            selected_memory_context_frame.missing_selected_memory_context_count
+        ),
         "llm_call_count": _count_records_by_type(data_store, "llm_call"),
         "tool_choice_count": _count_records_by_type(data_store, "tool_choice"),
         "tool_result_count": _count_records_with_type_prefix(data_store, "tool_result:"),
@@ -950,6 +1083,18 @@ def run_dry_turn(
             data_store,
             "node_4:gatekeeper_frame",
             "gate_status",
+            data_type="node_output:node4_gatekeeper_frame",
+        ),
+        "node4_recent_memory_guard_status": _read_payload_text(
+            data_store,
+            "node_4:gatekeeper_frame",
+            "recent_memory_guard_status",
+            data_type="node_output:node4_gatekeeper_frame",
+        ),
+        "node4_unsupported_recent_memory_claim_count": _read_payload_int(
+            data_store,
+            "node_4:gatekeeper_frame",
+            "unsupported_recent_memory_claim_count",
             data_type="node_output:node4_gatekeeper_frame",
         ),
         "force_l_route": force_l_route,
@@ -1058,6 +1203,22 @@ def _read_payload_text(
     return value if isinstance(value, str) else None
 
 
+def _read_payload_int(
+    data_store: DataStore,
+    data_id: str,
+    field_name: str,
+    *,
+    data_type: str | None = None,
+) -> int | None:
+    record = data_store.get_record(data_id)
+    if record is None and data_type is not None:
+        record = _latest_record_by_type(data_store, data_type)
+    if record is None or not isinstance(record.payload, dict):
+        return None
+    value = record.payload.get(field_name)
+    return value if isinstance(value, int) else None
+
+
 def _latest_record_by_type(data_store: DataStore, data_type: str):
     for record in reversed(data_store.list_records()):
         if record.data_type == data_type:
@@ -1090,6 +1251,7 @@ def _loop_adapter_label(
 def _assigned_model_by_node(
     *,
     node_1_router_adapter: LLMAdapter | None,
+    memory_relevance_selector_label: str,
     l1_goal_adapter: LLMAdapter | None,
     l2_query_planner_adapter: LLMAdapter | None,
     l3_result_adapter: LLMAdapter | None,
@@ -1100,6 +1262,7 @@ def _assigned_model_by_node(
     return {
         "node_0": "CODE:RULE_STUB",
         "node_1": _adapter_label(node_1_router_adapter, fallback="CODE:RULE_STUB"),
+        "memory_relevance_selector": memory_relevance_selector_label,
         "L": _loop_adapter_label(
             l1_goal_adapter=l1_goal_adapter,
             l2_query_planner_adapter=l2_query_planner_adapter,

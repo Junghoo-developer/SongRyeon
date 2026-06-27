@@ -2,331 +2,31 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-
-@dataclass
-class DataRef:
-    """시스템이 확인할 수 있는 데이터 하나를 가리키는 절대정보 참조."""
-
-    # 데이터 하나를 가리키는 고유 ID.
-    data_id: str
-    # 데이터 종류. 예: trace_event, user_message, node_output, schema_result.
-    data_type: str
-    # 시스템이 이 데이터의 존재를 확인했는지.
-    exists: bool = True
-    # 데이터가 만들어진 시간. 모르면 None으로 둔다.
-    created_at: str | None = None
-    # 이 데이터 존재를 확인하게 해준 trace ID.
-    source_trace_id: str | None = None
-
-
-@dataclass
-class SchemaBinding:
-    """어떤 스키마가 어디에 적용되고 검증됐는지 기록하는 절대정보."""
-
-    # 적용할 스키마 이름.
-    schema_name: str
-    # 적용할 스키마 버전.
-    schema_version: str
-    # 이 스키마가 반드시 적용되어야 하는지.
-    required: bool = True
-    # 스키마 검증 결과. 예: passed, failed, not_checked.
-    validation_status: str = "not_checked"
-    # 스키마 검증 과정 자체를 기록한 trace ID.
-    validation_trace_id: str | None = None
-
-
-@dataclass
-class NodeMovement:
-    """한 턴 안에서 노드나 루프가 실제로 이동한 동선을 기록하는 절대정보."""
-
-    # 노드 동선 하나를 구분하는 ID.
-    movement_id: str
-    # 이 동선이 속한 턴 ID.
-    turn_id: str
-    # 턴 안에서 몇 번째로 실행됐는지 나타내는 순서 번호.
-    step_index: int
-    # 실행된 노드나 루프의 ID. 예: node_0, node_1, L1.
-    node_id: str
-    # 실행 단위의 종류. 예: node, loop_node, tool.
-    node_type: str = "node"
-    # 실제 호출된 모드. 예: pre_route_report, final_trace_for_2.
-    mode: str | None = None
-    # 이 실행 단위가 입력으로 받은 trace ID 목록.
-    input_trace_ids: list[str] = field(default_factory=list)
-    # 이 실행 단위가 출력으로 만든 trace ID 목록.
-    output_trace_ids: list[str] = field(default_factory=list)
-    # 이 실행 단위가 입력으로 받은 데이터 ID 목록.
-    input_data_ids: list[str] = field(default_factory=list)
-    # 이 실행 단위가 출력으로 만든 데이터 ID 목록.
-    output_data_ids: list[str] = field(default_factory=list)
-    # 실행 시작 시간.
-    started_at: str | None = None
-    # 실행 종료 시간.
-    finished_at: str | None = None
-    # 실행 상태. 예: started, completed, failed.
-    status: str = "started"
-
-
-TASK_FRAME_SCHEMA_NAME = "TaskFrame"
-TASK_FRAME_SCHEMA_VERSION = "0.1"
-TASK_RESULT_FRAME_SCHEMA_NAME = "TaskResultFrame"
-TASK_RESULT_FRAME_SCHEMA_VERSION = "0.1"
-
-
-@dataclass
-class TaskFrame:
-    """스케줄러/큐 구조로 가기 전에 남기는 작업 장부의 최소 task 선언."""
-
-    # task 하나를 구분하는 ID.
-    task_id: str
-    # 이 task가 속한 턴 ID.
-    turn_id: str
-    # 현재 순차 런타임에서 몇 번째 task인지 나타내는 순서 번호.
-    step_index: int
-    # 이 task가 실행한 노드나 루프. 예: node_0, node_1, L.
-    node_id: str
-    # task의 종류. 예: node, loop, scheduler_stub.
-    task_kind: str
-    # 실제 실행 모드. 예: routing, report, gatekeeper.
-    mode: str | None = None
-    # v0에서는 직전 task에만 의존하는 순차 실행으로 기록한다.
-    depends_on_task_ids: list[str] = field(default_factory=list)
-    # task 입력 trace ID 목록.
-    input_trace_ids: list[str] = field(default_factory=list)
-    # task 입력 data ID 목록.
-    input_data_ids: list[str] = field(default_factory=list)
-    # task가 만들 것으로 기록된 trace ID 목록.
-    expected_output_trace_ids: list[str] = field(default_factory=list)
-    # task가 만들 것으로 기록된 data ID 목록.
-    expected_output_data_ids: list[str] = field(default_factory=list)
-    # 이 task에 배정된 모델이나 코드 실행자.
-    assigned_model_id: str = "CODE"
-    # 이 task에 배정된 worker. v0에서는 실제 worker가 아니라 장부용 이름이다.
-    assigned_worker_id: str = "local_sync_worker"
-    # 현재 task 실행 정책. v0에서는 기존 순차 실행을 task로 장부화한다.
-    scheduling_policy: str = "sequential_v0"
-    # task frame을 만든 주체.
-    created_by: str = "CODE:TASK_LEDGER_V0"
-    # task 상태. v0에서는 실행 후 장부화하므로 completed가 기본이다.
-    status: str = "completed"
-    schema_name: str = TASK_FRAME_SCHEMA_NAME
-    schema_version: str = TASK_FRAME_SCHEMA_VERSION
-
-
-@dataclass
-class TaskResultFrame:
-    """task 실행 결과를 장부에 남기는 최소 결과 프레임."""
-
-    # result frame 하나를 구분하는 ID.
-    result_id: str
-    # 대응하는 task ID.
-    task_id: str
-    # 이 결과가 속한 턴 ID.
-    turn_id: str
-    # task 실행 결과 상태.
-    status: str
-    # task가 실제로 만든 trace ID 목록.
-    output_trace_ids: list[str] = field(default_factory=list)
-    # task가 실제로 만든 data ID 목록.
-    output_data_ids: list[str] = field(default_factory=list)
-    # 실패 종류. 성공이면 None.
-    failure_type: str | None = None
-    # 실패 이유. 성공이면 None.
-    failure_reason: str | None = None
-    # task result를 최종 장부에 반영한 주체.
-    committed_by: str = "CODE:TASK_LEDGER_V0"
-    schema_name: str = TASK_RESULT_FRAME_SCHEMA_NAME
-    schema_version: str = TASK_RESULT_FRAME_SCHEMA_VERSION
-
-
-def validate_task_frame(frame: TaskFrame) -> None:
-    """TaskFrame이 최소 작업 장부 규칙을 지키는지 확인한다."""
-
-    for field_name, value in {
-        "task_id": frame.task_id,
-        "turn_id": frame.turn_id,
-        "node_id": frame.node_id,
-        "task_kind": frame.task_kind,
-        "assigned_model_id": frame.assigned_model_id,
-        "assigned_worker_id": frame.assigned_worker_id,
-        "scheduling_policy": frame.scheduling_policy,
-        "created_by": frame.created_by,
-        "status": frame.status,
-        "schema_name": frame.schema_name,
-        "schema_version": frame.schema_version,
-    }.items():
-        if not value:
-            raise ValueError(f"TaskFrame.{field_name} must not be empty")
-    if frame.step_index < 1:
-        raise ValueError("TaskFrame.step_index must be positive")
-    if frame.schema_name != TASK_FRAME_SCHEMA_NAME:
-        raise ValueError(f"unknown task frame schema_name: {frame.schema_name}")
-    if frame.schema_version != TASK_FRAME_SCHEMA_VERSION:
-        raise ValueError(f"unknown task frame schema_version: {frame.schema_version}")
-    if frame.status not in {"queued", "running", "completed", "failed", "skipped"}:
-        raise ValueError(f"unknown TaskFrame.status: {frame.status}")
-    _validate_string_list("TaskFrame.depends_on_task_ids", frame.depends_on_task_ids)
-    _validate_string_list("TaskFrame.input_trace_ids", frame.input_trace_ids)
-    _validate_string_list("TaskFrame.input_data_ids", frame.input_data_ids)
-    _validate_string_list("TaskFrame.expected_output_trace_ids", frame.expected_output_trace_ids)
-    _validate_string_list("TaskFrame.expected_output_data_ids", frame.expected_output_data_ids)
-
-
-def validate_task_result_frame(frame: TaskResultFrame) -> None:
-    """TaskResultFrame이 최소 결과 장부 규칙을 지키는지 확인한다."""
-
-    for field_name, value in {
-        "result_id": frame.result_id,
-        "task_id": frame.task_id,
-        "turn_id": frame.turn_id,
-        "status": frame.status,
-        "committed_by": frame.committed_by,
-        "schema_name": frame.schema_name,
-        "schema_version": frame.schema_version,
-    }.items():
-        if not value:
-            raise ValueError(f"TaskResultFrame.{field_name} must not be empty")
-    if frame.schema_name != TASK_RESULT_FRAME_SCHEMA_NAME:
-        raise ValueError(f"unknown task result schema_name: {frame.schema_name}")
-    if frame.schema_version != TASK_RESULT_FRAME_SCHEMA_VERSION:
-        raise ValueError(f"unknown task result schema_version: {frame.schema_version}")
-    if frame.status not in {"completed", "failed", "skipped"}:
-        raise ValueError(f"unknown TaskResultFrame.status: {frame.status}")
-    if frame.status == "failed" and not frame.failure_type:
-        raise ValueError("failed TaskResultFrame must include failure_type")
-    _validate_string_list("TaskResultFrame.output_trace_ids", frame.output_trace_ids)
-    _validate_string_list("TaskResultFrame.output_data_ids", frame.output_data_ids)
-
-
-def _validate_string_list(field_name: str, values: list[str]) -> None:
-    for value in values:
-        if not value:
-            raise ValueError(f"{field_name} must not contain empty values")
-
-
-@dataclass
-class TraceEvent:
-    """일 하나가 벌어질 때마다 남기는 trace 기록 조각."""
-
-    # trace 조각 하나를 나중에 다시 찾기 위한 고유 번호.
-    event_id: str
-    # 이 trace가 어느 사용자 턴에서 생겼는지 나타내는 번호.
-    turn_id: str
-    # 이 trace가 생긴 시간. 처음에는 문자열로 두고 나중에 datetime으로 바꿔도 된다.
-    timestamp: str
-    # 이 흔적을 만든 주체. 예: user, node_0, node_1, L2, tool_search.
-    actor: str
-    # 어떤 종류의 사건인지. 예: user_input, node_output, routing, tool_call.
-    event_type: str
-    # 이 사건이 참고한 입력 데이터 ID 목록.
-    input_ref: list[str] = field(default_factory=list)
-    # 이 사건이 만들어낸 출력 데이터 ID 목록.
-    output_ref: list[str] = field(default_factory=list)
-    # 원문이 길 때 원문이 저장된 위치나 ID.
-    raw_content_ref: str | None = None
-    # 이 사건의 출력이 스키마 검사를 통과했는지. 예: passed, failed, not_checked.
-    schema_status: str = "not_checked"
-
-
-@dataclass
-class UnifiedState:
-    """0번을 제외한 일반 노드와 루프가 함께 보는 현재 턴 상태."""
-
-    # 이번 턴을 구분하는 ID.
-    turn_id: str
-    # 현재 턴을 시작한 사용자 입력 원문 또는 원문 ID.
-    user_input: str
-    # 1번 라우터가 실제로 선택한 대상. 예: "2", "L".
-    current_route: str | None = None
-    # 이번 턴에서 지금까지 쌓인 trace 이벤트 ID 목록.
-    trace_event_ids: list[str] = field(default_factory=list)
-    # 현재 노드에 강제되는 스키마 정보.
-    active_schema: SchemaBinding | None = None
-    # 2번 메타정보 경계관이 만든 결과 ID.
-    metainfo_boundary_id: str | None = None
-    # 현재 실행 중인 루프 이름. 예: "L".
-    current_loop: str | None = None
-    # 가장 최근 실패/부족 신호의 ID.
-    latest_failure_signal_id: str | None = None
-
-
-@dataclass
-class TurnStateCapsule:
-    """이전 턴 전체를 다음 턴의 0번이 다시 읽을 수 있게 묶은 trace 색인 캡슐."""
-
-    # 학습 메모: TurnStateCapsule은 이전 턴을 "이해한 요약"이 아니라 다시 찾아가기 위한 색인 카드다.
-    # 이 캡슐이 색인하는 턴 ID.
-    turn_id: str
-    # 그 턴에서 지나간 모든 노드/루프 동선.
-    node_movements: list[NodeMovement] = field(default_factory=list)
-    # 이 캡슐이 참조하는 전체 trace 이벤트 ID 목록.
-    trace_event_ids: list[str] = field(default_factory=list)
-    # 해당 턴의 사용자 입력 trace ID.
-    user_input_trace_id: str | None = None
-    # 해당 턴의 최종 응답 trace ID.
-    final_response_trace_id: str | None = None
-
-
-@dataclass
-class ZeroState:
-    """0 기억공급관만 보는 특수 기억 상태."""
-
-    # 최근 대화 원본. 예: 최근 8턴.
-    recent_raw_conversation: list[dict[str, str]] = field(default_factory=list)
-    # 이전 턴 trace를 다시 찾기 위한 캡슐 목록. 여기에는 LLM 의미 요약을 넣지 않는다.
-    previous_turn_capsules: list[TurnStateCapsule] = field(default_factory=list)
-    # 이번 턴에서 실시간으로 쌓이는 trace ID 목록.
-    current_turn_trace_ids: list[str] = field(default_factory=list)
-    # 각 노드나 루프가 어떤 정보를 필요로 하는지 적은 프로필.
-    node_profiles: dict[str, dict[str, str]] = field(default_factory=dict)
-    # 0번이 기억 부족을 선언한 횟수.
-    memory_insufficient_count: int = 0
-
-
-@dataclass
-class MemoryPacketFrom0:
-    """0 기억공급관이 다음 노드나 루프에 넘기는 기억 패킷의 절대정보 뼈대."""
-
-    # 이 기억 패킷을 받을 대상. 예: node_1, node_2, L.
-    target: str
-    # 이 기억 패킷의 근거가 되는 trace ID 목록.
-    trace_evidence_ids: list[str] = field(default_factory=list)
-    # 기억 부족이나 접근 실패가 있으면 그 실패 신호 ID를 담는다.
-    insufficient_signal_id: str | None = None
-
-
-@dataclass
-class RoutingDecision:
-    """1 상황판단 라우터가 실제로 어디로 보냈는지 기록하는 라우팅 결정."""
-
-    # 다음으로 보낼 대상. MVP에서는 "2" 또는 "L".
-    route: str
-    # 라우팅을 고른 이유. 현재는 규칙 기반 또는 MVP 강제 라우팅 이유다.
-    route_reason: str = ""
-    # 이 라우팅 결정의 실제 생성자. 현재 node_1은 LLM이 아니라 규칙 스텁이다.
-    route_source: str = "CODE:RULE_STUB"
-    # 다음 대상에 강제할 스키마 정보.
-    required_schema: SchemaBinding | None = None
-    # 라우팅 직후 0번이 어떤 모드로 호출되어야 하는지.
-    expected_next_0_mode: str = ""
-    # 절대 정보: 코드 스텁이 사용한 라우팅 규칙 ID.
-    route_rule_id: str = ""
-    # 절대 정보: 키워드 규칙이 감지한 문자열 목록.
-    matched_keywords: list[str] = field(default_factory=list)
-    # 절대 정보: 사용자 입력이 아니라 런타임 정책으로 강제된 경우의 policy flag.
-    policy_flag: str | None = None
-    route_confidence: float | None = None
-    needs_more_memory: bool = False
-    llm_routing_status: str = "not_run"
-    llm_call_data_id: str | None = None
-    llm_trace_event_id: str | None = None
-    fallback_after_llm_failure: bool = False
-    router_llm_failure_data_id: str | None = None
-    router_llm_failure_trace_event_id: str | None = None
-    router_llm_failure_type: str | None = None
-    fallback_policy: str | None = None
-    fallback_allowed_by_runtime_policy: bool = False
-    fallback_source_route_rule_id: str | None = None
+from songryeon_core.core.schema_parts.base import (
+    DataRef,
+    NodeMovement,
+    SchemaBinding,
+    _validate_no_duplicates,
+    _validate_string_list,
+)
+from songryeon_core.core.schema_parts.task_ledger import (
+    TASK_FRAME_SCHEMA_NAME,
+    TASK_FRAME_SCHEMA_VERSION,
+    TASK_RESULT_FRAME_SCHEMA_NAME,
+    TASK_RESULT_FRAME_SCHEMA_VERSION,
+    TaskFrame,
+    TaskResultFrame,
+    validate_task_frame,
+    validate_task_result_frame,
+)
+from songryeon_core.core.schema_parts.trace_data import (
+    MemoryPacketFrom0,
+    RoutingDecision,
+    TraceEvent,
+    TurnStateCapsule,
+    UnifiedState,
+    ZeroState,
+)
 
 
 RELATIVE_INFO_REF_SCHEMA_NAME = "RelativeInfoRef"
@@ -500,6 +200,151 @@ class MemoryItem:
     source_data_ids: list[str] = field(default_factory=list)
 
 
+MEMORY_RELEVANCE_CANDIDATE_FRAME_SCHEMA_NAME = "MemoryRelevanceCandidateFrame"
+MEMORY_RELEVANCE_CANDIDATE_FRAME_SCHEMA_VERSION = "0.1"
+MEMORY_RELEVANCE_SELECTION_FRAME_SCHEMA_NAME = "MemoryRelevanceSelectionFrame"
+MEMORY_RELEVANCE_SELECTION_FRAME_SCHEMA_VERSION = "0.1"
+MEMORY_RELEVANCE_SELECTION_STATUSES = {"selected", "none_selected", "failed"}
+SELECTED_RECENT_MEMORY_CONTEXT_FRAME_SCHEMA_NAME = "SelectedRecentMemoryContextFrame"
+SELECTED_RECENT_MEMORY_CONTEXT_FRAME_SCHEMA_VERSION = "0.1"
+RAW_MEMORY_COMPRESSION_CANDIDATE_FRAME_SCHEMA_NAME = "RawMemoryCompressionCandidateFrame"
+RAW_MEMORY_COMPRESSION_CANDIDATE_FRAME_SCHEMA_VERSION = "0.1"
+RAW_MEMORY_COMPRESSION_CANDIDATE_STATUSES = {
+    "not_needed",
+    "pending_node5_compression",
+}
+
+
+@dataclass
+class MemoryRelevanceCandidateFrame:
+    """나중에 LLM이 기억 관련성 판단을 남길 수 있는 빈 후보 그릇."""
+
+    # 학습 메모: 이 frame은 "관련 있다"는 판단이 아니다.
+    # 최근 raw 대화와 capsule이 절대 좌표로 대응됐으니, 나중에 판단자가 볼 후보임을 표시한다.
+    frame_id: str
+    # 현재 사용자 턴 ID.
+    turn_id: str
+    # 후보가 가리키는 이전 턴 ID.
+    candidate_turn_id: str
+    # 이 후보 frame의 바탕이 된 memory item ID.
+    source_memory_item_id: str
+    # 후보 좌표의 근거 trace ID 목록.
+    source_trace_ids: list[str] = field(default_factory=list)
+    # 후보 좌표의 근거 data ID 목록.
+    source_data_ids: list[str] = field(default_factory=list)
+    # 아직 관련성 판단을 하지 않았다는 절대 상태.
+    judgement_status: str = "not_run"
+    # 아래 네 필드는 나중에 판단자가 채운다. not_run일 때는 반드시 비어 있어야 한다.
+    judged_by: str | None = None
+    relevance_label: str | None = None
+    relevance_reason: str | None = None
+    info_class: str | None = None
+    schema_name: str = MEMORY_RELEVANCE_CANDIDATE_FRAME_SCHEMA_NAME
+    schema_version: str = MEMORY_RELEVANCE_CANDIDATE_FRAME_SCHEMA_VERSION
+
+
+@dataclass
+class MemoryRelevanceSelectionFrame:
+    """LLM selector가 최근 기억 후보 관련성을 판단한 결과."""
+
+    # 이 frame은 0의 판단이 아니라 selector LLM 판단 또는 code status close를 기록한다.
+    frame_id: str
+    turn_id: str
+    selector_target_node: str
+    current_user_input_trace_id: str
+    source_memory_packet_id: str
+    candidate_frame_ids: list[str] = field(default_factory=list)
+    selected_candidate_turn_ids: list[str] = field(default_factory=list)
+    selected_candidate_frame_ids: list[str] = field(default_factory=list)
+    selection_status: str = "none_selected"
+    selection_reason: str = ""
+    judged_by: str | None = None
+    generated_by: str = "LLM:memory_relevance_selector"
+    llm_call_data_id: str | None = None
+    llm_trace_event_id: str | None = None
+    source_trace_ids: list[str] = field(default_factory=list)
+    source_data_ids: list[str] = field(default_factory=list)
+    source_memory_item_ids: list[str] = field(default_factory=list)
+    info_class: str = "mixed"
+    source_mode: str = "source_bundle"
+    claim_alignment: str = "multi_source_bundle"
+    schema_name: str = MEMORY_RELEVANCE_SELECTION_FRAME_SCHEMA_NAME
+    schema_version: str = MEMORY_RELEVANCE_SELECTION_FRAME_SCHEMA_VERSION
+
+
+@dataclass
+class SelectedRecentMemoryContextItem:
+    """selector가 고른 이전 턴 raw 원문을 요약 없이 복사한 항목."""
+
+    item_id: str
+    source_turn_id: str
+    source_candidate_frame_id: str
+    source_memory_item_id: str
+    raw_user_text: str
+    raw_assistant_text: str
+    raw_user_text_chars: int
+    raw_assistant_text_chars: int
+    raw_user_text_truncated: bool
+    raw_assistant_text_truncated: bool
+    copied_from: str
+    selection_reason_source_data_id: str
+    selection_info_class: str
+    source_trace_ids: list[str] = field(default_factory=list)
+    source_data_ids: list[str] = field(default_factory=list)
+
+
+@dataclass
+class SelectedRecentMemoryContextFrame:
+    """선택된 최근 기억 후보의 raw 대화 원문 복사본을 담는 절대정보 frame."""
+
+    frame_id: str
+    turn_id: str
+    selection_frame_id: str
+    selection_status: str
+    selected_turn_count: int
+    items: list[SelectedRecentMemoryContextItem] = field(default_factory=list)
+    missing_selected_memory_context_count: int = 0
+    generated_by: str = "CODE:SELECTED_RECENT_MEMORY_CONTEXT_BUILDER"
+    info_class: str = "absolute_copied_context"
+    semantic_judgement_status: str = "not_run"
+    source_data_ids: list[str] = field(default_factory=list)
+    source_trace_ids: list[str] = field(default_factory=list)
+    schema_name: str = SELECTED_RECENT_MEMORY_CONTEXT_FRAME_SCHEMA_NAME
+    schema_version: str = SELECTED_RECENT_MEMORY_CONTEXT_FRAME_SCHEMA_VERSION
+
+
+@dataclass
+class RawMemoryCompressionCandidateFrame:
+    """최근 raw 원문 창에서 node_5가 나중에 압축할 후보 좌표만 기록한다."""
+
+    # 학습 메모: 이 frame은 0의 의미 요약이 아니다.
+    # raw entry 개수와 정책 상수만으로 retained/candidate turn 좌표를 나눈 결과다.
+    frame_id: str
+    turn_id: str
+    policy_id: str
+    raw_conversation_count: int
+    max_raw_window: int
+    min_raw_guarantee: int
+    post_compression_keep: int
+    compression_batch_size: int
+    candidate_status: str
+    candidate_turn_ids: list[str] = field(default_factory=list)
+    candidate_raw_entry_count: int = 0
+    retained_raw_turn_ids: list[str] = field(default_factory=list)
+    retained_raw_entry_count: int = 0
+    older_unmanaged_raw_turn_count: int = 0
+    source_memory_item_ids: list[str] = field(default_factory=list)
+    source_trace_ids: list[str] = field(default_factory=list)
+    source_data_ids: list[str] = field(default_factory=list)
+    generated_by: str = "CODE:RAW_MEMORY_WINDOW_POLICY"
+    info_class: str = "absolute_policy_decision"
+    semantic_judgement_status: str = "not_run"
+    node5_compression_status: str = "not_run"
+    node4_approval_status: str = "not_run"
+    schema_name: str = RAW_MEMORY_COMPRESSION_CANDIDATE_FRAME_SCHEMA_NAME
+    schema_version: str = RAW_MEMORY_COMPRESSION_CANDIDATE_FRAME_SCHEMA_VERSION
+
+
 @dataclass
 class MemoryPacketPayload:
     """0 기억공급관이 만든 memory packet의 DataStore 저장용 본체."""
@@ -520,8 +365,10 @@ class MemoryPacketPayload:
     evidence_trace_ids: list[str] = field(default_factory=list)
     insufficient_signal_id: str | None = None
     memory_items: list[MemoryItem] = field(default_factory=list)
+    relevance_candidate_frames: list[MemoryRelevanceCandidateFrame] = field(default_factory=list)
+    compression_candidate_frames: list[RawMemoryCompressionCandidateFrame] = field(default_factory=list)
     schema_name: str = "MemoryPacketPayload"
-    schema_version: str = "0.1"
+    schema_version: str = "0.2"
 
 
 def validate_memory_packet_payload(payload: MemoryPacketPayload) -> None:
@@ -547,6 +394,437 @@ def validate_memory_packet_payload(payload: MemoryPacketPayload) -> None:
             raise ValueError("MemoryItem.item_type must not be empty")
         if not item.text:
             raise ValueError("MemoryItem.text must not be empty")
+
+    for frame in payload.relevance_candidate_frames:
+        validate_memory_relevance_candidate_frame(frame)
+    for frame in payload.compression_candidate_frames:
+        validate_raw_memory_compression_candidate_frame(frame)
+
+
+def validate_memory_relevance_candidate_frame(frame: MemoryRelevanceCandidateFrame) -> None:
+    """MemoryRelevanceCandidateFrame이 판단 없이 후보 좌표만 담는지 확인한다."""
+
+    required_text_fields = {
+        "frame_id": frame.frame_id,
+        "turn_id": frame.turn_id,
+        "candidate_turn_id": frame.candidate_turn_id,
+        "source_memory_item_id": frame.source_memory_item_id,
+        "judgement_status": frame.judgement_status,
+        "schema_name": frame.schema_name,
+        "schema_version": frame.schema_version,
+    }
+    for field_name, value in required_text_fields.items():
+        if not value:
+            raise ValueError(f"MemoryRelevanceCandidateFrame.{field_name} must not be empty")
+
+    if frame.schema_name != MEMORY_RELEVANCE_CANDIDATE_FRAME_SCHEMA_NAME:
+        raise ValueError(
+            f"unknown memory relevance candidate schema_name: {frame.schema_name}"
+        )
+    if frame.schema_version != MEMORY_RELEVANCE_CANDIDATE_FRAME_SCHEMA_VERSION:
+        raise ValueError(
+            f"unknown memory relevance candidate schema_version: {frame.schema_version}"
+        )
+    if frame.judgement_status != "not_run":
+        raise ValueError("MemoryRelevanceCandidateFrame v0 only allows judgement_status=not_run")
+    if any(
+        value is not None
+        for value in (
+            frame.judged_by,
+            frame.relevance_label,
+            frame.relevance_reason,
+            frame.info_class,
+        )
+    ):
+        raise ValueError("not_run MemoryRelevanceCandidateFrame must not contain judgement fields")
+    for trace_id in frame.source_trace_ids:
+        if not trace_id:
+            raise ValueError(
+                "MemoryRelevanceCandidateFrame.source_trace_ids must not contain empty values"
+            )
+    for data_id in frame.source_data_ids:
+        if not data_id:
+            raise ValueError(
+                "MemoryRelevanceCandidateFrame.source_data_ids must not contain empty values"
+            )
+
+
+def validate_selected_recent_memory_context_frame(
+    frame: SelectedRecentMemoryContextFrame,
+) -> None:
+    """SelectedRecentMemoryContextFrame이 요약 없이 raw 복사본만 담는지 확인한다."""
+
+    required_text_fields = {
+        "frame_id": frame.frame_id,
+        "turn_id": frame.turn_id,
+        "selection_frame_id": frame.selection_frame_id,
+        "selection_status": frame.selection_status,
+        "generated_by": frame.generated_by,
+        "info_class": frame.info_class,
+        "semantic_judgement_status": frame.semantic_judgement_status,
+        "schema_name": frame.schema_name,
+        "schema_version": frame.schema_version,
+    }
+    for field_name, value in required_text_fields.items():
+        if not value:
+            raise ValueError(f"SelectedRecentMemoryContextFrame.{field_name} must not be empty")
+    if frame.schema_name != SELECTED_RECENT_MEMORY_CONTEXT_FRAME_SCHEMA_NAME:
+        raise ValueError(
+            f"unknown selected recent memory context schema_name: {frame.schema_name}"
+        )
+    if frame.schema_version != SELECTED_RECENT_MEMORY_CONTEXT_FRAME_SCHEMA_VERSION:
+        raise ValueError(
+            f"unknown selected recent memory context schema_version: {frame.schema_version}"
+        )
+    if frame.selection_status not in (MEMORY_RELEVANCE_SELECTION_STATUSES | {"not_recorded"}):
+        raise ValueError(
+            f"unknown SelectedRecentMemoryContextFrame.selection_status: {frame.selection_status}"
+        )
+    if frame.generated_by != "CODE:SELECTED_RECENT_MEMORY_CONTEXT_BUILDER":
+        raise ValueError("SelectedRecentMemoryContextFrame.generated_by must be code builder")
+    if frame.info_class != "absolute_copied_context":
+        raise ValueError(
+            "SelectedRecentMemoryContextFrame.info_class must be absolute_copied_context"
+        )
+    if frame.semantic_judgement_status != "not_run":
+        raise ValueError("SelectedRecentMemoryContextFrame must not run semantic judgement")
+    if frame.selected_turn_count < 0:
+        raise ValueError("SelectedRecentMemoryContextFrame.selected_turn_count must be >= 0")
+    if frame.missing_selected_memory_context_count < 0:
+        raise ValueError(
+            "SelectedRecentMemoryContextFrame.missing_selected_memory_context_count must be >= 0"
+        )
+    if frame.selected_turn_count != len(frame.items):
+        raise ValueError("SelectedRecentMemoryContextFrame.selected_turn_count must match items")
+    if frame.selection_status in {"none_selected", "failed", "not_recorded"}:
+        if frame.selected_turn_count != 0 or frame.items:
+            raise ValueError("non-selected memory context frame must not include copied items")
+    _validate_string_list(
+        "SelectedRecentMemoryContextFrame.source_data_ids",
+        frame.source_data_ids,
+    )
+    _validate_string_list(
+        "SelectedRecentMemoryContextFrame.source_trace_ids",
+        frame.source_trace_ids,
+    )
+    if frame.selection_frame_id not in frame.source_data_ids:
+        raise ValueError(
+            "SelectedRecentMemoryContextFrame.source_data_ids must include selection_frame_id"
+        )
+    seen_turn_ids: set[str] = set()
+    for item in frame.items:
+        _validate_selected_recent_memory_context_item(item)
+        if item.source_turn_id in seen_turn_ids:
+            raise ValueError("SelectedRecentMemoryContextFrame.items must not duplicate turns")
+        seen_turn_ids.add(item.source_turn_id)
+
+
+def _validate_selected_recent_memory_context_item(
+    item: SelectedRecentMemoryContextItem,
+) -> None:
+    for field_name, value in {
+        "item_id": item.item_id,
+        "source_turn_id": item.source_turn_id,
+        "source_candidate_frame_id": item.source_candidate_frame_id,
+        "source_memory_item_id": item.source_memory_item_id,
+        "copied_from": item.copied_from,
+        "selection_reason_source_data_id": item.selection_reason_source_data_id,
+        "selection_info_class": item.selection_info_class,
+    }.items():
+        if not value:
+            raise ValueError(f"SelectedRecentMemoryContextItem.{field_name} must not be empty")
+    if item.selection_info_class != "mixed":
+        raise ValueError("SelectedRecentMemoryContextItem.selection_info_class must preserve mixed")
+    for field_name, value in {
+        "raw_user_text_chars": item.raw_user_text_chars,
+        "raw_assistant_text_chars": item.raw_assistant_text_chars,
+    }.items():
+        if value < 0:
+            raise ValueError(f"SelectedRecentMemoryContextItem.{field_name} must be >= 0")
+    if len(item.raw_user_text) > item.raw_user_text_chars:
+        raise ValueError("SelectedRecentMemoryContextItem.raw_user_text exceeds original char count")
+    if len(item.raw_assistant_text) > item.raw_assistant_text_chars:
+        raise ValueError(
+            "SelectedRecentMemoryContextItem.raw_assistant_text exceeds original char count"
+        )
+    if not item.raw_user_text_truncated and len(item.raw_user_text) != item.raw_user_text_chars:
+        raise ValueError("untruncated raw_user_text length must match original char count")
+    if not item.raw_assistant_text_truncated and len(item.raw_assistant_text) != item.raw_assistant_text_chars:
+        raise ValueError("untruncated raw_assistant_text length must match original char count")
+    _validate_string_list("SelectedRecentMemoryContextItem.source_trace_ids", item.source_trace_ids)
+    _validate_string_list("SelectedRecentMemoryContextItem.source_data_ids", item.source_data_ids)
+    for required_data_id in (
+        item.selection_reason_source_data_id,
+    ):
+        if required_data_id not in item.source_data_ids:
+            raise ValueError(
+                "SelectedRecentMemoryContextItem.source_data_ids must include selection source"
+            )
+
+
+def validate_raw_memory_compression_candidate_frame(
+    frame: RawMemoryCompressionCandidateFrame,
+) -> None:
+    """RawMemoryCompressionCandidateFrame이 요약 없이 정책 좌표만 담는지 확인한다."""
+
+    required_text_fields = {
+        "frame_id": frame.frame_id,
+        "turn_id": frame.turn_id,
+        "policy_id": frame.policy_id,
+        "candidate_status": frame.candidate_status,
+        "generated_by": frame.generated_by,
+        "info_class": frame.info_class,
+        "semantic_judgement_status": frame.semantic_judgement_status,
+        "node5_compression_status": frame.node5_compression_status,
+        "node4_approval_status": frame.node4_approval_status,
+        "schema_name": frame.schema_name,
+        "schema_version": frame.schema_version,
+    }
+    for field_name, value in required_text_fields.items():
+        if not value:
+            raise ValueError(
+                f"RawMemoryCompressionCandidateFrame.{field_name} must not be empty"
+            )
+
+    if frame.schema_name != RAW_MEMORY_COMPRESSION_CANDIDATE_FRAME_SCHEMA_NAME:
+        raise ValueError(
+            f"unknown raw memory compression candidate schema_name: {frame.schema_name}"
+        )
+    if frame.schema_version != RAW_MEMORY_COMPRESSION_CANDIDATE_FRAME_SCHEMA_VERSION:
+        raise ValueError(
+            f"unknown raw memory compression candidate schema_version: {frame.schema_version}"
+        )
+    if frame.candidate_status not in RAW_MEMORY_COMPRESSION_CANDIDATE_STATUSES:
+        raise ValueError(
+            f"unknown RawMemoryCompressionCandidateFrame.candidate_status: {frame.candidate_status}"
+        )
+
+    if frame.generated_by != "CODE:RAW_MEMORY_WINDOW_POLICY":
+        raise ValueError("RawMemoryCompressionCandidateFrame.generated_by must be CODE policy")
+    if frame.info_class != "absolute_policy_decision":
+        raise ValueError(
+            "RawMemoryCompressionCandidateFrame.info_class must be absolute_policy_decision"
+        )
+    for field_name, value in {
+        "semantic_judgement_status": frame.semantic_judgement_status,
+        "node5_compression_status": frame.node5_compression_status,
+        "node4_approval_status": frame.node4_approval_status,
+    }.items():
+        if value != "not_run":
+            raise ValueError(f"RawMemoryCompressionCandidateFrame.{field_name} must be not_run")
+
+    for field_name, value in {
+        "raw_conversation_count": frame.raw_conversation_count,
+        "max_raw_window": frame.max_raw_window,
+        "min_raw_guarantee": frame.min_raw_guarantee,
+        "post_compression_keep": frame.post_compression_keep,
+        "compression_batch_size": frame.compression_batch_size,
+        "candidate_raw_entry_count": frame.candidate_raw_entry_count,
+        "retained_raw_entry_count": frame.retained_raw_entry_count,
+        "older_unmanaged_raw_turn_count": frame.older_unmanaged_raw_turn_count,
+    }.items():
+        if value < 0:
+            raise ValueError(f"RawMemoryCompressionCandidateFrame.{field_name} must be >= 0")
+
+    if frame.max_raw_window <= 0:
+        raise ValueError("RawMemoryCompressionCandidateFrame.max_raw_window must be positive")
+    if frame.min_raw_guarantee <= 0:
+        raise ValueError("RawMemoryCompressionCandidateFrame.min_raw_guarantee must be positive")
+    if frame.compression_batch_size <= 0:
+        raise ValueError(
+            "RawMemoryCompressionCandidateFrame.compression_batch_size must be positive"
+        )
+    if frame.post_compression_keep < frame.min_raw_guarantee:
+        raise ValueError(
+            "RawMemoryCompressionCandidateFrame.post_compression_keep must satisfy min guarantee"
+        )
+    if frame.max_raw_window != frame.post_compression_keep + frame.compression_batch_size - 1:
+        raise ValueError("RawMemoryCompressionCandidateFrame policy constants are inconsistent")
+
+    _validate_string_list(
+        "RawMemoryCompressionCandidateFrame.candidate_turn_ids",
+        frame.candidate_turn_ids,
+    )
+    _validate_string_list(
+        "RawMemoryCompressionCandidateFrame.retained_raw_turn_ids",
+        frame.retained_raw_turn_ids,
+    )
+    _validate_string_list(
+        "RawMemoryCompressionCandidateFrame.source_memory_item_ids",
+        frame.source_memory_item_ids,
+    )
+    _validate_string_list(
+        "RawMemoryCompressionCandidateFrame.source_trace_ids",
+        frame.source_trace_ids,
+    )
+    _validate_string_list(
+        "RawMemoryCompressionCandidateFrame.source_data_ids",
+        frame.source_data_ids,
+    )
+    _validate_no_duplicates(
+        "RawMemoryCompressionCandidateFrame.candidate_turn_ids",
+        frame.candidate_turn_ids,
+    )
+    _validate_no_duplicates(
+        "RawMemoryCompressionCandidateFrame.retained_raw_turn_ids",
+        frame.retained_raw_turn_ids,
+    )
+    if set(frame.candidate_turn_ids).intersection(frame.retained_raw_turn_ids):
+        raise ValueError("raw memory candidate and retained turn ids must not overlap")
+
+    if frame.candidate_status == "not_needed":
+        if frame.raw_conversation_count > frame.max_raw_window:
+            raise ValueError("not_needed raw memory candidate cannot exceed max_raw_window")
+        if frame.candidate_turn_ids or frame.candidate_raw_entry_count != 0:
+            raise ValueError("not_needed raw memory candidate must not include candidate ids")
+        if frame.older_unmanaged_raw_turn_count != 0:
+            raise ValueError("not_needed raw memory candidate must not expose older unmanaged turns")
+
+    if frame.candidate_status == "pending_node5_compression":
+        if frame.raw_conversation_count <= frame.max_raw_window:
+            raise ValueError("pending raw memory candidate must exceed max_raw_window")
+        if frame.candidate_raw_entry_count != frame.compression_batch_size:
+            raise ValueError("pending raw memory candidate must use one compression batch")
+        if len(frame.candidate_turn_ids) != frame.compression_batch_size:
+            raise ValueError("pending raw memory candidate must include batch turn ids")
+        if frame.retained_raw_entry_count != frame.post_compression_keep:
+            raise ValueError("pending raw memory candidate must retain post_compression_keep turns")
+        if len(frame.retained_raw_turn_ids) != frame.post_compression_keep:
+            raise ValueError("pending raw memory candidate must include retained turn ids")
+
+
+def validate_memory_relevance_selection_frame(frame: MemoryRelevanceSelectionFrame) -> None:
+    """MemoryRelevanceSelectionFrame이 selector 판단 출처와 실패 경계를 드러내는지 확인한다."""
+
+    required_text_fields = {
+        "frame_id": frame.frame_id,
+        "turn_id": frame.turn_id,
+        "selector_target_node": frame.selector_target_node,
+        "current_user_input_trace_id": frame.current_user_input_trace_id,
+        "source_memory_packet_id": frame.source_memory_packet_id,
+        "selection_status": frame.selection_status,
+        "selection_reason": frame.selection_reason,
+        "generated_by": frame.generated_by,
+        "info_class": frame.info_class,
+        "source_mode": frame.source_mode,
+        "claim_alignment": frame.claim_alignment,
+        "schema_name": frame.schema_name,
+        "schema_version": frame.schema_version,
+    }
+    for field_name, value in required_text_fields.items():
+        if not value:
+            raise ValueError(f"MemoryRelevanceSelectionFrame.{field_name} must not be empty")
+
+    if frame.schema_name != MEMORY_RELEVANCE_SELECTION_FRAME_SCHEMA_NAME:
+        raise ValueError(
+            f"unknown memory relevance selection schema_name: {frame.schema_name}"
+        )
+    if frame.schema_version != MEMORY_RELEVANCE_SELECTION_FRAME_SCHEMA_VERSION:
+        raise ValueError(
+            f"unknown memory relevance selection schema_version: {frame.schema_version}"
+        )
+    if frame.selection_status not in MEMORY_RELEVANCE_SELECTION_STATUSES:
+        raise ValueError(
+            f"unknown MemoryRelevanceSelectionFrame.selection_status: {frame.selection_status}"
+        )
+    if frame.source_mode != "source_bundle":
+        raise ValueError(f"unknown MemoryRelevanceSelectionFrame.source_mode: {frame.source_mode}")
+    if frame.claim_alignment != "multi_source_bundle":
+        raise ValueError(
+            f"unknown MemoryRelevanceSelectionFrame.claim_alignment: {frame.claim_alignment}"
+        )
+
+    _validate_string_list(
+        "MemoryRelevanceSelectionFrame.candidate_frame_ids",
+        frame.candidate_frame_ids,
+    )
+    _validate_string_list(
+        "MemoryRelevanceSelectionFrame.selected_candidate_turn_ids",
+        frame.selected_candidate_turn_ids,
+    )
+    _validate_string_list(
+        "MemoryRelevanceSelectionFrame.selected_candidate_frame_ids",
+        frame.selected_candidate_frame_ids,
+    )
+    _validate_string_list(
+        "MemoryRelevanceSelectionFrame.source_trace_ids",
+        frame.source_trace_ids,
+    )
+    _validate_string_list(
+        "MemoryRelevanceSelectionFrame.source_data_ids",
+        frame.source_data_ids,
+    )
+    _validate_string_list(
+        "MemoryRelevanceSelectionFrame.source_memory_item_ids",
+        frame.source_memory_item_ids,
+    )
+    _validate_no_duplicates(
+        "MemoryRelevanceSelectionFrame.selected_candidate_frame_ids",
+        frame.selected_candidate_frame_ids,
+    )
+    _validate_no_duplicates(
+        "MemoryRelevanceSelectionFrame.selected_candidate_turn_ids",
+        frame.selected_candidate_turn_ids,
+    )
+
+    if frame.current_user_input_trace_id not in frame.source_trace_ids:
+        raise ValueError(
+            "MemoryRelevanceSelectionFrame.source_trace_ids must include current_user_input_trace_id"
+        )
+    if frame.source_memory_packet_id not in frame.source_data_ids:
+        raise ValueError(
+            "MemoryRelevanceSelectionFrame.source_data_ids must include source_memory_packet_id"
+        )
+    for selected_frame_id in frame.selected_candidate_frame_ids:
+        if selected_frame_id not in frame.candidate_frame_ids:
+            raise ValueError(
+                "selected_candidate_frame_ids must be a subset of candidate_frame_ids"
+            )
+
+    if frame.selection_status == "selected":
+        if not frame.selected_candidate_turn_ids or not frame.selected_candidate_frame_ids:
+            raise ValueError("selected MemoryRelevanceSelectionFrame must include selected candidates")
+        if frame.info_class != "mixed":
+            raise ValueError("selected MemoryRelevanceSelectionFrame must use info_class=mixed")
+
+    if frame.selection_status in {"none_selected", "failed"}:
+        if frame.selected_candidate_turn_ids or frame.selected_candidate_frame_ids:
+            raise ValueError(
+                "none_selected/failed MemoryRelevanceSelectionFrame must not include selected candidates"
+            )
+
+    if frame.candidate_frame_ids:
+        if frame.selection_status in {"selected", "none_selected"}:
+            if frame.judged_by is None or not frame.judged_by.startswith("LLM:"):
+                raise ValueError("LLM selection result must reveal judged_by=LLM:*")
+            if not frame.generated_by.startswith("LLM:"):
+                raise ValueError("LLM selection result must reveal generated_by=LLM:*")
+            if frame.llm_call_data_id is None or frame.llm_trace_event_id is None:
+                raise ValueError("LLM selection result must cite llm call data and trace")
+            if frame.llm_call_data_id not in frame.source_data_ids:
+                raise ValueError(
+                    "LLM selection source_data_ids must include llm_call_data_id"
+                )
+            if frame.llm_trace_event_id not in frame.source_trace_ids:
+                raise ValueError(
+                    "LLM selection source_trace_ids must include llm_trace_event_id"
+                )
+            if frame.info_class != "mixed":
+                raise ValueError("LLM selection result must use info_class=mixed")
+        if frame.selection_status == "failed":
+            if frame.selected_candidate_turn_ids or frame.selected_candidate_frame_ids:
+                raise ValueError("failed selector must not contain fallback selections")
+            if not frame.selection_reason.startswith("CODE_STATUS:"):
+                raise ValueError("failed selector reason must be a code status")
+    else:
+        if frame.selection_status != "none_selected":
+            raise ValueError("selection with no candidates must close as none_selected")
+        if frame.selection_reason != "CODE_STATUS:no_memory_relevance_candidates":
+            raise ValueError("selection with no candidates must use no-candidates code status")
+        if frame.judged_by is not None:
+            raise ValueError("selection with no candidates must not have judged_by")
+        if frame.llm_call_data_id is not None or frame.llm_trace_event_id is not None:
+            raise ValueError("selection with no candidates must not cite an LLM call")
 
 
 @dataclass
@@ -730,6 +1008,12 @@ class Node4GatekeeperFrame:
     unsupported_claims: list[str] = field(default_factory=list)
     contradictions: list[str] = field(default_factory=list)
     revision_targets: list[str] = field(default_factory=list)
+    recent_memory_guard_status: str = "not_run"
+    recent_memory_guard_reason_codes: list[str] = field(default_factory=list)
+    recent_memory_claim_count: int = 0
+    unsupported_recent_memory_claim_count: int = 0
+    recent_memory_internal_id_leak_count: int = 0
+    recent_memory_revision_targets: list[str] = field(default_factory=list)
     source_trace_ids: list[str] = field(default_factory=list)
     source_data_ids: list[str] = field(default_factory=list)
     schema_name: str = NODE4_GATEKEEPER_FRAME_SCHEMA_NAME
@@ -759,6 +1043,27 @@ def validate_node4_gatekeeper_frame(frame: Node4GatekeeperFrame) -> None:
         raise ValueError(f"unknown Node4GatekeeperFrame schema_version: {frame.schema_version}")
     if frame.gate_status not in NODE4_GATE_STATUSES:
         raise ValueError(f"unknown Node4 gate_status: {frame.gate_status}")
+    if frame.recent_memory_guard_status not in {"not_run", "pass", "needs_revision"}:
+        raise ValueError(
+            f"unknown Node4 recent_memory_guard_status: {frame.recent_memory_guard_status}"
+        )
+    for field_name, value in {
+        "recent_memory_claim_count": frame.recent_memory_claim_count,
+        "unsupported_recent_memory_claim_count": frame.unsupported_recent_memory_claim_count,
+        "recent_memory_internal_id_leak_count": frame.recent_memory_internal_id_leak_count,
+    }.items():
+        if not isinstance(value, int):
+            raise TypeError(f"Node4GatekeeperFrame.{field_name} must be an integer")
+        if value < 0:
+            raise ValueError(f"Node4GatekeeperFrame.{field_name} must not be negative")
+    _validate_string_list(
+        "Node4GatekeeperFrame.recent_memory_guard_reason_codes",
+        frame.recent_memory_guard_reason_codes,
+    )
+    _validate_string_list(
+        "Node4GatekeeperFrame.recent_memory_revision_targets",
+        frame.recent_memory_revision_targets,
+    )
     for trace_id in frame.source_trace_ids:
         if not trace_id:
             raise ValueError("Node4GatekeeperFrame.source_trace_ids must not contain empty values")
@@ -978,6 +1283,18 @@ class Node2HandoffFrame:
     blocked_same_turn_l_reroute_request_count: int = 0
     same_turn_l_reroute_controller_decisions: list[str] = field(default_factory=list)
     l_internal_revision_count: int = 0
+    memory_relevance_selection_frame_id: str | None = None
+    memory_relevance_selection_status: str = "not_recorded"
+    memory_relevance_candidate_count: int = 0
+    memory_relevance_selected_count: int = 0
+    memory_relevance_info_class: str = ""
+    memory_relevance_generated_by: str = ""
+    memory_relevance_llm_call_data_id: str | None = None
+    selected_recent_memory_context_frame_id: str | None = None
+    selected_recent_memory_context_count: int = 0
+    missing_selected_memory_context_count: int = 0
+    selected_recent_memory_context_generated_by: str = ""
+    selected_recent_memory_context_info_class: str = ""
     brief_available: bool = False
     insufficiency_reasons: list[str] = field(default_factory=list)
     source_trace_ids: list[str] = field(default_factory=list)
@@ -1017,6 +1334,10 @@ def validate_node2_handoff_frame(frame: Node2HandoffFrame) -> None:
         "actual_l_run_count": frame.actual_l_run_count,
         "blocked_same_turn_l_reroute_request_count": frame.blocked_same_turn_l_reroute_request_count,
         "l_internal_revision_count": frame.l_internal_revision_count,
+        "memory_relevance_candidate_count": frame.memory_relevance_candidate_count,
+        "memory_relevance_selected_count": frame.memory_relevance_selected_count,
+        "selected_recent_memory_context_count": frame.selected_recent_memory_context_count,
+        "missing_selected_memory_context_count": frame.missing_selected_memory_context_count,
     }.items():
         if not isinstance(value, int):
             raise TypeError(f"Node2HandoffFrame.{field_name} must be an integer")
@@ -1032,6 +1353,66 @@ def validate_node2_handoff_frame(frame: Node2HandoffFrame) -> None:
         raise ValueError(
             "Node2HandoffFrame.empty_document_extract_record_count must not exceed raw_document_extract_record_count"
         )
+    if frame.memory_relevance_selection_status not in (
+        MEMORY_RELEVANCE_SELECTION_STATUSES | {"not_recorded"}
+    ):
+        raise ValueError(
+            "unknown Node2HandoffFrame.memory_relevance_selection_status: "
+            f"{frame.memory_relevance_selection_status}"
+        )
+    if frame.memory_relevance_selected_count > frame.memory_relevance_candidate_count:
+        raise ValueError(
+            "Node2HandoffFrame.memory_relevance_selected_count must not exceed candidate count"
+        )
+    if frame.memory_relevance_selection_frame_id is not None:
+        if not frame.memory_relevance_selection_frame_id:
+            raise ValueError("Node2HandoffFrame.memory_relevance_selection_frame_id must not be empty")
+        if frame.memory_relevance_selection_frame_id not in frame.source_data_ids:
+            raise ValueError(
+                "Node2HandoffFrame.source_data_ids must include memory_relevance_selection_frame_id"
+            )
+        if frame.memory_relevance_selection_status == "not_recorded":
+            raise ValueError("memory relevance frame id requires a recorded selection status")
+        if not frame.memory_relevance_info_class:
+            raise ValueError("memory relevance frame id requires memory_relevance_info_class")
+        if not frame.memory_relevance_generated_by:
+            raise ValueError("memory relevance frame id requires memory_relevance_generated_by")
+    else:
+        if frame.memory_relevance_selection_status != "not_recorded":
+            raise ValueError("memory relevance selection status requires a frame id")
+        if frame.memory_relevance_candidate_count != 0 or frame.memory_relevance_selected_count != 0:
+            raise ValueError("not_recorded memory relevance selection must have zero counts")
+    if frame.memory_relevance_selection_status == "selected":
+        if frame.memory_relevance_selected_count < 1:
+            raise ValueError("selected memory relevance handoff must include selected count")
+        if frame.memory_relevance_info_class != "mixed":
+            raise ValueError("selected memory relevance handoff must preserve info_class=mixed")
+    if frame.memory_relevance_selection_status in {"none_selected", "failed", "not_recorded"}:
+        if frame.memory_relevance_selected_count != 0:
+            raise ValueError("non-selected memory relevance handoff must not include selected count")
+    if frame.memory_relevance_selection_status in {"selected", "none_selected"}:
+        if frame.memory_relevance_candidate_count > 0 and not frame.memory_relevance_generated_by.startswith("LLM:"):
+            raise ValueError("LLM memory relevance status must preserve generated_by=LLM:*")
+    if frame.selected_recent_memory_context_frame_id is not None:
+        if not frame.selected_recent_memory_context_frame_id:
+            raise ValueError(
+                "Node2HandoffFrame.selected_recent_memory_context_frame_id must not be empty"
+            )
+        if frame.selected_recent_memory_context_frame_id not in frame.source_data_ids:
+            raise ValueError(
+                "Node2HandoffFrame.source_data_ids must include selected recent memory context frame id"
+            )
+        if frame.selected_recent_memory_context_generated_by != (
+            "CODE:SELECTED_RECENT_MEMORY_CONTEXT_BUILDER"
+        ):
+            raise ValueError("selected recent memory context must reveal code builder")
+        if frame.selected_recent_memory_context_info_class != "absolute_copied_context":
+            raise ValueError("selected recent memory context must be absolute_copied_context")
+    else:
+        if frame.selected_recent_memory_context_count != 0:
+            raise ValueError("missing selected recent memory context frame id requires zero count")
+        if frame.missing_selected_memory_context_count != 0:
+            raise ValueError("missing selected recent memory context frame id requires zero missing count")
     if frame.node2_input_frame_id not in frame.source_data_ids:
         raise ValueError("Node2HandoffFrame.source_data_ids must include node2_input_frame_id")
     if frame.final_memory_packet_id not in frame.source_data_ids:
@@ -1082,6 +1463,40 @@ class Node3BriefClaim:
 
 
 @dataclass
+class Node3MemorySelectionMaterial:
+    """node_3가 기억 선택 결과를 판단 출처와 함께 볼 수 있게 하는 짧은 재료."""
+
+    selected_memory_count: int = 0
+    memory_selection_status: str = "not_recorded"
+    memory_selection_reason: str = ""
+    memory_selection_info_class: str = ""
+    memory_selection_source_mode: str = ""
+    memory_selection_claim_alignment: str = ""
+    selected_candidate_turn_ids: list[str] = field(default_factory=list)
+    source_memory_item_ids: list[str] = field(default_factory=list)
+    source_data_id: str = ""
+    generated_by: str = ""
+
+
+@dataclass
+class Node3SelectedRecentMemoryContext:
+    """node_3에게 넘길 선택된 이전 턴 raw 대화 복사본."""
+
+    source_turn_id: str
+    raw_user_text: str
+    raw_assistant_text: str
+    raw_user_text_chars: int
+    raw_assistant_text_chars: int
+    raw_user_text_truncated: bool
+    raw_assistant_text_truncated: bool
+    selection_status: str
+    selection_info_class: str
+    selection_reason: str
+    selection_reason_generated_by: str
+    copied_from: str = ""
+
+
+@dataclass
 class Node3BriefRuntimeTask:
     """node_3가 현재 턴 실행 순서를 설명할 때 사용할 수 있는 task 요약."""
 
@@ -1118,6 +1533,8 @@ class Node3InputBriefFrame:
     # 내부 추적 ID 대신 사람이 읽을 수 있는 문서명만 넣는다.
     search_candidate_documents: list[str] = field(default_factory=list)
     allowed_claims: list[Node3BriefClaim] = field(default_factory=list)
+    memory_selection_material: Node3MemorySelectionMaterial | None = None
+    selected_recent_memory_contexts: list[Node3SelectedRecentMemoryContext] = field(default_factory=list)
     runtime_tasks: list[Node3BriefRuntimeTask] = field(default_factory=list)
     reporting_rules: list[str] = field(default_factory=list)
     insufficiency_reasons: list[str] = field(default_factory=list)
@@ -1160,6 +1577,10 @@ def validate_node3_input_brief_frame(frame: Node3InputBriefFrame) -> None:
         _validate_node3_brief_document(document)
     for claim in frame.allowed_claims:
         _validate_node3_brief_claim(claim)
+    if frame.memory_selection_material is not None:
+        _validate_node3_memory_selection_material(frame.memory_selection_material)
+    for context in frame.selected_recent_memory_contexts:
+        _validate_node3_selected_recent_memory_context(context)
     for runtime_task in frame.runtime_tasks:
         _validate_node3_brief_runtime_task(runtime_task)
     for rule in frame.reporting_rules:
@@ -1196,6 +1617,98 @@ def _validate_node3_brief_claim(claim: Node3BriefClaim) -> None:
             raise ValueError(f"Node3BriefClaim.{field_name} must not be empty")
     if claim.info_class not in {"relative", "mixed"}:
         raise ValueError(f"unknown Node3BriefClaim.info_class: {claim.info_class}")
+
+
+def _validate_node3_memory_selection_material(material: Node3MemorySelectionMaterial) -> None:
+    if material.memory_selection_status not in (
+        MEMORY_RELEVANCE_SELECTION_STATUSES | {"not_recorded"}
+    ):
+        raise ValueError(
+            "unknown Node3MemorySelectionMaterial.memory_selection_status: "
+            f"{material.memory_selection_status}"
+        )
+    if not isinstance(material.selected_memory_count, int):
+        raise TypeError("Node3MemorySelectionMaterial.selected_memory_count must be an integer")
+    if material.selected_memory_count < 0:
+        raise ValueError("Node3MemorySelectionMaterial.selected_memory_count must not be negative")
+    _validate_string_list(
+        "Node3MemorySelectionMaterial.selected_candidate_turn_ids",
+        material.selected_candidate_turn_ids,
+    )
+    _validate_string_list(
+        "Node3MemorySelectionMaterial.source_memory_item_ids",
+        material.source_memory_item_ids,
+    )
+    if material.memory_selection_status == "selected":
+        required_text_fields = {
+            "memory_selection_reason": material.memory_selection_reason,
+            "memory_selection_info_class": material.memory_selection_info_class,
+            "memory_selection_source_mode": material.memory_selection_source_mode,
+            "memory_selection_claim_alignment": material.memory_selection_claim_alignment,
+            "source_data_id": material.source_data_id,
+            "generated_by": material.generated_by,
+        }
+        for field_name, value in required_text_fields.items():
+            if not value:
+                raise ValueError(f"Node3MemorySelectionMaterial.{field_name} must not be empty")
+        if material.memory_selection_info_class != "mixed":
+            raise ValueError("selected memory material must preserve info_class=mixed")
+        if material.memory_selection_source_mode != "source_bundle":
+            raise ValueError("selected memory material must preserve source_mode=source_bundle")
+        if material.memory_selection_claim_alignment != "multi_source_bundle":
+            raise ValueError(
+                "selected memory material must preserve claim_alignment=multi_source_bundle"
+            )
+        if material.selected_memory_count != len(material.selected_candidate_turn_ids):
+            raise ValueError(
+                "selected memory material count must match selected_candidate_turn_ids"
+            )
+        if material.selected_memory_count < 1:
+            raise ValueError("selected memory material must include at least one selection")
+    else:
+        if material.selected_memory_count != 0:
+            raise ValueError("non-selected memory material must have selected_memory_count=0")
+        if material.selected_candidate_turn_ids:
+            raise ValueError("non-selected memory material must not include selected turn ids")
+    if material.memory_selection_status != "not_recorded" and not material.source_data_id:
+        raise ValueError("recorded memory selection material must include source_data_id")
+
+
+def _validate_node3_selected_recent_memory_context(
+    context: Node3SelectedRecentMemoryContext,
+) -> None:
+    for field_name, value in {
+        "source_turn_id": context.source_turn_id,
+        "selection_status": context.selection_status,
+        "selection_info_class": context.selection_info_class,
+        "selection_reason": context.selection_reason,
+        "selection_reason_generated_by": context.selection_reason_generated_by,
+    }.items():
+        if not value:
+            raise ValueError(f"Node3SelectedRecentMemoryContext.{field_name} must not be empty")
+    if context.selection_status != "selected":
+        raise ValueError("Node3 selected recent memory contexts must come from selected status")
+    if context.selection_info_class != "mixed":
+        raise ValueError("Node3 selected recent memory context must preserve mixed info_class")
+    for field_name, value in {
+        "raw_user_text_chars": context.raw_user_text_chars,
+        "raw_assistant_text_chars": context.raw_assistant_text_chars,
+    }.items():
+        if not isinstance(value, int):
+            raise TypeError(f"Node3SelectedRecentMemoryContext.{field_name} must be an integer")
+        if value < 0:
+            raise ValueError(f"Node3SelectedRecentMemoryContext.{field_name} must be >= 0")
+    if len(context.raw_user_text) > context.raw_user_text_chars:
+        raise ValueError("Node3 selected recent memory raw_user_text exceeds original chars")
+    if len(context.raw_assistant_text) > context.raw_assistant_text_chars:
+        raise ValueError("Node3 selected recent memory raw_assistant_text exceeds original chars")
+    if not context.raw_user_text_truncated and len(context.raw_user_text) != context.raw_user_text_chars:
+        raise ValueError("Node3 untruncated raw_user_text length must match original chars")
+    if (
+        not context.raw_assistant_text_truncated
+        and len(context.raw_assistant_text) != context.raw_assistant_text_chars
+    ):
+        raise ValueError("Node3 untruncated raw_assistant_text length must match original chars")
 
 
 def _validate_node3_brief_runtime_task(runtime_task: Node3BriefRuntimeTask) -> None:

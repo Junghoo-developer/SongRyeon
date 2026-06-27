@@ -1,6 +1,7 @@
 ﻿from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
@@ -32,21 +33,31 @@ KNOWN_SCHEMA_STATUSES = {
     "not_checked",
 }
 
+TraceEventSink = Callable[[TraceEvent], None]
+
 
 class TraceStore:
     """TraceEvent를 메모리에 쌓고 JSON으로 저장/복원하는 최소 저장소."""
 
-    def __init__(self, events: Iterable[TraceEvent] | None = None) -> None:
+    def __init__(
+        self,
+        events: Iterable[TraceEvent] | None = None,
+        *,
+        on_event: TraceEventSink | None = None,
+    ) -> None:
         # 실행 순서를 보존하기 위해 list를 원본 저장소로 둔다.
         self._events: list[TraceEvent] = []
         # event_id로 빠르게 찾고, 중복 ID를 막기 위해 index를 별도로 둔다.
         self._event_index: dict[str, TraceEvent] = {}
+        # live trace 같은 관측 기능이 새 event를 즉시 볼 수 있게 하는 선택 hook이다.
+        self._on_event = on_event
 
         # 이미 만들어진 TraceEvent 목록을 받아 초기화할 수 있게 한다.
+        # 과거 trace 복원은 실시간 실행이 아니므로 callback을 호출하지 않는다.
         for event in events or []:
-            self.add_event(event)
+            self.add_event(event, notify=False)
 
-    def add_event(self, event: TraceEvent) -> TraceEvent:
+    def add_event(self, event: TraceEvent, *, notify: bool = True) -> TraceEvent:
         """이미 만들어진 TraceEvent를 저장소에 추가한다."""
 
         # event_id는 trace 조각의 신분증이므로 중복되면 전체 추적이 흔들린다.
@@ -56,6 +67,8 @@ class TraceStore:
         self._validate_event(event)
         self._events.append(event)
         self._event_index[event.event_id] = event
+        if notify and self._on_event is not None:
+            self._on_event(event)
         return event
 
     def create_event(

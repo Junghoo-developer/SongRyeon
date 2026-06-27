@@ -17,6 +17,14 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
         f"- 상태: {result.get('status', 'unknown')}",
         f"- trace/data: {result.get('trace_count', 0)} / {result.get('data_record_count', 0)}",
     ]
+    session_memory = result.get("session_memory")
+    if isinstance(session_memory, dict):
+        lines.append(
+            "- session_memory: "
+            f"recent_raw_conversation={session_memory.get('recent_raw_conversation_count', 0)} / "
+            f"previous_turn_capsules={session_memory.get('previous_turn_capsule_count', 0)} / "
+            f"current_turn_id={session_memory.get('current_turn_id', result.get('turn_id', 'unknown'))}"
+        )
 
     task_frames = _payloads_with_type(result, "task_ledger:task_frame")
     task_results = _payloads_with_type(result, "task_ledger:task_result_frame")
@@ -116,12 +124,56 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
             target = packet.get("target", "unknown")
             mode = packet.get("mode", "unknown")
             evidence_count = _list_count(packet.get("evidence_trace_ids"))
+            memory_items = packet.get("memory_items")
+            previous_capsule_count = _memory_item_type_count(
+                memory_items,
+                "previous_turn_capsule_index",
+            )
+            raw_alignment_count = _memory_item_type_count(
+                memory_items,
+                "recent_raw_conversation_capsule_alignment",
+            )
+            relevance_candidate_count = _list_count(packet.get("relevance_candidate_frames"))
+            compression_candidate_frames = packet.get("compression_candidate_frames")
+            compression_candidate_count = _list_count(compression_candidate_frames)
             operation_label = packet.get("operation_label") or packet.get("compression_summary")
             source = packet.get("packet_id", "unknown")
+            relevance_suffix = (
+                f" / relevance_candidates {relevance_candidate_count}개"
+                if relevance_candidate_count
+                else ""
+            )
+            compression_suffix = (
+                f" / compression_frames {compression_candidate_count}개"
+                if compression_candidate_count
+                else ""
+            )
             lines.append(
                 f"  - source={source} / {mode} -> {target}: "
-                f"trace {evidence_count}개 / operation_label={operation_label}"
+                f"trace {evidence_count}개{relevance_suffix}{compression_suffix} "
+                f"/ operation_label={operation_label}"
             )
+            if previous_capsule_count or raw_alignment_count or relevance_candidate_count:
+                lines.append(
+                    "    "
+                    "memory_items: "
+                    f"previous_turn_capsule_index={previous_capsule_count} / "
+                    f"recent_raw_conversation_capsule_alignment={raw_alignment_count} / "
+                    f"recent_memory_relevance_candidate={relevance_candidate_count}"
+                )
+            if isinstance(compression_candidate_frames, list):
+                for frame in compression_candidate_frames:
+                    if not isinstance(frame, dict):
+                        continue
+                    lines.append(
+                        "    "
+                        "raw_memory_window: "
+                        f"status={frame.get('candidate_status', 'unknown')} / "
+                        f"raw={frame.get('raw_conversation_count', 0)} / "
+                        f"candidate={_list_count(frame.get('candidate_turn_ids'))} / "
+                        f"retained={_list_count(frame.get('retained_raw_turn_ids'))} / "
+                        f"older={frame.get('older_unmanaged_raw_turn_count', 0)}"
+                    )
             lines.extend(
                 _metainfo_lines(
                     indent=4,
@@ -130,6 +182,97 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
                     source_data_ids=_source_data_ids(packet, fallback=[source]),
                     semantic_judgement_status=str(
                         packet.get("llm_semantic_summary_status") or "not_run"
+                    ),
+                )
+            )
+
+    relevance_selection_frames = _payloads_with_type(
+        result,
+        "node_output:memory_relevance_selection_frame",
+    )
+    if relevance_selection_frames:
+        lines.append("- 최근 기억 selector:")
+        for frame in relevance_selection_frames:
+            lines.append(
+                "  - "
+                "memory_relevance_selection: "
+                f"status={frame.get('selection_status', 'unknown')} / "
+                f"candidates={_list_count(frame.get('candidate_frame_ids'))} / "
+                f"selected={_list_count(frame.get('selected_candidate_frame_ids'))} / "
+                f"generated_by={frame.get('generated_by', 'unknown')}"
+            )
+            lines.append(
+                "    "
+                f"source={frame.get('frame_id', 'unknown')} / "
+                f"judged_by={frame.get('judged_by')} / "
+                f"llm_call={frame.get('llm_call_data_id')} / "
+                f"reason={frame.get('selection_reason', '')}"
+            )
+            lines.extend(
+                _metainfo_lines(
+                    indent=4,
+                    generated_by=str(frame.get("generated_by") or "unknown"),
+                    info_class=str(frame.get("info_class") or "unknown"),
+                    source_data_ids=_source_data_ids(
+                        frame,
+                        fallback=[
+                            str(
+                                frame.get("source_memory_packet_id")
+                                or "memory_packet:node_1:pre_route_report"
+                            )
+                        ],
+                    ),
+                    semantic_judgement_status=(
+                        "ran"
+                        if frame.get("judged_by")
+                        else str(frame.get("selection_status") or "not_run")
+                    ),
+                )
+            )
+
+    selected_context_frames = _payloads_with_type(
+        result,
+        "node_output:selected_recent_memory_context_frame",
+    )
+    if selected_context_frames:
+        lines.append("- selected recent memory context:")
+        for frame in selected_context_frames:
+            items = frame.get("items")
+            copied_count = _list_count(items)
+            missing_count = frame.get("missing_selected_memory_context_count", 0)
+            lines.append(
+                "  - "
+                f"status={frame.get('selection_status', 'unknown')} / "
+                f"copied={copied_count} / "
+                f"missing={missing_count} / "
+                f"generated_by={frame.get('generated_by', 'unknown')}"
+            )
+            if isinstance(items, list):
+                for item in items[:3]:
+                    if not isinstance(item, dict):
+                        continue
+                    lines.append(
+                        "    "
+                        f"turn={item.get('source_turn_id', 'unknown')} / "
+                        f"user_chars={item.get('raw_user_text_chars', 0)}"
+                        f"{' truncated' if item.get('raw_user_text_truncated') else ''} / "
+                        f"assistant_chars={item.get('raw_assistant_text_chars', 0)}"
+                        f"{' truncated' if item.get('raw_assistant_text_truncated') else ''}"
+                    )
+            lines.extend(
+                _metainfo_lines(
+                    indent=4,
+                    generated_by=str(
+                        frame.get("generated_by")
+                        or "CODE:SELECTED_RECENT_MEMORY_CONTEXT_BUILDER"
+                    ),
+                    info_class=str(frame.get("info_class") or "absolute_copied_context"),
+                    source_data_ids=_source_data_ids(
+                        frame,
+                        fallback=[str(frame.get("selection_frame_id") or "")],
+                    ),
+                    semantic_judgement_status=str(
+                        frame.get("semantic_judgement_status") or "not_run"
                     ),
                 )
             )
@@ -569,6 +712,15 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
                 f"raw_extract_records={raw_extract_count if isinstance(raw_extract_count, int) else route2_handoff.get('read_doc_count', 0)} / "
                 f"empty_extract_records={empty_extract_count if isinstance(empty_extract_count, int) else 0}"
             )
+        memory_selection_status = route2_handoff.get("memory_relevance_selection_status")
+        if isinstance(memory_selection_status, str) and memory_selection_status:
+            lines.append(
+                "  - memory_relevance_selection: "
+                f"status={memory_selection_status} / "
+                f"candidates={route2_handoff.get('memory_relevance_candidate_count', 0)} / "
+                f"selected={route2_handoff.get('memory_relevance_selected_count', 0)} / "
+                f"generated_by={route2_handoff.get('memory_relevance_generated_by', '')}"
+            )
         actual_l_runs = route2_handoff.get("actual_l_run_count")
         blocked_l_requests = route2_handoff.get("blocked_same_turn_l_reroute_request_count")
         if isinstance(actual_l_runs, int) or isinstance(blocked_l_requests, int):
@@ -632,23 +784,41 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
         read_documents = node3_brief.get("read_documents")
         search_candidate_documents = node3_brief.get("search_candidate_documents")
         allowed_claims = node3_brief.get("allowed_claims")
+        memory_selection_material = node3_brief.get("memory_selection_material")
+        selected_recent_memory_contexts = node3_brief.get("selected_recent_memory_contexts")
         runtime_tasks = node3_brief.get("runtime_tasks")
         doc_count = len(read_documents) if isinstance(read_documents, list) else 0
         search_candidate_count = (
             len(search_candidate_documents) if isinstance(search_candidate_documents, list) else 0
         )
         claim_count = len(allowed_claims) if isinstance(allowed_claims, list) else 0
+        selected_context_count = (
+            len(selected_recent_memory_contexts)
+            if isinstance(selected_recent_memory_contexts, list)
+            else 0
+        )
         runtime_task_count = len(runtime_tasks) if isinstance(runtime_tasks, list) else 0
         lines.append(
             "- node_3 input brief: "
             f"{node3_brief.get('brief_status', 'unknown')} / "
             f"reportable_documents={doc_count} / search_candidates={search_candidate_count} / "
             f"claims={claim_count} / "
+            f"selected_memory_contexts={selected_context_count} / "
             f"runtime_tasks={runtime_task_count}"
         )
         reasons = node3_brief.get("insufficiency_reasons")
         if isinstance(reasons, list) and reasons:
             lines.append(f"  - insufficiency: {reasons}")
+        if isinstance(memory_selection_material, dict):
+            lines.append(
+                "  - memory selection material: "
+                f"status={memory_selection_material.get('memory_selection_status', 'unknown')} / "
+                f"selected={memory_selection_material.get('selected_memory_count', 0)} / "
+                f"info_class={memory_selection_material.get('memory_selection_info_class', '')} / "
+                f"generated_by={memory_selection_material.get('generated_by', '')}"
+            )
+        if selected_context_count:
+            lines.append(f"  - selected recent memory contexts: {selected_context_count}")
         lines.extend(
             _metainfo_lines(
                 indent=2,
@@ -712,6 +882,18 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
             f"checked={checked_count} / unsupported={unsupported_count} / "
             f"contradictions={contradiction_count}"
         )
+        recent_memory_guard_status = node4_gate.get("recent_memory_guard_status")
+        if isinstance(recent_memory_guard_status, str) and recent_memory_guard_status:
+            lines.append(
+                "  - recent memory guard: "
+                f"{recent_memory_guard_status} / "
+                f"claims={node4_gate.get('recent_memory_claim_count', 0)} / "
+                f"unsupported={node4_gate.get('unsupported_recent_memory_claim_count', 0)} / "
+                f"internal_id_leak={node4_gate.get('recent_memory_internal_id_leak_count', 0)}"
+            )
+            reason_codes = node4_gate.get("recent_memory_guard_reason_codes")
+            if isinstance(reason_codes, list) and reason_codes:
+                lines.append(f"    reason_codes: {reason_codes}")
         contradictions = node4_gate.get("contradictions")
         if isinstance(contradictions, list) and contradictions:
             lines.append("  - contradiction details:")
@@ -1212,6 +1394,16 @@ def _top_search_docs(search_payload: dict[str, object], *, limit: int) -> list[d
 
 def _list_count(value: object) -> int:
     return len(value) if isinstance(value, list) else 0
+
+
+def _memory_item_type_count(value: object, item_type: str) -> int:
+    if not isinstance(value, list):
+        return 0
+    return sum(
+        1
+        for item in value
+        if isinstance(item, dict) and item.get("item_type") == item_type
+    )
 
 
 def _extract_doc_summary(read_payload: dict[str, object]) -> list[str]:

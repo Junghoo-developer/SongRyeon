@@ -36,6 +36,60 @@ class BrokenJSONFakeLLMAdapter:
         )
 
 
+class MemoryRelevanceSelectedFakeLLMAdapter:
+    """Memory relevance selector selected smoke용 adapter."""
+
+    model_id = "memory-relevance-selected-fake-llm-adapter"
+
+    def complete(self, request: LLMRequest) -> LLMResponse:
+        candidates = request.input_payload.get("relevance_candidate_frames")
+        first_candidate = candidates[0] if isinstance(candidates, list) and candidates else {}
+        frame_id = (
+            first_candidate.get("frame_id")
+            if isinstance(first_candidate, dict)
+            else None
+        )
+        turn_id = (
+            first_candidate.get("candidate_turn_id")
+            if isinstance(first_candidate, dict)
+            else None
+        )
+        payload = {
+            "selection_status": "selected" if frame_id and turn_id else "none_selected",
+            "selected_candidate_turn_ids": [turn_id] if isinstance(turn_id, str) and turn_id else [],
+            "selected_candidate_frame_ids": [frame_id] if isinstance(frame_id, str) and frame_id else [],
+            "selection_reason": (
+                "fake selector selected the first supplied candidate for smoke testing."
+                if frame_id and turn_id
+                else "fake selector received no candidates."
+            ),
+        }
+        return LLMResponse(
+            text=json.dumps(payload, ensure_ascii=False),
+            model_id=self.model_id,
+            raw=payload,
+        )
+
+
+class MemoryRelevanceNoneSelectedFakeLLMAdapter:
+    """Memory relevance selector none_selected smoke용 adapter."""
+
+    model_id = "memory-relevance-none-selected-fake-llm-adapter"
+
+    def complete(self, request: LLMRequest) -> LLMResponse:
+        payload = {
+            "selection_status": "none_selected",
+            "selected_candidate_turn_ids": [],
+            "selected_candidate_frame_ids": [],
+            "selection_reason": "fake selector intentionally selected no candidates for smoke testing.",
+        }
+        return LLMResponse(
+            text=json.dumps(payload, ensure_ascii=False),
+            model_id=self.model_id,
+            raw=payload,
+        )
+
+
 class QueryPlannerFakeLLMAdapter:
     """L2 query planner smoke test용 adapter."""
 
@@ -222,6 +276,8 @@ class SongRyeonAllNodesFakeLLMAdapter:
             payload = self._node_3_payload(request)
         elif "node_4 Gatekeeper" in prompt:
             payload = self._node_4_payload()
+        elif "Memory Relevance Selector" in prompt:
+            payload = MemoryRelevanceNoneSelectedFakeLLMAdapter().complete(request).raw
         elif "L2" in prompt or "query" in prompt.lower():
             payload = QueryPlannerFakeLLMAdapter().complete(request).raw
         else:
@@ -234,11 +290,18 @@ class SongRyeonAllNodesFakeLLMAdapter:
 
     def _node_1_payload(self, request: LLMRequest) -> dict[str, object]:
         user_input = str(request.input_payload.get("user_input") or "")
-        route = (
-            "L"
-            if any(keyword in user_input for keyword in ("문서", "검색", "기억", "송련", "너는", "누구", "정체", "소개"))
-            else "2"
+        selected_recent_memory_count = self._selected_recent_memory_count(request.input_payload)
+        document_required = any(
+            keyword in user_input
+            for keyword in ("문서", "검색", "내부", "송련", "너는", "누구", "정체", "소개")
         )
+        memory_lookup_requested = any(keyword in user_input for keyword in ("기억", "방금", "이전"))
+        if selected_recent_memory_count > 0 and not document_required:
+            route = "2"
+        elif document_required or memory_lookup_requested:
+            route = "L"
+        else:
+            route = "2"
         return {
             "route": route,
             "route_reason": "사용자 입력이 내부 문서/기억 확인과 연결되는지 기준으로 라우팅했다.",
@@ -247,6 +310,13 @@ class SongRyeonAllNodesFakeLLMAdapter:
             "needs_more_memory": False,
             "policy_flag": None,
         }
+
+    def _selected_recent_memory_count(self, input_payload: dict[str, object]) -> int:
+        context = input_payload.get("recent_memory_router_context")
+        if not isinstance(context, dict):
+            return 0
+        value = context.get("selected_recent_memory_context_count")
+        return value if isinstance(value, int) else 0
 
     def _l1_payload(self) -> dict[str, object]:
         return {
@@ -301,10 +371,25 @@ class SongRyeonAllNodesFakeLLMAdapter:
         extracts = request.input_payload.get("read_documents")
         if not isinstance(extracts, list):
             extracts = request.input_payload.get("document_extracts")
+        selected_contexts = request.input_payload.get("selected_recent_memory_contexts")
         read_count = int(request.input_payload.get("available_document_extract_count") or 0)
         search_candidate_count = int(request.input_payload.get("available_search_candidate_document_count") or 0)
         runtime_task_count = int(request.input_payload.get("available_runtime_task_count") or 0)
-        if isinstance(extracts, list) and extracts:
+        if isinstance(selected_contexts, list) and selected_contexts:
+            first_context = selected_contexts[0] if isinstance(selected_contexts[0], dict) else {}
+            raw_user_text = str(first_context.get("raw_user_text") or "")
+            raw_assistant_text = str(first_context.get("raw_assistant_text") or "")
+            combined = f"{raw_user_text}\n{raw_assistant_text}"
+            if "파란노트" in combined:
+                body_markdown = (
+                    "선택된 최근 기억에 따르면, 네가 방금 말한 테스트 암호는 `파란노트`야.\n\n"
+                    "근거 기준: 선택된 최근 기억의 복사된 이전 턴 원문 안에 그 표현이 있어."
+                )
+            else:
+                body_markdown = (
+                    "선택된 최근 기억은 들어왔지만, 그 복사본 안에서 테스트 암호를 확정할 수는 없어."
+                )
+        elif isinstance(extracts, list) and extracts:
             first = extracts[0] if isinstance(extracts[0], dict) else {}
             doc_id = first.get("document_name") or first.get("doc_id") or "읽은 문서"
             text = str(first.get("text") or "").strip()

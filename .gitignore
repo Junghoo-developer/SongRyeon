@@ -27,3 +27,4 @@ desktop.ini
 
 # Large or disposable runtime exports
 Administrative_Reform_1/05_Execution_Records/runtime_runs/
+Administrative_Reform_1/05_Execution_Records/manual_qwen_order_trace_test_*/

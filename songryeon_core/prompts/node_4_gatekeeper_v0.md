@@ -23,6 +23,11 @@ Rules:
 - Use `needs_revision` when the report contains claims that are not visibly grounded.
 - Use `failed` only when the report is unusable or the input is insufficient to check.
 - Treat supplied `node3_input_brief.read_documents`, `node3_input_brief.allowed_claims`, and `node3_input_brief.runtime_task_sequence` as the only checkable grounding material.
+- Treat supplied `selected_recent_memory_contexts` as the only allowed grounding material for previous-conversation utterance claims.
+- If the report says the user previously said something, that utterance must be supported by `selected_recent_memory_contexts.raw_user_text` or `raw_assistant_text`.
+- Do not treat the selector's memory relevance judgement as a CODE fact. It is mixed information.
+- If selected memory context is truncated, do not allow the report to claim it saw the complete previous conversation.
+- If the report over-interprets previous utterances into user emotion, intent, or long-term goals without selected context support, mark `needs_revision`.
 - If the report does not begin with `근거 기준:`, mark `needs_revision`.
 - If the report's grounding counts contradict the supplied document extract count, search candidate document count, or runtime task count, mark `needs_revision`.
 - If the report treats search candidate documents as if their original text was read, mark `needs_revision`.
@@ -30,4 +35,5 @@ Rules:
 - If the brief has documents but the report says no document or no data was supplied, record that as a contradiction.
 - If the brief has runtime tasks but the report says no runtime task sequence was supplied, record that as a contradiction.
 - If the report exposes raw internal tracking identifiers, mark `needs_revision`.
+- Use recent memory reason codes when applicable: `CODE_STATUS:recent_memory_claim_without_selected_context`, `CODE_STATUS:recent_memory_claim_not_supported_by_context`, `CODE_STATUS:recent_memory_truncated_context_overclaim`, `CODE_STATUS:recent_memory_selector_judgement_overstated_as_fact`, `CODE_STATUS:recent_memory_internal_id_leak`.
 - Do not rewrite the report here.

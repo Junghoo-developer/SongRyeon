@@ -9,10 +9,16 @@ from songryeon_core.core.schemas import (
     Node2HandoffFrame,
     Node3BriefClaim,
     Node3BriefDocument,
+    Node3MemorySelectionMaterial,
+    Node3SelectedRecentMemoryContext,
     Node3InputBriefFrame,
     Node3BriefRuntimeTask,
+    SelectedRecentMemoryContextFrame,
+    SelectedRecentMemoryContextItem,
+    ZeroState,
     validate_node2_handoff_frame,
     validate_node3_input_brief_frame,
+    validate_selected_recent_memory_context_frame,
 )
 from songryeon_core.core.trace_store import TraceStore
 from songryeon_core.loops.l_loop_namespace import LRunIds
@@ -20,6 +26,170 @@ from songryeon_core.loops.l_loop_namespace import LRunIds
 
 NODE2_HANDOFF_FRAME_DATA_ID = "node_2:handoff_frame"
 NODE3_INPUT_BRIEF_FRAME_DATA_ID = "node_3:input_brief_frame"
+SELECTED_MEMORY_RAW_USER_TEXT_MAX_CHARS = 800
+SELECTED_MEMORY_RAW_ASSISTANT_TEXT_MAX_CHARS = 1200
+SELECTED_MEMORY_MAX_ITEMS = 3
+
+
+def selected_recent_memory_context_frame_data_id(selection_frame_id: str) -> str:
+    return f"{selection_frame_id}:selected_recent_memory_context"
+
+
+def record_selected_recent_memory_context(
+    *,
+    trace_store: TraceStore,
+    data_store: DataStore,
+    turn_id: str,
+    zero_state: ZeroState,
+    selection_frame_id: str,
+    frame_id: str | None = None,
+) -> tuple[str, str, SelectedRecentMemoryContextFrame]:
+    """selector가 고른 이전 raw 대화를 요약 없이 node_3용 context frame으로 복사한다."""
+
+    context_frame_id = frame_id or selected_recent_memory_context_frame_data_id(
+        selection_frame_id
+    )
+    frame = build_selected_recent_memory_context_frame(
+        data_store=data_store,
+        turn_id=turn_id,
+        zero_state=zero_state,
+        selection_frame_id=selection_frame_id,
+        frame_id=context_frame_id,
+    )
+    validate_selected_recent_memory_context_frame(frame)
+    event = trace_store.create_event(
+        turn_id=turn_id,
+        actor="node_0",
+        event_type="node_output",
+        input_ref=frame.source_trace_ids,
+        output_ref=[context_frame_id],
+        schema_status="passed",
+    )
+    data_store.create_record(
+        data_id=context_frame_id,
+        data_type="node_output:selected_recent_memory_context_frame",
+        exists=True,
+        created_at=event.timestamp,
+        source_trace_id=event.event_id,
+        payload=asdict(frame),
+    )
+    return event.event_id, context_frame_id, frame
+
+
+def build_selected_recent_memory_context_frame(
+    *,
+    data_store: DataStore,
+    turn_id: str,
+    zero_state: ZeroState,
+    selection_frame_id: str,
+    frame_id: str | None = None,
+    max_items: int = SELECTED_MEMORY_MAX_ITEMS,
+    raw_user_text_max_chars: int = SELECTED_MEMORY_RAW_USER_TEXT_MAX_CHARS,
+    raw_assistant_text_max_chars: int = SELECTED_MEMORY_RAW_ASSISTANT_TEXT_MAX_CHARS,
+) -> SelectedRecentMemoryContextFrame:
+    """선택된 candidate turn_id와 정확히 일치하는 raw entry만 복사한다."""
+
+    context_frame_id = frame_id or selected_recent_memory_context_frame_data_id(
+        selection_frame_id
+    )
+    selection_record = data_store.get_record(selection_frame_id)
+    if selection_record is None or not isinstance(selection_record.payload, dict):
+        return SelectedRecentMemoryContextFrame(
+            frame_id=context_frame_id,
+            turn_id=turn_id,
+            selection_frame_id=selection_frame_id,
+            selection_status="not_recorded",
+            selected_turn_count=0,
+            items=[],
+            missing_selected_memory_context_count=0,
+            source_data_ids=[selection_frame_id],
+            source_trace_ids=[],
+        )
+
+    selection_payload = selection_record.payload
+    selection_status = _text(selection_payload, "selection_status", fallback="not_recorded")
+    source_memory_packet_id = _text(selection_payload, "source_memory_packet_id", fallback="")
+    source_data_ids = _unique_strings([selection_frame_id, source_memory_packet_id])
+    source_trace_ids = _string_list(selection_payload.get("source_trace_ids"))
+    if selection_status != "selected":
+        return SelectedRecentMemoryContextFrame(
+            frame_id=context_frame_id,
+            turn_id=turn_id,
+            selection_frame_id=selection_frame_id,
+            selection_status=selection_status,
+            selected_turn_count=0,
+            items=[],
+            missing_selected_memory_context_count=0,
+            source_data_ids=source_data_ids,
+            source_trace_ids=source_trace_ids,
+        )
+
+    packet_payload = _payload(data_store, source_memory_packet_id)
+    candidate_by_frame_id = _candidate_by_frame_id(packet_payload)
+    selected_frame_ids = _string_list(selection_payload.get("selected_candidate_frame_ids"))
+    raw_by_turn_id = _raw_conversation_by_turn_id(zero_state.recent_raw_conversation)
+
+    items: list[SelectedRecentMemoryContextItem] = []
+    missing_count = 0
+    for selected_frame_id in selected_frame_ids[:max_items]:
+        candidate = candidate_by_frame_id.get(selected_frame_id)
+        if candidate is None:
+            missing_count += 1
+            continue
+        source_turn_id = _text(candidate, "candidate_turn_id", fallback="")
+        raw_entry = raw_by_turn_id.get(source_turn_id)
+        if raw_entry is None:
+            missing_count += 1
+            continue
+        raw_user_text = _raw_conversation_text(raw_entry, "user") or ""
+        raw_assistant_text = _raw_conversation_text(raw_entry, "assistant") or ""
+        copied_user_text, user_truncated = _truncate(raw_user_text, raw_user_text_max_chars)
+        copied_assistant_text, assistant_truncated = _truncate(
+            raw_assistant_text,
+            raw_assistant_text_max_chars,
+        )
+        source_memory_item_id = _text(candidate, "source_memory_item_id", fallback="")
+        item_source_trace_ids = _unique_strings(
+            [
+                *_string_list(candidate.get("source_trace_ids")),
+                *_string_list(selection_payload.get("source_trace_ids")),
+            ]
+        )
+        item_source_data_ids = _unique_strings([selection_frame_id, source_memory_packet_id])
+        items.append(
+            SelectedRecentMemoryContextItem(
+                item_id=f"{context_frame_id}:item:{len(items) + 1:03d}",
+                source_turn_id=source_turn_id,
+                source_candidate_frame_id=selected_frame_id,
+                source_memory_item_id=source_memory_item_id,
+                raw_user_text=copied_user_text,
+                raw_assistant_text=copied_assistant_text,
+                raw_user_text_chars=len(raw_user_text),
+                raw_assistant_text_chars=len(raw_assistant_text),
+                raw_user_text_truncated=user_truncated,
+                raw_assistant_text_truncated=assistant_truncated,
+                copied_from=f"ZeroState.recent_raw_conversation[turn_id={source_turn_id}]",
+                selection_reason_source_data_id=selection_frame_id,
+                selection_info_class=_text(selection_payload, "info_class", fallback=""),
+                source_trace_ids=item_source_trace_ids,
+                source_data_ids=item_source_data_ids,
+            )
+        )
+
+    if len(selected_frame_ids) > max_items:
+        missing_count += len(selected_frame_ids) - max_items
+
+    return SelectedRecentMemoryContextFrame(
+        frame_id=context_frame_id,
+        turn_id=turn_id,
+        selection_frame_id=selection_frame_id,
+        selection_status=selection_status,
+        selected_turn_count=len(items),
+        items=items,
+        missing_selected_memory_context_count=missing_count,
+        source_data_ids=source_data_ids,
+        source_trace_ids=source_trace_ids,
+    )
 
 
 def record_route2_handoff(
@@ -34,6 +204,8 @@ def record_route2_handoff(
     turn_outcome_id: str,
     route_ids: list[str],
     l_loop_output_ids: list[str],
+    memory_relevance_selection_frame_id: str | None = None,
+    selected_recent_memory_context_frame_id: str | None = None,
     id_namespace: LRunIds | None = None,
 ) -> tuple[str, str]:
     """route=2 진입 시 0/code가 2에게 넘길 handoff 무결성 프레임을 기록한다."""
@@ -93,6 +265,14 @@ def record_route2_handoff(
         data_store,
         id_namespace=id_namespace,
     )
+    memory_relevance_summary = _memory_relevance_handoff_summary(
+        data_store=data_store,
+        selection_frame_id=memory_relevance_selection_frame_id,
+    )
+    selected_memory_context_summary = _selected_recent_memory_context_handoff_summary(
+        data_store=data_store,
+        context_frame_id=selected_recent_memory_context_frame_id,
+    )
 
     insufficiency_reasons: list[str] = []
     if node2_input_frame_id not in existing_data_ids:
@@ -122,6 +302,8 @@ def record_route2_handoff(
             node2_input_frame_id,
             final_memory_packet_id,
             turn_outcome_id,
+            memory_relevance_summary["frame_id"],
+            selected_memory_context_summary["frame_id"],
             *route_ids,
             *l_loop_output_ids,
             *_same_turn_l_reroute_controller_ids(data_store),
@@ -151,6 +333,22 @@ def record_route2_handoff(
         blocked_same_turn_l_reroute_request_count=blocked_reroute_count,
         same_turn_l_reroute_controller_decisions=controller_decisions,
         l_internal_revision_count=l_internal_revision_count,
+        memory_relevance_selection_frame_id=memory_relevance_summary["frame_id"],
+        memory_relevance_selection_status=str(memory_relevance_summary["status"]),
+        memory_relevance_candidate_count=int(memory_relevance_summary["candidate_count"]),
+        memory_relevance_selected_count=int(memory_relevance_summary["selected_count"]),
+        memory_relevance_info_class=str(memory_relevance_summary["info_class"]),
+        memory_relevance_generated_by=str(memory_relevance_summary["generated_by"]),
+        memory_relevance_llm_call_data_id=memory_relevance_summary["llm_call_data_id"],
+        selected_recent_memory_context_frame_id=selected_memory_context_summary["frame_id"],
+        selected_recent_memory_context_count=int(selected_memory_context_summary["count"]),
+        missing_selected_memory_context_count=int(selected_memory_context_summary["missing_count"]),
+        selected_recent_memory_context_generated_by=str(
+            selected_memory_context_summary["generated_by"]
+        ),
+        selected_recent_memory_context_info_class=str(
+            selected_memory_context_summary["info_class"]
+        ),
         brief_available=reportable_document_count > 0,
         insufficiency_reasons=insufficiency_reasons,
         source_trace_ids=[node2_input_trace_id],
@@ -202,6 +400,14 @@ def record_node3_input_brief(
         data_store,
         id_namespace=id_namespace,
     )
+    memory_selection_material = _node3_memory_selection_material(
+        data_store=data_store,
+        handoff_frame_id=handoff_frame_id,
+    )
+    selected_recent_memory_contexts = _node3_selected_recent_memory_contexts(
+        data_store=data_store,
+        handoff_frame_id=handoff_frame_id,
+    )
     runtime_tasks = _runtime_tasks(
         runtime_movements or [],
         assigned_model_by_node or {},
@@ -231,11 +437,31 @@ def record_node3_input_brief(
         for info_ref in boundary.mixed_info[:20]
     )
     insufficiency_reasons: list[str] = []
-    if not read_documents and not allowed_claims and not runtime_tasks:
+    has_selected_memory_material = (
+        memory_selection_material is not None
+        and memory_selection_material.selected_memory_count > 0
+    )
+    has_selected_memory_context = bool(selected_recent_memory_contexts)
+    if (
+        not read_documents
+        and not allowed_claims
+        and not runtime_tasks
+        and not has_selected_memory_material
+        and not has_selected_memory_context
+    ):
         insufficiency_reasons.append("no_document_or_claim_material")
 
     runtime_trace_ids = _runtime_task_trace_ids(runtime_movements or [])
     runtime_data_ids = _runtime_task_data_ids(runtime_movements or [])
+    memory_selection_source_data_id = (
+        memory_selection_material.source_data_id
+        if memory_selection_material is not None
+        else None
+    )
+    selected_memory_context_source_data_id = _selected_recent_memory_context_frame_id(
+        data_store=data_store,
+        handoff_frame_id=handoff_frame_id,
+    )
     frame = Node3InputBriefFrame(
         frame_id=brief_frame_id,
         turn_id=turn_id,
@@ -246,6 +472,8 @@ def record_node3_input_brief(
         search_candidate_count=len(search_candidate_documents),
         search_candidate_documents=search_candidate_documents,
         allowed_claims=allowed_claims,
+        memory_selection_material=memory_selection_material,
+        selected_recent_memory_contexts=selected_recent_memory_contexts,
         runtime_tasks=runtime_tasks,
         reporting_rules=[
             "사용자 질문에 직접 답한다.",
@@ -254,6 +482,10 @@ def record_node3_input_brief(
             "node_3 LLM은 읽은 문서 수, 검색 후보 문서 수, 현재 턴 실행 순서 자료 수를 직접 쓰지 않고 본문만 작성한다.",
             "검색 후보 문서는 원문을 읽은 문서가 아니다. 검색 후보만 보고 읽은 문서처럼 말하지 않는다.",
             "현재 턴 실행 순서 자료가 있으면 실행 순서와 작업 장부 설명의 근거로 사용할 수 있다.",
+            "기억 선택 결과가 있으면 LLM selector가 고른 mixed 판단으로만 취급하고, 선택된 과거 턴을 code 사실처럼 단정하지 않는다.",
+            "선택된 최근 기억 context가 있으면 raw_user_text/raw_assistant_text에 복사된 범위에서만 이전 대화를 언급한다.",
+            "선택된 최근 기억 context의 관련성은 selector의 mixed 판단이며 code fact가 아니다.",
+            "truncated=true인 최근 기억 context는 전체 이전 대화라고 단정하지 않는다.",
             "해석, 정의, 평가, 요약을 말할 때는 답변 안에 근거 기준을 짧게 밝히고, 문서/허용 주장/현재 턴 실행 순서 자료 중 무엇에 기대는지와 왜 그 근거로 말할 수 있는지 설명한다.",
             "너는 특정 내부 노드 그 자체가 아니라, 사용자에게 보고하는 송련의 최종 응답자 관점으로 말한다.",
             "node_0/node_1/node_2/node_3 같은 내부 역할명은 자기정체성으로 쓰지 않고, 필요할 때 실행 경로 설명에만 제한적으로 쓴다.",
@@ -262,7 +494,15 @@ def record_node3_input_brief(
         ],
         insufficiency_reasons=insufficiency_reasons,
         source_trace_ids=_unique_strings([*input_trace_ids, *runtime_trace_ids]),
-        source_data_ids=_unique_strings([handoff_frame_id, *source_data_ids, *runtime_data_ids]),
+        source_data_ids=_unique_strings(
+            [
+                handoff_frame_id,
+                *source_data_ids,
+                memory_selection_source_data_id,
+                selected_memory_context_source_data_id,
+                *runtime_data_ids,
+            ]
+        ),
     )
     validate_node3_input_brief_frame(frame)
     event = trace_store.create_event(
@@ -311,6 +551,26 @@ def node3_brief_llm_payload(frame: Node3InputBriefFrame) -> dict[str, object]:
             }
             for claim in frame.allowed_claims
         ],
+        "memory_selection": _node3_memory_selection_llm_payload(
+            frame.memory_selection_material
+        ),
+        "selected_recent_memory_contexts": [
+            {
+                "source_turn_id": context.source_turn_id,
+                "raw_user_text": context.raw_user_text,
+                "raw_assistant_text": context.raw_assistant_text,
+                "raw_user_text_chars": context.raw_user_text_chars,
+                "raw_assistant_text_chars": context.raw_assistant_text_chars,
+                "raw_user_text_truncated": context.raw_user_text_truncated,
+                "raw_assistant_text_truncated": context.raw_assistant_text_truncated,
+                "selection_status": context.selection_status,
+                "selection_info_class": context.selection_info_class,
+                "selection_reason": context.selection_reason,
+                "selection_reason_generated_by": context.selection_reason_generated_by,
+                "copied_from": context.copied_from,
+            }
+            for context in frame.selected_recent_memory_contexts
+        ],
         "available_runtime_task_count": len(frame.runtime_tasks),
         "runtime_task_sequence_note": (
             "This sequence is captured before node_3 report generation. "
@@ -334,6 +594,244 @@ def node3_brief_llm_payload(frame: Node3InputBriefFrame) -> dict[str, object]:
         ],
         "reporting_rules": list(frame.reporting_rules),
         "insufficiency_reasons": list(frame.insufficiency_reasons),
+    }
+
+
+def _memory_relevance_handoff_summary(
+    *,
+    data_store: DataStore,
+    selection_frame_id: str | None,
+) -> dict[str, object]:
+    if not selection_frame_id:
+        return {
+            "frame_id": None,
+            "status": "not_recorded",
+            "candidate_count": 0,
+            "selected_count": 0,
+            "info_class": "",
+            "generated_by": "",
+            "llm_call_data_id": None,
+        }
+
+    record = data_store.get_record(selection_frame_id)
+    if record is None or not isinstance(record.payload, dict):
+        return {
+            "frame_id": None,
+            "status": "not_recorded",
+            "candidate_count": 0,
+            "selected_count": 0,
+            "info_class": "",
+            "generated_by": "",
+            "llm_call_data_id": None,
+        }
+
+    payload = record.payload
+    llm_call_data_id = payload.get("llm_call_data_id")
+    return {
+        "frame_id": selection_frame_id,
+        "status": _text(payload, "selection_status", fallback="not_recorded"),
+        "candidate_count": len(_string_list(payload.get("candidate_frame_ids"))),
+        "selected_count": len(_string_list(payload.get("selected_candidate_frame_ids"))),
+        "info_class": _text(payload, "info_class", fallback=""),
+        "generated_by": _text(payload, "generated_by", fallback=""),
+        "llm_call_data_id": llm_call_data_id if isinstance(llm_call_data_id, str) else None,
+    }
+
+
+def _selected_recent_memory_context_handoff_summary(
+    *,
+    data_store: DataStore,
+    context_frame_id: str | None,
+) -> dict[str, object]:
+    if not context_frame_id:
+        return {
+            "frame_id": None,
+            "count": 0,
+            "missing_count": 0,
+            "generated_by": "",
+            "info_class": "",
+        }
+
+    record = data_store.get_record(context_frame_id)
+    if record is None or not isinstance(record.payload, dict):
+        return {
+            "frame_id": None,
+            "count": 0,
+            "missing_count": 0,
+            "generated_by": "",
+            "info_class": "",
+        }
+
+    payload = record.payload
+    count = payload.get("selected_turn_count")
+    missing_count = payload.get("missing_selected_memory_context_count")
+    return {
+        "frame_id": context_frame_id,
+        "count": count if isinstance(count, int) else 0,
+        "missing_count": missing_count if isinstance(missing_count, int) else 0,
+        "generated_by": _text(payload, "generated_by", fallback=""),
+        "info_class": _text(payload, "info_class", fallback=""),
+    }
+
+
+def _node3_memory_selection_material(
+    *,
+    data_store: DataStore,
+    handoff_frame_id: str,
+) -> Node3MemorySelectionMaterial | None:
+    handoff_record = data_store.get_record(handoff_frame_id)
+    if handoff_record is None or not isinstance(handoff_record.payload, dict):
+        return None
+
+    selection_frame_id = handoff_record.payload.get("memory_relevance_selection_frame_id")
+    if not isinstance(selection_frame_id, str) or not selection_frame_id:
+        return None
+
+    selection_record = data_store.get_record(selection_frame_id)
+    if selection_record is None or not isinstance(selection_record.payload, dict):
+        return None
+
+    payload = selection_record.payload
+    status = _text(payload, "selection_status", fallback="not_recorded")
+    selected_turn_ids = (
+        _string_list(payload.get("selected_candidate_turn_ids"))
+        if status == "selected"
+        else []
+    )
+    selected_frame_ids = (
+        _string_list(payload.get("selected_candidate_frame_ids"))
+        if status == "selected"
+        else []
+    )
+    source_memory_item_ids = _selected_source_memory_item_ids(
+        data_store=data_store,
+        selection_payload=payload,
+        selected_frame_ids=selected_frame_ids,
+    )
+    return Node3MemorySelectionMaterial(
+        selected_memory_count=len(selected_turn_ids),
+        memory_selection_status=status,
+        memory_selection_reason=_text(payload, "selection_reason", fallback=""),
+        memory_selection_info_class=_text(payload, "info_class", fallback=""),
+        memory_selection_source_mode=_text(payload, "source_mode", fallback=""),
+        memory_selection_claim_alignment=_text(payload, "claim_alignment", fallback=""),
+        selected_candidate_turn_ids=selected_turn_ids,
+        source_memory_item_ids=source_memory_item_ids if status == "selected" else [],
+        source_data_id=selection_frame_id,
+        generated_by=_text(payload, "generated_by", fallback=""),
+    )
+
+
+def _selected_recent_memory_context_frame_id(
+    *,
+    data_store: DataStore,
+    handoff_frame_id: str,
+) -> str | None:
+    handoff_record = data_store.get_record(handoff_frame_id)
+    if handoff_record is None or not isinstance(handoff_record.payload, dict):
+        return None
+    value = handoff_record.payload.get("selected_recent_memory_context_frame_id")
+    if isinstance(value, str) and value:
+        return value
+    return None
+
+
+def _node3_selected_recent_memory_contexts(
+    *,
+    data_store: DataStore,
+    handoff_frame_id: str,
+) -> list[Node3SelectedRecentMemoryContext]:
+    context_frame_id = _selected_recent_memory_context_frame_id(
+        data_store=data_store,
+        handoff_frame_id=handoff_frame_id,
+    )
+    if context_frame_id is None:
+        return []
+
+    context_record = data_store.get_record(context_frame_id)
+    if context_record is None or not isinstance(context_record.payload, dict):
+        return []
+
+    payload = context_record.payload
+    if _text(payload, "selection_status", fallback="") != "selected":
+        return []
+    selection_frame_id = _text(payload, "selection_frame_id", fallback="")
+    selection_payload = _payload(data_store, selection_frame_id)
+    selection_reason = _text(selection_payload, "selection_reason", fallback="")
+    selection_generated_by = _text(selection_payload, "generated_by", fallback="")
+    contexts: list[Node3SelectedRecentMemoryContext] = []
+    items = payload.get("items")
+    if not isinstance(items, list):
+        return contexts
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        contexts.append(
+            Node3SelectedRecentMemoryContext(
+                source_turn_id=_text(item, "source_turn_id", fallback=""),
+                raw_user_text=str(item.get("raw_user_text") or ""),
+                raw_assistant_text=str(item.get("raw_assistant_text") or ""),
+                raw_user_text_chars=_int(item, "raw_user_text_chars"),
+                raw_assistant_text_chars=_int(item, "raw_assistant_text_chars"),
+                raw_user_text_truncated=bool(item.get("raw_user_text_truncated")),
+                raw_assistant_text_truncated=bool(item.get("raw_assistant_text_truncated")),
+                selection_status=_text(payload, "selection_status", fallback="selected"),
+                selection_info_class=_text(item, "selection_info_class", fallback=""),
+                selection_reason=selection_reason,
+                selection_reason_generated_by=selection_generated_by,
+                copied_from=_text(item, "copied_from", fallback=""),
+            )
+        )
+    return contexts
+
+
+def _selected_source_memory_item_ids(
+    *,
+    data_store: DataStore,
+    selection_payload: dict[str, object],
+    selected_frame_ids: list[str],
+) -> list[str]:
+    if not selected_frame_ids:
+        return []
+
+    packet_id = selection_payload.get("source_memory_packet_id")
+    if not isinstance(packet_id, str) or not packet_id:
+        return _string_list(selection_payload.get("source_memory_item_ids"))
+
+    packet_record = data_store.get_record(packet_id)
+    if packet_record is None or not isinstance(packet_record.payload, dict):
+        return _string_list(selection_payload.get("source_memory_item_ids"))
+
+    candidates = packet_record.payload.get("relevance_candidate_frames")
+    if not isinstance(candidates, list):
+        return _string_list(selection_payload.get("source_memory_item_ids"))
+
+    selected_frame_id_set = set(selected_frame_ids)
+    source_memory_item_ids: list[str] = []
+    for candidate in candidates:
+        if not isinstance(candidate, dict):
+            continue
+        if candidate.get("frame_id") not in selected_frame_id_set:
+            continue
+        source_memory_item_id = candidate.get("source_memory_item_id")
+        if isinstance(source_memory_item_id, str) and source_memory_item_id:
+            source_memory_item_ids.append(source_memory_item_id)
+    return _unique_strings(source_memory_item_ids)
+
+
+def _node3_memory_selection_llm_payload(
+    material: Node3MemorySelectionMaterial | None,
+) -> dict[str, object] | None:
+    if material is None:
+        return None
+    return {
+        "selected_memory_count": material.selected_memory_count,
+        "memory_selection_status": material.memory_selection_status,
+        "memory_selection_reason": material.memory_selection_reason,
+        "memory_selection_info_class": material.memory_selection_info_class,
+        "memory_selection_source_mode": material.memory_selection_source_mode,
+        "memory_selection_claim_alignment": material.memory_selection_claim_alignment,
+        "generated_by": material.generated_by,
     }
 
 
@@ -595,6 +1093,82 @@ def _document_name(value: object) -> str:
         return "읽은 문서"
     normalized = value.replace("\\", "/").strip("/")
     return normalized.rsplit("/", 1)[-1] or "읽은 문서"
+
+
+def _payload(data_store: DataStore, data_id: str) -> dict[str, object]:
+    if not data_id:
+        return {}
+    record = data_store.get_record(data_id)
+    if record is None or not isinstance(record.payload, dict):
+        return {}
+    return record.payload
+
+
+def _candidate_by_frame_id(packet_payload: dict[str, object]) -> dict[str, dict[str, object]]:
+    candidates = packet_payload.get("relevance_candidate_frames")
+    if not isinstance(candidates, list):
+        return {}
+    result: dict[str, dict[str, object]] = {}
+    for candidate in candidates:
+        if not isinstance(candidate, dict):
+            continue
+        frame_id = candidate.get("frame_id")
+        if isinstance(frame_id, str) and frame_id:
+            result[frame_id] = candidate
+    return result
+
+
+def _raw_conversation_by_turn_id(
+    recent_raw_conversation: list[dict[str, str]],
+) -> dict[str, dict[str, str]]:
+    result: dict[str, dict[str, str]] = {}
+    for entry in recent_raw_conversation:
+        turn_id = _raw_conversation_text(entry, "turn_id")
+        if turn_id:
+            result[turn_id] = entry
+    return result
+
+
+def _raw_conversation_text(entry: dict[str, str], field_kind: str) -> str | None:
+    field_names_by_kind = {
+        "turn_id": ["turn_id"],
+        "user": ["raw_user_text", "user_text", "user_input", "user"],
+        "assistant": [
+            "raw_assistant_text",
+            "assistant_text",
+            "final_response",
+            "assistant",
+        ],
+    }
+    for field_name in field_names_by_kind.get(field_kind, []):
+        value = entry.get(field_name)
+        if isinstance(value, str):
+            return value
+    return None
+
+
+def _truncate(text: str, max_chars: int) -> tuple[str, bool]:
+    if len(text) <= max_chars:
+        return text, False
+    return text[:max_chars], True
+
+
+def _text(payload: dict[str, object], field_name: str, *, fallback: str) -> str:
+    value = payload.get(field_name)
+    if isinstance(value, str) and value.strip():
+        return value
+    return fallback
+
+
+def _int(payload: dict[str, object], field_name: str) -> int:
+    value = payload.get(field_name)
+    return value if isinstance(value, int) else 0
+
+
+def _string_list(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, str) and item]
 
 
 def _current_namespace_ids(

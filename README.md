@@ -92,10 +92,12 @@ agent-architecture
 
 ## Quick Start
 
-The default smoke test uses only the Python standard library.
+The full local baseline uses pytest as a dev/test dependency. The CLI smoke test itself still runs through `python main.py smoke-test`.
 
 ```powershell
+python -m pip install -r requirements-dev.txt
 python -m compileall songryeon_core main.py
+python -m pytest
 python main.py smoke-test
 ```
 
@@ -141,14 +143,23 @@ You can also point `QWEN_LOCAL_ENDPOINT` at an OpenAI-compatible local HTTP endp
 
 ## Current Baseline
 
-As of 2026-06-26:
+As of 2026-06-27:
 
 - `python -m compileall songryeon_core main.py` passes.
+- `python -m pytest` passes.
 - `python main.py smoke-test` passes.
+- Pytest has import, schema split compatibility, and domain smoke-case coverage.
 - Relative direct-field claims are tested.
 - Source-bundle planner claims remain mixed information.
 - Node 3 report grounding counts are code-supplied.
 - Node 4 can block unsafe or mismatched reports.
+
+Test layers:
+
+- `compileall`: syntax/import floor.
+- `pytest`: unit and domain regression checks.
+- `smoke-test`: integrated runtime baseline.
+- `qwen-turn` / `qwen-chat`: manual live LLM checks, not CI requirements.
 
 ## Repository Map
 

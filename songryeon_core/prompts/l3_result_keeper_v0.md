@@ -41,6 +41,11 @@ Rules:
 - Treat `evidence_counts.unique_search_result_document_count` as the number of unique documents that appeared in search results.
 - Treat `evidence_counts.read_document_count` and `read_doc_ids` as the only proof that document text was actually read.
 - Do not say "read", "viewed", "analyzed", or "relationship analysis completed" for search candidates whose document text was not in `read_document_previews`.
+- The L loop may have a wide search/read budget. Do not treat an old minimum such as two read documents as automatically sufficient when the user explicitly asks for broad coverage, "as many as possible", or several named ORDER/document identifiers.
+- If the user query names several explicit ORDER/document identifiers, judge coverage against those named targets using `read_doc_ids` and `read_document_previews`.
+- Reading an index, README, map, digest, or execution summary can support a partial overview, but it is not the same as reading each named source document.
+- If only some requested identifiers are visibly covered, or if coverage cannot be verified from the supplied read documents, use `partial` and explain what is still missing.
+- Return `achieved` only when the read documents are sufficient for node 3 to answer the user's actual requested scope, not merely because the controller produced `stop_success`.
 - If L1's macro goal asks for multiple read documents, random/exploratory reading, comparison, or relationship analysis, then:
   - `macro_achievement_status` should not be `achieved` when `evidence_counts.read_document_count` is less than 2.
   - If the L1 success condition is evidence-readiness for later node 3 analysis, judge whether enough original document extracts were read; do not require L3 itself to complete the final relationship analysis.

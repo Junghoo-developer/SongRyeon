@@ -12,12 +12,12 @@ from songryeon_core.core.trace_store import TraceEvent, TraceStore
 
 L_LOOP_BUDGET_PLAN_FRAME_DATA_ID = "L:budget_plan_frame"
 
-# MVP 단계의 하드 정책 한도다.
+# 문서 추적 테스트용 하드 정책 한도다.
 # L1은 이 값보다 큰 예산을 요청할 수 있지만, CODE:BUDGET_POLICY는 여기서 잘라낸다.
-SEARCH_TOP_K_CEILING = 6
-MAX_TOOL_CALLS_CEILING = 5
-MAX_READ_DOC_CALLS_CEILING = 3
-MAX_QUERY_ATTEMPTS_CEILING = 3
+SEARCH_TOP_K_CEILING = 12
+MAX_TOOL_CALLS_CEILING = 18
+MAX_READ_DOC_CALLS_CEILING = 10
+MAX_QUERY_ATTEMPTS_CEILING = 8
 
 # search_docs 뒤에 read_doc을 여러 번 태우려면 도구 호출 수가 같이 늘어야 한다.
 # 예: read_doc 2개 승인 => search_docs 1회 + read_doc 2회 = tool_calls 최소 3회.
