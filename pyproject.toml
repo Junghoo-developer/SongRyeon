@@ -1,0 +1,7 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-ra -p no:cacheprovider"
+markers = [
+  "smoke: existing integration smoke baseline",
+]

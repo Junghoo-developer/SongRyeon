@@ -58,6 +58,37 @@ MVP 구현은 다음 원칙을 따른다.
 6. pretty runtime에서 사용자가 꼭 봐야 할 내부 처리를 확인할 수 있어야 한다.
 7. smoke test 또는 재현 명령을 남긴다.
 
+## 검증 계층
+
+ORDER_117 이후 로컬 개발과 CI의 기본 기준선은 다음 순서다.
+
+```powershell
+python -m compileall songryeon_core main.py
+python -m pytest
+python main.py smoke-test
+```
+
+계층 이름:
+
+```text
+compileall: 문법/임포트 최소 검사
+pytest: 단위/도메인 회귀 검사
+smoke-test: 통합 런타임 기준선 검사
+qwen-turn/qwen-chat: 수동 live LLM 검사
+```
+
+작은 변경 전후에는 관련 pytest를 먼저 실행한다.
+구조 변경 후에는 전체 `python -m pytest`를 실행한다.
+release/public 기준선 전에는 `python main.py smoke-test`까지 실행한다.
+Qwen/Ollama live test는 로컬 수동 검사로 분리하고 CI 필수 조건으로 넣지 않는다.
+
+ORDER_112 같은 기능 구현은 다음 조건을 만족한 뒤 재개한다.
+
+- pytest baseline 존재
+- schema split 계획 또는 최소 1차 완료
+- smoke decomposition 시작
+- CI가 pytest와 smoke-test를 모두 실행
+
 ## 3단계: 학습 회고
 
 MVP 구현 후에는 다음을 기록한다.
@@ -84,14 +115,13 @@ MVP 구현 후에는 다음을 기록한다.
 
 ## 다음 기준선
 
-현재 기준선에서 다음 개발 후보는 다음 순서로 둔다.
+ORDER_113~117 재정립 이후 다음 기능 개발 후보는 ORDER_112다.
 
 ```text
-1. node_4 remand blocking
-2. W1ProblemTriageFrame
-3. W1 LLM node/prompt
-4. W runtime wiring
-5. W smoke/runtime view
+1. ORDER_112: explicit artifact priority and whole-document packing
+2. 후속 schema split 지속
+3. 후속 smoke case decomposition 지속
+4. 이후 W/R loop, scheduler, 외부 DB/vector DB 후보 재검토
 ```
 
 다만 이 순서는 코딩 명령이 아니다.

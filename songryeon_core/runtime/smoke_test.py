@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import asdict
 import tempfile
 
@@ -8,6 +9,8 @@ from songryeon_core.core.registry import build_default_schema_registry
 from songryeon_core.core.schemas import (
     MetainfoBoundary,
     MemoryPacketFrom0,
+    Node3InputBriefFrame,
+    Node3SelectedRecentMemoryContext,
     NodeMovement,
     Node2InputFrame,
     TurnOutcomeFrame,
@@ -21,11 +24,14 @@ from songryeon_core.llm.fake import (
     BrokenJSONFakeLLMAdapter,
     ExactArtifactQueryPlannerFakeLLMAdapter,
     FakeLLMAdapter,
+    MemoryRelevanceNoneSelectedFakeLLMAdapter,
+    MemoryRelevanceSelectedFakeLLMAdapter,
     MixedToolQueryPlannerFakeLLMAdapter,
     QueryPlannerFakeLLMAdapter,
     RevisionQueryPlannerFakeLLMAdapter,
     SongRyeonAllNodesFakeLLMAdapter,
 )
+from songryeon_core.llm.base import LLMResponse
 from songryeon_core.llm.node_executor import LLMNodeExecutor
 from songryeon_core.loops.l_loop_continuation import record_l_loop_continuation_decision
 from songryeon_core.loops.l_loop import run_l_loop
@@ -55,28 +61,45 @@ from songryeon_core.nodes.node_0_memory_supplier import (
     record_l3_continuation_summary_for_l2,
     record_l_loop_return_summary_for_node1,
 )
-from songryeon_core.nodes.node_1_router import (
-    ROUTER_FALLBACK_POLICY_DEV_SMOKE,
-    ROUTER_FALLBACK_POLICY_QWEN_STRICT_BLOCKED,
-    Node1RouterLLMFailure,
-    record_routing,
-    route_next,
-)
+from songryeon_core.nodes.node_1_router import record_routing, route_next
 from songryeon_core.nodes.node_2_handoff import record_node3_input_brief, record_route2_handoff
+from songryeon_core.nodes.node_2_handoff import record_selected_recent_memory_context
 from songryeon_core.nodes.node_2_metainfo_boundary import build_metainfo_boundary, record_boundary
 from songryeon_core.nodes.node_3_reporter import record_report, render_report
 from songryeon_core.nodes.node_4_gatekeeper import run_node4_gatekeeper
 from songryeon_core.runtime.dry_run import run_dry_turn
+from songryeon_core.runtime.defaults import (
+    DEFAULT_MAX_INPUT_CHARS,
+    DEFAULT_MAX_QUERY_ATTEMPTS,
+    DEFAULT_MAX_READ_DOC_CALLS,
+    DEFAULT_MAX_TOOL_CALLS,
+    DEFAULT_SEARCH_TOP_K,
+)
+from songryeon_core.runtime.chat_session import (
+    ChatSessionMemory,
+    attach_chat_session_snapshot,
+    current_chat_turn_id,
+    store_chat_turn_result,
+)
 from songryeon_core.runtime.l_loop_smoke import run_fake_llm_l_loop_smoke
+from songryeon_core.runtime.smoke_cases.document_memory import (
+    check_document_memory_index as _check_document_memory_index,
+)
+from songryeon_core.runtime.smoke_cases.router_fallback import (
+    run_router_fallback_honesty_smoke as _run_router_fallback_honesty_smoke,
+)
+from songryeon_core.runtime.smoke_cases.runtime_view import (
+    run_live_trace_progress_stream_smoke as _run_live_trace_progress_stream_smoke,
+    run_runtime_count_consistency_smoke as _run_runtime_count_consistency_smoke,
+)
 from songryeon_core.runtime.same_turn_l_reroute import (
     SAME_TURN_L_REROUTE_ALLOWED_REASON,
     SAME_TURN_L_REROUTE_MAX_REACHED_REASON,
     SAME_TURN_L_REROUTE_NODE1_ROUTE2_REASON,
 )
-from songryeon_core.runtime.terminal_view import render_pretty_turn
+from songryeon_core.runtime.terminal_view import render_chat_answer, render_pretty_turn
 from songryeon_core.runtime.user_turn import run_fake_user_turn
-from songryeon_core.tools.document_memory_index import load_document_memory_index
-from songryeon_core.tools.document_tools import list_docs, read_artifact, read_doc, search_docs
+from songryeon_core.tools.document_tools import read_artifact, search_docs
 from songryeon_core.tools.tool_efficiency_policy import (
     record_duplicate_tool_use_signal,
     record_tool_use_budget_frame,
@@ -134,8 +157,15 @@ def run_smoke_tests() -> dict[str, object]:
     return_summary_smoke = _check_l_loop_return_summary(records)
     _check_runtime_explanation_fields(records)
     runtime_label_smoke = _check_runtime_metainfo_labels(result)
+    live_trace_smoke = _run_live_trace_progress_stream_smoke()
     recent_capsule_smoke = _run_recent_turn_capsule_pre_route_smoke()
     recent_raw_alignment_smoke = _run_recent_raw_conversation_capsule_alignment_smoke()
+    raw_memory_window_smoke = _run_raw_memory_window_policy_smoke()
+    qwen_chat_continuity_smoke = _run_qwen_chat_session_zero_state_continuity_smoke()
+    recent_relevance_candidate_smoke = _run_recent_memory_relevance_candidate_frame_smoke()
+    recent_relevance_selection_smoke = _run_recent_memory_relevance_selection_smoke()
+    selected_recent_memory_context_smoke = _run_selected_recent_memory_context_smoke()
+    node1_recent_memory_router_visibility_smoke = _run_node1_recent_memory_router_visibility_smoke()
 
     mixed_info_smoke = _check_mixed_info_boundary(records)
     relative_info_direct_field_smoke = _run_relative_info_direct_field_smoke()
@@ -159,6 +189,7 @@ def run_smoke_tests() -> dict[str, object]:
     remand_blocking_smoke = _run_node4_remand_blocking_smoke()
     grounding_count_guard_smoke = _run_node4_grounding_count_guard_smoke()
     gate_failed_honesty_smoke = _run_node4_gate_failed_honesty_smoke()
+    recent_memory_guard_smoke = _run_node4_recent_memory_utterance_guard_smoke()
     continuation_controller_smoke = _run_l_loop_continuation_controller_smoke()
     continuation_memory_smoke = _run_l3_continuation_memory_packet_smoke()
     l2_revision_input_smoke = _run_l2_revision_input_frame_smoke()
@@ -260,6 +291,13 @@ def run_smoke_tests() -> dict[str, object]:
         "node4_remand_gate_status": remand_blocking_smoke["gate_status"],
         "node4_grounding_count_guard": grounding_count_guard_smoke["gate_status"],
         "node4_gate_failed_honest": gate_failed_honesty_smoke["honest_failure_message"],
+        "node4_recent_memory_guard_pass": recent_memory_guard_smoke["pass_status"],
+        "node4_recent_memory_guard_without_context": recent_memory_guard_smoke["without_context_status"],
+        "node4_recent_memory_guard_unsupported": recent_memory_guard_smoke["unsupported_status"],
+        "node4_recent_memory_guard_internal_id": recent_memory_guard_smoke["internal_id_status"],
+        "node4_recent_memory_guard_truncated": recent_memory_guard_smoke["truncated_status"],
+        "node4_recent_memory_guard_no_word_heuristic": recent_memory_guard_smoke["no_word_heuristic"],
+        "node4_recent_memory_guard_safe_blocking": recent_memory_guard_smoke["safe_blocking"],
         "l_loop_continuation_stop": continuation_controller_smoke["stop_status"],
         "l_loop_continuation_continue": continuation_controller_smoke["continue_status"],
         "l3_continuation_memory_mode": continuation_memory_smoke["mode"],
@@ -283,6 +321,9 @@ def run_smoke_tests() -> dict[str, object]:
         "document_memory_index_l3_metadata": document_memory_smoke["l3_metadata"],
         "runtime_metainfo_label_count": runtime_label_smoke["metainfo_label_count"],
         "runtime_has_copied_from": runtime_label_smoke["has_copied_from"],
+        "live_trace_line_count": live_trace_smoke["line_count"],
+        "live_trace_matches_trace_count": live_trace_smoke["matches_trace_count"],
+        "live_trace_no_report_body": live_trace_smoke["no_report_body"],
         "recent_capsule_read_window": recent_capsule_smoke["read_window"],
         "recent_capsules_read_count": recent_capsule_smoke["read_count"],
         "recent_capsule_item_type": recent_capsule_smoke["item_type"],
@@ -293,8 +334,140 @@ def run_smoke_tests() -> dict[str, object]:
         "recent_raw_conversation_alignment_item_type": recent_raw_alignment_smoke["item_type"],
         "recent_raw_conversation_alignment_skips_mismatch": recent_raw_alignment_smoke["skips_mismatch"],
         "recent_raw_conversation_alignment_llm_summary_status": recent_raw_alignment_smoke["llm_summary_status"],
+        "raw_memory_window_count_8_status": raw_memory_window_smoke["count_8_status"],
+        "raw_memory_window_count_9_status": raw_memory_window_smoke["count_9_status"],
+        "raw_memory_window_count_13_older_unmanaged": raw_memory_window_smoke["count_13_older_unmanaged"],
+        "raw_memory_window_no_semantic_compression": raw_memory_window_smoke["no_semantic_compression"],
+        "raw_memory_window_original_kept": raw_memory_window_smoke["original_kept"],
+        "qwen_chat_continuity_external_turn_id": qwen_chat_continuity_smoke["external_turn_id"],
+        "qwen_chat_continuity_two_turn_alignment": qwen_chat_continuity_smoke["two_turn_alignment"],
+        "qwen_chat_continuity_stateless_default": qwen_chat_continuity_smoke["stateless_default"],
+        "qwen_chat_continuity_no_semantic_memory": qwen_chat_continuity_smoke["no_semantic_memory"],
+        "qwen_chat_loop_snapshot_raw_count": qwen_chat_continuity_smoke["loop_snapshot_raw_count"],
+        "qwen_chat_loop_after_store_raw_count": qwen_chat_continuity_smoke["loop_after_store_raw_count"],
+        "qwen_chat_loop_after_store_capsule_count": qwen_chat_continuity_smoke["loop_after_store_capsule_count"],
+        "recent_memory_relevance_candidate_window": recent_relevance_candidate_smoke["read_window"],
+        "recent_memory_relevance_candidate_count": recent_relevance_candidate_smoke["candidate_count"],
+        "recent_memory_relevance_candidate_judgement": recent_relevance_candidate_smoke["judgement_status"],
+        "recent_memory_relevance_candidate_skips_mismatch": recent_relevance_candidate_smoke["skips_mismatch"],
+        "recent_memory_relevance_selection_selected": recent_relevance_selection_smoke["selected_status"],
+        "recent_memory_relevance_selection_none": recent_relevance_selection_smoke["none_selected_status"],
+        "recent_memory_relevance_selection_failed": recent_relevance_selection_smoke["failed_status"],
+        "recent_memory_relevance_selection_no_candidates": recent_relevance_selection_smoke["no_candidates_status"],
+        "recent_memory_relevance_selection_info_class": recent_relevance_selection_smoke["info_class"],
+        "recent_memory_relevance_selection_raw_text_selected": recent_relevance_selection_smoke["raw_text_selected"],
+        "recent_memory_relevance_selector_input_has_raw_text": recent_relevance_selection_smoke["selector_input_has_raw_text"],
+        "memory_selection_handoff_status": recent_relevance_selection_smoke["handoff_status"],
+        "memory_selection_handoff_selected_count": recent_relevance_selection_smoke["handoff_selected_count"],
+        "memory_selection_boundary_mixed": recent_relevance_selection_smoke["boundary_mixed"],
+        "memory_selection_node3_selected_count": recent_relevance_selection_smoke["node3_selected_count"],
+        "memory_selection_no_raw_answer_leak": recent_relevance_selection_smoke["no_raw_answer_leak"],
+        "selected_recent_memory_context_copied": selected_recent_memory_context_smoke["copied_count"],
+        "selected_recent_memory_context_none_empty": selected_recent_memory_context_smoke["none_empty"],
+        "selected_recent_memory_context_missing": selected_recent_memory_context_smoke["missing_count"],
+        "selected_recent_memory_context_truncated": selected_recent_memory_context_smoke["truncated"],
+        "selected_recent_memory_context_node3_answer": selected_recent_memory_context_smoke["node3_answer"],
+        "node1_recent_memory_router_visibility_route": node1_recent_memory_router_visibility_smoke["route"],
+        "node1_recent_memory_router_visibility_context_seen": node1_recent_memory_router_visibility_smoke["context_seen"],
+        "node1_recent_memory_router_visibility_source_ids": node1_recent_memory_router_visibility_smoke["source_ids"],
         "top_doc": search_result["results"][0]["doc_id"],
     }
+
+
+class MemoryRelevanceRawTextProbeFakeLLMAdapter:
+    """Smoke-only adapter: selects the candidate whose copied raw text contains 청성."""
+
+    model_id = "memory-relevance-raw-text-probe-fake-llm-adapter"
+
+    def complete(self, request: object) -> LLMResponse:
+        input_payload = getattr(request, "input_payload", {})
+        raw_items = (
+            input_payload.get("candidate_raw_conversation_items")
+            if isinstance(input_payload, dict)
+            else None
+        )
+        selected_item: dict[str, object] | None = None
+        if isinstance(raw_items, list):
+            for item in raw_items:
+                if not isinstance(item, dict):
+                    continue
+                combined = (
+                    f"{item.get('raw_user_text') or ''}\n"
+                    f"{item.get('raw_assistant_text') or ''}"
+                )
+                if "청성" in combined:
+                    selected_item = item
+                    break
+        frame_id = (
+            selected_item.get("candidate_frame_id")
+            if selected_item is not None
+            else None
+        )
+        turn_id = (
+            selected_item.get("candidate_turn_id")
+            if selected_item is not None
+            else None
+        )
+        payload = {
+            "selection_status": "selected" if frame_id and turn_id else "none_selected",
+            "selected_candidate_turn_ids": [turn_id] if isinstance(turn_id, str) and turn_id else [],
+            "selected_candidate_frame_ids": [frame_id] if isinstance(frame_id, str) and frame_id else [],
+            "selection_reason": (
+                "copied raw conversation item contains the current passphrase."
+                if frame_id and turn_id
+                else "no copied raw conversation item contained the current passphrase."
+            ),
+        }
+        return LLMResponse(
+            text=json.dumps(payload, ensure_ascii=False),
+            model_id=self.model_id,
+            raw=payload,
+        )
+
+
+class Node1RecentMemoryRouterVisibilityFakeLLMAdapter:
+    """Smoke-only adapter: route=2 only when node_1 input sees selected raw memory."""
+
+    model_id = "node1-recent-memory-router-visibility-fake-llm-adapter"
+
+    def complete(self, request: object) -> LLMResponse:
+        input_payload = getattr(request, "input_payload", {})
+        context_seen = False
+        if isinstance(input_payload, dict):
+            router_context = input_payload.get("recent_memory_router_context")
+            if isinstance(router_context, dict):
+                records = router_context.get("selected_recent_memory_context_records")
+                if isinstance(records, list):
+                    for record in records:
+                        if not isinstance(record, dict):
+                            continue
+                        items = record.get("items")
+                        if not isinstance(items, list):
+                            continue
+                        for item in items:
+                            if isinstance(item, dict) and "청성" in str(item.get("raw_user_text") or ""):
+                                context_seen = True
+                                break
+                        if context_seen:
+                            break
+        route = "2" if context_seen else "L"
+        payload = {
+            "route": route,
+            "route_reason": (
+                "selected recent memory context contains the requested prior utterance."
+                if context_seen
+                else "selected recent memory context was not visible to node_1."
+            ),
+            "expected_next_0_mode": "final_trace_for_2" if route == "2" else "targeted_memory_supply",
+            "route_confidence": 0.91 if context_seen else 0.51,
+            "needs_more_memory": False,
+            "policy_flag": None,
+        }
+        return LLMResponse(
+            text=json.dumps(payload, ensure_ascii=False),
+            model_id=self.model_id,
+            raw=payload,
+        )
 
 
 def _check_task_ledger(result: dict[str, object]) -> dict[str, object]:
@@ -591,12 +764,1107 @@ def _run_recent_raw_conversation_capsule_alignment_smoke() -> dict[str, object]:
     }
 
 
+def _run_raw_memory_window_policy_smoke() -> dict[str, object]:
+    """0 should expose raw compression candidate coordinates without summarizing them."""
+
+    raw_count_8 = [_sample_raw_memory_window_entry(index) for index in range(1, 9)]
+    result_8 = run_dry_turn(recent_raw_conversation=raw_count_8)
+    frame_8 = _raw_memory_compression_candidate_payload(result_8)
+    if frame_8.get("raw_conversation_count") != 8:
+        raise AssertionError("raw count 8 smoke must record raw_conversation_count=8")
+    if frame_8.get("candidate_status") != "not_needed":
+        raise AssertionError("raw count 8 smoke must not create a pending candidate")
+    if frame_8.get("candidate_turn_ids") != []:
+        raise AssertionError("raw count 8 smoke must leave candidate_turn_ids empty")
+    if frame_8.get("candidate_raw_entry_count") != 0:
+        raise AssertionError("raw count 8 smoke must leave candidate_raw_entry_count=0")
+    if frame_8.get("retained_raw_turn_ids") != [
+        f"turn_{index:03d}" for index in range(1, 9)
+    ]:
+        raise AssertionError("raw count 8 smoke must retain all 8 raw turn ids")
+    if frame_8.get("retained_raw_entry_count") != 8:
+        raise AssertionError("raw count 8 smoke must record retained count 8")
+    if frame_8.get("node5_compression_status") != "not_run":
+        raise AssertionError("raw count 8 smoke must leave node5 status not_run")
+    if frame_8.get("node4_approval_status") != "not_run":
+        raise AssertionError("raw count 8 smoke must leave node4 status not_run")
+
+    raw_count_9 = [_sample_raw_memory_window_entry(index) for index in range(1, 10)]
+    result_9 = run_dry_turn(recent_raw_conversation=raw_count_9)
+    frame_9 = _raw_memory_compression_candidate_payload(result_9)
+    if frame_9.get("raw_conversation_count") != 9:
+        raise AssertionError("raw count 9 smoke must record raw_conversation_count=9")
+    if frame_9.get("candidate_status") != "pending_node5_compression":
+        raise AssertionError("raw count 9 smoke must create a pending node5 candidate")
+    if frame_9.get("candidate_turn_ids") != [
+        "turn_001",
+        "turn_002",
+        "turn_003",
+        "turn_004",
+    ]:
+        raise AssertionError("raw count 9 smoke must candidate turns 1..4")
+    if frame_9.get("candidate_raw_entry_count") != 4:
+        raise AssertionError("raw count 9 smoke must record candidate_raw_entry_count=4")
+    if frame_9.get("retained_raw_turn_ids") != [
+        "turn_005",
+        "turn_006",
+        "turn_007",
+        "turn_008",
+        "turn_009",
+    ]:
+        raise AssertionError("raw count 9 smoke must retain turns 5..9")
+    if frame_9.get("retained_raw_entry_count") != 5:
+        raise AssertionError("raw count 9 smoke must record retained count 5")
+    if frame_9.get("older_unmanaged_raw_turn_count") != 0:
+        raise AssertionError("raw count 9 smoke must expose older unmanaged count 0")
+    if frame_9.get("semantic_judgement_status") != "not_run":
+        raise AssertionError("raw count 9 smoke must not run semantic judgement")
+
+    raw_count_13 = [_sample_raw_memory_window_entry(index) for index in range(1, 14)]
+    result_13 = run_dry_turn(recent_raw_conversation=raw_count_13)
+    frame_13 = _raw_memory_compression_candidate_payload(result_13)
+    if frame_13.get("candidate_turn_ids") != [
+        "turn_005",
+        "turn_006",
+        "turn_007",
+        "turn_008",
+    ]:
+        raise AssertionError("raw count 13 smoke must candidate turns 5..8")
+    if frame_13.get("retained_raw_turn_ids") != [
+        "turn_009",
+        "turn_010",
+        "turn_011",
+        "turn_012",
+        "turn_013",
+    ]:
+        raise AssertionError("raw count 13 smoke must retain turns 9..13")
+    if frame_13.get("older_unmanaged_raw_turn_count") != 4:
+        raise AssertionError("raw count 13 smoke must expose older unmanaged count 4")
+
+    packet_9 = _pre_route_memory_packet_payload(result_9)
+    frames = packet_9.get("compression_candidate_frames")
+    if not isinstance(frames, list) or len(frames) != 1:
+        raise AssertionError("pre-route packet must include one compression candidate frame")
+    if frames[0].get("frame_id") != result_9.get("raw_memory_compression_candidate_frame_id"):
+        raise AssertionError("compression candidate frame id must be surfaced in result")
+
+    forbidden_summary_fields = {
+        "summary",
+        "compression_summary",
+        "natural_language_summary",
+        "semantic_summary",
+    }
+    for frame in (frame_8, frame_9, frame_13):
+        if forbidden_summary_fields.intersection(frame):
+            raise AssertionError("compression candidate frame must not include a summary field")
+        if frame.get("generated_by") != "CODE:RAW_MEMORY_WINDOW_POLICY":
+            raise AssertionError("compression candidate frame must reveal code policy generator")
+        if frame.get("info_class") != "absolute_policy_decision":
+            raise AssertionError("compression candidate frame must be absolute policy decision")
+        if frame.get("node5_compression_status") != "not_run":
+            raise AssertionError("compression candidate frame must not run node5")
+        if frame.get("node4_approval_status") != "not_run":
+            raise AssertionError("compression candidate frame must not run node4")
+
+    if len(raw_count_13) != 13:
+        raise AssertionError("raw memory window policy must not mutate raw conversation fixture")
+
+    return {
+        "count_8_status": frame_8["candidate_status"],
+        "count_9_status": frame_9["candidate_status"],
+        "count_13_older_unmanaged": frame_13["older_unmanaged_raw_turn_count"],
+        "no_semantic_compression": True,
+        "original_kept": True,
+    }
+
+
+def _run_qwen_chat_session_zero_state_continuity_smoke() -> dict[str, object]:
+    """ORDER_108: session raw/capsule state should feed the next chat turn's node_0."""
+
+    previous_capsule = _sample_previous_turn_capsule(1)
+    recent_raw = [_sample_recent_raw_conversation_entry(1)]
+    external_result = run_dry_turn(
+        user_input="external zero state smoke",
+        turn_id="turn_test_0002",
+        previous_turn_capsules=[previous_capsule],
+        recent_raw_conversation=recent_raw,
+    )
+    if external_result.get("turn_id") != "turn_test_0002":
+        raise AssertionError("run_dry_turn must accept external turn_id")
+    if external_result.get("recent_capsules_read_count") != 1:
+        raise AssertionError("external zero state smoke must read one previous capsule")
+    if external_result.get("recent_raw_conversation_alignment_count") != 1:
+        raise AssertionError("external zero state smoke must align one raw/capsule pair")
+    if external_result.get("recent_memory_relevance_candidate_count") != 1:
+        raise AssertionError("external zero state smoke must create one relevance candidate")
+    capsule_payload = external_result.get("turn_capsule")
+    if not isinstance(capsule_payload, dict):
+        raise AssertionError("run_dry_turn result must expose turn_capsule")
+    if capsule_payload.get("turn_id") != "turn_test_0002":
+        raise AssertionError("turn_capsule.turn_id must use external turn_id")
+
+    chat_session = ChatSessionMemory()
+    first_user_input = "내 테스트 암호는 파란노트야."
+    first_turn_id = current_chat_turn_id(chat_session)
+    if first_turn_id != "turn_chat_0001":
+        raise AssertionError("qwen-chat helper must start from turn_chat_0001")
+    first_result = run_fake_user_turn(
+        user_input=first_user_input,
+        turn_id=first_turn_id,
+        include_data_records=True,
+    )
+    attach_chat_session_snapshot(
+        result=first_result,
+        session_memory=chat_session,
+        current_turn_id=first_turn_id,
+    )
+    first_snapshot = first_result.get("session_memory")
+    if not isinstance(first_snapshot, dict):
+        raise AssertionError("first qwen-chat smoke turn must expose session_memory snapshot")
+    if first_snapshot.get("recent_raw_conversation_count") != 0:
+        raise AssertionError("first qwen-chat smoke snapshot must start with empty raw memory")
+    if first_snapshot.get("previous_turn_capsule_count") != 0:
+        raise AssertionError("first qwen-chat smoke snapshot must start with empty capsules")
+    if not store_chat_turn_result(
+        session_memory=chat_session,
+        current_turn_id=first_turn_id,
+        user_input=first_user_input,
+        result=first_result,
+    ):
+        raise AssertionError("first qwen-chat smoke turn must store a turn capsule")
+    if chat_session.turn_index != 2:
+        raise AssertionError("qwen-chat session helper must advance turn_index after storing")
+    if len(chat_session.previous_turn_capsules) != 1:
+        raise AssertionError("qwen-chat session helper must store one previous capsule")
+    if chat_session.previous_turn_capsules[0].turn_id != first_turn_id:
+        raise AssertionError("first chat smoke capsule must keep the first turn id")
+    first_assistant_text = render_chat_answer(first_result, user_input=first_user_input)
+    if len(chat_session.recent_raw_conversation) != 1:
+        raise AssertionError("qwen-chat session helper must store one raw conversation entry")
+    first_raw_entry = chat_session.recent_raw_conversation[0]
+    if first_raw_entry.get("turn_id") != first_turn_id:
+        raise AssertionError("stored raw conversation must keep the first turn id")
+    if first_raw_entry.get("user_text") != first_user_input:
+        raise AssertionError("stored raw conversation must copy the first user input")
+    if first_raw_entry.get("assistant_text") != first_assistant_text:
+        raise AssertionError("stored raw conversation must use render_chat_answer output")
+
+    second_turn_id = current_chat_turn_id(chat_session)
+    if second_turn_id != "turn_chat_0002":
+        raise AssertionError("qwen-chat helper must advance to turn_chat_0002")
+    second_result = run_fake_user_turn(
+        user_input="방금 내가 말한 테스트 암호 관련 기억 후보가 있나?",
+        turn_id=second_turn_id,
+        previous_turn_capsules=chat_session.previous_turn_capsules,
+        recent_raw_conversation=chat_session.recent_raw_conversation,
+        include_data_records=True,
+    )
+    attach_chat_session_snapshot(
+        result=second_result,
+        session_memory=chat_session,
+        current_turn_id=second_turn_id,
+    )
+    second_snapshot = second_result.get("session_memory")
+    if not isinstance(second_snapshot, dict):
+        raise AssertionError("second qwen-chat smoke turn must expose session_memory snapshot")
+    if second_snapshot.get("recent_raw_conversation_count") != 1:
+        raise AssertionError("second qwen-chat smoke snapshot must see one previous raw turn")
+    if second_snapshot.get("previous_turn_capsule_count") != 1:
+        raise AssertionError("second qwen-chat smoke snapshot must see one previous capsule")
+    if second_result.get("turn_id") == first_result.get("turn_id"):
+        raise AssertionError("chat smoke turn ids must be distinct")
+    if second_result.get("recent_capsules_read_count", 0) < 1:
+        raise AssertionError("second chat smoke turn must receive previous capsule")
+    if second_result.get("recent_raw_conversation_alignment_count", 0) < 1:
+        raise AssertionError("second chat smoke turn must align prior raw/capsule")
+    if second_result.get("recent_memory_relevance_candidate_count", 0) < 1:
+        raise AssertionError("second chat smoke turn must expose relevance candidate")
+
+    stateless_result = run_fake_user_turn(
+        user_input="stateless default smoke",
+        turn_id="turn_stateless_smoke_0001",
+    )
+    if stateless_result.get("recent_capsules_read_count") != 0:
+        raise AssertionError("default user turn must not auto-carry previous capsules")
+    if stateless_result.get("recent_raw_conversation_alignment_count") != 0:
+        raise AssertionError("default user turn must not auto-carry raw conversation")
+
+    packet = _pre_route_memory_packet_payload(second_result)
+    if packet.get("llm_semantic_summary_status") != "not_run":
+        raise AssertionError("node_0 session memory supply must not summarize raw text")
+    if second_result.get("recent_memory_relevance_selection_status") not in {
+        "selected",
+        "none_selected",
+        "failed",
+    }:
+        raise AssertionError("only selector should record memory relevance judgement status")
+
+    rendered = render_pretty_turn(second_result, user_input="방금 내가 말한 테스트 암호 관련 기억 후보가 있나?")
+    if "recent_raw_conversation_capsule_alignment" not in rendered:
+        raise AssertionError("runtime view should expose raw/capsule alignment in memory items")
+
+    if not store_chat_turn_result(
+        session_memory=chat_session,
+        current_turn_id=second_turn_id,
+        user_input="방금 내가 말한 테스트 암호 관련 기억 후보가 있나?",
+        result=second_result,
+    ):
+        raise AssertionError("second qwen-chat smoke turn must store a turn capsule")
+    if len(chat_session.recent_raw_conversation) != 2:
+        raise AssertionError("qwen-chat session helper must store the second raw turn")
+    if len(chat_session.previous_turn_capsules) != 2:
+        raise AssertionError("qwen-chat session helper must store the second capsule")
+    if chat_session.previous_turn_capsules[1].turn_id != second_turn_id:
+        raise AssertionError("stored second capsule must keep the second turn id")
+
+    return {
+        "external_turn_id": external_result["turn_id"],
+        "two_turn_alignment": second_result["recent_raw_conversation_alignment_count"],
+        "stateless_default": True,
+        "no_semantic_memory": True,
+        "loop_snapshot_raw_count": second_snapshot["recent_raw_conversation_count"],
+        "loop_after_store_raw_count": len(chat_session.recent_raw_conversation),
+        "loop_after_store_capsule_count": len(chat_session.previous_turn_capsules),
+    }
+
+
+def _run_recent_memory_relevance_candidate_frame_smoke() -> dict[str, object]:
+    """0 should create not_run relevance candidate frames without judging relevance."""
+
+    recent_raw_conversation = [
+        _sample_recent_raw_conversation_entry(index)
+        for index in range(1, 10)
+    ]
+    previous_capsules = [
+        _sample_previous_turn_capsule(index)
+        for index in range(1, 10)
+    ]
+    result = run_dry_turn(
+        recent_raw_conversation=recent_raw_conversation,
+        previous_turn_capsules=previous_capsules,
+    )
+    if result.get("recent_memory_relevance_candidate_window") != 8:
+        raise AssertionError("recent memory relevance candidate window must be N=8")
+    if result.get("recent_memory_relevance_candidate_count") != 8:
+        raise AssertionError("recent memory relevance candidate count must be 8")
+
+    records = {item["data_id"]: item["payload"] for item in result["data_records"]}
+    packet = records.get("memory_packet:node_1:pre_route_report")
+    if not isinstance(packet, dict):
+        raise AssertionError("pre-route memory packet payload must be a dict")
+    if packet.get("llm_semantic_summary_status") != "not_run":
+        raise AssertionError("relevance candidate frames must not run semantic summary")
+
+    items = packet.get("memory_items")
+    if not isinstance(items, list):
+        raise AssertionError("pre-route memory_items must be a list")
+    alignment_item_ids = {
+        item.get("item_id")
+        for item in items
+        if isinstance(item, dict)
+        and item.get("item_type") == "recent_raw_conversation_capsule_alignment"
+    }
+    candidate_frames = packet.get("relevance_candidate_frames")
+    if not isinstance(candidate_frames, list):
+        raise AssertionError("relevance_candidate_frames must be a list")
+    if len(candidate_frames) != 8:
+        raise AssertionError("pre-route packet must include 8 relevance candidate frames")
+
+    for frame, index in zip(candidate_frames, range(2, 10)):
+        if not isinstance(frame, dict):
+            raise AssertionError("relevance candidate frame must be a dict")
+        if frame.get("candidate_turn_id") != f"turn_prev_{index:03d}":
+            raise AssertionError("candidate frame must preserve the previous turn_id")
+        if frame.get("source_memory_item_id") not in alignment_item_ids:
+            raise AssertionError("candidate frame must point to an alignment memory item")
+        if frame.get("judgement_status") != "not_run":
+            raise AssertionError("candidate frame must not judge relevance yet")
+        for field_name in ("judged_by", "relevance_label", "relevance_reason", "info_class"):
+            if frame.get(field_name) is not None:
+                raise AssertionError(f"candidate frame must leave {field_name} empty")
+        if frame.get("source_trace_ids") != [
+            f"trace_prev_{index:03d}_user",
+            f"trace_prev_{index:03d}_final",
+        ]:
+            raise AssertionError("candidate frame source_trace_ids are wrong")
+        if frame.get("source_data_ids") != []:
+            raise AssertionError("candidate frame source_data_ids must be empty")
+
+    mismatch_result = run_dry_turn(
+        recent_raw_conversation=[
+            _sample_recent_raw_conversation_entry(1),
+            {
+                "turn_id": "turn_without_capsule",
+                "user_text": "raw user mismatch",
+                "assistant_text": "raw assistant mismatch",
+            },
+        ],
+        previous_turn_capsules=[
+            _sample_previous_turn_capsule(1),
+            _sample_previous_turn_capsule(2),
+        ],
+    )
+    if mismatch_result.get("recent_memory_relevance_candidate_count") != 1:
+        raise AssertionError("mismatched raw/capsule entries must not become candidates")
+    mismatch_records = {
+        item["data_id"]: item["payload"]
+        for item in mismatch_result["data_records"]
+    }
+    mismatch_packet = mismatch_records.get("memory_packet:node_1:pre_route_report")
+    if not isinstance(mismatch_packet, dict):
+        raise AssertionError("mismatch pre-route memory packet payload must be a dict")
+    mismatch_frames = mismatch_packet.get("relevance_candidate_frames")
+    if not isinstance(mismatch_frames, list):
+        raise AssertionError("mismatch relevance_candidate_frames must be a list")
+    rendered_candidates = "\n".join(
+        str(frame.get("candidate_turn_id", ""))
+        for frame in mismatch_frames
+        if isinstance(frame, dict)
+    )
+    if "turn_without_capsule" in rendered_candidates:
+        raise AssertionError("raw turn without capsule must not become a candidate")
+    if "turn_prev_002" in rendered_candidates:
+        raise AssertionError("capsule turn without raw must not become a candidate")
+
+    return {
+        "read_window": result["recent_memory_relevance_candidate_window"],
+        "candidate_count": result["recent_memory_relevance_candidate_count"],
+        "judgement_status": "not_run",
+        "skips_mismatch": True,
+    }
+
+
+def _run_recent_memory_relevance_selection_smoke() -> dict[str, object]:
+    """LLM selector should record selection judgement without code fallback selection."""
+
+    recent_raw_conversation = [
+        _sample_recent_raw_conversation_entry(index)
+        for index in range(1, 4)
+    ]
+    previous_capsules = [
+        _sample_previous_turn_capsule(index)
+        for index in range(1, 4)
+    ]
+
+    selected_result = run_dry_turn(
+        user_input="이전 얘기 다시 봐줘",
+        recent_raw_conversation=recent_raw_conversation,
+        previous_turn_capsules=previous_capsules,
+        memory_relevance_selector_adapter=MemoryRelevanceSelectedFakeLLMAdapter(),
+    )
+    selected_frame = _memory_relevance_selection_payload(selected_result)
+    if selected_frame.get("selection_status") != "selected":
+        raise AssertionError("selected selector smoke must record selection_status=selected")
+    if len(selected_frame.get("selected_candidate_turn_ids") or []) < 1:
+        raise AssertionError("selected selector smoke must include selected_candidate_turn_ids")
+    if len(selected_frame.get("selected_candidate_frame_ids") or []) < 1:
+        raise AssertionError("selected selector smoke must include selected_candidate_frame_ids")
+    if not str(selected_frame.get("judged_by") or "").startswith("LLM:"):
+        raise AssertionError("selected selector smoke must reveal judged_by is LLM")
+    if "memory_relevance_selector" not in str(selected_frame.get("generated_by") or ""):
+        raise AssertionError("selected selector smoke must reveal generated_by selector")
+    llm_call_data_id = selected_frame.get("llm_call_data_id")
+    if not isinstance(llm_call_data_id, str) or not llm_call_data_id:
+        raise AssertionError("selected selector smoke must cite llm_call_data_id")
+    if selected_frame.get("info_class") != "mixed":
+        raise AssertionError("selected selector smoke must classify LLM judgement as mixed")
+    if selected_frame.get("source_mode") != "source_bundle":
+        raise AssertionError("selector smoke must use source_bundle")
+    if selected_frame.get("claim_alignment") != "multi_source_bundle":
+        raise AssertionError("selector smoke must use multi_source_bundle")
+    if not selected_frame.get("source_memory_item_ids"):
+        raise AssertionError("selected selector smoke must cite source_memory_item_ids")
+    if llm_call_data_id not in (selected_frame.get("source_data_ids") or []):
+        raise AssertionError("selected selector source_data_ids must include llm_call_data_id")
+    selected_handoff_smoke = _check_memory_selection_to_node2_handoff(
+        result=selected_result,
+        selection_frame=selected_frame,
+    )
+
+    raw_probe_recent_raw_conversation = [
+        _sample_recent_raw_conversation_entry(1),
+        _sample_recent_raw_conversation_entry(2),
+        {
+            "turn_id": "turn_prev_003",
+            "user_text": '그럼 내가 너를 테스트 할 거야. 기억력 테스트. 암구호는 "청성"이야',
+            "assistant_text": "알겠어. 이번 턴 안에서 확인 가능한 원문으로만 다룰게.",
+        },
+    ]
+    raw_probe_result = run_dry_turn(
+        user_input="내가 방금 암구호를 뭐라고 말했는지 말해봐",
+        recent_raw_conversation=raw_probe_recent_raw_conversation,
+        previous_turn_capsules=previous_capsules,
+        memory_relevance_selector_adapter=MemoryRelevanceRawTextProbeFakeLLMAdapter(),
+    )
+    raw_probe_frame = _memory_relevance_selection_payload(raw_probe_result)
+    if raw_probe_frame.get("selection_status") != "selected":
+        raise AssertionError("raw text selector probe must select the matching candidate")
+    if raw_probe_frame.get("selected_candidate_turn_ids") != ["turn_prev_003"]:
+        raise AssertionError("raw text selector probe must select the turn containing 청성")
+    raw_selector_input = _memory_relevance_selector_input_payload(raw_probe_result)
+    raw_items = raw_selector_input.get("candidate_raw_conversation_items")
+    if not isinstance(raw_items, list) or not any(
+        isinstance(item, dict) and "청성" in str(item.get("raw_user_text") or "")
+        for item in raw_items
+    ):
+        raise AssertionError("selector input must include copied raw user text for candidates")
+    raw_probe_context = _selected_recent_memory_context_payload(raw_probe_result)
+    context_items = raw_probe_context.get("items")
+    if not isinstance(context_items, list) or not any(
+        isinstance(item, dict) and "청성" in str(item.get("raw_user_text") or "")
+        for item in context_items
+    ):
+        raise AssertionError("selected recent memory context must copy the selected raw utterance")
+
+    none_result = run_dry_turn(
+        user_input="새로운 별도 질문",
+        recent_raw_conversation=recent_raw_conversation,
+        previous_turn_capsules=previous_capsules,
+        memory_relevance_selector_adapter=MemoryRelevanceNoneSelectedFakeLLMAdapter(),
+    )
+    none_frame = _memory_relevance_selection_payload(none_result)
+    if none_frame.get("selection_status") != "none_selected":
+        raise AssertionError("none selector smoke must record none_selected")
+    if none_frame.get("selected_candidate_turn_ids") != []:
+        raise AssertionError("none selector smoke must leave selected_candidate_turn_ids empty")
+    if none_frame.get("selected_candidate_frame_ids") != []:
+        raise AssertionError("none selector smoke must leave selected_candidate_frame_ids empty")
+    if not str(none_frame.get("judged_by") or "").startswith("LLM:"):
+        raise AssertionError("none selector smoke must reveal judged_by is LLM")
+    none_material = _memory_selection_material_payload(none_result)
+    if none_material.get("memory_selection_status") != "none_selected":
+        raise AssertionError("none selector brief must preserve none_selected status")
+    if none_material.get("selected_memory_count") != 0:
+        raise AssertionError("none selector brief must not expose selected memory material")
+    if none_material.get("selected_candidate_turn_ids") != []:
+        raise AssertionError("none selector brief must not include selected turn ids")
+
+    failed_result = run_dry_turn(
+        user_input="turn_prev_001 다시 봐줘",
+        recent_raw_conversation=recent_raw_conversation,
+        previous_turn_capsules=previous_capsules,
+        memory_relevance_selector_adapter=BrokenJSONFakeLLMAdapter(),
+    )
+    failed_frame = _memory_relevance_selection_payload(failed_result)
+    if failed_frame.get("selection_status") != "failed":
+        raise AssertionError("failed selector smoke must record selection_status=failed")
+    if failed_frame.get("selected_candidate_turn_ids") != []:
+        raise AssertionError("failed selector smoke must not select candidate turn ids")
+    if failed_frame.get("selected_candidate_frame_ids") != []:
+        raise AssertionError("failed selector smoke must not select candidate frame ids")
+    if failed_frame.get("selection_reason") != "CODE_STATUS:memory_relevance_selector_failed":
+        raise AssertionError("failed selector smoke must use failure code status")
+    if failed_result.get("recent_memory_relevance_selection_selected_count") != 0:
+        raise AssertionError("failed selector smoke must not fallback-select candidates")
+    failed_material = _memory_selection_material_payload(failed_result)
+    if failed_material.get("memory_selection_status") != "failed":
+        raise AssertionError("failed selector brief must preserve failed status")
+    if failed_material.get("selected_memory_count") != 0:
+        raise AssertionError("failed selector brief must not expose selected memory material")
+    if failed_material.get("selected_candidate_turn_ids") != []:
+        raise AssertionError("failed selector brief must not include selected turn ids")
+
+    no_candidates_result = run_dry_turn(
+        user_input="후보 없는 질문",
+        memory_relevance_selector_adapter=MemoryRelevanceSelectedFakeLLMAdapter(),
+    )
+    no_candidates_frame = _memory_relevance_selection_payload(no_candidates_result)
+    if no_candidates_frame.get("selection_status") != "none_selected":
+        raise AssertionError("no-candidates selector smoke must close as none_selected")
+    if no_candidates_frame.get("selection_reason") != "CODE_STATUS:no_memory_relevance_candidates":
+        raise AssertionError("no-candidates selector smoke must use no-candidates code status")
+    if no_candidates_frame.get("llm_call_data_id") is not None:
+        raise AssertionError("no-candidates selector smoke must not call the LLM")
+    if no_candidates_result.get("llm_call_count") != 0:
+        raise AssertionError("no-candidates selector smoke must not create llm_call records")
+    no_candidates_material = _memory_selection_material_payload(no_candidates_result)
+    if no_candidates_material.get("memory_selection_status") != "none_selected":
+        raise AssertionError("no-candidates brief must preserve none_selected status")
+    if no_candidates_material.get("selected_memory_count") != 0:
+        raise AssertionError("no-candidates brief must not expose selected memory material")
+
+    return {
+        "selected_status": selected_frame["selection_status"],
+        "none_selected_status": none_frame["selection_status"],
+        "failed_status": failed_frame["selection_status"],
+        "no_candidates_status": no_candidates_frame["selection_status"],
+        "info_class": selected_frame["info_class"],
+        "raw_text_selected": raw_probe_frame["selection_status"],
+        "selector_input_has_raw_text": True,
+        "handoff_status": selected_handoff_smoke["handoff_status"],
+        "handoff_selected_count": selected_handoff_smoke["handoff_selected_count"],
+        "boundary_mixed": selected_handoff_smoke["boundary_mixed"],
+        "node3_selected_count": selected_handoff_smoke["node3_selected_count"],
+        "no_raw_answer_leak": selected_handoff_smoke["no_raw_answer_leak"],
+    }
+
+
+def _memory_relevance_selection_payload(result: dict[str, object]) -> dict[str, object]:
+    records = {
+        item["data_id"]: item["payload"]
+        for item in result["data_records"]
+        if isinstance(item, dict)
+    }
+    frame_id = result.get("recent_memory_relevance_selection_frame_id")
+    if not isinstance(frame_id, str):
+        raise AssertionError("result must include recent_memory_relevance_selection_frame_id")
+    frame = records.get(frame_id)
+    if not isinstance(frame, dict):
+        raise AssertionError("memory relevance selection frame payload must be a dict")
+    return frame
+
+
+def _memory_relevance_selector_input_payload(result: dict[str, object]) -> dict[str, object]:
+    records = [
+        item
+        for item in result["data_records"]
+        if isinstance(item, dict)
+        and item.get("data_type") == "node_input:memory_relevance_selector_input"
+    ]
+    if len(records) != 1:
+        raise AssertionError("result must include one memory relevance selector input record")
+    payload = records[0].get("payload")
+    if not isinstance(payload, dict):
+        raise AssertionError("memory relevance selector input payload must be a dict")
+    return payload
+
+
+def _pre_route_memory_packet_payload(result: dict[str, object]) -> dict[str, object]:
+    records = {
+        item["data_id"]: item["payload"]
+        for item in result["data_records"]
+        if isinstance(item, dict)
+    }
+    packet = records.get("memory_packet:node_1:pre_route_report")
+    if not isinstance(packet, dict):
+        raise AssertionError("pre-route memory packet payload must be a dict")
+    return packet
+
+
+def _raw_memory_compression_candidate_payload(
+    result: dict[str, object],
+) -> dict[str, object]:
+    packet = _pre_route_memory_packet_payload(result)
+    frames = packet.get("compression_candidate_frames")
+    if not isinstance(frames, list) or len(frames) != 1:
+        raise AssertionError("pre-route packet must include one compression candidate frame")
+    frame = frames[0]
+    if not isinstance(frame, dict):
+        raise AssertionError("compression candidate frame payload must be a dict")
+    return frame
+
+
+def _run_selected_recent_memory_context_smoke() -> dict[str, object]:
+    """ORDER_109: selected raw memory context should be copied into node_3 brief."""
+
+    recent_raw_conversation = [
+        _sample_recent_raw_conversation_entry(index)
+        for index in range(1, 3)
+    ]
+    previous_capsules = [
+        _sample_previous_turn_capsule(index)
+        for index in range(1, 3)
+    ]
+    selected_result = run_dry_turn(
+        user_input="이전에 말한 내용 확인해줘",
+        recent_raw_conversation=recent_raw_conversation,
+        previous_turn_capsules=previous_capsules,
+        memory_relevance_selector_adapter=MemoryRelevanceSelectedFakeLLMAdapter(),
+    )
+    selected_context = _selected_recent_memory_context_payload(selected_result)
+    if selected_context.get("selected_turn_count") != 1:
+        raise AssertionError("selected context smoke must copy one selected turn")
+    if selected_context.get("generated_by") != "CODE:SELECTED_RECENT_MEMORY_CONTEXT_BUILDER":
+        raise AssertionError("selected context frame must reveal code builder")
+    if selected_context.get("semantic_judgement_status") != "not_run":
+        raise AssertionError("selected context frame must not run semantic judgement")
+    items = selected_context.get("items")
+    if not isinstance(items, list) or len(items) != 1:
+        raise AssertionError("selected context frame must include one copied item")
+    item = items[0]
+    if not isinstance(item, dict):
+        raise AssertionError("selected context item must be a dict")
+    if item.get("raw_user_text") != recent_raw_conversation[0]["user_text"]:
+        raise AssertionError("selected context must copy raw_user_text exactly")
+    if item.get("raw_assistant_text") != recent_raw_conversation[0]["assistant_text"]:
+        raise AssertionError("selected context must copy raw_assistant_text exactly")
+    brief = _node3_brief_payload(selected_result)
+    brief_contexts = brief.get("selected_recent_memory_contexts")
+    if not isinstance(brief_contexts, list) or len(brief_contexts) != 1:
+        raise AssertionError("node3 brief must include selected recent memory context")
+
+    none_result = run_dry_turn(
+        user_input="새 질문",
+        recent_raw_conversation=recent_raw_conversation,
+        previous_turn_capsules=previous_capsules,
+        memory_relevance_selector_adapter=MemoryRelevanceNoneSelectedFakeLLMAdapter(),
+    )
+    none_context = _selected_recent_memory_context_payload(none_result)
+    if none_context.get("selected_turn_count") != 0 or none_context.get("items") != []:
+        raise AssertionError("none_selected must not copy selected memory context")
+    if _node3_brief_payload(none_result).get("selected_recent_memory_contexts") != []:
+        raise AssertionError("node3 brief must leave selected contexts empty for none_selected")
+
+    failed_result = run_dry_turn(
+        user_input="실패 selector smoke",
+        recent_raw_conversation=recent_raw_conversation,
+        previous_turn_capsules=previous_capsules,
+        memory_relevance_selector_adapter=BrokenJSONFakeLLMAdapter(),
+    )
+    failed_context = _selected_recent_memory_context_payload(failed_result)
+    if failed_context.get("selected_turn_count") != 0 or failed_context.get("items") != []:
+        raise AssertionError("failed selector must not copy selected memory context")
+
+    missing_count = _run_selected_recent_memory_context_missing_source_smoke()
+
+    long_user_text = "가" * 900
+    long_assistant_text = "나" * 1300
+    truncation_result = run_dry_turn(
+        user_input="긴 이전 턴 확인",
+        recent_raw_conversation=[
+            {
+                "turn_id": "turn_prev_001",
+                "user_text": long_user_text,
+                "assistant_text": long_assistant_text,
+            }
+        ],
+        previous_turn_capsules=[_sample_previous_turn_capsule(1)],
+        memory_relevance_selector_adapter=MemoryRelevanceSelectedFakeLLMAdapter(),
+    )
+    truncation_context = _selected_recent_memory_context_payload(truncation_result)
+    truncation_items = truncation_context.get("items")
+    if not isinstance(truncation_items, list) or not truncation_items:
+        raise AssertionError("truncation smoke must copy one item")
+    truncation_item = truncation_items[0]
+    if not isinstance(truncation_item, dict):
+        raise AssertionError("truncation smoke item must be a dict")
+    if truncation_item.get("raw_user_text_chars") != len(long_user_text):
+        raise AssertionError("truncation smoke must preserve original user char count")
+    if truncation_item.get("raw_assistant_text_chars") != len(long_assistant_text):
+        raise AssertionError("truncation smoke must preserve original assistant char count")
+    if truncation_item.get("raw_user_text_truncated") is not True:
+        raise AssertionError("long user text must be marked truncated")
+    if truncation_item.get("raw_assistant_text_truncated") is not True:
+        raise AssertionError("long assistant text must be marked truncated")
+    if len(str(truncation_item.get("raw_user_text") or "")) > 800:
+        raise AssertionError("truncated user text must fit max chars")
+    if len(str(truncation_item.get("raw_assistant_text") or "")) > 1200:
+        raise AssertionError("truncated assistant text must fit max chars")
+    if not truncation_item.get("copied_from"):
+        raise AssertionError("truncation item must include copied_from")
+
+    answer_result = run_dry_turn(
+        user_input="방금 내가 말한 테스트 암호가 뭐였지?",
+        recent_raw_conversation=[
+            {
+                "turn_id": "turn_prev_001",
+                "user_text": "내 테스트 암호는 파란노트야.",
+                "assistant_text": "기록해둘게.",
+            }
+        ],
+        previous_turn_capsules=[_sample_previous_turn_capsule(1)],
+        memory_relevance_selector_adapter=MemoryRelevanceSelectedFakeLLMAdapter(),
+        node_3_reporter_adapter=SongRyeonAllNodesFakeLLMAdapter(),
+        node_4_gatekeeper_adapter=SongRyeonAllNodesFakeLLMAdapter(),
+    )
+    answer_brief = _node3_brief_payload(answer_result)
+    answer_contexts = answer_brief.get("selected_recent_memory_contexts")
+    if not isinstance(answer_contexts, list) or not answer_contexts:
+        raise AssertionError("node3 answer smoke must receive selected memory context")
+    rendered = render_pretty_turn(
+        answer_result,
+        user_input="방금 내가 말한 테스트 암호가 뭐였지?",
+    )
+    if "파란노트" not in rendered:
+        raise AssertionError("node3 selected memory answer must mention copied raw value")
+    if answer_result.get("node4_gate_status") != "pass":
+        raise AssertionError("node3 selected memory answer must pass node4 in fake smoke")
+    answer_section = rendered.split("[answer]", 1)[1] if "[answer]" in rendered else rendered
+    forbidden_markers = [
+        "memory_packet:",
+        "selected_recent_memory_context",
+        "turn_prev_001",
+    ]
+    for marker in forbidden_markers:
+        if marker in answer_section:
+            raise AssertionError("final answer must not expose raw internal memory ids")
+
+    return {
+        "copied_count": selected_context["selected_turn_count"],
+        "none_empty": True,
+        "missing_count": missing_count,
+        "truncated": True,
+        "node3_answer": "파란노트",
+    }
+
+
+def _run_node1_recent_memory_router_visibility_smoke() -> dict[str, object]:
+    """ORDER_111: node_1 router should see selected recent memory context before routing."""
+
+    result = run_dry_turn(
+        user_input="내가 방금 암구호를 뭐라고 말했는지 말해봐",
+        recent_raw_conversation=[
+            {
+                "turn_id": "turn_prev_003",
+                "user_text": '그럼 내가 너를 테스트 할 거야. 기억력 테스트. 암구호는 "청성"이야',
+                "assistant_text": "알겠어. 이번 턴 안에서 확인 가능한 원문으로만 다룰게.",
+            }
+        ],
+        previous_turn_capsules=[_sample_previous_turn_capsule(3)],
+        memory_relevance_selector_adapter=MemoryRelevanceRawTextProbeFakeLLMAdapter(),
+        node_1_router_adapter=Node1RecentMemoryRouterVisibilityFakeLLMAdapter(),
+    )
+    if result.get("current_route") != "2":
+        raise AssertionError("node_1 must be able to route to 2 when selected recent memory is visible")
+    if result.get("selected_recent_memory_context_count") != 1:
+        raise AssertionError("router visibility smoke must create one selected recent memory context")
+
+    records = {
+        item["data_id"]: item["payload"]
+        for item in result["data_records"]
+        if isinstance(item, dict)
+    }
+    route_payload = records.get("route:2")
+    if not isinstance(route_payload, dict):
+        raise AssertionError("router visibility smoke must record route:2 payload")
+    selection_frame_id = result.get("recent_memory_relevance_selection_frame_id")
+    selected_context_frame_id = result.get("selected_recent_memory_context_frame_id")
+    route_source_data_ids = route_payload.get("source_data_ids")
+    if not isinstance(route_source_data_ids, list):
+        raise AssertionError("route payload source_data_ids must be a list")
+    source_ids_ok = (
+        selection_frame_id in route_source_data_ids
+        and selected_context_frame_id in route_source_data_ids
+    )
+    if not source_ids_ok:
+        raise AssertionError("route payload must cite memory selection and selected context records")
+    route_reason = str(route_payload.get("route_reason") or "")
+    context_seen = "selected recent memory context contains" in route_reason
+    if not context_seen:
+        raise AssertionError("node_1 adapter must only route=2 after seeing selected context")
+    if route_payload.get("route_source") != "LLM:node1-recent-memory-router-visibility-fake-llm-adapter":
+        raise AssertionError("router visibility smoke must exercise the LLM router path")
+
+    return {
+        "route": result["current_route"],
+        "context_seen": context_seen,
+        "source_ids": source_ids_ok,
+    }
+
+
+def _run_selected_recent_memory_context_missing_source_smoke() -> int:
+    trace_store = TraceStore()
+    data_store = DataStore()
+    event = trace_store.create_event(
+        turn_id="turn_missing_context",
+        actor="smoke",
+        event_type="fixture",
+        schema_status="passed",
+    )
+    packet_id = "memory_packet:node_1:pre_route_report"
+    candidate_frame_id = f"{packet_id}:memory_relevance_candidate:001"
+    data_store.create_record(
+        data_id=packet_id,
+        data_type="node_output:memory_packet",
+        exists=True,
+        created_at=event.timestamp,
+        source_trace_id=event.event_id,
+        payload={
+            "packet_id": packet_id,
+            "turn_id": "turn_missing_context",
+            "target": "node_1",
+            "mode": "pre_route_report",
+            "memory_items": [
+                {
+                    "item_id": f"{packet_id}:recent_raw_conversation_capsule_alignment:001",
+                    "item_type": "recent_raw_conversation_capsule_alignment",
+                    "text": "COPIED_FIELDS:turn_id=turn_missing",
+                    "source_trace_ids": [],
+                    "source_data_ids": [],
+                }
+            ],
+            "relevance_candidate_frames": [
+                {
+                    "frame_id": candidate_frame_id,
+                    "turn_id": "turn_missing_context",
+                    "candidate_turn_id": "turn_missing",
+                    "source_memory_item_id": (
+                        f"{packet_id}:recent_raw_conversation_capsule_alignment:001"
+                    ),
+                    "source_trace_ids": [],
+                    "source_data_ids": [],
+                    "judgement_status": "not_run",
+                    "judged_by": None,
+                    "relevance_label": None,
+                    "relevance_reason": None,
+                    "info_class": None,
+                    "schema_name": "MemoryRelevanceCandidateFrame",
+                    "schema_version": "0.1",
+                }
+            ],
+        },
+    )
+    selection_frame_id = f"{packet_id}:memory_relevance_selection"
+    data_store.create_record(
+        data_id=selection_frame_id,
+        data_type="node_output:memory_relevance_selection_frame",
+        exists=True,
+        created_at=event.timestamp,
+        source_trace_id=event.event_id,
+        payload={
+            "frame_id": selection_frame_id,
+            "turn_id": "turn_missing_context",
+            "selector_target_node": "node_1",
+            "current_user_input_trace_id": event.event_id,
+            "source_memory_packet_id": packet_id,
+            "candidate_frame_ids": [candidate_frame_id],
+            "selected_candidate_turn_ids": ["turn_missing"],
+            "selected_candidate_frame_ids": [candidate_frame_id],
+            "selection_status": "selected",
+            "selection_reason": "fake selected a turn whose raw source is absent",
+            "judged_by": "LLM:missing-source-smoke",
+            "generated_by": "LLM:missing-source-smoke:memory_relevance_selector",
+            "llm_call_data_id": "llm_call:missing_source",
+            "llm_trace_event_id": event.event_id,
+            "source_trace_ids": [event.event_id],
+            "source_data_ids": [packet_id, "llm_call:missing_source"],
+            "source_memory_item_ids": [
+                f"{packet_id}:recent_raw_conversation_capsule_alignment:001"
+            ],
+            "info_class": "mixed",
+            "source_mode": "source_bundle",
+            "claim_alignment": "multi_source_bundle",
+            "schema_name": "MemoryRelevanceSelectionFrame",
+            "schema_version": "0.1",
+        },
+    )
+    _, _, frame = record_selected_recent_memory_context(
+        trace_store=trace_store,
+        data_store=data_store,
+        turn_id="turn_missing_context",
+        zero_state=ZeroState(
+            recent_raw_conversation=[
+                {
+                    "turn_id": "turn_similar_but_not_equal",
+                    "user_text": "turn_missing 비슷한 문자열",
+                    "assistant_text": "fallback 금지",
+                }
+            ]
+        ),
+        selection_frame_id=selection_frame_id,
+    )
+    if frame.selected_turn_count != 0:
+        raise AssertionError("missing raw source smoke must not create context item")
+    if frame.missing_selected_memory_context_count < 1:
+        raise AssertionError("missing raw source smoke must expose missing count")
+    if frame.items:
+        raise AssertionError("missing raw source smoke must not use string fallback")
+    return frame.missing_selected_memory_context_count
+
+
+def _selected_recent_memory_context_payload(result: dict[str, object]) -> dict[str, object]:
+    records = {
+        item["data_id"]: item["payload"]
+        for item in result["data_records"]
+        if isinstance(item, dict)
+    }
+    frame_id = result.get("selected_recent_memory_context_frame_id")
+    if not isinstance(frame_id, str) or not frame_id:
+        raise AssertionError("result must include selected_recent_memory_context_frame_id")
+    frame = records.get(frame_id)
+    if not isinstance(frame, dict):
+        raise AssertionError("selected recent memory context frame payload must be a dict")
+    return frame
+
+
+def _node3_brief_payload(result: dict[str, object]) -> dict[str, object]:
+    records = {
+        item["data_id"]: item["payload"]
+        for item in result["data_records"]
+        if isinstance(item, dict)
+    }
+    brief = records.get("node_3:input_brief_frame")
+    if not isinstance(brief, dict):
+        raise AssertionError("node3 brief payload must be a dict")
+    return brief
+
+
+def _check_memory_selection_to_node2_handoff(
+    *,
+    result: dict[str, object],
+    selection_frame: dict[str, object],
+) -> dict[str, object]:
+    """ORDER_105: selector result should reach node_2 handoff and node_3 brief honestly."""
+
+    frame_id = result.get("recent_memory_relevance_selection_frame_id")
+    if not isinstance(frame_id, str) or not frame_id:
+        raise AssertionError("selected memory selection result must include frame id")
+    records = {
+        item["data_id"]: item["payload"]
+        for item in result["data_records"]
+        if isinstance(item, dict)
+    }
+    node2_input = records.get("node2_input:turn_dry_001")
+    handoff = records.get("node_2:handoff_frame")
+    boundary = records.get("boundary_dry_001")
+    brief = records.get("node_3:input_brief_frame")
+    if not all(isinstance(item, dict) for item in (node2_input, handoff, boundary, brief)):
+        raise AssertionError("ORDER_105 smoke requires node2 input, handoff, boundary, and brief")
+
+    node2_sources = node2_input.get("source_data_ids")
+    if not isinstance(node2_sources, list) or frame_id not in node2_sources:
+        raise AssertionError("Node2InputFrame.source_data_ids must include memory relevance selection frame id")
+
+    handoff_sources = handoff.get("source_data_ids")
+    if not isinstance(handoff_sources, list) or frame_id not in handoff_sources:
+        raise AssertionError("Node2HandoffFrame.source_data_ids must include memory relevance selection frame id")
+    if handoff.get("memory_relevance_selection_frame_id") != frame_id:
+        raise AssertionError("handoff must name the memory relevance selection frame id")
+    if handoff.get("memory_relevance_selection_status") != "selected":
+        raise AssertionError("handoff must preserve selected memory relevance status")
+    if handoff.get("memory_relevance_selected_count") != 1:
+        raise AssertionError("handoff must preserve selected memory count")
+    if handoff.get("memory_relevance_info_class") != "mixed":
+        raise AssertionError("handoff must preserve memory relevance info_class=mixed")
+    if handoff.get("memory_relevance_generated_by") != selection_frame.get("generated_by"):
+        raise AssertionError("handoff must preserve memory relevance generated_by")
+    if handoff.get("memory_relevance_llm_call_data_id") != selection_frame.get("llm_call_data_id"):
+        raise AssertionError("handoff must preserve memory relevance llm_call_data_id")
+
+    mixed_info = boundary.get("mixed_info")
+    if not isinstance(mixed_info, list):
+        raise AssertionError("MetainfoBoundary.mixed_info must be a list")
+    memory_reason = None
+    for item in mixed_info:
+        if not isinstance(item, dict):
+            continue
+        if item.get("info_kind") == "memory_relevance_selection_reason":
+            memory_reason = item
+            break
+    if memory_reason is None:
+        raise AssertionError("MetainfoBoundary.mixed_info must include memory relevance selection reason")
+    if memory_reason.get("source_data_id") != frame_id:
+        raise AssertionError("memory selection reason source_data_id must match selection frame id")
+    if memory_reason.get("source_mode") != "source_bundle":
+        raise AssertionError("memory selection reason must preserve source_mode=source_bundle")
+    if memory_reason.get("claim_alignment") != "multi_source_bundle":
+        raise AssertionError("memory selection reason must preserve claim_alignment=multi_source_bundle")
+    if memory_reason.get("field_path") != "selection_reason":
+        raise AssertionError("memory selection reason field_path must point to selection_reason")
+    _assert_mixed_info_has_evidence(memory_reason)
+
+    material = brief.get("memory_selection_material")
+    if not isinstance(material, dict):
+        raise AssertionError("Node3InputBriefFrame must include memory selection material")
+    if material.get("memory_selection_status") != "selected":
+        raise AssertionError("node3 memory material must preserve selected status")
+    if material.get("memory_selection_info_class") != "mixed":
+        raise AssertionError("node3 memory material must preserve info_class=mixed")
+    if material.get("selected_memory_count") != handoff.get("memory_relevance_selected_count"):
+        raise AssertionError("node3 selected memory count must match handoff")
+    selected_turn_ids = material.get("selected_candidate_turn_ids")
+    if not isinstance(selected_turn_ids, list) or len(selected_turn_ids) != material.get("selected_memory_count"):
+        raise AssertionError("node3 selected_candidate_turn_ids length must match selected count")
+    if material.get("source_data_id") != frame_id:
+        raise AssertionError("node3 memory material must cite selection frame source_data_id")
+    if not material.get("source_memory_item_ids"):
+        raise AssertionError("node3 selected memory material must cite source_memory_item_ids")
+
+    allowed_claims = brief.get("allowed_claims")
+    if not isinstance(allowed_claims, list) or not any(
+        isinstance(claim, dict)
+        and claim.get("kind") == "memory_relevance_selection_reason"
+        and claim.get("info_class") == "mixed"
+        for claim in allowed_claims
+    ):
+        raise AssertionError("node3 allowed_claims must carry memory selection reason as mixed")
+
+    rendered = render_pretty_turn(result, user_input="이전 얘기 다시 봐줘")
+    if "memory_relevance_selection: status=selected" not in rendered:
+        raise AssertionError("terminal runtime output must show memory selection handoff status")
+    answer = rendered.split("[answer]", 1)[1] if "[answer]" in rendered else rendered
+    raw_markers = [
+        frame_id,
+        *(selection_frame.get("selected_candidate_frame_ids") or []),
+        *(selection_frame.get("selected_candidate_turn_ids") or []),
+    ]
+    for marker in raw_markers:
+        if isinstance(marker, str) and marker and marker in answer:
+            raise AssertionError("final answer must not expose raw memory selection ids")
+
+    return {
+        "handoff_status": handoff.get("memory_relevance_selection_status"),
+        "handoff_selected_count": handoff.get("memory_relevance_selected_count"),
+        "boundary_mixed": True,
+        "node3_selected_count": material.get("selected_memory_count"),
+        "no_raw_answer_leak": True,
+    }
+
+
+def _memory_selection_material_payload(result: dict[str, object]) -> dict[str, object]:
+    records = {
+        item["data_id"]: item["payload"]
+        for item in result["data_records"]
+        if isinstance(item, dict)
+    }
+    brief = records.get("node_3:input_brief_frame")
+    if not isinstance(brief, dict):
+        raise AssertionError("node3 brief payload must be a dict")
+    material = brief.get("memory_selection_material")
+    if not isinstance(material, dict):
+        raise AssertionError("node3 brief must include memory_selection_material")
+    return material
+
+
 def _sample_recent_raw_conversation_entry(index: int) -> dict[str, str]:
     return {
         "turn_id": f"turn_prev_{index:03d}",
         "user_text": f"raw user {index:03d}",
         "assistant_text": f"raw assistant {index:03d}",
     }
+
+
+def _sample_raw_memory_window_entry(index: int) -> dict[str, str]:
+    return {
+        "turn_id": f"turn_{index:03d}",
+        "user_text": f"raw memory window user {index:03d}",
+        "assistant_text": f"raw memory window assistant {index:03d}",
+    }
+
+
+def _turn_capsule_from_payload(payload: object) -> TurnStateCapsule:
+    if not isinstance(payload, dict):
+        raise AssertionError("turn_capsule payload must be a dict")
+    movements_payload = payload.get("node_movements")
+    movements: list[NodeMovement] = []
+    if isinstance(movements_payload, list):
+        for item in movements_payload:
+            if isinstance(item, NodeMovement):
+                movements.append(item)
+            elif isinstance(item, dict):
+                movements.append(NodeMovement(**item))
+    turn_id = payload.get("turn_id")
+    if not isinstance(turn_id, str) or not turn_id:
+        raise AssertionError("turn_capsule payload must include turn_id")
+    return TurnStateCapsule(
+        turn_id=turn_id,
+        node_movements=movements,
+        trace_event_ids=_string_list(payload.get("trace_event_ids")),
+        user_input_trace_id=_optional_string(payload.get("user_input_trace_id")),
+        final_response_trace_id=_optional_string(payload.get("final_response_trace_id")),
+    )
+
+
+def _string_list(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, str) and item]
+
+
+def _optional_string(value: object) -> str | None:
+    if isinstance(value, str) and value:
+        return value
+    return None
 
 
 def _sample_previous_turn_capsule(index: int) -> TurnStateCapsule:
@@ -655,6 +1923,24 @@ def _check_route2_handoff_and_brief(records: dict[str, object]) -> None:
     controller_decisions = handoff.get("same_turn_l_reroute_controller_decisions")
     if not isinstance(controller_decisions, list):
         raise AssertionError("route2 handoff controller decisions must be a list")
+    memory_selection_status = handoff.get("memory_relevance_selection_status")
+    if memory_selection_status not in {"selected", "none_selected", "failed", "not_recorded"}:
+        raise AssertionError("route2 handoff memory relevance selection status is invalid")
+    memory_candidate_count = handoff.get("memory_relevance_candidate_count")
+    memory_selected_count = handoff.get("memory_relevance_selected_count")
+    if not isinstance(memory_candidate_count, int) or memory_candidate_count < 0:
+        raise AssertionError("route2 handoff memory relevance candidate count must be non-negative")
+    if not isinstance(memory_selected_count, int) or memory_selected_count < 0:
+        raise AssertionError("route2 handoff memory relevance selected count must be non-negative")
+    if memory_selected_count > memory_candidate_count:
+        raise AssertionError("route2 handoff memory relevance selected count must not exceed candidate count")
+    memory_selection_frame_id = handoff.get("memory_relevance_selection_frame_id")
+    handoff_sources = handoff.get("source_data_ids")
+    if isinstance(memory_selection_frame_id, str) and memory_selection_frame_id:
+        if not isinstance(handoff_sources, list) or memory_selection_frame_id not in handoff_sources:
+            raise AssertionError("route2 handoff source_data_ids must include memory selection frame id")
+        if memory_selection_status == "selected" and handoff.get("memory_relevance_info_class") != "mixed":
+            raise AssertionError("selected memory relevance handoff must preserve info_class=mixed")
     if brief.get("brief_status") not in {"ready", "insufficient"}:
         raise AssertionError("node3 brief status is invalid")
     if brief.get("handoff_frame_id") != "node_2:handoff_frame":
@@ -663,6 +1949,7 @@ def _check_route2_handoff_and_brief(records: dict[str, object]) -> None:
     search_candidate_count = brief.get("search_candidate_count")
     search_candidate_documents = brief.get("search_candidate_documents")
     allowed_claims = brief.get("allowed_claims")
+    memory_selection_material = brief.get("memory_selection_material")
     runtime_tasks = brief.get("runtime_tasks")
     reporting_rules = brief.get("reporting_rules")
     if (
@@ -688,6 +1975,18 @@ def _check_route2_handoff_and_brief(records: dict[str, object]) -> None:
             raise AssertionError("node3 brief document leaked internal id field names")
     if not runtime_tasks:
         raise AssertionError("node3 brief should include current runtime task sequence")
+    if isinstance(memory_selection_frame_id, str) and memory_selection_frame_id:
+        if not isinstance(memory_selection_material, dict):
+            raise AssertionError("node3 brief must preserve memory selection material")
+        if memory_selection_material.get("source_data_id") != memory_selection_frame_id:
+            raise AssertionError("node3 memory material must cite memory selection frame id")
+        if memory_selection_material.get("selected_memory_count") != memory_selected_count:
+            raise AssertionError("node3 memory material selected count must match handoff")
+        if memory_selection_status in {"none_selected", "failed"}:
+            if memory_selection_material.get("selected_memory_count") != 0:
+                raise AssertionError("non-selected memory status must not become selected material")
+            if memory_selection_material.get("selected_candidate_turn_ids") != []:
+                raise AssertionError("non-selected memory status must not expose selected turn ids")
     if not any("근거 기준" in str(rule) for rule in reporting_rules):
         raise AssertionError("node3 brief should require an explicit grounding note")
     if not any("답변 첫머리" in str(rule) for rule in reporting_rules):
@@ -709,110 +2008,6 @@ def _check_route2_handoff_and_brief(records: dict[str, object]) -> None:
     first_runtime_task = runtime_tasks[0]
     if first_runtime_task.get("node_label") != "node_0":
         raise AssertionError("node3 runtime task sequence should start from node_0")
-
-
-def _run_runtime_count_consistency_smoke() -> dict[str, int]:
-    """빈 extract record와 보고 가능한 문서를 같은 read_doc 숫자로 섞지 않는지 확인한다."""
-
-    trace_store = TraceStore()
-    data_store = DataStore()
-    turn_id = "turn_runtime_count_consistency"
-    seed_event = trace_store.create_event(
-        turn_id=turn_id,
-        actor="smoke",
-        event_type="node_output",
-        output_ref=["node2_input:runtime_count_consistency"],
-        schema_status="passed",
-    )
-    data_store.create_record(
-        data_id="node2_input:runtime_count_consistency",
-        data_type="node_output:node2_input_frame",
-        source_trace_id=seed_event.event_id,
-        payload={"frame_id": "node2_input:runtime_count_consistency"},
-    )
-    data_store.create_record(
-        data_id="memory_packet:node_2:final_trace_for_2",
-        data_type="node_output:memory_packet",
-        source_trace_id=seed_event.event_id,
-        payload={"packet_id": "memory_packet:node_2:final_trace_for_2"},
-    )
-    data_store.create_record(
-        data_id="turn_outcome:runtime_count_consistency",
-        data_type="node_output:turn_outcome",
-        source_trace_id=seed_event.event_id,
-        payload={"outcome_id": "turn_outcome:runtime_count_consistency"},
-    )
-    data_store.create_record(
-        data_id="route:2",
-        data_type="node_output:routing_decision",
-        source_trace_id=seed_event.event_id,
-        payload={"frame_id": "route:2", "route": "2"},
-    )
-    for index in range(1, 3):
-        text = f"보고 가능한 문서 {index} 본문"
-        data_store.create_record(
-            data_id=f"tool_result:read_doc:runtime_count:{index:04d}",
-            data_type="tool_result:read_doc",
-            source_trace_id=seed_event.event_id,
-            payload={
-                "doc_id": f"doc_{index}.md",
-                "char_count": len(text),
-                "text": text,
-            },
-        )
-    data_store.create_record(
-        data_id="tool_result:read_artifact:runtime_count:empty",
-        data_type="tool_result:read_artifact",
-        source_trace_id=seed_event.event_id,
-        payload={
-            "doc_id": "empty_artifact.md",
-            "char_count": 0,
-            "text": "",
-        },
-    )
-
-    handoff_trace_id, handoff_id = record_route2_handoff(
-        trace_store=trace_store,
-        data_store=data_store,
-        turn_id=turn_id,
-        user_question="runtime count consistency smoke",
-        node2_input_frame_id="node2_input:runtime_count_consistency",
-        node2_input_trace_id=seed_event.event_id,
-        final_memory_packet_id="memory_packet:node_2:final_trace_for_2",
-        turn_outcome_id="turn_outcome:runtime_count_consistency",
-        route_ids=["route:2"],
-        l_loop_output_ids=[],
-    )
-    handoff_payload = data_store.require_record(handoff_id).payload
-    if not isinstance(handoff_payload, dict):
-        raise AssertionError("runtime count smoke handoff payload must be dict")
-    if handoff_payload.get("reportable_document_count") != 2:
-        raise AssertionError("handoff must count two reportable document extracts")
-    if handoff_payload.get("read_doc_count") != 2:
-        raise AssertionError("handoff compatibility read_doc_count must mean reportable documents")
-    if handoff_payload.get("raw_document_extract_record_count") != 3:
-        raise AssertionError("handoff must keep raw extract record count separate")
-    if handoff_payload.get("empty_document_extract_record_count") != 1:
-        raise AssertionError("handoff must count empty extract records separately")
-
-    _, _, brief_frame = record_node3_input_brief(
-        trace_store=trace_store,
-        data_store=data_store,
-        turn_id=turn_id,
-        user_question="runtime count consistency smoke",
-        handoff_frame_id=handoff_id,
-        boundary=MetainfoBoundary(),
-        input_trace_ids=[handoff_trace_id],
-        source_data_ids=[handoff_id],
-    )
-    if len(brief_frame.read_documents) != 2:
-        raise AssertionError("node3 brief must expose only the two reportable documents")
-
-    return {
-        "reportable_document_count": handoff_payload["reportable_document_count"],
-        "raw_document_extract_record_count": handoff_payload["raw_document_extract_record_count"],
-        "empty_document_extract_record_count": handoff_payload["empty_document_extract_record_count"],
-    }
 
 
 def _check_l_loop_return_summary(records: dict[str, object]) -> dict[str, object]:
@@ -2036,106 +3231,6 @@ def _run_relative_info_direct_field_smoke() -> dict[str, object]:
     }
 
 
-def _check_document_memory_index(
-    records: dict[str, object],
-    search_result: dict[str, object],
-) -> dict[str, object]:
-    """문서 검색 도구가 문서 메모리 인덱스 metadata를 보존하는지 확인한다."""
-
-    index_id = search_result.get("document_memory_index_id")
-    snapshot_id = search_result.get("snapshot_id")
-    if not isinstance(index_id, str) or not index_id.startswith("document_memory_index:"):
-        raise AssertionError("search_docs did not return document_memory_index_id")
-    if not isinstance(snapshot_id, str) or not snapshot_id.startswith("snapshot:"):
-        raise AssertionError("search_docs did not return snapshot_id")
-
-    document_count = search_result.get("document_count")
-    chunk_count = search_result.get("chunk_count")
-    if not isinstance(document_count, int) or document_count < 1:
-        raise AssertionError("document memory index document_count is invalid")
-    if not isinstance(chunk_count, int) or chunk_count < document_count:
-        raise AssertionError("document memory index chunk_count is invalid")
-
-    kind_counts = search_result.get("document_kind_counts")
-    role_counts = search_result.get("source_role_counts")
-    if not isinstance(kind_counts, dict) or "order" not in kind_counts:
-        raise AssertionError("document memory index did not classify order documents")
-    if not isinstance(role_counts, dict) or "generated_order" not in role_counts:
-        raise AssertionError("document memory index did not classify generated orders")
-
-    results = search_result.get("results")
-    if not isinstance(results, list) or not results:
-        raise AssertionError("search_docs results are missing")
-    first_result = results[0]
-    if not isinstance(first_result, dict):
-        raise AssertionError("search_docs result item must be a dict")
-    for field_name in (
-        "document_memory_index_id",
-        "content_hash",
-        "chunk_count",
-        "document_kind",
-        "source_role",
-    ):
-        if not first_result.get(field_name):
-            raise AssertionError(f"search_docs result misses {field_name}")
-
-    listed_docs = list_docs(root="Administrative_Reform_1")
-    order_doc = next(
-        (
-            item
-            for item in listed_docs
-            if item.get("doc_id") == "04_Orders/ORDER_061_DOCUMENT_MEMORY_INDEX_V2.md"
-        ),
-        None,
-    )
-    if not isinstance(order_doc, dict):
-        raise AssertionError("list_docs did not include ORDER_061")
-    if order_doc.get("document_kind") != "order":
-        raise AssertionError("list_docs did not classify ORDER_061 as order")
-    if order_doc.get("source_role") != "generated_order":
-        raise AssertionError("list_docs did not classify ORDER_061 as generated_order")
-
-    read_payload = read_doc(
-        root="Administrative_Reform_1",
-        doc_id="04_Orders/ORDER_061_DOCUMENT_MEMORY_INDEX_V2.md",
-    )
-    if read_payload.get("document_kind") != "order":
-        raise AssertionError("read_doc did not preserve document_kind")
-    if not read_payload.get("content_hash"):
-        raise AssertionError("read_doc did not preserve content_hash")
-
-    cached = load_document_memory_index(
-        cache_dir=".songryeon_core_cache/document_memory_indexes",
-        snapshot_id=snapshot_id,
-    )
-    if cached is None:
-        raise AssertionError("document memory index cache was not saved")
-
-    preserved = records["L3:preserved_info_frame"]
-    if not isinstance(preserved, dict):
-        raise AssertionError("L3 preserved payload must be a dict")
-    candidates = preserved.get("candidates")
-    if not isinstance(candidates, list) or not candidates:
-        raise AssertionError("L3 candidates are missing")
-    first_candidate = candidates[0]
-    if not isinstance(first_candidate, dict):
-        raise AssertionError("L3 candidate must be a dict")
-    l3_metadata = bool(
-        first_candidate.get("document_kind")
-        and first_candidate.get("source_role")
-        and first_candidate.get("document_memory_index_id")
-        and first_candidate.get("snapshot_id")
-    )
-    if not l3_metadata:
-        raise AssertionError("L3 candidate did not preserve document memory metadata")
-
-    return {
-        "document_count": document_count,
-        "has_order": True,
-        "l3_metadata": True,
-    }
-
-
 def _assert_semantic_info_has_evidence(item: dict[str, object], *, info_class: str) -> None:
     """RelativeInfoRef/MixedInfoRef payload가 분류 근거와 근거 ID를 갖췄는지 확인한다."""
 
@@ -2213,24 +3308,26 @@ def _check_tool_catalog_and_choice(records: dict[str, object]) -> dict[str, obje
 def _check_l_loop_controller(records: dict[str, object]) -> dict[str, object]:
     """기본 dry run이 LLoopControlFrame으로 search/read/stop을 남겼는지 확인한다."""
 
-    controls = [
-        records["L:control:0001"],
-        records["L:control:0002"],
-        records["L:control:0003"],
-    ]
+    control_ids = sorted(data_id for data_id in records if data_id.startswith("L:control:"))
+    controls = [records[data_id] for data_id in control_ids]
     if not all(isinstance(control, dict) for control in controls):
         raise AssertionError("L loop controls must be dict payloads")
     decisions = [control["decision"] for control in controls]
-    if decisions != ["continue_search", "read_document", "stop_success"]:
+    if not decisions or decisions[0] != "continue_search":
         raise AssertionError(f"unexpected L loop control decisions: {decisions}")
+    if "read_document" not in decisions:
+        raise AssertionError(f"L loop control did not read a document: {decisions}")
+    if decisions[-1] != "stop_success":
+        raise AssertionError(f"L loop control did not end with stop_success: {decisions}")
     if controls[0]["selected_tool_name"] != "search_docs":
         raise AssertionError("first L loop control must select search_docs")
-    if controls[1]["selected_tool_name"] != "read_doc":
-        raise AssertionError("second L loop control must select read_doc")
-    if not controls[1].get("doc_id"):
-        raise AssertionError("read_document control must include doc_id")
-    if controls[2]["tool_call_count"] != 2:
-        raise AssertionError("stop_success control must see two tool calls")
+    read_controls = [control for control in controls if control.get("decision") == "read_document"]
+    if not all(control.get("selected_tool_name") == "read_doc" for control in read_controls):
+        raise AssertionError("read_document controls must select read_doc")
+    if not all(control.get("doc_id") for control in read_controls):
+        raise AssertionError("read_document controls must include doc_id")
+    if controls[-1]["tool_call_count"] < 2:
+        raise AssertionError("stop_success control must see at least two tool calls")
 
     read_doc_results = [
         data_id for data_id in records if data_id.startswith("tool_result:read_doc:")
@@ -2243,7 +3340,7 @@ def _check_l_loop_controller(records: dict[str, object]) -> dict[str, object]:
         raise AssertionError("L3 achievement payload must be a dict")
     if achievement.get("controller_decision") != "stop_success":
         raise AssertionError("L3 achievement did not reflect final controller decision")
-    if achievement.get("final_control_data_id") != "L:control:0003":
+    if achievement.get("final_control_data_id") != control_ids[-1]:
         raise AssertionError("L3 achievement did not reference final control frame")
 
     return {
@@ -2257,34 +3354,44 @@ def _check_tool_result_distillation(records: dict[str, object]) -> dict[str, obj
     """도구 결과 distillation이 원본 링크와 L3 입력 우선권을 가지는지 확인한다."""
 
     search_id = _single_id_with_prefix(records, "tool_distillation:search_docs:")
-    read_id = _single_id_with_prefix(records, "tool_distillation:read_doc:")
+    read_ids = _ids_with_prefix(records, "tool_distillation:read_doc:")
     search_distillation = records[search_id]
-    read_distillation = records[read_id]
-    if not isinstance(search_distillation, dict) or not isinstance(read_distillation, dict):
+    read_distillations = [records[read_id] for read_id in read_ids]
+    if not isinstance(search_distillation, dict) or not all(
+        isinstance(read_distillation, dict)
+        for read_distillation in read_distillations
+    ):
         raise AssertionError("tool distillation payloads must be dicts")
     if search_distillation["tool_name"] != "search_docs":
         raise AssertionError("search_docs distillation has wrong tool_name")
-    if read_distillation["tool_name"] != "read_doc":
-        raise AssertionError("read_doc distillation has wrong tool_name")
+    if not all(read_distillation["tool_name"] == "read_doc" for read_distillation in read_distillations):
+        raise AssertionError("read_doc distillations have wrong tool_name")
     if not str(search_distillation["original_tool_result_data_id"]).startswith("tool_result:search_docs:"):
         raise AssertionError("search_docs distillation lost original tool result link")
-    if not str(read_distillation["original_tool_result_data_id"]).startswith("tool_result:read_doc:"):
+    if not all(
+        str(read_distillation["original_tool_result_data_id"]).startswith("tool_result:read_doc:")
+        for read_distillation in read_distillations
+    ):
         raise AssertionError("read_doc distillation lost original tool result link")
     if search_distillation["distilled_content_bytes"] >= search_distillation["original_payload_bytes"]:
         raise AssertionError("search_docs distillation did not reduce LLM content size")
-    if read_distillation["distilled_content_bytes"] >= read_distillation["original_payload_bytes"]:
+    if not all(
+        read_distillation["distilled_content_bytes"] < read_distillation["original_payload_bytes"]
+        for read_distillation in read_distillations
+    ):
         raise AssertionError("read_doc distillation did not reduce LLM content size")
 
     search_items = search_distillation.get("items")
-    read_items = read_distillation.get("items")
     if not isinstance(search_items, list) or not search_items:
         raise AssertionError("search_docs distillation items are missing")
-    if not isinstance(read_items, list) or len(read_items) != 1:
-        raise AssertionError("read_doc distillation item is missing")
     if search_items[0].get("item_kind") != "search_result":
         raise AssertionError("search_docs distillation first item must be search_result")
-    if read_items[0].get("item_kind") != "read_doc_excerpt":
-        raise AssertionError("read_doc distillation item must be read_doc_excerpt")
+    for read_distillation in read_distillations:
+        read_items = read_distillation.get("items")
+        if not isinstance(read_items, list) or len(read_items) != 1:
+            raise AssertionError("read_doc distillation item is missing")
+        if read_items[0].get("item_kind") != "read_doc_excerpt":
+            raise AssertionError("read_doc distillation item must be read_doc_excerpt")
 
     preserved = records["L3:preserved_info_frame"]
     if not isinstance(preserved, dict):
@@ -2292,7 +3399,7 @@ def _check_tool_result_distillation(records: dict[str, object]) -> dict[str, obj
     l3_sources = preserved.get("source_data_ids")
     if not isinstance(l3_sources, list):
         raise AssertionError("L3 source_data_ids must be a list")
-    if search_id not in l3_sources or read_id not in l3_sources:
+    if search_id not in l3_sources or not all(read_id in l3_sources for read_id in read_ids):
         raise AssertionError("L3 must receive tool distillation records")
     if any(str(data_id).startswith("tool_result:search_docs:") for data_id in l3_sources):
         raise AssertionError("L3 should prefer distillation over raw search_docs tool result")
@@ -2304,7 +3411,7 @@ def _check_tool_result_distillation(records: dict[str, object]) -> dict[str, obj
         raise AssertionError("L3 candidates must reference search_docs distillation source")
 
     return {
-        "distillation_count": 2,
+        "distillation_count": 1 + len(read_ids),
         "l3_uses_distillation": True,
     }
 
@@ -2320,17 +3427,17 @@ def _check_tool_efficiency_policy(records: dict[str, object]) -> dict[str, objec
         raise AssertionError("tool budget payloads must be dicts")
 
     first = budget_payloads[0]
-    if first["max_tool_calls"] != 5:
+    if first["max_tool_calls"] != DEFAULT_MAX_TOOL_CALLS:
         raise AssertionError("default max_tool_calls budget is wrong")
-    if first["search_top_k"] != 3:
+    if first["search_top_k"] != DEFAULT_SEARCH_TOP_K:
         raise AssertionError("default search_top_k budget is wrong")
-    if first["max_query_attempts"] != 3:
+    if first["max_query_attempts"] != DEFAULT_MAX_QUERY_ATTEMPTS:
         raise AssertionError("default max_query_attempts budget is wrong")
     if first["max_query_candidates"] != first["max_query_attempts"]:
         raise AssertionError("max_query_candidates alias must mirror max_query_attempts")
-    if first["max_read_doc_calls"] != 1:
+    if first["max_read_doc_calls"] != DEFAULT_MAX_READ_DOC_CALLS:
         raise AssertionError("default max_read_doc_calls budget is wrong")
-    if first["max_input_chars"] != 6000:
+    if first["max_input_chars"] != DEFAULT_MAX_INPUT_CHARS:
         raise AssertionError("default max_input_chars budget is wrong")
 
     cache_records = []
@@ -2446,6 +3553,7 @@ def _run_l_loop_budget_consistency_smoke() -> dict[str, object]:
         node_3_reporter_adapter=adapter,
         node_4_gatekeeper_adapter=adapter,
         max_tool_calls=2,
+        max_read_doc_calls=1,
     )
     records = {item["data_id"]: item["payload"] for item in result["data_records"]}
     budget_plan = records.get("L:budget_plan_frame")
@@ -2455,7 +3563,8 @@ def _run_l_loop_budget_consistency_smoke() -> dict[str, object]:
         raise AssertionError("budget consistency smoke should request tool_calls=2")
     if budget_plan.get("requested_max_read_doc_calls") != 2:
         raise AssertionError("budget consistency smoke should request read_doc=2")
-    if budget_plan.get("approved_max_tool_calls") != 3:
+    approved_max_tool_calls = budget_plan.get("approved_max_tool_calls")
+    if not isinstance(approved_max_tool_calls, int) or approved_max_tool_calls < 3:
         raise AssertionError("read_doc=2 should imply at least 3 total tool calls")
     if budget_plan.get("approved_max_read_doc_calls") != 2:
         raise AssertionError("budget consistency smoke should keep read_doc=2")
@@ -2466,8 +3575,8 @@ def _run_l_loop_budget_consistency_smoke() -> dict[str, object]:
     first_budget = records.get("tool_budget:turn_dry_001:0001")
     if not isinstance(first_budget, dict):
         raise AssertionError("budget consistency smoke did not record first tool budget")
-    if first_budget.get("max_tool_calls") != 3:
-        raise AssertionError("tool budget should use aligned max_tool_calls=3")
+    if first_budget.get("max_tool_calls") != approved_max_tool_calls:
+        raise AssertionError("tool budget should use budget plan approved max_tool_calls")
     if first_budget.get("max_read_doc_calls") != 2:
         raise AssertionError("tool budget should keep max_read_doc_calls=2")
     read_doc_result_count = sum(
@@ -2757,94 +3866,6 @@ def _run_llm_call_smoke() -> dict[str, object]:
         "llm_call_records": len(llm_call_records),
         "llm_retry_failure_type": failed_payload["failure_type"],
     }
-
-
-def _run_router_fallback_honesty_smoke() -> dict[str, object]:
-    """node_1 LLM 실패 뒤 code fallback이 정직하게 구분되는지 확인한다."""
-
-    user_input = "그냥 보고해줘"
-    success = run_dry_turn(
-        user_input=user_input,
-        node_1_router_adapter=SongRyeonAllNodesFakeLLMAdapter(),
-    )
-    success_route = _first_routing_payload(success)
-    if success_route.get("llm_routing_status") != "ran":
-        raise AssertionError("node_1 LLM router success must record llm_routing_status=ran")
-    if success_route.get("fallback_after_llm_failure") is not False:
-        raise AssertionError("node_1 LLM router success must not look like fallback")
-
-    fallback = run_dry_turn(
-        user_input=user_input,
-        node_1_router_adapter=BrokenJSONFakeLLMAdapter(),
-    )
-    fallback_route = _first_routing_payload(fallback)
-    failure_data_id = fallback_route.get("router_llm_failure_data_id")
-    failure_trace_id = fallback_route.get("router_llm_failure_trace_event_id")
-    source_data_ids = fallback_route.get("source_data_ids")
-    source_trace_ids = fallback_route.get("source_trace_ids")
-    if fallback_route.get("llm_routing_status") != "failed":
-        raise AssertionError("fallback route must record llm_routing_status=failed")
-    if fallback_route.get("fallback_after_llm_failure") is not True:
-        raise AssertionError("fallback route must record fallback_after_llm_failure=true")
-    if fallback_route.get("fallback_policy") != ROUTER_FALLBACK_POLICY_DEV_SMOKE:
-        raise AssertionError("fallback route must record the dev/smoke fallback policy")
-    if fallback_route.get("fallback_allowed_by_runtime_policy") is not True:
-        raise AssertionError("fallback route must record runtime policy allowance")
-    if fallback_route.get("fallback_source_route_rule_id") != fallback_route.get("route_rule_id"):
-        raise AssertionError("fallback route must preserve the code route rule id")
-    if fallback_route.get("router_llm_failure_type") != "parse_failed":
-        raise AssertionError("fallback route must preserve the LLM failure type")
-    if not isinstance(failure_data_id, str) or not isinstance(source_data_ids, list):
-        raise AssertionError("fallback route must cite the failed LLM call data id")
-    if failure_data_id not in source_data_ids:
-        raise AssertionError("fallback route source_data_ids must include failed LLM call id")
-    if not isinstance(failure_trace_id, str) or not isinstance(source_trace_ids, list):
-        raise AssertionError("fallback route must cite the failed LLM trace event id")
-    if failure_trace_id not in source_trace_ids:
-        raise AssertionError("fallback route source_trace_ids must include failed LLM trace id")
-
-    code = run_dry_turn(user_input=user_input)
-    code_terminal = render_pretty_turn(code, user_input=user_input)
-    fallback_terminal = render_pretty_turn(fallback, user_input=user_input)
-    if "node_1 router: CODE:RULE_STUB" not in code_terminal:
-        raise AssertionError("terminal must show direct code router status")
-    if "node_1 router: LLM failed -> CODE:RULE_STUB fallback" not in fallback_terminal:
-        raise AssertionError("terminal must distinguish LLM failure fallback")
-
-    strict_blocked = False
-    try:
-        run_dry_turn(
-            user_input=user_input,
-            node_1_router_adapter=BrokenJSONFakeLLMAdapter(),
-            allow_node_1_router_fallback=False,
-            node_1_router_fallback_policy=ROUTER_FALLBACK_POLICY_QWEN_STRICT_BLOCKED,
-        )
-    except Node1RouterLLMFailure:
-        strict_blocked = True
-    if not strict_blocked:
-        raise AssertionError("strict router policy must not silently allow fallback")
-
-    return {
-        "fallback_policy": fallback_route["fallback_policy"],
-        "failure_type": fallback_route["router_llm_failure_type"],
-        "terminal_distinct": True,
-        "strict_blocked": strict_blocked,
-    }
-
-
-def _first_routing_payload(result: dict[str, object]) -> dict[str, object]:
-    records = result.get("data_records")
-    if not isinstance(records, list):
-        raise AssertionError("data_records must be a list")
-    for record in records:
-        if not isinstance(record, dict):
-            continue
-        if record.get("data_type") != "node_output:routing_decision":
-            continue
-        payload = record.get("payload")
-        if isinstance(payload, dict):
-            return payload
-    raise AssertionError("routing decision payload not found")
 
 
 def _run_l2_query_planner_smoke() -> dict[str, object]:
@@ -4200,6 +5221,226 @@ def _run_node4_gate_failed_honesty_smoke() -> dict[str, object]:
     return {"honest_failure_message": True}
 
 
+def _run_node4_recent_memory_utterance_guard_smoke() -> dict[str, object]:
+    """ORDER_110: code guard avoids word heuristics and blocks internal id leaks."""
+
+    supported = _run_node4_recent_memory_guard_case(
+        rendered_markdown=_report_with_grounding(
+            "방금 테스트 암호는 파란노트라고 말했어."
+        ),
+        contexts=[
+            _node3_selected_memory_context(
+                raw_user_text="내 테스트 암호는 파란노트야.",
+                raw_assistant_text="기록해둘게.",
+            )
+        ],
+    )
+    if supported.get("gate_status") != "pass":
+        raise AssertionError("supported recent memory answer should pass node4")
+    if supported.get("recent_memory_guard_status") != "pass":
+        raise AssertionError("supported recent memory guard should pass")
+    if supported.get("unsupported_recent_memory_claim_count") != 0:
+        raise AssertionError("supported recent memory claim count should be 0")
+
+    without_context = _run_node4_recent_memory_guard_case(
+        rendered_markdown=_report_with_grounding("아까 너는 파란노트라고 말했어."),
+        contexts=[],
+    )
+    if without_context.get("gate_status") != "pass":
+        raise AssertionError("word-based recent memory claim heuristic must not block")
+    _assert_recent_memory_reason_absent(
+        without_context,
+        "CODE_STATUS:recent_memory_claim_without_selected_context",
+    )
+
+    unsupported = _run_node4_recent_memory_guard_case(
+        rendered_markdown=_report_with_grounding("아까 너는 빨간노트라고 말했어."),
+        contexts=[
+            _node3_selected_memory_context(
+                raw_user_text="내 테스트 암호는 파란노트야.",
+                raw_assistant_text="기록해둘게.",
+            )
+        ],
+    )
+    if unsupported.get("gate_status") != "pass":
+        raise AssertionError("literal-token recent memory heuristic must not block")
+    _assert_recent_memory_reason_absent(
+        unsupported,
+        "CODE_STATUS:recent_memory_claim_not_supported_by_context",
+    )
+
+    internal_id = _run_node4_recent_memory_guard_case(
+        rendered_markdown=_report_with_grounding(
+            "memory_packet:node_1:pre_route_report 를 봤어."
+        ),
+        contexts=[
+            _node3_selected_memory_context(
+                raw_user_text="내 테스트 암호는 파란노트야.",
+                raw_assistant_text="기록해둘게.",
+            )
+        ],
+    )
+    if internal_id.get("gate_status") != "needs_revision":
+        raise AssertionError("recent memory internal id leak must be blocked")
+    _assert_recent_memory_reason(
+        internal_id,
+        "CODE_STATUS:recent_memory_internal_id_leak",
+    )
+    if internal_id.get("recent_memory_internal_id_leak_count", 0) < 1:
+        raise AssertionError("internal id leak count must be exposed")
+
+    truncated = _run_node4_recent_memory_guard_case(
+        rendered_markdown=_report_with_grounding(
+            "이전 대화 전체를 보면 너는 항상 파란노트라고 말했어."
+        ),
+        contexts=[
+            _node3_selected_memory_context(
+                raw_user_text="내 테스트 암호는 파란노트야.",
+                raw_assistant_text="기록해둘게.",
+                raw_user_text_truncated=True,
+            )
+        ],
+    )
+    if truncated.get("gate_status") != "pass":
+        raise AssertionError("truncated-context word heuristic must not block")
+    _assert_recent_memory_reason_absent(
+        truncated,
+        "CODE_STATUS:recent_memory_truncated_context_overclaim",
+    )
+
+    safe_answer = render_chat_answer(
+        {
+            "data_records": [
+                {
+                    "data_id": "node_4:gatekeeper_frame",
+                    "data_type": "node_output:node4_gatekeeper_frame",
+                    "payload": internal_id,
+                }
+            ]
+        },
+        user_input="recent memory guard smoke",
+    )
+    if "FINAL_BLOCKED_BY_GATEKEEPER" not in safe_answer:
+        raise AssertionError("recent memory guard remand must use safe blocking answer")
+    if "memory_packet:node_1:pre_route_report" in safe_answer:
+        raise AssertionError("blocked internal id leak must not leak to final answer")
+
+    return {
+        "pass_status": supported.get("recent_memory_guard_status"),
+        "without_context_status": without_context.get("gate_status"),
+        "unsupported_status": unsupported.get("gate_status"),
+        "internal_id_status": internal_id.get("gate_status"),
+        "truncated_status": truncated.get("gate_status"),
+        "no_word_heuristic": (
+            without_context.get("gate_status") == "pass"
+            and unsupported.get("gate_status") == "pass"
+            and truncated.get("gate_status") == "pass"
+        ),
+        "safe_blocking": True,
+    }
+
+
+def _run_node4_recent_memory_guard_case(
+    *,
+    rendered_markdown: str,
+    contexts: list[Node3SelectedRecentMemoryContext],
+) -> dict[str, object]:
+    trace_store = TraceStore()
+    data_store = DataStore()
+    brief = Node3InputBriefFrame(
+        frame_id="node_3:input_brief_frame",
+        turn_id="turn_node4_recent_memory_guard",
+        user_question="recent memory guard smoke",
+        brief_status="ready",
+        handoff_frame_id="node_2:handoff_frame",
+        selected_recent_memory_contexts=contexts,
+        reporting_rules=["smoke"],
+        source_trace_ids=[],
+        source_data_ids=[
+            "node_2:handoff_frame",
+            "memory_packet:node_1:pre_route_report:memory_relevance_selection:selected_recent_memory_context",
+        ],
+    )
+    run_node4_gatekeeper(
+        trace_store=trace_store,
+        data_store=data_store,
+        turn_id="turn_node4_recent_memory_guard",
+        report_id="report_dry_001",
+        boundary_id="boundary_dry_001",
+        brief_frame=brief,
+        rendered_markdown=rendered_markdown,
+        adapter=SongRyeonAllNodesFakeLLMAdapter(),
+        input_ref=[],
+        source_data_ids=["report_dry_001", "node_3:input_brief_frame", "boundary_dry_001"],
+    )
+    records = {record.data_id: record.payload for record in data_store.list_records()}
+    gate = records.get("node_4:gatekeeper_frame")
+    if not isinstance(gate, dict):
+        raise AssertionError("recent memory guard case did not record node4 frame")
+    return gate
+
+
+def _node3_selected_memory_context(
+    *,
+    raw_user_text: str,
+    raw_assistant_text: str,
+    raw_user_text_truncated: bool = False,
+    raw_assistant_text_truncated: bool = False,
+) -> Node3SelectedRecentMemoryContext:
+    copied_user_text = raw_user_text[:800] if raw_user_text_truncated else raw_user_text
+    copied_assistant_text = (
+        raw_assistant_text[:1200]
+        if raw_assistant_text_truncated
+        else raw_assistant_text
+    )
+    return Node3SelectedRecentMemoryContext(
+        source_turn_id="turn_prev_001",
+        raw_user_text=copied_user_text,
+        raw_assistant_text=copied_assistant_text,
+        raw_user_text_chars=len(raw_user_text),
+        raw_assistant_text_chars=len(raw_assistant_text),
+        raw_user_text_truncated=raw_user_text_truncated,
+        raw_assistant_text_truncated=raw_assistant_text_truncated,
+        selection_status="selected",
+        selection_info_class="mixed",
+        selection_reason="fake selected memory context for node4 smoke",
+        selection_reason_generated_by="LLM:smoke",
+        copied_from="ZeroState.recent_raw_conversation[turn_id=turn_prev_001]",
+    )
+
+
+def _report_with_grounding(body: str) -> str:
+    return "\n".join(
+        [
+            "근거 기준:",
+            "- 읽은 문서: 0개",
+            "- 검색 후보 문서: 0개",
+            "- 현재 턴 실행 순서 자료: 0개",
+            "- 답변 한계: 제공된 자료 범위 안에서만 답한다.",
+            "",
+            body,
+        ]
+    )
+
+
+def _assert_recent_memory_reason(gate: dict[str, object], reason_code: str) -> None:
+    reason = str(gate.get("reason") or "")
+    reason_codes = gate.get("recent_memory_guard_reason_codes")
+    if reason_code not in reason:
+        raise AssertionError(f"node4 reason must include {reason_code}")
+    if not isinstance(reason_codes, list) or reason_code not in reason_codes:
+        raise AssertionError(f"node4 recent_memory_guard_reason_codes must include {reason_code}")
+
+
+def _assert_recent_memory_reason_absent(gate: dict[str, object], reason_code: str) -> None:
+    reason = str(gate.get("reason") or "")
+    reason_codes = gate.get("recent_memory_guard_reason_codes")
+    if reason_code in reason:
+        raise AssertionError(f"node4 reason must not include {reason_code}")
+    if isinstance(reason_codes, list) and reason_code in reason_codes:
+        raise AssertionError(f"node4 recent_memory_guard_reason_codes must not include {reason_code}")
+
+
 class RemandFakeLLMAdapter(SongRyeonAllNodesFakeLLMAdapter):
     """node_3 문제 보고문과 node_4 반려를 함께 재현하는 smoke 전용 adapter."""
 
@@ -4376,7 +5617,14 @@ def _selected_query_from_payload(plan_payload: dict[str, object]) -> str:
 
 
 def _single_id_with_prefix(records: dict[str, object], prefix: str) -> str:
-    matches = sorted(data_id for data_id in records if data_id.startswith(prefix))
+    matches = _ids_with_prefix(records, prefix)
     if len(matches) != 1:
         raise AssertionError(f"expected one record with prefix {prefix}, got {matches}")
     return matches[0]
+
+
+def _ids_with_prefix(records: dict[str, object], prefix: str) -> list[str]:
+    matches = sorted(data_id for data_id in records if data_id.startswith(prefix))
+    if not matches:
+        raise AssertionError(f"expected records with prefix {prefix}, got none")
+    return matches

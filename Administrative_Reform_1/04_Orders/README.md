@@ -2,7 +2,7 @@
 
 발주서는 개발 지도에서 내려온 실무 계획서다.
 
-현재 정식 발주서는 `ORDER_001`부터 `ORDER_101`까지 있다.
+현재 정식 발주서는 `ORDER_001`부터 `ORDER_117`까지 있다.
 
 `ORDER_066`부터 `ORDER_075`까지는 메타정보 관리법을 실제 런타임과 LLM 노드 배선에 적용하기 위한 복구 로드맵이다.
 
@@ -41,6 +41,38 @@
 `ORDER_100`은 장기기억 DB를 만들기 전에 0 기억공급관이 최근 3턴 `TurnStateCapsule` 색인 좌표를 `pre_route_report` memory packet에 안전하게 공급하는 발주서다.
 
 `ORDER_101`은 최근 8턴 raw conversation과 `TurnStateCapsule`을 `turn_id` 기준으로 대응시켜, 이번 발주에서는 관련성 판단이나 요약을 구현하지 않고 alignment 좌표만 `pre_route_report` memory packet에 공급하는 발주서다.
+
+`ORDER_102`는 특정 하나의 절대정보에 직접 대응하는 LLM 의미 판단이 `relative` 정보로 보존되는지 확인하는 smoke 발주서다.
+
+`ORDER_103`은 최근 raw-capsule alignment를 LLM selector가 나중에 판단할 수 있는 `MemoryRelevanceCandidateFrame` 후보 좌표로 보존하는 발주서다.
+
+`ORDER_104`는 최근 기억 후보 중 현재 입력과 관련 있어 보이는 후보를 LLM selector가 고르되, 실패 시 code fallback 없이 실패/none 상태를 명시하는 발주서다.
+
+`ORDER_105`는 `MemoryRelevanceSelectionFrame`을 node_2 handoff와 node_3 brief까지 출처 달린 mixed 판단으로 전달하는 발주서다.
+
+`ORDER_106`은 턴 완료 전에도 trace event progress line을 볼 수 있게 `--live-trace`를 여는 발주서다.
+
+`ORDER_107`은 최근 원문 기억 창이 9턴으로 넘칠 때 최신 5턴을 active raw window로 남기고 오래된 4턴을 의미 요약 없이 compression candidate 좌표로 분리하는 발주서다.
+
+`ORDER_108`은 qwen-chat 세션 안에서 recent raw conversation과 TurnStateCapsule을 다음 턴 ZeroState로 이어주는 발주서다.
+
+`ORDER_109`는 LLM selector가 고른 최근 원문 기억을 code가 요약 없이 복사해 node_3 brief에 넣는 발주서다.
+
+`ORDER_110`은 node_3가 이전 대화를 말할 때 node_4가 selected recent memory context 범위를 벗어난 기억 발화를 반려하는 발주서다.
+
+`ORDER_111`은 node_1 router가 selected recent memory context를 볼 수 있게 하여, 최근 대화 기억만으로 답할 수 있는 요청이 불필요하게 L 문서 검색으로 새지 않게 하는 발주서다.
+
+`ORDER_112`는 명시된 ORDER/document ID를 임베딩 검색 후보보다 먼저 직접 원문 후보로 잡고, node_3에 공급할 문서를 whole-document strict rank order 방식으로 context budget 안에 packing하는 발주서다.
+
+`ORDER_113`은 새 기능 확장을 잠시 멈추고, 비대한 schema/smoke/test 구조를 재정립하기 전 기준선을 감사하는 발주서다.
+
+`ORDER_114`는 기존 smoke-test를 유지하면서 pytest 기반 테스트 골격을 도입하는 발주서다.
+
+`ORDER_115`는 `schemas.py`를 기존 import 호환성을 유지한 채 여러 schema module로 분해하는 발주서다.
+
+`ORDER_116`은 5000줄 이상으로 커진 `smoke_test.py`를 도메인별 smoke case와 pytest 파일로 분해하는 발주서다.
+
+`ORDER_117`은 compileall / pytest / smoke-test를 개발 루틴과 CI에 고정하는 발주서다.
 
 ## 임시 발주서
 
@@ -125,3 +157,18 @@
 - [ORDER 100: Recent Turn Capsule Read Window Packet v0](ORDER_100_RECENT_TURN_CAPSULE_READ_WINDOW_PACKET_V0.md)
 - [ORDER 101: Recent Raw Conversation Capsule Alignment v0](ORDER_101_RECENT_RAW_CONVERSATION_CAPSULE_ALIGNMENT_V0.md)
 - [ORDER 102: Relative Info Direct-Field Smoke v0](ORDER_102_RELATIVE_INFO_DIRECT_FIELD_SMOKE_V0.md)
+- [ORDER 103: Node0 Memory Relevance Candidate Frame v0](ORDER_103_NODE0_MEMORY_RELEVANCE_CANDIDATE_FRAME_V0.md)
+- [ORDER 104: Recent Memory LLM Selector v0](ORDER_104_RECENT_MEMORY_LLM_SELECTOR_V0.md)
+- [ORDER 105: Memory Selection To Node2 Handoff v0](ORDER_105_MEMORY_SELECTION_TO_NODE2_HANDOFF_V0.md)
+- [ORDER 106: Live Trace Progress Stream v0](ORDER_106_LIVE_TRACE_PROGRESS_STREAM_V0.md)
+- [ORDER 107: Raw Memory Window And Compression Candidate Policy v0](ORDER_107_RAW_MEMORY_WINDOW_AND_COMPRESSION_CANDIDATE_POLICY_V0.md)
+- [ORDER 108: Qwen Chat Session ZeroState Continuity v0](ORDER_108_QWEN_CHAT_SESSION_ZERO_STATE_CONTINUITY_V0.md)
+- [ORDER 109: Selected Recent Memory Context To Node3 Brief v0](ORDER_109_SELECTED_RECENT_MEMORY_CONTEXT_TO_NODE3_BRIEF_V0.md)
+- [ORDER 110: Node4 Recent Memory Utterance Guard v0](ORDER_110_NODE4_RECENT_MEMORY_UTTERANCE_GUARD_V0.md)
+- [ORDER 111: Node1 Recent Memory Router Visibility v0](ORDER_111_NODE1_RECENT_MEMORY_ROUTER_VISIBILITY_V0.md)
+- [ORDER 112: Explicit Artifact Priority And Whole Document Packing v0](ORDER_112_EXPLICIT_ARTIFACT_PRIORITY_AND_WHOLE_DOCUMENT_PACKING_V0.md)
+- [ORDER 113: Refoundation Freeze And Baseline Audit v0](ORDER_113_REFOUNDATION_FREEZE_AND_BASELINE_AUDIT_V0.md)
+- [ORDER 114: Pytest Baseline Harness v0](ORDER_114_PYTEST_BASELINE_HARNESS_V0.md)
+- [ORDER 115: Schema Module Split With Compatibility Layer v0](ORDER_115_SCHEMA_MODULE_SPLIT_COMPAT_LAYER_V0.md)
+- [ORDER 116: Smoke Test Decomposition To Pytest v0](ORDER_116_SMOKE_TEST_DECOMPOSITION_TO_PYTEST_V0.md)
+- [ORDER 117: CI And Development Routine Lock v0](ORDER_117_CI_AND_DEVELOPMENT_ROUTINE_LOCK_V0.md)

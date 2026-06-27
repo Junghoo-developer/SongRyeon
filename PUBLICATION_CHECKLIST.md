@@ -11,7 +11,9 @@ This checklist is for publishing SongRyeon Core as a public GitHub portfolio rep
 - [ ] Run the safety checks:
 
 ```powershell
+python -m pip install -r requirements-dev.txt
 python -m compileall songryeon_core main.py
+python -m pytest
 python main.py smoke-test
 rg -n -i "(api[_-]?key|secret|password|private[_-]?key|BEGIN (RSA|OPENSSH|PRIVATE)|authorization:|bearer |sk-[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|hf_[A-Za-z0-9]{20,})" . -g "!PUBLICATION_CHECKLIST.md"
 rg -n "C:\\\\Users|OneDrive|바탕 화면" . -g "!Administrative_Reform_1/05_Execution_Records/runtime_runs/**" -g "!PUBLICATION_CHECKLIST.md"
@@ -19,6 +21,7 @@ rg -n "C:\\\\Users|OneDrive|바탕 화면" . -g "!Administrative_Reform_1/05_Exe
 
 - [ ] Confirm generated artifacts are not staged:
   - `.songryeon_core_cache/`
+  - `.pytest_cache/`
   - `Administrative_Reform_1/05_Execution_Records/runtime_runs/`
   - `output/`
   - `tmp/`

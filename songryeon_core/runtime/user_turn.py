@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from songryeon_core.core.schemas import TurnStateCapsule
 from songryeon_core.llm.fake import SongRyeonAllNodesFakeLLMAdapter
 from songryeon_core.llm.runtime import (
     build_llm_adapter,
@@ -18,6 +19,7 @@ from songryeon_core.runtime.defaults import (
 )
 from songryeon_core.nodes.node_1_router import ROUTER_FALLBACK_POLICY_QWEN_STRICT_BLOCKED
 from songryeon_core.runtime.dry_run import run_dry_turn
+from songryeon_core.runtime.live_trace import make_live_trace_sink
 from songryeon_core.runtime.replay import replay_run
 
 
@@ -35,6 +37,10 @@ def run_fake_user_turn(
     force_l_route: bool = False,
     same_turn_l_reroute_enabled: bool = False,
     max_l_runs_per_turn: int = 1,
+    live_trace: bool = False,
+    turn_id: str | None = None,
+    previous_turn_capsules: list[TurnStateCapsule] | None = None,
+    recent_raw_conversation: list[dict[str, str]] | None = None,
 ) -> dict[str, object]:
     """Fake adapter로 전체 노드 흐름을 실행한다.
 
@@ -45,7 +51,9 @@ def run_fake_user_turn(
     adapter = SongRyeonAllNodesFakeLLMAdapter()
     result = run_dry_turn(
         user_input=user_input,
+        turn_id=turn_id,
         node_1_router_adapter=adapter,
+        memory_relevance_selector_adapter=adapter,
         l1_goal_adapter=adapter,
         l2_query_planner_adapter=adapter,
         l3_result_adapter=adapter,
@@ -62,6 +70,9 @@ def run_fake_user_turn(
         force_l_route=force_l_route,
         same_turn_l_reroute_enabled=same_turn_l_reroute_enabled,
         max_l_runs_per_turn=max_l_runs_per_turn,
+        previous_turn_capsules=previous_turn_capsules,
+        recent_raw_conversation=recent_raw_conversation,
+        live_trace_sink=make_live_trace_sink(enabled=live_trace),
     )
     return _turn_response(
         status=_status_from_result(result),
@@ -93,6 +104,10 @@ def run_qwen_user_turn(
     force_l_route: bool = False,
     same_turn_l_reroute_enabled: bool = False,
     max_l_runs_per_turn: int = 1,
+    live_trace: bool = False,
+    turn_id: str | None = None,
+    previous_turn_capsules: list[TurnStateCapsule] | None = None,
+    recent_raw_conversation: list[dict[str, str]] | None = None,
 ) -> dict[str, object]:
     """Qwen adapter로 사용자 턴을 실행한다.
 
@@ -120,7 +135,9 @@ def run_qwen_user_turn(
     try:
         result = run_dry_turn(
             user_input=user_input,
+            turn_id=turn_id,
             node_1_router_adapter=adapter,
+            memory_relevance_selector_adapter=adapter,
             l1_goal_adapter=adapter,
             l2_query_planner_adapter=adapter,
             l3_result_adapter=adapter,
@@ -139,6 +156,9 @@ def run_qwen_user_turn(
             max_l_runs_per_turn=max_l_runs_per_turn,
             allow_node_1_router_fallback=False,
             node_1_router_fallback_policy=ROUTER_FALLBACK_POLICY_QWEN_STRICT_BLOCKED,
+            previous_turn_capsules=previous_turn_capsules,
+            recent_raw_conversation=recent_raw_conversation,
+            live_trace_sink=make_live_trace_sink(enabled=live_trace),
         )
     except Exception as exc:
         return {
@@ -209,10 +229,47 @@ def _turn_response(
         "node1_llm_routing_failed_count": result.get("node1_llm_routing_failed_count"),
         "node1_router_fallback_count": result.get("node1_router_fallback_count"),
         "node1_router_fallback_policy": result.get("node1_router_fallback_policy"),
+        "recent_capsules_read_count": result.get("recent_capsules_read_count"),
+        "recent_raw_conversation_alignment_count": result.get(
+            "recent_raw_conversation_alignment_count"
+        ),
+        "recent_memory_relevance_candidate_count": result.get(
+            "recent_memory_relevance_candidate_count"
+        ),
+        "recent_memory_relevance_selection_status": result.get(
+            "recent_memory_relevance_selection_status"
+        ),
+        "recent_memory_relevance_selection_candidate_count": result.get(
+            "recent_memory_relevance_selection_candidate_count"
+        ),
+        "recent_memory_relevance_selection_selected_count": result.get(
+            "recent_memory_relevance_selection_selected_count"
+        ),
+        "selected_recent_memory_context_count": result.get(
+            "selected_recent_memory_context_count"
+        ),
+        "missing_selected_memory_context_count": result.get(
+            "missing_selected_memory_context_count"
+        ),
+        "raw_memory_compression_candidate_status": result.get(
+            "raw_memory_compression_candidate_status"
+        ),
+        "raw_memory_compression_candidate_turn_ids": result.get(
+            "raw_memory_compression_candidate_turn_ids"
+        ),
+        "raw_memory_retained_raw_turn_ids": result.get("raw_memory_retained_raw_turn_ids"),
+        "older_unmanaged_raw_turn_count": result.get("older_unmanaged_raw_turn_count"),
         "l1_goal_generation_source": result.get("l1_goal_generation_source"),
         "l3_achievement_generation_source": result.get("l3_achievement_generation_source"),
         "node3_reporter_status": result.get("node3_reporter_status"),
         "node4_gate_status": result.get("node4_gate_status"),
+        "node4_recent_memory_guard_status": result.get(
+            "node4_recent_memory_guard_status"
+        ),
+        "node4_unsupported_recent_memory_claim_count": result.get(
+            "node4_unsupported_recent_memory_claim_count"
+        ),
+        "turn_capsule": result.get("turn_capsule"),
         "export_dir": str(export_dir) if export_dir is not None else result.get("export_dir"),
         "report": result.get("report"),
     }

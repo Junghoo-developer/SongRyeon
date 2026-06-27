@@ -11,6 +11,13 @@ from songryeon_core.runtime.replay import replay_run
 from songryeon_core.runtime.smoke_test import run_smoke_tests
 from songryeon_core.runtime.terminal_view import render_pretty_turn
 from songryeon_core.runtime.user_turn import run_fake_user_turn, run_qwen_user_turn
+from songryeon_core.runtime.live_trace import make_live_trace_sink
+from songryeon_core.runtime.chat_session import (
+    ChatSessionMemory,
+    attach_chat_session_snapshot,
+    current_chat_turn_id,
+    store_chat_turn_result,
+)
 from songryeon_core.runtime.defaults import (
     DEFAULT_MAX_INPUT_CHARS,
     DEFAULT_MAX_QUERY_ATTEMPTS,
@@ -38,6 +45,7 @@ def main() -> None:
     dry_run_parser.add_argument("--export", default=None)
     dry_run_parser.add_argument("--same-turn-l-reroute", action="store_true")
     dry_run_parser.add_argument("--max-l-runs-per-turn", type=int, default=1)
+    dry_run_parser.add_argument("--live-trace", action="store_true")
 
     # search-docs는 L루프 전체를 돌리지 않고 문서 검색 도구만 직접 확인할 때 쓴다.
     # qwen-chat은 송련 전체를 돌려보는 모드이고, search-docs는 문서 검색 엔진만 따로 뜯어보는 모드다.
@@ -77,7 +85,7 @@ def main() -> None:
     _add_turn_runtime_args(qwen_turn_parser, include_qwen_args=True)
 
     # qwen-chat은 qwen-turn을 반복 호출하는 대화형 껍데기다.
-    # 현재는 각 입력이 독립 턴에 가깝고, 직전 대화를 풍부하게 기억하지 않는다.
+    # 세션 안 raw conversation과 capsule을 다음 턴의 ZeroState로 이어준다.
     qwen_chat_parser = subparsers.add_parser("qwen-chat")
     _add_turn_runtime_args(qwen_chat_parser, include_qwen_args=True)
 
@@ -93,6 +101,7 @@ def main() -> None:
             export_dir=args.export,
             same_turn_l_reroute_enabled=args.same_turn_l_reroute,
             max_l_runs_per_turn=args.max_l_runs_per_turn,
+            live_trace_sink=make_live_trace_sink(enabled=args.live_trace),
         )
         print("DRY_RUN_OK")
         print(json.dumps(_summary(result), ensure_ascii=False, indent=2))
@@ -133,6 +142,7 @@ def main() -> None:
             force_l_route=args.force_l,
             same_turn_l_reroute_enabled=args.same_turn_l_reroute,
             max_l_runs_per_turn=args.max_l_runs_per_turn,
+            live_trace=args.live_trace,
         )
         if args.pretty:
             print(render_pretty_turn(result, user_input=args.user_input))
@@ -155,6 +165,7 @@ def main() -> None:
             force_l_route=args.force_l,
             same_turn_l_reroute_enabled=args.same_turn_l_reroute,
             max_l_runs_per_turn=args.max_l_runs_per_turn,
+            live_trace=args.live_trace,
         )
         if args.pretty:
             print(render_pretty_turn(result, user_input=args.user_input))
@@ -181,6 +192,7 @@ def _add_turn_runtime_args(parser: argparse.ArgumentParser, *, include_qwen_args
     parser.add_argument("--force-l", action="store_true")
     parser.add_argument("--same-turn-l-reroute", action="store_true")
     parser.add_argument("--max-l-runs-per-turn", type=int, default=1)
+    parser.add_argument("--live-trace", action="store_true")
     if include_qwen_args:
         parser.add_argument("--endpoint", default=None)
         parser.add_argument("--model-id", default=None)
@@ -189,8 +201,7 @@ def _add_turn_runtime_args(parser: argparse.ArgumentParser, *, include_qwen_args
 
 def _run_qwen_chat(args: argparse.Namespace) -> None:
     # 대화형 모드다. 사용자가 /exit 또는 /quit을 입력할 때까지 반복한다.
-    # 주의: 지금 구조에서는 매 입력마다 run_qwen_user_turn을 새로 호출하므로
-    # "아까 2번" 같은 직전 대화 참조는 아직 약하다.
+    # 세션 안 raw conversation과 capsule을 다음 턴의 ZeroState로 다시 주입한다.
     #H 따라서 차후 0의 기억과 다른 노드의 기억 패킷을 학습하고 이에 연동하여 최적의 공용 기억에 최근 대화랑 이전 작업 기억을 각 노드별로 나눠서 적절히 배분하는 방안이 필요하다.
     #H llm의 시야를 다루는 관점과는 달리, 송련은 본점의 헌법 문서에 명시돼 있듯 주요 구성 요소 중 하나가 데이터이기에, 코드랑 시스템은 노드별로 분산하여 배분되는 기억과 무관하게 통합적으로 관리할 체계가 필요하다.
     #H 장기기억과 DB는 본점의 노하우를 참조하면 시간 절약 및 효율적인 관리가 가능하다.
@@ -198,7 +209,7 @@ def _run_qwen_chat(args: argparse.Namespace) -> None:
     print("종료하려면 /exit 또는 /quit 입력")
     print("")
 
-    turn_index = 1
+    session_memory = ChatSessionMemory()
     while True:
         try:
             user_input = input("나> ").strip()
@@ -212,12 +223,14 @@ def _run_qwen_chat(args: argparse.Namespace) -> None:
             print("송련> 종료")
             return
 
-        export_dir = _chat_export_dir(args.export, turn_index)
+        export_dir = _chat_export_dir(args.export, session_memory.turn_index)
+        current_turn_id = current_chat_turn_id(session_memory)
         print("송련> 처리 중...")
         # 실제 한 턴 실행은 runtime/user_turn.py로 넘어간다.
         # main.py는 입력값과 옵션을 모아서 넘기는 얇은 연결부로 남기는 것이 좋다.
         result = run_qwen_user_turn(
             user_input=user_input,
+            turn_id=current_turn_id,
             endpoint=args.endpoint,
             model_id=args.model_id,
             timeout_seconds=args.timeout,
@@ -232,10 +245,23 @@ def _run_qwen_chat(args: argparse.Namespace) -> None:
             force_l_route=args.force_l,
             same_turn_l_reroute_enabled=args.same_turn_l_reroute,
             max_l_runs_per_turn=args.max_l_runs_per_turn,
+            recent_raw_conversation=session_memory.recent_raw_conversation,
+            previous_turn_capsules=session_memory.previous_turn_capsules,
+            live_trace=args.live_trace,
+        )
+        attach_chat_session_snapshot(
+            result=result,
+            session_memory=session_memory,
+            current_turn_id=current_turn_id,
         )
         print(render_pretty_turn(result, user_input=user_input))
         print("")
-        turn_index += 1
+        store_chat_turn_result(
+            session_memory=session_memory,
+            current_turn_id=current_turn_id,
+            user_input=user_input,
+            result=result,
+        )
 
 
 def _chat_export_dir(base_export_dir: str | None, turn_index: int) -> str | None:
@@ -283,6 +309,35 @@ def _summary(result: dict[str, object]) -> dict[str, object]:
         "node1_llm_routing_failed_count": result.get("node1_llm_routing_failed_count"),
         "node1_router_fallback_count": result.get("node1_router_fallback_count"),
         "node1_router_fallback_policy": result.get("node1_router_fallback_policy"),
+        "recent_memory_relevance_selection_status": result.get(
+            "recent_memory_relevance_selection_status"
+        ),
+        "recent_memory_relevance_selection_candidate_count": result.get(
+            "recent_memory_relevance_selection_candidate_count"
+        ),
+        "recent_memory_relevance_selection_selected_count": result.get(
+            "recent_memory_relevance_selection_selected_count"
+        ),
+        "selected_recent_memory_context_count": result.get(
+            "selected_recent_memory_context_count"
+        ),
+        "missing_selected_memory_context_count": result.get(
+            "missing_selected_memory_context_count"
+        ),
+        "raw_memory_compression_candidate_status": result.get(
+            "raw_memory_compression_candidate_status"
+        ),
+        "raw_memory_compression_candidate_turn_ids": result.get(
+            "raw_memory_compression_candidate_turn_ids"
+        ),
+        "raw_memory_retained_raw_turn_ids": result.get("raw_memory_retained_raw_turn_ids"),
+        "older_unmanaged_raw_turn_count": result.get("older_unmanaged_raw_turn_count"),
+        "node4_recent_memory_guard_status": result.get(
+            "node4_recent_memory_guard_status"
+        ),
+        "node4_unsupported_recent_memory_claim_count": result.get(
+            "node4_unsupported_recent_memory_claim_count"
+        ),
         "export_dir": result.get("export_dir"),
     }
 

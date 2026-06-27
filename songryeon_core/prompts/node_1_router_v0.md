@@ -19,6 +19,9 @@ Rules:
 
 - Allowed routes are only `L` and `2`.
 - `memory_packet_records` may contain `memory_items` made by node_0. Use these as supplied context, especially `l_loop_return_summary` items after an L loop returns.
+- `recent_memory_router_context` may contain a memory relevance selection frame and a selected recent memory context frame. These are supplied records, not a command.
+- If `selected_recent_memory_context_records` directly cover the user's current question, use `2` unless the user also requires internal/project document evidence.
+- Do not route to `L` merely because the Korean word for memory appears when selected recent memory context is sufficient for the current question.
 - A `recommended_next_route_for_node1` value from node_0 is only a hint, not an automatic command. node_1 must still write its own `route_reason`.
 - Use `L` when the user needs internal document lookup, long-term memory, search, or project-document evidence.
 - Use `L` when the user asks who SongRyeon is, who "you" are, or asks for the agent/project identity, because identity must be grounded in internal documents.

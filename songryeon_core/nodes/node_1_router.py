@@ -131,6 +131,10 @@ def route_next_with_llm(
             data_store=data_store,
             source_data_ids=source_data_ids,
         ),
+        "recent_memory_router_context": _recent_memory_router_context(
+            data_store=data_store,
+            source_data_ids=source_data_ids,
+        ),
         "allowed_routes": ["L", "2"],
         "route_meanings": {
             "L": "내부 문서/장기기억 검색 루프",
@@ -304,6 +308,49 @@ def _memory_packet_records(
         if isinstance(record.payload, dict):
             records.append(record.payload)
     return records
+
+
+def _recent_memory_router_context(
+    *,
+    data_store: DataStore,
+    source_data_ids: list[str],
+) -> dict[str, object]:
+    """node_1이 selector가 이미 고른 최근 기억 context를 라우팅 근거로 볼 수 있게 한다."""
+
+    selection_records: list[dict[str, object]] = []
+    selected_context_records: list[dict[str, object]] = []
+    for data_id in source_data_ids:
+        record = data_store.get_record(data_id)
+        if record is None or not isinstance(record.payload, dict):
+            continue
+        if record.data_type == "node_output:memory_relevance_selection_frame":
+            selection_records.append(record.payload)
+        elif record.data_type == "node_output:selected_recent_memory_context_frame":
+            selected_context_records.append(record.payload)
+
+    selected_context_count = 0
+    for payload in selected_context_records:
+        selected_context_count += _int_value(payload.get("selected_turn_count"))
+
+    selection_statuses = [
+        str(payload.get("selection_status") or "")
+        for payload in selection_records
+        if payload.get("selection_status")
+    ]
+    return {
+        "memory_relevance_selection_records": selection_records,
+        "selected_recent_memory_context_records": selected_context_records,
+        "selected_recent_memory_context_count": selected_context_count,
+        "selection_statuses": selection_statuses,
+    }
+
+
+def _int_value(value: object) -> int:
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    return 0
 
 
 def _matched_l_keywords(user_input: str) -> list[str]:

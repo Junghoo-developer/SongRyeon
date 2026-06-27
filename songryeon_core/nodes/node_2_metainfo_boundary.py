@@ -391,8 +391,53 @@ def _build_semantic_info_refs(
                 source_trace_ids=source_trace_ids,
                 source_data_ids=source_data_ids_for_record,
             )
+        elif schema_name == "MemoryRelevanceSelectionFrame":
+            _append_memory_relevance_selection_reason(
+                relative_info=relative_info,
+                mixed_info=mixed_info,
+                seen_info_ids=seen_info_ids,
+                source_data_id=record.data_id,
+                payload=payload,
+                source_trace_ids=source_trace_ids,
+                source_data_ids=source_data_ids_for_record,
+            )
 
     return relative_info, mixed_info
+
+
+def _append_memory_relevance_selection_reason(
+    *,
+    relative_info: list[RelativeInfoRef],
+    mixed_info: list[MixedInfoRef],
+    seen_info_ids: set[str],
+    source_data_id: str,
+    payload: dict[str, object],
+    source_trace_ids: list[str],
+    source_data_ids: list[str],
+) -> None:
+    """LLM selector의 selection_reason을 source bundle 혼합 정보로 보존한다."""
+
+    if payload.get("info_class") != "mixed":
+        return
+    if payload.get("source_mode") != "source_bundle":
+        return
+    if payload.get("claim_alignment") != "multi_source_bundle":
+        return
+    if not str(payload.get("generated_by") or "").startswith("LLM:"):
+        return
+
+    _append_semantic_text_field(
+        relative_info=relative_info,
+        mixed_info=mixed_info,
+        seen_info_ids=seen_info_ids,
+        source_data_id=source_data_id,
+        field_path="selection_reason",
+        info_kind="memory_relevance_selection_reason",
+        text=payload.get("selection_reason"),
+        source_trace_ids=source_trace_ids,
+        source_data_ids=source_data_ids,
+        force_mixed=True,
+    )
 
 
 def _append_l2_query_plan_purposes(
