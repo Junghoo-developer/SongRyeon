@@ -154,6 +154,9 @@ class LRunIds:
     def node3_input_brief_frame_id(self) -> str:
         return self.scoped_data_id("node_3:input_brief_frame")
 
+    def node2_answer_basis_frame_id(self) -> str:
+        return self.scoped_data_id("node_2:answer_basis_frame")
+
     def node3_report_id(self) -> str:
         return self.scoped_data_id("report_dry_001")
 

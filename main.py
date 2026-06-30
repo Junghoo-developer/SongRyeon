@@ -19,6 +19,7 @@ from songryeon_core.runtime.chat_session import (
     store_chat_turn_result,
 )
 from songryeon_core.runtime.defaults import (
+    DEFAULT_MAX_DOCUMENT_CONTEXT_CHARS,
     DEFAULT_MAX_INPUT_CHARS,
     DEFAULT_MAX_QUERY_ATTEMPTS,
     DEFAULT_MAX_READ_DOC_CALLS,
@@ -26,6 +27,14 @@ from songryeon_core.runtime.defaults import (
     DEFAULT_SEARCH_TOP_K,
 )
 from songryeon_core.llm.runtime import ping_qwen
+from songryeon_core.night_government.runtime import (
+    DEFAULT_NIGHT_DB_DIR,
+    ingest_memory_record,
+    load_active_memory_packet,
+    render_active_memory_packet_markdown,
+    run_night_government,
+)
+from songryeon_core.night_government.schemas import MEMORY_ROLES
 from songryeon_core.tools.document_tools import search_docs
 
 
@@ -56,6 +65,30 @@ def main() -> None:
 
     # show-orders는 현재 발주서 목록을 빠르게 훑기 위한 작은 보조 명령이다.
     subparsers.add_parser("show-orders")
+
+    # night-* commands are the first external-memory "night government" MVP.
+    # They do not train the model. They write durable memory fragments to an
+    # external JSONL DB, then prepare an active packet for the next work session.
+    night_ingest_parser = subparsers.add_parser("night-ingest")
+    night_ingest_parser.add_argument("--db-dir", default=DEFAULT_NIGHT_DB_DIR)
+    night_ingest_parser.add_argument("--text", required=True)
+    night_ingest_parser.add_argument("--record-type", default="manual_note")
+    night_ingest_parser.add_argument("--role", choices=sorted(MEMORY_ROLES), default="raw")
+    night_ingest_parser.add_argument("--confidence", default="unknown")
+    night_ingest_parser.add_argument("--review", default="unreviewed")
+    night_ingest_parser.add_argument("--tag", action="append", default=[])
+    night_ingest_parser.add_argument("--source-ref", action="append", default=[])
+    night_ingest_parser.add_argument("--record-id", default=None)
+
+    night_run_parser = subparsers.add_parser("night-run")
+    night_run_parser.add_argument("--db-dir", default=DEFAULT_NIGHT_DB_DIR)
+    night_run_parser.add_argument("--day-id", default=None)
+    night_run_parser.add_argument("--active-goal", default="")
+    night_run_parser.add_argument("--max-records", type=int, default=24)
+
+    night_active_parser = subparsers.add_parser("night-active")
+    night_active_parser.add_argument("--db-dir", default=DEFAULT_NIGHT_DB_DIR)
+    night_active_parser.add_argument("--format", choices=["json", "markdown"], default="json")
 
     # replay는 export로 저장한 실행 기록을 다시 읽을 때 쓴다.
     replay_parser = subparsers.add_parser("replay")
@@ -111,6 +144,33 @@ def main() -> None:
     elif args.command == "show-orders":
         for path in sorted(Path("Administrative_Reform_1/04_Orders").glob("*.md")):
             print(path.as_posix())
+    elif args.command == "night-ingest":
+        result = ingest_memory_record(
+            db_dir=args.db_dir,
+            text=args.text,
+            record_type=args.record_type,
+            memory_role=args.role,
+            confidence_label=args.confidence,
+            human_review_status=args.review,
+            tags=args.tag,
+            source_refs=args.source_ref,
+            record_id=args.record_id,
+        )
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    elif args.command == "night-run":
+        result = run_night_government(
+            db_dir=args.db_dir,
+            day_id=args.day_id,
+            active_goal=args.active_goal,
+            max_records=args.max_records,
+        )
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    elif args.command == "night-active":
+        packet = load_active_memory_packet(db_dir=args.db_dir)
+        if args.format == "markdown":
+            print(render_active_memory_packet_markdown(packet))
+        else:
+            print(json.dumps(packet or {"status": "NO_ACTIVE_MEMORY_PACKET"}, ensure_ascii=False, indent=2))
     elif args.command == "replay":
         print(replay_run(args.run_dir))
     elif args.command == "qwen-ping":
@@ -138,6 +198,7 @@ def main() -> None:
             max_query_candidates=args.max_query_candidates,
             max_read_doc_calls=args.max_read_doc_calls,
             max_input_chars=args.max_input_chars,
+            max_document_context_chars=args.max_document_context_chars,
             include_data_records=args.pretty,
             force_l_route=args.force_l,
             same_turn_l_reroute_enabled=args.same_turn_l_reroute,
@@ -161,6 +222,7 @@ def main() -> None:
             max_query_candidates=args.max_query_candidates,
             max_read_doc_calls=args.max_read_doc_calls,
             max_input_chars=args.max_input_chars,
+            max_document_context_chars=args.max_document_context_chars,
             include_data_records=args.pretty,
             force_l_route=args.force_l,
             same_turn_l_reroute_enabled=args.same_turn_l_reroute,
@@ -189,6 +251,11 @@ def _add_turn_runtime_args(parser: argparse.ArgumentParser, *, include_qwen_args
     parser.add_argument("--max-query-candidates", type=int, default=None)
     parser.add_argument("--max-read-doc-calls", type=int, default=DEFAULT_MAX_READ_DOC_CALLS)
     parser.add_argument("--max-input-chars", type=int, default=DEFAULT_MAX_INPUT_CHARS)
+    parser.add_argument(
+        "--max-document-context-chars",
+        type=int,
+        default=DEFAULT_MAX_DOCUMENT_CONTEXT_CHARS,
+    )
     parser.add_argument("--force-l", action="store_true")
     parser.add_argument("--same-turn-l-reroute", action="store_true")
     parser.add_argument("--max-l-runs-per-turn", type=int, default=1)
@@ -241,6 +308,7 @@ def _run_qwen_chat(args: argparse.Namespace) -> None:
             max_query_candidates=args.max_query_candidates,
             max_read_doc_calls=args.max_read_doc_calls,
             max_input_chars=args.max_input_chars,
+            max_document_context_chars=args.max_document_context_chars,
             include_data_records=True,
             force_l_route=args.force_l,
             same_turn_l_reroute_enabled=args.same_turn_l_reroute,
@@ -291,6 +359,7 @@ def _summary(result: dict[str, object]) -> dict[str, object]:
         "l_loop_budget_plan_count": result.get("l_loop_budget_plan_count"),
         "search_top_k": result.get("search_top_k"),
         "max_query_attempts": result.get("max_query_attempts"),
+        "max_document_context_chars": result.get("max_document_context_chars"),
         "l_loop_final_decision": result.get("l_loop_final_decision"),
         "l_loop_final_continuation_status": result.get("l_loop_final_continuation_status"),
         "l_loop_continuation_count": result.get("l_loop_continuation_count"),
@@ -337,6 +406,22 @@ def _summary(result: dict[str, object]) -> dict[str, object]:
         ),
         "node4_unsupported_recent_memory_claim_count": result.get(
             "node4_unsupported_recent_memory_claim_count"
+        ),
+        "node2_answer_basis_mode": result.get("node2_answer_basis_mode"),
+        "node2_answer_basis_generated_by": result.get("node2_answer_basis_generated_by"),
+        "node2_answer_basis_reason_codes": result.get("node2_answer_basis_reason_codes"),
+        "node2_answer_basis_semantic_judgement_status": result.get(
+            "node2_answer_basis_semantic_judgement_status"
+        ),
+        "node2_answer_basis_failure_type": result.get("node2_answer_basis_failure_type"),
+        "node2_answer_basis_llm_call_data_id": result.get(
+            "node2_answer_basis_llm_call_data_id"
+        ),
+        "node2_answer_basis_trace_event_id": result.get(
+            "node2_answer_basis_trace_event_id"
+        ),
+        "node2_answer_basis_payload_parse_status": result.get(
+            "node2_answer_basis_payload_parse_status"
         ),
         "export_dir": result.get("export_dir"),
     }

@@ -48,6 +48,11 @@ from songryeon_core.nodes.l3_result_keeper import (
     run_l3_result_keeper,
     run_l3_revision_result_keeper,
 )
+from songryeon_core.nodes.l_tool_scope import (
+    filter_available_tools_for_scope,
+    record_l_tool_budget_partition,
+    run_l_tool_scope_planner,
+)
 from songryeon_core.nodes.node_0_memory_supplier import (
     record_l3_continuation_summary_for_l2,
 )
@@ -59,6 +64,12 @@ from songryeon_core.tools.tool_runner import (
     record_tool_choice,
     tool_catalog_data_id,
     tool_choice_data_id,
+)
+from songryeon_core.tools.document_context_pack import (
+    document_context_pack_frame_id,
+    explicit_artifact_reference_frame_id,
+    record_document_context_pack_frame,
+    record_explicit_artifact_reference_frame,
 )
 from songryeon_core.tools.tool_efficiency_policy import (
     cache_status_from_search_payload,
@@ -89,8 +100,11 @@ class LLoopResult:
     continuation_trace_ids: list[str] = field(default_factory=list)
     revision_trace_ids: list[str] = field(default_factory=list)
     failure_trace_ids: list[str] = field(default_factory=list)
+    document_context_trace_ids: list[str] = field(default_factory=list)
     goal_data_ids: list[str] = field(default_factory=list)
     budget_plan_data_ids: list[str] = field(default_factory=list)
+    tool_scope_data_ids: list[str] = field(default_factory=list)
+    tool_budget_partition_data_ids: list[str] = field(default_factory=list)
     tool_catalog_data_ids: list[str] = field(default_factory=list)
     tool_choice_data_ids: list[str] = field(default_factory=list)
     query_plan_data_ids: list[str] = field(default_factory=list)
@@ -104,6 +118,8 @@ class LLoopResult:
     revision_query_plan_data_ids: list[str] = field(default_factory=list)
     revision_query_data_ids: list[str] = field(default_factory=list)
     failure_signal_data_ids: list[str] = field(default_factory=list)
+    explicit_artifact_reference_data_ids: list[str] = field(default_factory=list)
+    document_context_pack_data_ids: list[str] = field(default_factory=list)
     preserved_data_ids: list[str] = field(default_factory=list)
     achievement_data_ids: list[str] = field(default_factory=list)
     output_data_ids: list[str] = field(default_factory=list)
@@ -125,6 +141,7 @@ def run_l_loop(
     zero_state: ZeroState | None = None,
     document_root: str | Path = "Administrative_Reform_1",
     l1_goal_adapter: LLMAdapter | None = None,
+    l_tool_scope_adapter: LLMAdapter | None = None,
     l2_query_planner_adapter: LLMAdapter | None = None,
     l3_result_adapter: LLMAdapter | None = None,
     max_iterations: int = 3,
@@ -134,6 +151,7 @@ def run_l_loop(
     max_query_candidates: int | None = None,
     max_read_doc_calls: int = 1,
     max_input_chars: int = 6000,
+    max_document_context_chars: int = 30000,
     run_index: int = 1,
     same_turn_rerun_allowed: bool = False,
     rerun_block_reason: str = L_REROUTE_REMAINING_BLOCK_REASON,
@@ -157,6 +175,8 @@ def run_l_loop(
         raise ValueError("max_read_doc_calls must be at least 1")
     if max_input_chars < 1:
         raise ValueError("max_input_chars must be at least 1")
+    if max_document_context_chars < 1:
+        raise ValueError("max_document_context_chars must be at least 1")
 
     # L루프 전체 실행 단위의 ID 묶음이다.
     # run_index=1은 기존 고정 ID를 유지한다.
@@ -234,14 +254,50 @@ def run_l_loop(
         if isinstance(catalog_payload, dict) and isinstance(catalog_payload.get("tools"), list)
         else []
     )
+    tool_scope_trace_id, tool_scope_data_id, tool_scope_frame = run_l_tool_scope_planner(
+        trace_store=trace_store,
+        data_store=data_store,
+        turn_id=turn_id,
+        l1_event=l1,
+        user_query=search_query,
+        goal_data_id=l1_goal_data_id,
+        budget_plan_data_id=budget_plan_data_id,
+        tool_catalog_data_id=catalog_id,
+        available_tools=available_tools,
+        adapter=l_tool_scope_adapter,
+        id_namespace=run_ids,
+    )
+    (
+        tool_budget_partition_trace_id,
+        tool_budget_partition_data_id,
+        tool_budget_partition_frame,
+    ) = record_l_tool_budget_partition(
+        trace_store=trace_store,
+        data_store=data_store,
+        turn_id=turn_id,
+        tool_scope_frame=tool_scope_frame,
+        tool_scope_trace_id=tool_scope_trace_id,
+        budget_plan_data_id=budget_plan_data_id,
+        budget_plan_trace_id=budget_plan_trace_id,
+        id_namespace=run_ids,
+    )
+    scoped_available_tools = filter_available_tools_for_scope(
+        available_tools,
+        tool_scope_frame,
+    )
 
     query_text = search_query
     query_source = "user_input_fallback"
-    query_source_data_ids = [l1_goal_data_id, budget_plan_data_id]
+    query_source_data_ids = [
+        l1_goal_data_id,
+        budget_plan_data_id,
+        tool_scope_data_id,
+        tool_budget_partition_data_id,
+    ]
     query_extra_trace_ids: list[str] = []
     query_plan_data_ids: list[str] = []
     l2_plan_trace_ids: list[str] = []
-    selected_tool_name = "search_docs"
+    selected_tool_name = _fallback_l2_tool_for_available_tools(scoped_available_tools)
     if l2_query_planner_adapter is not None:
         try:
             plan_event = run_l2_query_planner(
@@ -251,8 +307,16 @@ def run_l_loop(
                 l1_event=l1,
                 user_input=search_query,
                 adapter=l2_query_planner_adapter,
-                source_data_ids=[l1_goal_data_id, budget_plan_data_id, catalog_id],
-                available_tools=available_tools,
+                source_data_ids=[
+                    l1_goal_data_id,
+                    budget_plan_data_id,
+                    catalog_id,
+                    tool_scope_data_id,
+                    tool_budget_partition_data_id,
+                ],
+                available_tools=scoped_available_tools,
+                l_tool_scope=asdict(tool_scope_frame),
+                budget_partition=asdict(tool_budget_partition_frame),
                 query_plan_frame_data_id=l2_query_plan_data_id,
             )
             plan_record = data_store.require_record(l2_query_plan_data_id)
@@ -263,6 +327,8 @@ def run_l_loop(
                 l1_goal_data_id,
                 budget_plan_data_id,
                 catalog_id,
+                tool_scope_data_id,
+                tool_budget_partition_data_id,
                 l2_query_plan_data_id,
             ]
             query_extra_trace_ids = [plan_event.event_id]
@@ -305,6 +371,19 @@ def run_l_loop(
         tool_choice_data_id("L2", selected_tool_name, id_namespace=run_ids)
     ]
     tool_choice_trace_ids = [tool_choice_trace_id]
+
+    explicit_trace_id, explicit_data_id, _ = record_explicit_artifact_reference_frame(
+        trace_store=trace_store,
+        data_store=data_store,
+        turn_id=turn_id,
+        user_text=search_query,
+        document_root=document_root,
+        source_trace_ids=_unique_strings([run_trace_id, l1.event_id, budget_plan_trace_id]),
+        source_data_ids=_unique_strings([run_data_id, l1_goal_data_id, budget_plan_data_id]),
+        frame_id=explicit_artifact_reference_frame_id(id_namespace=run_ids),
+    )
+    document_context_trace_ids = [explicit_trace_id]
+    explicit_artifact_reference_data_ids = [explicit_data_id]
 
     l2_query_frame = data_store.require_record(l2_query_data_id)
     query_text = _read_query_text_from_l2_frame(l2_query_frame.payload)
@@ -600,12 +679,8 @@ def run_l_loop(
             data_store=data_store,
             turn_id=turn_id,
             iteration_index=next_iteration_index,
-            decision="continue_read_artifact" if selected_tool_name == "read_artifact" else "continue_search",
-            reason=(
-                "CODE_STATUS:continue_read_artifact"
-                if selected_tool_name == "read_artifact"
-                else "CODE_STATUS:continue_search_docs"
-            ),
+            decision=_initial_control_decision_for_tool(selected_tool_name),
+            reason=_initial_control_reason_for_tool(selected_tool_name),
             max_iterations=max_iterations,
             max_tool_calls=max_tool_calls,
             tool_call_count=tool_call_count,
@@ -639,6 +714,85 @@ def run_l_loop(
         control_trace_ids.append(control_trace_id)
         control_data_ids.append(control_data_id)
         next_iteration_index += 1
+
+        if _is_code_inspection_tool(selected_tool_name):
+            code_result = _run_code_inspection_tool(
+                tool_runner=tool_runner,
+                selected_tool_name=selected_tool_name,
+                trace_store=trace_store,
+                data_store=data_store,
+                turn_id=turn_id,
+                input_ref=[l2.event_id, tool_choice_trace_id, control_trace_id],
+                id_namespace=run_ids,
+                query_text=current_query,
+            )
+            tool_call_count += 1
+            tool_call_trace_ids.append(code_result.trace_event_id)
+            tool_result_data_ids.append(code_result.data_ref.data_id)
+            code_distillation = record_tool_result_distillation(
+                trace_store=trace_store,
+                data_store=data_store,
+                turn_id=turn_id,
+                tool_result=code_result,
+                id_namespace=run_ids,
+            )
+            distillation_trace_ids.append(code_distillation.trace_event_id)
+            tool_distillation_data_ids.append(code_distillation.data_id)
+            input_chars_used += len(current_query) + distilled_input_size(code_distillation.frame)
+            code_stop_reason = _code_inspection_stop_reason(
+                tool_name=selected_tool_name,
+                payload=code_result.payload,
+            )
+            code_budget_trace_id, code_budget_data_id = record_budget(
+                stop_reason=code_stop_reason,
+                reason=f"CODE_STATUS:{selected_tool_name}_{code_stop_reason}",
+                condition_flags=[selected_tool_name, code_stop_reason],
+                source_trace_ids=[
+                    code_result.trace_event_id,
+                    code_distillation.trace_event_id,
+                ],
+                source_data_ids=[
+                    code_result.data_ref.data_id,
+                    code_distillation.data_id,
+                ],
+            )
+            stop_control_trace_id, stop_control_data_id = _record_l_loop_control(
+                trace_store=trace_store,
+                data_store=data_store,
+                turn_id=turn_id,
+                iteration_index=next_iteration_index,
+                decision="stop_success" if code_stop_reason == "completed" else "stop_failed",
+                reason=(
+                    f"CODE_STATUS:stop_success_{selected_tool_name}"
+                    if code_stop_reason == "completed"
+                    else f"CODE_STATUS:stop_failed_{selected_tool_name}_{code_stop_reason}"
+                ),
+                max_iterations=max_iterations,
+                max_tool_calls=max_tool_calls,
+                tool_call_count=tool_call_count,
+                source_trace_ids=_unique_strings(
+                    [
+                        control_trace_id,
+                        code_result.trace_event_id,
+                        code_distillation.trace_event_id,
+                        code_budget_trace_id,
+                    ]
+                ),
+                source_data_ids=_unique_strings(
+                    [
+                        control_data_id,
+                        code_result.data_ref.data_id,
+                        code_distillation.data_id,
+                        code_budget_data_id,
+                    ]
+                ),
+                id_namespace=run_ids,
+            )
+            control_trace_ids.append(stop_control_trace_id)
+            control_data_ids.append(stop_control_data_id)
+            final_control_data_id = stop_control_data_id
+            final_control_decision = "stop_success" if code_stop_reason == "completed" else "stop_failed"
+            break
 
         if selected_tool_name == "read_artifact":
             artifact_result = tool_runner.run(
@@ -1122,6 +1276,8 @@ def run_l_loop(
             run_data_id,
             l1_goal_data_id,
             *budget_plan_data_ids,
+            tool_scope_data_id,
+            tool_budget_partition_data_id,
             catalog_id,
             *query_plan_data_ids,
             l2_query_data_id,
@@ -1205,7 +1361,9 @@ def run_l_loop(
                     turn_id=turn_id,
                     revision_input_data_id=revision_input_id,
                     adapter=l2_query_planner_adapter,
-                    available_tools=available_tools,
+                    available_tools=scoped_available_tools,
+                    l_tool_scope=asdict(tool_scope_frame),
+                    budget_partition=asdict(tool_budget_partition_frame),
                     id_namespace=run_ids,
                 )
             except Exception:
@@ -1277,6 +1435,7 @@ def run_l_loop(
                 revision_tool_source_data_ids=revision_tool_result.source_data_ids,
                 user_query=search_query,
                 l1_goal_data_id=l1_goal_data_id,
+                adapter=l3_result_adapter,
                 id_namespace=run_ids,
             )
             revision_trace_ids.append(revision_l3_event.event_id)
@@ -1296,12 +1455,56 @@ def run_l_loop(
             l3 = revision_l3_event
             continuation_attempt_index += 1
 
+    pack_trace_id, pack_data_id, _ = record_document_context_pack_frame(
+        trace_store=trace_store,
+        data_store=data_store,
+        turn_id=turn_id,
+        document_root=document_root,
+        max_document_context_chars=max_document_context_chars,
+        frame_id=document_context_pack_frame_id(id_namespace=run_ids),
+        explicit_reference_data_id=explicit_data_id,
+        source_trace_ids=_unique_strings(
+            [
+                explicit_trace_id,
+                l3.event_id,
+                *tool_call_trace_ids,
+                *distillation_trace_ids,
+                *revision_trace_ids,
+            ]
+        ),
+        source_data_ids=_unique_strings(
+            [
+                explicit_data_id,
+                l2_query_data_id,
+                *revision_query_data_ids,
+                *tool_result_data_ids,
+                *tool_distillation_data_ids,
+                l3_preserved_data_id,
+                *revision_preserved_data_ids,
+            ]
+        ),
+        id_namespace=run_ids,
+    )
+    document_context_trace_ids.append(pack_trace_id)
+    document_context_pack_data_ids = [pack_data_id]
+    l3_per_document_summary_data_ids = _l3_per_document_summary_data_ids(
+        data_store,
+        id_namespace=run_ids,
+    )
+    l3_per_document_summary_trace_ids = _source_trace_ids_for_data_ids(
+        data_store=data_store,
+        data_ids=l3_per_document_summary_data_ids,
+    )
+
     source_trace_ids = _unique_strings(
         [
             run_trace_id,
             l1.event_id,
             *budget_plan_trace_ids,
+            tool_scope_trace_id,
+            tool_budget_partition_trace_id,
             tool_catalog_trace_id,
+            *document_context_trace_ids,
             *l2_plan_trace_ids,
             l2.event_id,
             *tool_choice_trace_ids,
@@ -1312,6 +1515,7 @@ def run_l_loop(
             *continuation_trace_ids,
             *revision_trace_ids,
             *failure_trace_ids,
+            *l3_per_document_summary_trace_ids,
             l3.event_id,
         ]
     )
@@ -1320,7 +1524,10 @@ def run_l_loop(
             run_data_id,
             l1_goal_data_id,
             *budget_plan_data_ids,
+            tool_scope_data_id,
+            tool_budget_partition_data_id,
             catalog_id,
+            *explicit_artifact_reference_data_ids,
             *query_plan_data_ids,
             l2_query_data_id,
             *tool_choice_ids,
@@ -1337,6 +1544,8 @@ def run_l_loop(
             l3_achievement_data_id,
             *revision_preserved_data_ids,
             *revision_achievement_data_ids,
+            *l3_per_document_summary_data_ids,
+            *document_context_pack_data_ids,
         ]
     )
     return LLoopResult(
@@ -1356,9 +1565,12 @@ def run_l_loop(
         continuation_trace_ids=continuation_trace_ids,
         revision_trace_ids=revision_trace_ids,
         failure_trace_ids=failure_trace_ids,
+        document_context_trace_ids=document_context_trace_ids,
         run_data_ids=[run_data_id],
         goal_data_ids=[l1_goal_data_id],
         budget_plan_data_ids=budget_plan_data_ids,
+        tool_scope_data_ids=[tool_scope_data_id],
+        tool_budget_partition_data_ids=[tool_budget_partition_data_id],
         tool_catalog_data_ids=[catalog_id],
         tool_choice_data_ids=tool_choice_ids,
         query_plan_data_ids=query_plan_data_ids,
@@ -1372,6 +1584,8 @@ def run_l_loop(
         revision_query_plan_data_ids=revision_query_plan_data_ids,
         revision_query_data_ids=revision_query_data_ids,
         failure_signal_data_ids=failure_signal_data_ids,
+        explicit_artifact_reference_data_ids=explicit_artifact_reference_data_ids,
+        document_context_pack_data_ids=document_context_pack_data_ids,
         preserved_data_ids=[l3_preserved_data_id, *revision_preserved_data_ids],
         achievement_data_ids=[l3_achievement_data_id, *revision_achievement_data_ids],
         output_data_ids=output_data_ids,
@@ -1556,6 +1770,109 @@ def _control_condition_flags(
     return flags
 
 
+def _initial_control_decision_for_tool(tool_name: str) -> str:
+    if tool_name == "read_artifact":
+        return "continue_read_artifact"
+    if tool_name == "list_code_files":
+        return "list_code_files"
+    if tool_name == "search_code":
+        return "continue_code_search"
+    if tool_name == "read_code_file":
+        return "read_code_file"
+    return "continue_search"
+
+
+def _initial_control_reason_for_tool(tool_name: str) -> str:
+    if tool_name == "read_artifact":
+        return "CODE_STATUS:continue_read_artifact"
+    if tool_name == "list_code_files":
+        return "CODE_STATUS:list_code_files"
+    if tool_name == "search_code":
+        return "CODE_STATUS:continue_search_code"
+    if tool_name == "read_code_file":
+        return "CODE_STATUS:read_code_file"
+    return "CODE_STATUS:continue_search_docs"
+
+
+def _is_code_inspection_tool(tool_name: str) -> bool:
+    return tool_name in {"list_code_files", "search_code", "read_code_file"}
+
+
+def _fallback_l2_tool_for_available_tools(available_tools: list[dict[str, object]]) -> str:
+    available_names = {
+        str(tool.get("tool_name") or tool.get("name"))
+        for tool in available_tools
+        if isinstance(tool, dict) and isinstance(tool.get("tool_name") or tool.get("name"), str)
+    }
+    for tool_name in (
+        "search_docs",
+        "read_artifact",
+        "search_code",
+        "list_code_files",
+        "read_code_file",
+    ):
+        if tool_name in available_names:
+            return tool_name
+    return "search_docs"
+
+
+def _run_code_inspection_tool(
+    *,
+    tool_runner: ToolRunner,
+    selected_tool_name: str,
+    trace_store: TraceStore,
+    data_store: DataStore,
+    turn_id: str,
+    input_ref: list[str],
+    id_namespace: LRunIds,
+    query_text: str,
+) -> ToolRunResult:
+    if selected_tool_name == "list_code_files":
+        return tool_runner.run(
+            tool_name="list_code_files",
+            trace_store=trace_store,
+            data_store=data_store,
+            turn_id=turn_id,
+            input_ref=input_ref,
+            id_namespace=id_namespace,
+        )
+    if selected_tool_name == "search_code":
+        return tool_runner.run(
+            tool_name="search_code",
+            trace_store=trace_store,
+            data_store=data_store,
+            turn_id=turn_id,
+            input_ref=input_ref,
+            id_namespace=id_namespace,
+            query=query_text,
+        )
+    if selected_tool_name == "read_code_file":
+        return tool_runner.run(
+            tool_name="read_code_file",
+            trace_store=trace_store,
+            data_store=data_store,
+            turn_id=turn_id,
+            input_ref=input_ref,
+            id_namespace=id_namespace,
+            file_path=query_text,
+        )
+    raise ValueError(f"unsupported code inspection tool: {selected_tool_name}")
+
+
+def _code_inspection_stop_reason(*, tool_name: str, payload: object) -> str:
+    if not isinstance(payload, dict):
+        return "low_yield_stop"
+    if tool_name == "list_code_files":
+        count = payload.get("returned_file_count")
+        return "completed" if isinstance(count, int) and count > 0 else "low_yield_stop"
+    if tool_name == "search_code":
+        count = payload.get("returned_match_count")
+        return "completed" if isinstance(count, int) and count > 0 else "low_yield_stop"
+    if tool_name == "read_code_file":
+        return "completed" if payload.get("read_status") == "ok" else "low_yield_stop"
+    return "low_yield_stop"
+
+
 def _read_query_text_from_l2_frame(payload: object) -> str:
     """DataStore에 저장된 L2 query frame payload에서 query_text를 꺼낸다."""
 
@@ -1614,6 +1931,34 @@ def _refine_search_query(query: str, *, attempt_count: int) -> str:
     ]
     suffix = suffixes[min(attempt_count - 1, len(suffixes) - 1)]
     return f"{query}{suffix}"
+
+
+def _l3_per_document_summary_data_ids(
+    data_store: DataStore,
+    *,
+    id_namespace: LRunIds,
+) -> list[str]:
+    return _unique_strings(
+        [
+            record.data_id
+            for record in data_store.list_records()
+            if record.data_type == "node_output:L3_per_document_summary_frame"
+            and id_namespace.owns_data_id(record.data_id)
+        ]
+    )
+
+
+def _source_trace_ids_for_data_ids(
+    *,
+    data_store: DataStore,
+    data_ids: list[str],
+) -> list[str]:
+    trace_ids: list[str] = []
+    for data_id in data_ids:
+        record = data_store.get_record(data_id)
+        if record is not None and record.source_trace_id:
+            trace_ids.append(record.source_trace_id)
+    return _unique_strings(trace_ids)
 
 
 def _unique_strings(values: list[str | None]) -> list[str]:

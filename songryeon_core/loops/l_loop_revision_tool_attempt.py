@@ -69,7 +69,14 @@ def run_l_loop_revision_tool_attempt(
     attempt_index = _attempt_index_from_revision_query_frame_id(revision_query_frame_data_id)
     query_text = _required_text(query_payload, "query_text")
     tool_name = _required_text(query_payload, "target_tool_name")
-    if tool_name not in {"search_docs", "read_artifact"}:
+    if tool_name not in {
+        "search_docs",
+        "read_artifact",
+        "read_doc",
+        "list_code_files",
+        "search_code",
+        "read_code_file",
+    }:
         raise ValueError(f"unsupported revision tool: {tool_name}")
 
     registry = build_document_tool_registry(document_root)
@@ -117,6 +124,45 @@ def run_l_loop_revision_tool_attempt(
             query=query_text,
             top_k=search_top_k,
         )
+    elif tool_name == "read_doc":
+        tool_result = runner.run(
+            tool_name="read_doc",
+            trace_store=trace_store,
+            data_store=data_store,
+            turn_id=turn_id,
+            input_ref=_unique_strings([query_record.source_trace_id, choice_trace_id]),
+            id_namespace=id_namespace,
+            doc_id=query_text,
+        )
+    elif tool_name == "list_code_files":
+        tool_result = runner.run(
+            tool_name="list_code_files",
+            trace_store=trace_store,
+            data_store=data_store,
+            turn_id=turn_id,
+            input_ref=_unique_strings([query_record.source_trace_id, choice_trace_id]),
+            id_namespace=id_namespace,
+        )
+    elif tool_name == "search_code":
+        tool_result = runner.run(
+            tool_name="search_code",
+            trace_store=trace_store,
+            data_store=data_store,
+            turn_id=turn_id,
+            input_ref=_unique_strings([query_record.source_trace_id, choice_trace_id]),
+            id_namespace=id_namespace,
+            query=query_text,
+        )
+    elif tool_name == "read_code_file":
+        tool_result = runner.run(
+            tool_name="read_code_file",
+            trace_store=trace_store,
+            data_store=data_store,
+            turn_id=turn_id,
+            input_ref=_unique_strings([query_record.source_trace_id, choice_trace_id]),
+            id_namespace=id_namespace,
+            file_path=query_text,
+        )
     else:
         tool_result = runner.run(
             tool_name="read_artifact",
@@ -142,7 +188,7 @@ def run_l_loop_revision_tool_attempt(
     )
     latest_budget_payload = _require_dict_payload(latest_budget) if latest_budget is not None else {}
     executed_queries = _string_list(latest_budget_payload.get("executed_queries"))
-    if query_text not in executed_queries:
+    if tool_name in {"search_docs", "search_code"} and query_text not in executed_queries:
         executed_queries.append(query_text)
     read_doc_ids = _string_list(latest_budget_payload.get("read_doc_ids"))
     read_doc_id = _read_doc_id_from_tool_payload(tool_name=tool_name, payload=tool_result.payload)
@@ -336,6 +382,9 @@ def _next_budget_sequence_index(
 def _read_doc_id_from_tool_payload(*, tool_name: str, payload: object) -> str | None:
     if not isinstance(payload, dict):
         return None
+    if tool_name == "read_doc":
+        doc_id = payload.get("doc_id")
+        return doc_id if isinstance(doc_id, str) and doc_id else None
     if tool_name == "read_artifact" and payload.get("match_status") == "unique":
         doc_id = payload.get("doc_id") or payload.get("selected_doc_id")
         return doc_id if isinstance(doc_id, str) and doc_id else None
@@ -350,6 +399,17 @@ def _tool_attempt_stop_reason(*, tool_name: str, payload: object) -> str:
         return "completed" if isinstance(result_count, int) and result_count > 0 else "low_yield_stop"
     if tool_name == "read_artifact":
         return "completed" if payload.get("match_status") == "unique" else "low_yield_stop"
+    if tool_name == "read_doc":
+        text = payload.get("text")
+        return "completed" if isinstance(text, str) and text else "low_yield_stop"
+    if tool_name == "list_code_files":
+        count = payload.get("returned_file_count")
+        return "completed" if isinstance(count, int) and count > 0 else "low_yield_stop"
+    if tool_name == "search_code":
+        count = payload.get("returned_match_count")
+        return "completed" if isinstance(count, int) and count > 0 else "low_yield_stop"
+    if tool_name == "read_code_file":
+        return "completed" if payload.get("read_status") == "ok" else "low_yield_stop"
     return "low_yield_stop"
 
 

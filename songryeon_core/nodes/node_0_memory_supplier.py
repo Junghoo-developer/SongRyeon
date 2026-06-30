@@ -9,10 +9,13 @@ from songryeon_core.core.schemas import (
     MemoryPacketFrom0,
     MemoryPacketPayload,
     MemoryRelevanceCandidateFrame,
+    Node0DocumentMaterialItem,
+    Node0DocumentMaterialPacketFrame,
     RawMemoryCompressionCandidateFrame,
     ZeroState,
     validate_l_loop_return_summary_frame,
     validate_memory_packet_payload,
+    validate_node0_document_material_packet_frame,
 )
 from songryeon_core.core.trace_store import TraceStore
 from songryeon_core.loops.l_loop_namespace import LRunIds
@@ -35,6 +38,7 @@ RAW_MEMORY_POST_COMPRESSION_KEEP = 5
 RAW_MEMORY_COMPRESSION_BATCH_SIZE = 4
 L3_CONTINUATION_SUMMARY_MODE = "l3_continuation_summary_for_L2"
 L_LOOP_RETURN_SUMMARY_FRAME_DATA_ID = "L:return_summary_frame"
+NODE0_DOCUMENT_MATERIAL_PACKET_FRAME_DATA_ID = "node_0:document_material_packet_frame"
 
 NODE_0_MODES = {
     "pre_route_report",
@@ -52,6 +56,14 @@ def memory_packet_data_id(target: str, mode: str, packet_id_suffix: str | None =
     if packet_id_suffix is None:
         return base_id
     return f"{base_id}:{packet_id_suffix}"
+
+
+def document_material_packet_frame_data_id(*, id_namespace: LRunIds | None) -> str:
+    """L 이후 node_0 문서 장부 frame ID를 만든다."""
+
+    if id_namespace is None:
+        return NODE0_DOCUMENT_MATERIAL_PACKET_FRAME_DATA_ID
+    return id_namespace.scoped_data_id(NODE0_DOCUMENT_MATERIAL_PACKET_FRAME_DATA_ID)
 
 
 def supply_memory(
@@ -532,6 +544,14 @@ def record_l_loop_return_summary_for_node1(
         source_trace_id=summary_event.event_id,
         payload=asdict(frame),
     )
+    material_trace_id, material_frame_id, material_frame = record_node0_document_material_packet(
+        trace_store=trace_store,
+        data_store=data_store,
+        turn_id=turn_id,
+        frame_id=document_material_packet_frame_data_id(id_namespace=id_namespace),
+        source_trace_ids=_unique_strings([*input_ref, summary_event.event_id]),
+        source_data_ids=_unique_strings([return_summary_frame_id, *source_data_ids]),
+    )
 
     packet = supply_memory(
         target="node_1",
@@ -546,13 +566,16 @@ def record_l_loop_return_summary_for_node1(
         turn_id=turn_id,
         packet=packet,
         mode="loop_return_summary",
-        input_ref=_unique_strings([*input_ref, summary_event.event_id]),
+        input_ref=_unique_strings([*input_ref, summary_event.event_id, material_trace_id]),
         source_data_ids=_unique_strings(
-            [return_summary_frame_id, *source_data_ids]
+            [return_summary_frame_id, material_frame_id, *source_data_ids]
         ),
         compression_summary="CODE_STATUS:l_loop_return_summary_supplied",
         operation_label="CODE_STATUS:l_loop_return_summary_supplied",
-        memory_items=build_l_loop_return_summary_items(frame),
+        memory_items=[
+            *build_l_loop_return_summary_items(frame),
+            build_document_material_packet_status_item(material_frame),
+        ],
         id_namespace=id_namespace,
     )
     packet_data_id = (
@@ -561,6 +584,218 @@ def record_l_loop_return_summary_for_node1(
         else memory_packet_data_id("node_1", "loop_return_summary")
     )
     return packet_trace_id, packet_data_id, return_summary_frame_id, packet
+
+
+def record_node0_document_material_packet(
+    *,
+    trace_store: TraceStore,
+    data_store: DataStore,
+    turn_id: str,
+    frame_id: str,
+    source_trace_ids: list[str],
+    source_data_ids: list[str],
+) -> tuple[str, str, Node0DocumentMaterialPacketFrame]:
+    """L 이후 문서 검색/읽기/context 공급 상태를 node_0 절대정보 장부로 기록한다."""
+
+    frame = build_node0_document_material_packet_frame(
+        data_store=data_store,
+        turn_id=turn_id,
+        frame_id=frame_id,
+        source_trace_ids=source_trace_ids,
+        source_data_ids=source_data_ids,
+    )
+    validate_node0_document_material_packet_frame(frame)
+    event = trace_store.create_event(
+        turn_id=turn_id,
+        actor="node_0",
+        event_type="node_output",
+        input_ref=frame.source_trace_ids,
+        output_ref=[frame_id],
+        schema_status="passed",
+    )
+    data_store.create_record(
+        data_id=frame_id,
+        data_type="node_output:node0_document_material_packet_frame",
+        exists=True,
+        created_at=event.timestamp,
+        source_trace_id=event.event_id,
+        payload=asdict(frame),
+    )
+    return event.event_id, frame_id, frame
+
+
+def build_node0_document_material_packet_frame(
+    *,
+    data_store: DataStore,
+    turn_id: str,
+    frame_id: str,
+    source_trace_ids: list[str],
+    source_data_ids: list[str],
+) -> Node0DocumentMaterialPacketFrame:
+    """흩어진 L 산출 문서 좌표를 문서별 절대정보 장부로 합친다."""
+
+    return_summary_payload = _latest_payload_by_exact_type(
+        data_store=data_store,
+        source_data_ids=source_data_ids,
+        data_type="node_output:l_loop_return_summary_frame",
+    )
+    l3_payload = _latest_payload_by_type_fragment(
+        data_store=data_store,
+        source_data_ids=source_data_ids,
+        type_fragment="L3_achievement_frame",
+    )
+    context_pack_payload = _latest_payload_by_exact_type(
+        data_store=data_store,
+        source_data_ids=source_data_ids,
+        data_type="node_output:document_context_pack_frame",
+    )
+    read_doc_ids = _unique_strings(
+        [
+            *_string_list(return_summary_payload.get("read_doc_ids")),
+            *_document_extract_doc_ids(
+                data_store=data_store,
+                source_data_ids=source_data_ids,
+                require_text=True,
+            ),
+        ]
+    )
+    if not read_doc_ids:
+        read_doc_ids = _string_list(l3_payload.get("read_doc_ids"))
+    search_doc_ids = _string_list(return_summary_payload.get("search_result_doc_ids"))
+    if not search_doc_ids:
+        search_doc_ids = _string_list(l3_payload.get("search_result_doc_ids"))
+
+    item_map: dict[str, dict[str, object]] = {}
+    source_trace_ids_by_data_id = _source_trace_ids_by_data_id(
+        data_store=data_store,
+        source_data_ids=source_data_ids,
+    )
+    return_summary_data_id = _text(return_summary_payload, "frame_id", fallback="")
+    l3_data_id = _text(l3_payload, "frame_id", fallback="")
+    context_pack_data_id = _text(context_pack_payload, "frame_id", fallback="")
+
+    for rank, doc_id in enumerate(search_doc_ids, start=1):
+        entry = _material_entry(item_map, doc_id)
+        _add_material_role(entry, "search_candidate")
+        entry["was_search_candidate"] = True
+        entry["search_candidate_rank"] = rank
+        _extend_material_sources(
+            entry,
+            data_ids=[return_summary_data_id, l3_data_id],
+            trace_ids=source_trace_ids_by_data_id,
+        )
+
+    tool_read_sources = _tool_read_sources_by_doc_id(
+        data_store=data_store,
+        source_data_ids=source_data_ids,
+    )
+    for rank, doc_id in enumerate(read_doc_ids, start=1):
+        entry = _material_entry(item_map, doc_id)
+        _add_material_role(entry, "actual_tool_read_doc")
+        entry["was_actual_tool_read_doc"] = True
+        entry["actual_read_rank"] = rank
+        tool_source = tool_read_sources.get(doc_id, {})
+        char_count = tool_source.get("char_count")
+        if isinstance(char_count, int) and char_count > int(entry["char_count"]):
+            entry["char_count"] = char_count
+        _extend_material_sources(
+            entry,
+            data_ids=[return_summary_data_id, l3_data_id, str(tool_source.get("data_id") or "")],
+            trace_ids=source_trace_ids_by_data_id,
+        )
+
+    included_documents = context_pack_payload.get("included_documents")
+    if isinstance(included_documents, list):
+        for rank, item in enumerate(included_documents, start=1):
+            if not isinstance(item, dict):
+                continue
+            doc_id = _text_from_value(item.get("doc_id"))
+            if not doc_id:
+                continue
+            entry = _material_entry(item_map, doc_id)
+            _add_material_role(entry, "supplied_document_context")
+            entry["was_supplied_document_context"] = True
+            entry["supplied_context_rank"] = rank
+            entry["document_name"] = _text_from_value(item.get("document_name")) or _document_name(doc_id)
+            char_count = item.get("char_count")
+            if isinstance(char_count, int) and char_count > int(entry["char_count"]):
+                entry["char_count"] = char_count
+            _extend_material_sources(
+                entry,
+                data_ids=[context_pack_data_id, _text_from_value(item.get("source_data_id"))],
+                trace_ids=source_trace_ids_by_data_id,
+            )
+
+    excluded_documents = context_pack_payload.get("excluded_documents")
+    if isinstance(excluded_documents, list):
+        for rank, item in enumerate(excluded_documents, start=1):
+            if not isinstance(item, dict):
+                continue
+            doc_id = _text_from_value(item.get("doc_id"))
+            if not doc_id:
+                continue
+            entry = _material_entry(item_map, doc_id)
+            _add_material_role(entry, "excluded_document_context")
+            entry["was_excluded_document_context"] = True
+            entry["excluded_context_rank"] = rank
+            entry["document_name"] = _text_from_value(item.get("document_name")) or _document_name(doc_id)
+            char_count = item.get("char_count")
+            if isinstance(char_count, int) and char_count > int(entry["char_count"]):
+                entry["char_count"] = char_count
+            _extend_material_sources(
+                entry,
+                data_ids=[context_pack_data_id, _text_from_value(item.get("source_data_id"))],
+                trace_ids=source_trace_ids_by_data_id,
+            )
+
+    for entry in item_map.values():
+        if bool(entry["was_search_candidate"]) and not bool(entry["was_actual_tool_read_doc"]):
+            _add_material_role(entry, "unread_candidate")
+            entry["was_unread_candidate"] = True
+
+    items = [_entry_to_document_material_item(entry) for entry in item_map.values()]
+    items.sort(
+        key=lambda item: (
+            item.search_candidate_rank or 999999,
+            item.actual_read_rank or 999999,
+            item.supplied_context_rank or 999999,
+            item.excluded_context_rank or 999999,
+            item.document_name,
+        )
+    )
+    return Node0DocumentMaterialPacketFrame(
+        frame_id=frame_id,
+        turn_id=turn_id,
+        items=items,
+        item_count=len(items),
+        search_candidate_count=sum(1 for item in items if item.was_search_candidate),
+        actual_tool_read_doc_count=sum(1 for item in items if item.was_actual_tool_read_doc),
+        supplied_document_context_count=sum(1 for item in items if item.was_supplied_document_context),
+        excluded_document_context_count=sum(1 for item in items if item.was_excluded_document_context),
+        unread_candidate_count=sum(1 for item in items if item.was_unread_candidate),
+        source_trace_ids=_unique_strings(source_trace_ids),
+        source_data_ids=_unique_strings(source_data_ids),
+    )
+
+
+def build_document_material_packet_status_item(
+    frame: Node0DocumentMaterialPacketFrame,
+) -> MemoryItem:
+    """node_1도 문서 장부 존재와 count를 알 수 있게 memory item으로 복사한다."""
+
+    return _memory_item(
+        packet_source_id=frame.frame_id,
+        item_type="document_material_packet_status",
+        text=(
+            "COPIED_FIELDS:"
+            f"item_count={frame.item_count};"
+            f"search_candidate_count={frame.search_candidate_count};"
+            f"actual_tool_read_doc_count={frame.actual_tool_read_doc_count};"
+            f"supplied_document_context_count={frame.supplied_document_context_count};"
+            f"unread_candidate_count={frame.unread_candidate_count}"
+        ),
+        source_data_ids=[frame.frame_id, *frame.source_data_ids],
+    )
 
 
 def build_l_loop_return_summary_frame(
@@ -600,11 +835,31 @@ def build_l_loop_return_summary_frame(
         fallback="unspecified",
     )
     required_min_read_documents = _int(l1_payload, "minimum_read_documents")
-    read_doc_ids = _string_list(l3_payload.get("read_doc_ids"))
+    read_doc_ids = _unique_strings(
+        [
+            *_string_list(l3_payload.get("read_doc_ids")),
+            *_document_extract_doc_ids(
+                data_store=data_store,
+                source_data_ids=source_data_ids,
+                require_text=True,
+            ),
+        ]
+    )
     if not read_doc_ids:
         read_doc_ids = _string_list(budget_payload.get("read_doc_ids"))
+    read_code_file_paths = _unique_strings(
+        [
+            *_string_list(l3_payload.get("read_code_file_paths")),
+            *_code_extract_file_paths(
+                data_store=data_store,
+                source_data_ids=source_data_ids,
+                require_text=True,
+            ),
+        ]
+    )
     search_result_doc_ids = _string_list(l3_payload.get("search_result_doc_ids"))
     actual_read_doc_count = len(read_doc_ids)
+    actual_read_code_file_count = len(read_code_file_paths)
     search_candidate_count = len(search_result_doc_ids)
     if search_candidate_count == 0:
         search_candidate_count = _int(l3_payload, "candidate_count")
@@ -643,6 +898,7 @@ def build_l_loop_return_summary_frame(
         l3_semantic_goal_match_status=l3_semantic_goal_match_status,
         required_min_read_documents=required_min_read_documents,
         actual_read_doc_count=actual_read_doc_count,
+        actual_source_evidence_count=actual_read_doc_count + actual_read_code_file_count,
         budget_stop_reason=budget_stop_reason,
         final_continuation_status=final_continuation_status,
         remaining_tool_calls=remaining_tool_calls,
@@ -659,6 +915,7 @@ def build_l_loop_return_summary_frame(
         evidence_requirement_kind=evidence_requirement_kind,
         required_min_read_documents=required_min_read_documents,
         actual_read_doc_count=actual_read_doc_count,
+        actual_read_code_file_count=actual_read_code_file_count,
         search_candidate_count=search_candidate_count,
         final_continuation_status=final_continuation_status,
         budget_stop_reason=budget_stop_reason,
@@ -670,6 +927,7 @@ def build_l_loop_return_summary_frame(
         recommended_next_route_for_node1=route_hint,
         route_hint_reason=route_hint_reason,
         read_doc_ids=read_doc_ids,
+        read_code_file_paths=read_code_file_paths,
         search_result_doc_ids=search_result_doc_ids,
         source_trace_ids=_unique_strings(source_trace_ids),
         source_data_ids=_unique_strings(source_data_ids),
@@ -700,6 +958,7 @@ def build_l_loop_return_summary_items(frame: LLoopReturnSummaryFrame) -> list[Me
                 f"evidence_requirement_kind={frame.evidence_requirement_kind};"
                 f"required_min_read_documents={frame.required_min_read_documents};"
                 f"actual_read_doc_count={frame.actual_read_doc_count};"
+                f"actual_read_code_file_count={frame.actual_read_code_file_count};"
                 f"search_candidate_count={frame.search_candidate_count}"
             ),
             source_data_ids=source_data_ids,
@@ -732,6 +991,7 @@ def build_l_loop_return_summary_items(frame: LLoopReturnSummaryFrame) -> list[Me
             text=(
                 "COPIED_FIELDS:"
                 f"read_doc_ids={_format_list(frame.read_doc_ids)};"
+                f"read_code_file_paths={_format_list(frame.read_code_file_paths)};"
                 f"search_result_doc_ids={_format_list(frame.search_result_doc_ids)}"
             ),
             source_data_ids=source_data_ids,
@@ -784,6 +1044,7 @@ def _return_failure_level_and_route_hint(
     l3_semantic_goal_match_status: str,
     required_min_read_documents: int,
     actual_read_doc_count: int,
+    actual_source_evidence_count: int,
     budget_stop_reason: str,
     final_continuation_status: str,
     remaining_tool_calls: int,
@@ -794,7 +1055,7 @@ def _return_failure_level_and_route_hint(
 
     minimum_evidence_missing = (
         required_min_read_documents > 0
-        and actual_read_doc_count < required_min_read_documents
+        and actual_source_evidence_count < required_min_read_documents
     )
     l3_unsatisfied = (
         l_loop_task_status in {"partial", "failed", "unknown"}
@@ -936,6 +1197,209 @@ def build_l3_continuation_summary_items(
         )
     )
     return items
+
+
+def _material_entry(item_map: dict[str, dict[str, object]], doc_id: str) -> dict[str, object]:
+    if doc_id not in item_map:
+        item_map[doc_id] = {
+            "doc_id": doc_id,
+            "document_name": _document_name(doc_id),
+            "source_roles": [],
+            "was_search_candidate": False,
+            "was_actual_tool_read_doc": False,
+            "was_supplied_document_context": False,
+            "was_excluded_document_context": False,
+            "was_unread_candidate": False,
+            "search_candidate_rank": 0,
+            "actual_read_rank": 0,
+            "supplied_context_rank": 0,
+            "excluded_context_rank": 0,
+            "char_count": 0,
+            "source_trace_ids": [],
+            "source_data_ids": [],
+        }
+    return item_map[doc_id]
+
+
+def _add_material_role(entry: dict[str, object], role: str) -> None:
+    roles = entry.get("source_roles")
+    if not isinstance(roles, list):
+        roles = []
+        entry["source_roles"] = roles
+    if role not in roles:
+        roles.append(role)
+
+
+def _extend_material_sources(
+    entry: dict[str, object],
+    *,
+    data_ids: list[str],
+    trace_ids: dict[str, str],
+) -> None:
+    source_data_ids = entry.get("source_data_ids")
+    if not isinstance(source_data_ids, list):
+        source_data_ids = []
+    source_trace_ids = entry.get("source_trace_ids")
+    if not isinstance(source_trace_ids, list):
+        source_trace_ids = []
+
+    for data_id in data_ids:
+        if not data_id:
+            continue
+        if data_id not in source_data_ids:
+            source_data_ids.append(data_id)
+        trace_id = trace_ids.get(data_id)
+        if trace_id and trace_id not in source_trace_ids:
+            source_trace_ids.append(trace_id)
+
+    entry["source_data_ids"] = source_data_ids
+    entry["source_trace_ids"] = source_trace_ids
+
+
+def _entry_to_document_material_item(entry: dict[str, object]) -> Node0DocumentMaterialItem:
+    return Node0DocumentMaterialItem(
+        doc_id=str(entry.get("doc_id") or ""),
+        document_name=str(entry.get("document_name") or ""),
+        source_roles=_string_list(entry.get("source_roles")),
+        was_search_candidate=bool(entry.get("was_search_candidate")),
+        was_actual_tool_read_doc=bool(entry.get("was_actual_tool_read_doc")),
+        was_supplied_document_context=bool(entry.get("was_supplied_document_context")),
+        was_excluded_document_context=bool(entry.get("was_excluded_document_context")),
+        was_unread_candidate=bool(entry.get("was_unread_candidate")),
+        search_candidate_rank=_int(entry, "search_candidate_rank"),
+        actual_read_rank=_int(entry, "actual_read_rank"),
+        supplied_context_rank=_int(entry, "supplied_context_rank"),
+        excluded_context_rank=_int(entry, "excluded_context_rank"),
+        char_count=_int(entry, "char_count"),
+        source_trace_ids=_string_list(entry.get("source_trace_ids")),
+        source_data_ids=_string_list(entry.get("source_data_ids")),
+    )
+
+
+def _source_trace_ids_by_data_id(
+    *,
+    data_store: DataStore,
+    source_data_ids: list[str],
+) -> dict[str, str]:
+    trace_ids: dict[str, str] = {}
+    for data_id in source_data_ids:
+        record = data_store.get_record(data_id)
+        if record is None or not record.source_trace_id:
+            continue
+        trace_ids[data_id] = record.source_trace_id
+    return trace_ids
+
+
+def _tool_read_sources_by_doc_id(
+    *,
+    data_store: DataStore,
+    source_data_ids: list[str],
+) -> dict[str, dict[str, object]]:
+    sources: dict[str, dict[str, object]] = {}
+    for source in _document_extract_sources(
+        data_store=data_store,
+        source_data_ids=source_data_ids,
+    ):
+        if source.get("has_text") is not True:
+            continue
+        doc_id = str(source.get("doc_id") or "")
+        if doc_id and doc_id not in sources:
+            sources[doc_id] = source
+    return sources
+
+
+def _document_extract_doc_ids(
+    *,
+    data_store: DataStore,
+    source_data_ids: list[str],
+    require_text: bool,
+) -> list[str]:
+    doc_ids: list[str] = []
+    for source in _document_extract_sources(
+        data_store=data_store,
+        source_data_ids=source_data_ids,
+    ):
+        if require_text and source.get("has_text") is not True:
+            continue
+        doc_id = source.get("doc_id")
+        if isinstance(doc_id, str) and doc_id and doc_id not in doc_ids:
+            doc_ids.append(doc_id)
+    return doc_ids
+
+
+def _code_extract_file_paths(
+    *,
+    data_store: DataStore,
+    source_data_ids: list[str],
+    require_text: bool,
+) -> list[str]:
+    file_paths: list[str] = []
+    for data_id in source_data_ids:
+        record = data_store.get_record(data_id)
+        if record is None or not _is_code_extract_record(record.data_type):
+            continue
+        payload = record.payload if isinstance(record.payload, dict) else {}
+        if payload.get("read_status") != "ok":
+            continue
+        if require_text:
+            text = payload.get("text")
+            if not isinstance(text, str) or not text.strip():
+                continue
+        file_path = _text_from_value(payload.get("file_path"))
+        if file_path and file_path not in file_paths:
+            file_paths.append(file_path)
+    return file_paths
+
+
+def _document_extract_sources(
+    *,
+    data_store: DataStore,
+    source_data_ids: list[str],
+) -> list[dict[str, object]]:
+    sources: list[dict[str, object]] = []
+    seen_data_ids: set[str] = set()
+    for data_id in source_data_ids:
+        if data_id in seen_data_ids:
+            continue
+        seen_data_ids.add(data_id)
+        record = data_store.get_record(data_id)
+        if record is None:
+            continue
+        if not _is_document_extract_record(record.data_type):
+            continue
+        payload = record.payload if isinstance(record.payload, dict) else {}
+        doc_id = _text_from_value(payload.get("doc_id"))
+        if not doc_id:
+            continue
+        text = payload.get("text")
+        has_text = isinstance(text, str) and bool(text.strip())
+        sources.append(
+            {
+                "doc_id": doc_id,
+                "data_id": record.data_id,
+                "source_trace_id": record.source_trace_id or "",
+                "char_count": payload.get("char_count"),
+                "has_text": has_text,
+            }
+        )
+    return sources
+
+
+def _document_name(doc_id: str) -> str:
+    normalized = doc_id.replace("\\", "/").strip("/")
+    return normalized.rsplit("/", 1)[-1] or doc_id
+
+
+def _text_from_value(value: object) -> str:
+    return value.strip() if isinstance(value, str) and value.strip() else ""
+
+
+def _is_document_extract_record(data_type: str) -> bool:
+    return data_type.startswith("tool_result:read_doc") or data_type.startswith("tool_result:read_artifact")
+
+
+def _is_code_extract_record(data_type: str) -> bool:
+    return data_type.startswith("tool_result:read_code_file")
 
 
 def _memory_item(

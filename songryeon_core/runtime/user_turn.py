@@ -11,6 +11,7 @@ from songryeon_core.llm.runtime import (
     llm_runtime_status,
 )
 from songryeon_core.runtime.defaults import (
+    DEFAULT_MAX_DOCUMENT_CONTEXT_CHARS,
     DEFAULT_MAX_INPUT_CHARS,
     DEFAULT_MAX_QUERY_ATTEMPTS,
     DEFAULT_MAX_READ_DOC_CALLS,
@@ -33,6 +34,7 @@ def run_fake_user_turn(
     max_query_candidates: int | None = None,
     max_read_doc_calls: int = DEFAULT_MAX_READ_DOC_CALLS,
     max_input_chars: int = DEFAULT_MAX_INPUT_CHARS,
+    max_document_context_chars: int = DEFAULT_MAX_DOCUMENT_CONTEXT_CHARS,
     include_data_records: bool = False,
     force_l_route: bool = False,
     same_turn_l_reroute_enabled: bool = False,
@@ -55,6 +57,7 @@ def run_fake_user_turn(
         node_1_router_adapter=adapter,
         memory_relevance_selector_adapter=adapter,
         l1_goal_adapter=adapter,
+        l_tool_scope_adapter=adapter,
         l2_query_planner_adapter=adapter,
         l3_result_adapter=adapter,
         node_2_boundary_adapter=adapter,
@@ -67,6 +70,7 @@ def run_fake_user_turn(
         max_query_candidates=max_query_candidates,
         max_read_doc_calls=max_read_doc_calls,
         max_input_chars=max_input_chars,
+        max_document_context_chars=max_document_context_chars,
         force_l_route=force_l_route,
         same_turn_l_reroute_enabled=same_turn_l_reroute_enabled,
         max_l_runs_per_turn=max_l_runs_per_turn,
@@ -100,6 +104,7 @@ def run_qwen_user_turn(
     max_query_candidates: int | None = None,
     max_read_doc_calls: int = DEFAULT_MAX_READ_DOC_CALLS,
     max_input_chars: int = DEFAULT_MAX_INPUT_CHARS,
+    max_document_context_chars: int = DEFAULT_MAX_DOCUMENT_CONTEXT_CHARS,
     include_data_records: bool = False,
     force_l_route: bool = False,
     same_turn_l_reroute_enabled: bool = False,
@@ -139,6 +144,7 @@ def run_qwen_user_turn(
             node_1_router_adapter=adapter,
             memory_relevance_selector_adapter=adapter,
             l1_goal_adapter=adapter,
+            l_tool_scope_adapter=adapter,
             l2_query_planner_adapter=adapter,
             l3_result_adapter=adapter,
             node_2_boundary_adapter=adapter,
@@ -151,6 +157,7 @@ def run_qwen_user_turn(
             max_query_candidates=max_query_candidates,
             max_read_doc_calls=max_read_doc_calls,
             max_input_chars=max_input_chars,
+            max_document_context_chars=max_document_context_chars,
             force_l_route=force_l_route,
             same_turn_l_reroute_enabled=same_turn_l_reroute_enabled,
             max_l_runs_per_turn=max_l_runs_per_turn,
@@ -161,10 +168,12 @@ def run_qwen_user_turn(
             live_trace_sink=make_live_trace_sink(enabled=live_trace),
         )
     except Exception as exc:
+        diagnostics = _structure_failure_diagnostics(exc)
         return {
             "status": "structure_failed",
             "reason": exc.__class__.__name__,
             "error": str(exc),
+            **diagnostics,
             "runtime": runtime,
             "user_input": user_input,
         }
@@ -207,6 +216,7 @@ def _turn_response(
         "task_result_count": result.get("task_result_count"),
         "search_top_k": result.get("search_top_k"),
         "max_query_attempts": result.get("max_query_attempts"),
+        "max_document_context_chars": result.get("max_document_context_chars"),
         "l2_query_source": result.get("l2_query_source"),
         "l2_query_plan_present": (
             "L2:query_plan_frame" in data_ids
@@ -261,6 +271,29 @@ def _turn_response(
         "older_unmanaged_raw_turn_count": result.get("older_unmanaged_raw_turn_count"),
         "l1_goal_generation_source": result.get("l1_goal_generation_source"),
         "l3_achievement_generation_source": result.get("l3_achievement_generation_source"),
+        "node2_answer_basis_mode": result.get("node2_answer_basis_mode"),
+        "node2_answer_basis_generated_by": result.get("node2_answer_basis_generated_by"),
+        "node2_answer_basis_reason_codes": result.get("node2_answer_basis_reason_codes"),
+        "node2_answer_basis_semantic_judgement_status": result.get(
+            "node2_answer_basis_semantic_judgement_status"
+        ),
+        "node2_answer_basis_failure_type": result.get("node2_answer_basis_failure_type"),
+        "node2_answer_basis_llm_call_data_id": result.get(
+            "node2_answer_basis_llm_call_data_id"
+        ),
+        "node2_answer_basis_trace_event_id": result.get(
+            "node2_answer_basis_trace_event_id"
+        ),
+        "node2_answer_basis_validation_error": result.get(
+            "node2_answer_basis_validation_error"
+        ),
+        "node2_answer_basis_raw_text_present": result.get(
+            "node2_answer_basis_raw_text_present"
+        ),
+        "node2_answer_basis_prompt_ref": result.get("node2_answer_basis_prompt_ref"),
+        "node2_answer_basis_payload_parse_status": result.get(
+            "node2_answer_basis_payload_parse_status"
+        ),
         "node3_reporter_status": result.get("node3_reporter_status"),
         "node4_gate_status": result.get("node4_gate_status"),
         "node4_recent_memory_guard_status": result.get(
@@ -282,6 +315,78 @@ def _turn_response(
         response["replay_has_controller"] = "controller:" in replay_text
         response["replay_has_budget"] = "budget:" in replay_text
     return response
+
+
+def _structure_failure_diagnostics(exc: Exception) -> dict[str, object]:
+    message = _short_diagnostic_text(str(exc) or exc.__class__.__name__)
+    node = _infer_failure_node(message)
+    diagnostics = {
+        "structure_failure_stage": _infer_failure_stage(message, node=node),
+        "structure_failure_reason": message or exc.__class__.__name__,
+        "structure_failure_exception_type": exc.__class__.__name__,
+        "structure_failure_llm_call_data_id": None,
+        "structure_failure_trace_event_id": None,
+        "structure_failure_node": node,
+        "structure_failure_prompt_ref": _prompt_ref_for_node(node),
+    }
+    budget_diagnostics = getattr(exc, "budget_diagnostics", None)
+    if isinstance(budget_diagnostics, dict):
+        diagnostics.update(budget_diagnostics)
+        diagnostics["structure_failure_stage"] = "run_dry_turn"
+        diagnostics["structure_failure_node"] = "L"
+    return diagnostics
+
+
+def _infer_failure_node(message: str) -> str:
+    lowered = message.lower()
+    if "node_4" in lowered or "gatekeeper" in lowered:
+        return "node_4"
+    if "node_3" in lowered or "reporter" in lowered:
+        return "node_3"
+    if "answer_basis" in lowered or "node2 answer" in lowered or "node_2" in lowered:
+        return "node_2"
+    if "node_1" in lowered or "router" in lowered:
+        return "node_1"
+    if "toolusebudgetframe" in lowered or "tool use budget" in lowered:
+        return "L"
+    if "l3" in lowered:
+        return "L3"
+    if "l2" in lowered:
+        return "L2"
+    if "l1" in lowered:
+        return "L1"
+    return "unknown"
+
+
+def _infer_failure_stage(message: str, *, node: str) -> str:
+    lowered = message.lower()
+    if "schema" in lowered:
+        return f"{node}:schema_validation" if node != "unknown" else "schema_validation"
+    if "parse" in lowered or "json" in lowered:
+        return f"{node}:payload_parse" if node != "unknown" else "payload_parse"
+    if node != "unknown":
+        return f"{node}:run"
+    return "run_dry_turn"
+
+
+def _prompt_ref_for_node(node: str) -> str | None:
+    prompt_refs = {
+        "node_1": "songryeon_core/prompts/node_1_router_v0.md",
+        "L1": "songryeon_core/prompts/l1_goal_setter_v0.md",
+        "L2": "songryeon_core/prompts/l2_query_setter_v0.md",
+        "L3": "songryeon_core/prompts/l3_result_keeper_v0.md",
+        "node_2": "songryeon_core/prompts/node_2_answer_basis_selector_v0.md",
+        "node_3": "songryeon_core/prompts/node_3_reporter_v0.md",
+        "node_4": "songryeon_core/prompts/node_4_gatekeeper_v0.md",
+    }
+    return prompt_refs.get(node)
+
+
+def _short_diagnostic_text(text: str, *, limit: int = 240) -> str:
+    compact = " ".join(text.split())
+    if len(compact) <= limit:
+        return compact
+    return f"{compact[: limit - 3]}..."
 
 
 def _status_from_result(result: dict[str, object]) -> str:

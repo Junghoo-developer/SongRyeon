@@ -13,6 +13,14 @@ from songryeon_core.core.trace_store import TraceStore
 from songryeon_core.loops.l_loop_namespace import LRunIds
 
 
+class BudgetConsistencyError(ValueError):
+    """ToolUseBudgetFrame 검증 실패를 구조화된 진단과 함께 올린다."""
+
+    def __init__(self, message: str, *, diagnostics: dict[str, object]) -> None:
+        super().__init__(message)
+        self.budget_diagnostics = diagnostics
+
+
 def tool_budget_data_id(
     turn_id: str,
     sequence_index: int,
@@ -85,7 +93,15 @@ def record_tool_use_budget_frame(
         source_trace_ids=source_trace_ids or [],
         source_data_ids=source_data_ids or [],
     )
-    validate_tool_use_budget_frame(frame)
+    try:
+        validate_tool_use_budget_frame(frame)
+    except (TypeError, ValueError) as exc:
+        diagnostics = _budget_failure_diagnostics(
+            frame=frame,
+            reason=str(exc),
+            id_namespace=id_namespace,
+        )
+        raise BudgetConsistencyError(str(exc), diagnostics=diagnostics) from exc
     event = trace_store.create_event(
         turn_id=turn_id,
         actor="tool_efficiency_policy",
@@ -103,6 +119,51 @@ def record_tool_use_budget_frame(
         payload=asdict(frame),
     )
     return event.event_id, budget_id
+
+
+def _budget_failure_diagnostics(
+    *,
+    frame: ToolUseBudgetFrame,
+    reason: str,
+    id_namespace: LRunIds | None,
+) -> dict[str, object]:
+    return {
+        "budget_failure_type": _budget_failure_type(frame, reason=reason),
+        "budget_failure_reason": reason,
+        "budget_failure_frame_id": frame.budget_id,
+        "budget_failure_source_data_ids": list(frame.source_data_ids),
+        "budget_failure_route": "L",
+        "budget_failure_l_run_id": _budget_failure_l_run_id(id_namespace),
+        "budget_failure_query_count": frame.query_count,
+        "budget_failure_max_query_attempts": frame.max_query_attempts,
+        "budget_failure_tool_calls": frame.tool_call_count,
+        "budget_failure_max_tool_calls": frame.max_tool_calls,
+        "budget_failure_read_doc_count": frame.read_doc_count,
+        "budget_failure_max_read_doc": frame.max_read_doc_calls,
+        "budget_failure_stage": "record_tool_use_budget_frame:validate",
+    }
+
+
+def _budget_failure_type(frame: ToolUseBudgetFrame, *, reason: str) -> str:
+    if frame.query_count > frame.max_query_attempts:
+        return "query_count_exceeded_max_query_attempts"
+    if frame.tool_call_count > frame.max_tool_calls:
+        return "tool_call_count_exceeded_max_tool_calls"
+    if frame.read_doc_count > frame.max_read_doc_calls:
+        return "read_doc_count_exceeded_max_read_doc"
+    if frame.max_query_candidates != frame.max_query_attempts:
+        return "max_query_candidates_mismatch"
+    if "must be positive" in reason:
+        return "budget_limit_not_positive"
+    if "must not be negative" in reason:
+        return "budget_count_negative"
+    return "budget_consistency_violation"
+
+
+def _budget_failure_l_run_id(id_namespace: LRunIds | None) -> str:
+    if id_namespace is None:
+        return "unknown"
+    return f"L:run:{id_namespace.run_index:04d}"
 
 
 def record_duplicate_tool_use_signal(

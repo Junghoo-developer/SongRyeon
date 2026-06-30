@@ -1,5 +1,6 @@
 ﻿from __future__ import annotations
 
+import re
 from dataclasses import asdict
 from pathlib import Path
 
@@ -209,7 +210,9 @@ _ARTIFACT_MATCH_RANK = {
     "path_suffix_exact": 3,
     "filename_exact": 4,
     "filename_stem_exact": 5,
+    "order_number_prefix": 6,
 }
+_ORDER_NUMBER_REF_RE = re.compile(r"^order_\d{3}$")
 
 
 def _artifact_candidates(
@@ -268,6 +271,11 @@ def _artifact_match_type(normalized_ref: str, doc_id: str) -> str | None:
         return "filename_exact"
     if normalized_ref_no_suffix == filename_no_suffix:
         return "filename_stem_exact"
+    if normalized_doc.startswith("04_orders/") and _ORDER_NUMBER_REF_RE.match(normalized_ref_no_suffix) and (
+        filename_no_suffix == normalized_ref_no_suffix
+        or filename_no_suffix.startswith(f"{normalized_ref_no_suffix}_")
+    ):
+        return "order_number_prefix"
     return None
 
 

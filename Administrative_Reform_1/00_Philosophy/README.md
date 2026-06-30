@@ -13,3 +13,4 @@
 - [Raw_Memory_Window_And_Node5_Compression_Philosophy_2026_06_26.md](Raw_Memory_Window_And_Node5_Compression_Philosophy_2026_06_26.md): 최근 원문 기억 최대 8턴, 최소 3턴 보장, 9턴 진입 시 4턴 압축 후보 분리, 0/5/4 역할 분담을 정리한 미승격 기억 철학 문서.
 - [Answer_Basis_Mode_And_Evidence_Role_Philosophy_2026_06_26.md](Answer_Basis_Mode_And_Evidence_Role_Philosophy_2026_06_26.md): 기억은 전달되지만 node_3가 문서/최근기억/현재발화 중 무엇을 주근거로 삼아야 하는지 정하지 못하는 문제와 `answer_basis_mode` 다음 MVP 후보를 정리한 미승격 철학 문서.
 - [L_Loop_Dynamic_Budget_Management_Philosophy_2026_06_27.md](L_Loop_Dynamic_Budget_Management_Philosophy_2026_06_27.md): L3 partial 이후 예산 부족 신호, code budget policy 승인, context packing 예산을 어떻게 장기적으로 분리할지 정리한 미승격 철학 문서.
+- [Qwen_Model_Vs_SongRyeon_Runtime_Experiment_Philosophy_2026_06_29.md](Qwen_Model_Vs_SongRyeon_Runtime_Experiment_Philosophy_2026_06_29.md): Qwen 14B 단독 성능과 SongRyeon Core 런타임 구조가 더하는 가치를 비교하기 위한 A/B/C 실험 설계 철학 문서.

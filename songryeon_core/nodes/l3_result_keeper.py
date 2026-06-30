@@ -7,10 +7,12 @@ from pathlib import Path
 from songryeon_core.core.data_store import DataStore
 from songryeon_core.core.schemas import (
     L3AchievementFrame,
+    L3PerDocumentSummaryFrame,
     L3PreservedInfoFrame,
     L3PreservedSearchCandidate,
     TraceEvent,
     validate_l3_achievement_frame,
+    validate_l3_per_document_summary_frame,
     validate_l3_preserved_info_frame,
 )
 from songryeon_core.core.trace_store import TraceStore
@@ -23,6 +25,9 @@ L3_PRESERVED_FRAME_DATA_ID = "L3:preserved_info_frame"
 L3_ACHIEVEMENT_FRAME_DATA_ID = "L3:achievement_frame"
 L3_REVISION_PRESERVED_FRAME_DATA_ID_PREFIX = "L3:revision_preserved_info"
 L3_REVISION_ACHIEVEMENT_FRAME_DATA_ID_PREFIX = "L3:revision_achievement"
+L3_PER_DOCUMENT_SUMMARY_FRAME_DATA_ID_PREFIX = "L3:per_document_summary"
+L3_PER_DOCUMENT_SUMMARY_PROMPT_REF = "songryeon_core/prompts/l3_per_document_summary_v0.md"
+L3_PER_DOCUMENT_SUMMARY_MAX_SOURCE_CHARS = 12000
 
 
 def l3_revision_preserved_frame_data_id(
@@ -157,6 +162,19 @@ def run_l3_result_keeper(
             source_trace_id=event.event_id,
             payload=asdict(achievement_frame),
         )
+        if adapter is not None:
+            record_l3_per_document_summary_frames(
+                trace_store=trace_store,
+                data_store=data_store,
+                turn_id=turn_id,
+                input_trace_ids=input_ref,
+                input_data_ids=source_data_ids,
+                user_query=user_query,
+                adapter=adapter,
+                preserved_frame_data_id=preserved_frame_data_id,
+                target_goal_data_id=target_goal_data_id,
+                frame_id_prefix=f"{preserved_frame_data_id}:per_document_summary",
+            )
     return event
 
 
@@ -172,6 +190,7 @@ def run_l3_revision_result_keeper(
     user_query: str = "",
     final_control_data_id: str | None = None,
     l1_goal_data_id: str = "L1:goal_frame",
+    adapter: LLMAdapter | None = None,
     id_namespace: LRunIds | None = None,
 ) -> TraceEvent:
     """Re-run the L3 preservation/achievement check after one revision tool attempt.
@@ -243,7 +262,250 @@ def run_l3_revision_result_keeper(
         source_trace_id=event.event_id,
         payload=asdict(achievement_frame),
     )
+    if adapter is not None:
+        record_l3_per_document_summary_frames(
+            trace_store=trace_store,
+            data_store=data_store,
+            turn_id=turn_id,
+            input_trace_ids=input_trace_ids,
+            input_data_ids=input_data_ids,
+            user_query=user_query,
+            adapter=adapter,
+            preserved_frame_data_id=preserved_frame_id,
+            target_goal_data_id=l1_goal_data_id,
+            frame_id_prefix=f"{preserved_frame_id}:per_document_summary",
+        )
     return event
+
+
+def record_l3_per_document_summary_frames(
+    *,
+    trace_store: TraceStore,
+    data_store: DataStore,
+    turn_id: str,
+    input_trace_ids: list[str],
+    input_data_ids: list[str],
+    user_query: str,
+    adapter: LLMAdapter,
+    preserved_frame_data_id: str,
+    target_goal_data_id: str,
+    frame_id_prefix: str = L3_PER_DOCUMENT_SUMMARY_FRAME_DATA_ID_PREFIX,
+) -> list[str]:
+    """실제 document extract record마다 L3 문서별 요약 frame을 기록한다."""
+
+    source_documents = _document_extract_records_for_ids(
+        data_store=data_store,
+        input_data_ids=input_data_ids,
+    )
+    created_frame_ids: list[str] = []
+    for index, source_document in enumerate(source_documents, start=1):
+        frame_id = f"{frame_id_prefix}:{index:04d}"
+        frame = _build_l3_per_document_summary_frame(
+            trace_store=trace_store,
+            data_store=data_store,
+            turn_id=turn_id,
+            frame_id=frame_id,
+            source_document=source_document,
+            input_trace_ids=input_trace_ids,
+            user_query=user_query,
+            adapter=adapter,
+            preserved_frame_data_id=preserved_frame_data_id,
+            target_goal_data_id=target_goal_data_id,
+        )
+        validate_l3_per_document_summary_frame(frame)
+        event = trace_store.create_event(
+            turn_id=turn_id,
+            actor="L3",
+            event_type="node_output",
+            input_ref=frame.source_trace_ids,
+            output_ref=[frame_id],
+            schema_status="passed" if frame.summary_status == "ran" else "failed",
+        )
+        data_store.create_record(
+            data_id=frame_id,
+            data_type="node_output:L3_per_document_summary_frame",
+            exists=True,
+            created_at=event.timestamp,
+            source_trace_id=event.event_id,
+            payload=asdict(frame),
+        )
+        created_frame_ids.append(frame_id)
+    return created_frame_ids
+
+
+def _build_l3_per_document_summary_frame(
+    *,
+    trace_store: TraceStore,
+    data_store: DataStore,
+    turn_id: str,
+    frame_id: str,
+    source_document: dict[str, object],
+    input_trace_ids: list[str],
+    user_query: str,
+    adapter: LLMAdapter,
+    preserved_frame_data_id: str,
+    target_goal_data_id: str,
+) -> L3PerDocumentSummaryFrame:
+    source_document_data_id = str(source_document["source_data_id"])
+    source_doc_id = str(source_document["doc_id"])
+    source_text = str(source_document.get("text") or "")
+    source_trace_id = source_document.get("source_trace_id")
+    source_document_name = _document_name_from_doc_id(source_doc_id)
+    source_char_count = int(source_document.get("char_count") or len(source_text))
+    task_source_data_ids = _unique_strings(
+        [source_document_data_id, target_goal_data_id, preserved_frame_data_id]
+    )
+    source_text_for_llm = source_text[:L3_PER_DOCUMENT_SUMMARY_MAX_SOURCE_CHARS]
+    source_text_truncated = len(source_text) > len(source_text_for_llm)
+    l1_goal = _read_l1_goal_frame(
+        data_store=data_store,
+        input_data_ids=[target_goal_data_id],
+    )
+    prompt = Path(L3_PER_DOCUMENT_SUMMARY_PROMPT_REF).read_text(encoding="utf-8")
+    llm_result = LLMNodeExecutor(adapter).run(
+        node_id="L3_document_summary",
+        prompt=prompt,
+        input_payload={
+            "user_query": user_query,
+            "l1_goal": l1_goal,
+            "source_document": {
+                "document_name": source_document_name,
+                "char_count": source_char_count,
+                "text": source_text_for_llm,
+                "text_truncated": source_text_truncated,
+            },
+            "summary_contract": {
+                "plain_document_summary_info_class": "relative",
+                "plain_document_summary_source_mode": "direct_record",
+                "task_relevant_summary_info_class": "mixed",
+                "task_relevant_summary_source_mode": "source_bundle",
+            },
+        },
+        trace_store=trace_store,
+        data_store=data_store,
+        turn_id=turn_id,
+        prompt_ref=L3_PER_DOCUMENT_SUMMARY_PROMPT_REF,
+        input_ref=_unique_strings(
+            [
+                *input_trace_ids,
+                source_trace_id if isinstance(source_trace_id, str) else None,
+            ]
+        ),
+        source_data_ids=task_source_data_ids,
+        payload_validator=_validate_l3_per_document_summary_payload,
+    )
+
+    frame_source_trace_ids = _unique_strings(
+        [
+            *input_trace_ids,
+            source_trace_id if isinstance(source_trace_id, str) else None,
+            llm_result.trace_event_id,
+        ]
+    )
+    frame_source_data_ids = _unique_strings(
+        [
+            *task_source_data_ids,
+            llm_result.call_data_id,
+        ]
+    )
+    generated_by = f"LLM:{llm_result.model_id}"
+    if llm_result.failure_type != "none" or llm_result.validation.payload is None:
+        return L3PerDocumentSummaryFrame(
+            frame_id=frame_id,
+            turn_id=turn_id,
+            source_document_data_id=source_document_data_id,
+            source_doc_id=source_doc_id,
+            source_document_name=source_document_name,
+            source_char_count=source_char_count,
+            summary_status="failed",
+            plain_summary_source_data_id=source_document_data_id,
+            task_relevant_summary_source_data_ids=task_source_data_ids,
+            generated_by=generated_by,
+            semantic_judgement_status="failed",
+            summary_failure_type=llm_result.failure_type or "unknown",
+            llm_call_data_id=llm_result.call_data_id,
+            prompt_ref=L3_PER_DOCUMENT_SUMMARY_PROMPT_REF,
+            source_trace_ids=frame_source_trace_ids,
+            source_data_ids=frame_source_data_ids,
+        )
+
+    payload = llm_result.validation.payload
+    summary_limit_note = str(payload.get("summary_limit_note") or "").strip()
+    if source_text_truncated and not summary_limit_note:
+        summary_limit_note = "원문이 L3 요약 입력 한도에서 잘려 요약 범위에 한계가 있다."
+
+    return L3PerDocumentSummaryFrame(
+        frame_id=frame_id,
+        turn_id=turn_id,
+        source_document_data_id=source_document_data_id,
+        source_doc_id=source_doc_id,
+        source_document_name=source_document_name,
+        source_char_count=source_char_count,
+        summary_status="ran",
+        plain_document_summary=str(payload.get("plain_document_summary") or "").strip(),
+        plain_summary_source_data_id=source_document_data_id,
+        task_relevant_summary=str(payload.get("task_relevant_summary") or "").strip(),
+        task_relevant_summary_source_data_ids=task_source_data_ids,
+        summary_limit_note=summary_limit_note,
+        generated_by=generated_by,
+        semantic_judgement_status="ran",
+        summary_failure_type="none",
+        llm_call_data_id=llm_result.call_data_id,
+        prompt_ref=L3_PER_DOCUMENT_SUMMARY_PROMPT_REF,
+        source_trace_ids=frame_source_trace_ids,
+        source_data_ids=frame_source_data_ids,
+    )
+
+
+def _validate_l3_per_document_summary_payload(payload: dict[str, object]) -> None:
+    for field_name in ("plain_document_summary", "task_relevant_summary"):
+        value = payload.get(field_name)
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(f"L3 document summary payload {field_name} must not be empty")
+    limit_note = payload.get("summary_limit_note")
+    if limit_note is not None and not isinstance(limit_note, str):
+        raise TypeError("L3 document summary payload summary_limit_note must be a string")
+
+
+def _document_extract_records_for_ids(
+    *,
+    data_store: DataStore,
+    input_data_ids: list[str],
+) -> list[dict[str, object]]:
+    documents: list[dict[str, object]] = []
+    seen_data_ids: set[str] = set()
+    for data_id in input_data_ids:
+        if data_id in seen_data_ids:
+            continue
+        seen_data_ids.add(data_id)
+        record = data_store.get_record(data_id)
+        if record is None or not _is_document_extract_record(record.data_type):
+            continue
+        payload = record.payload
+        if not isinstance(payload, dict):
+            continue
+        text = payload.get("text")
+        doc_id = payload.get("doc_id")
+        if not isinstance(text, str) or not text.strip():
+            continue
+        if not isinstance(doc_id, str) or not doc_id.strip():
+            continue
+        char_count = payload.get("char_count")
+        documents.append(
+            {
+                "source_data_id": record.data_id,
+                "source_trace_id": record.source_trace_id,
+                "doc_id": doc_id.strip(),
+                "text": text,
+                "char_count": char_count if isinstance(char_count, int) else len(text),
+            }
+        )
+    return documents
+
+
+def _document_name_from_doc_id(doc_id: str) -> str:
+    normalized = doc_id.replace("\\", "/").strip()
+    return normalized.rsplit("/", 1)[-1] if normalized else doc_id
 
 
 def _build_preserved_frame(
@@ -365,6 +627,33 @@ def _build_achievement_frame(
     if achievement_status != original_status:
         generation_source = f"{generation_source}+CODE:GOAL_MATCH_GUARD"
 
+    status_before_l1_requirement_guard = achievement_status
+    (
+        achievement_status,
+        reason,
+        macro_status,
+        macro_reason,
+        micro_status,
+        micro_reason,
+    ) = _apply_l1_requirement_count_guard(
+        achievement_status=achievement_status,
+        reason=reason,
+        macro_status=macro_status,
+        macro_reason=macro_reason,
+        micro_status=micro_status,
+        micro_reason=micro_reason,
+        l1_goal=l1_goal,
+        read_document_count=len(goal_match["read_doc_ids"]),
+        read_code_file_count=len(goal_match["read_code_file_paths"]),
+        source_code_evidence_expected=_source_code_evidence_expected(
+            l1_goal=l1_goal,
+            data_store=data_store,
+            input_data_ids=input_data_ids,
+        ),
+    )
+    if achievement_status != status_before_l1_requirement_guard:
+        generation_source = f"{generation_source}+CODE:L1_REQUIREMENT_COUNT_GUARD"
+
     evidence_data_ids = _unique_strings(
         [
             *input_data_ids,
@@ -396,6 +685,8 @@ def _build_achievement_frame(
         micro_achievement_reason=micro_reason,
         requested_doc_hint=str(goal_match["requested_doc_hint"]),
         read_doc_ids=list(goal_match["read_doc_ids"]),
+        read_code_file_paths=list(goal_match["read_code_file_paths"]),
+        actual_read_code_file_count=len(goal_match["read_code_file_paths"]),
         search_result_doc_ids=list(goal_match["search_result_doc_ids"]),
         goal_match_status=str(goal_match["goal_match_status"]),
         goal_match_reason=str(goal_match["goal_match_reason"]),
@@ -433,6 +724,7 @@ def _build_llm_achievement_frame(
         data_store=data_store,
     )
     read_doc_ids = list(goal_match["read_doc_ids"])
+    read_code_file_paths = list(goal_match["read_code_file_paths"])
     search_result_doc_ids = list(goal_match["search_result_doc_ids"])
     input_payload = {
         "user_query": user_query,
@@ -446,11 +738,14 @@ def _build_llm_achievement_frame(
             "preserved_candidate_count": len(preserved_frame.candidates),
             "unique_search_result_document_count": len(search_result_doc_ids),
             "read_document_count": len(read_doc_ids),
+            "read_code_file_count": len(read_code_file_paths),
         },
         "read_doc_ids": read_doc_ids,
+        "read_code_file_paths": read_code_file_paths,
         "search_result_doc_ids": search_result_doc_ids,
         "specific_document_request": goal_match,
         "read_document_previews": _read_doc_previews_from_data_store(data_store),
+        "read_code_file_previews": _read_code_file_previews_from_data_store(data_store),
         "candidate_previews": [
             {
                 "candidate_id": candidate.candidate_id,
@@ -561,6 +856,12 @@ def _build_llm_achievement_frame(
         micro_reason=micro_reason,
         l1_goal=l1_goal,
         read_document_count=len(read_doc_ids),
+        read_code_file_count=len(read_code_file_paths),
+        source_code_evidence_expected=_source_code_evidence_expected(
+            l1_goal=l1_goal,
+            data_store=data_store,
+            input_data_ids=input_data_ids,
+        ),
     )
     if achievement_status != status_before_l1_requirement_guard:
         generation_source = f"{generation_source}+CODE:L1_REQUIREMENT_COUNT_GUARD"
@@ -589,6 +890,8 @@ def _build_llm_achievement_frame(
         micro_achievement_reason=micro_reason,
         requested_doc_hint=str(goal_match["requested_doc_hint"]),
         read_doc_ids=list(goal_match["read_doc_ids"]),
+        read_code_file_paths=list(goal_match["read_code_file_paths"]),
+        actual_read_code_file_count=len(goal_match["read_code_file_paths"]),
         search_result_doc_ids=list(goal_match["search_result_doc_ids"]),
         goal_match_status=str(goal_match["goal_match_status"]),
         goal_match_reason=str(goal_match["goal_match_reason"]),
@@ -623,7 +926,9 @@ def _l3_judgement_contract(l1_goal: dict[str, object]) -> list[str]:
     evidence_kind = str(l1_goal.get("evidence_requirement_kind") or "unspecified")
     contract = [
         "Judge the current user_query and L1 success condition, not whether a read document describes some implementation success.",
-        "Use read_document_count and read_doc_ids as the only proof that original document text was read.",
+        "Use read_document_count and read_doc_ids as proof that original Markdown/document text was read.",
+        "Use read_code_file_count and read_code_file_paths as proof that original source/config code text was read.",
+        "Do not rename source-code evidence into read_doc evidence; keep document evidence and source-code evidence separate.",
         "If the evidence kind is exploratory or multi-document, judge whether the read documents can support cross-document relationship analysis.",
     ]
     if evidence_kind in {"exploratory_multi_doc", "multi_doc_relationship"}:
@@ -780,6 +1085,7 @@ def _build_goal_match_context(
 
     requested_doc_hint = _extract_requested_doc_hint(user_query)
     read_doc_ids = _read_doc_ids_from_data_store(data_store)
+    read_code_file_paths = _read_code_file_paths_from_data_store(data_store)
     search_result_doc_ids = _unique_strings(
         [candidate.doc_id for candidate in preserved_frame.candidates if candidate.doc_id]
     )
@@ -788,6 +1094,7 @@ def _build_goal_match_context(
         return {
             "requested_doc_hint": "",
             "read_doc_ids": read_doc_ids,
+            "read_code_file_paths": read_code_file_paths,
             "search_result_doc_ids": search_result_doc_ids,
             "goal_match_status": "not_applicable",
             "goal_match_reason": "CODE_STATUS:no_specific_doc_hint_detected",
@@ -797,24 +1104,37 @@ def _build_goal_match_context(
         return {
             "requested_doc_hint": requested_doc_hint,
             "read_doc_ids": read_doc_ids,
+            "read_code_file_paths": read_code_file_paths,
             "search_result_doc_ids": search_result_doc_ids,
             "goal_match_status": "matched",
             "goal_match_reason": "CODE_STATUS:requested_doc_read_doc_matched",
+        }
+
+    if any(_doc_matches_hint(file_path, requested_doc_hint) for file_path in read_code_file_paths):
+        return {
+            "requested_doc_hint": requested_doc_hint,
+            "read_doc_ids": read_doc_ids,
+            "read_code_file_paths": read_code_file_paths,
+            "search_result_doc_ids": search_result_doc_ids,
+            "goal_match_status": "matched",
+            "goal_match_reason": "CODE_STATUS:requested_source_code_file_read_code_file_matched",
         }
 
     if any(_doc_matches_hint(doc_id, requested_doc_hint) for doc_id in search_result_doc_ids):
         return {
             "requested_doc_hint": requested_doc_hint,
             "read_doc_ids": read_doc_ids,
+            "read_code_file_paths": read_code_file_paths,
             "search_result_doc_ids": search_result_doc_ids,
             "goal_match_status": "partial",
             "goal_match_reason": "CODE_STATUS:requested_doc_found_in_search_results_but_not_read",
         }
 
-    if read_doc_ids or search_result_doc_ids:
+    if read_doc_ids or read_code_file_paths or search_result_doc_ids:
         return {
             "requested_doc_hint": requested_doc_hint,
             "read_doc_ids": read_doc_ids,
+            "read_code_file_paths": read_code_file_paths,
             "search_result_doc_ids": search_result_doc_ids,
             "goal_match_status": "partial",
             "goal_match_reason": "CODE_STATUS:requested_doc_not_matched_but_l_loop_has_other_evidence",
@@ -823,6 +1143,7 @@ def _build_goal_match_context(
     return {
         "requested_doc_hint": requested_doc_hint,
         "read_doc_ids": read_doc_ids,
+        "read_code_file_paths": read_code_file_paths,
         "search_result_doc_ids": search_result_doc_ids,
         "goal_match_status": "missing",
         "goal_match_reason": "CODE_STATUS:requested_doc_not_matched_and_no_l_loop_evidence",
@@ -916,8 +1237,10 @@ def _apply_l1_requirement_count_guard(
     micro_reason: str,
     l1_goal: dict[str, object],
     read_document_count: int,
+    read_code_file_count: int,
+    source_code_evidence_expected: bool,
 ) -> tuple[str, str, str, str, str, str]:
-    """L1의 최소 원문 열람 요구보다 실제 read_doc 수가 적으면 achieved를 낮춘다."""
+    """L1의 최소 원문 열람 요구보다 실제 source evidence 수가 적으면 achieved를 낮춘다."""
 
     minimum_read_documents = l1_goal.get("minimum_read_documents")
     if not isinstance(minimum_read_documents, int) or minimum_read_documents <= 0:
@@ -929,7 +1252,10 @@ def _apply_l1_requirement_count_guard(
             micro_status,
             micro_reason,
         )
-    if read_document_count >= minimum_read_documents:
+    actual_evidence_count = read_document_count
+    if source_code_evidence_expected:
+        actual_evidence_count += read_code_file_count
+    if actual_evidence_count >= minimum_read_documents:
         return (
             achievement_status,
             reason,
@@ -941,7 +1267,7 @@ def _apply_l1_requirement_count_guard(
 
     guard_reason = (
         "CODE_STATUS:l1_minimum_read_documents_not_met"
-        f":required_{minimum_read_documents}_actual_{read_document_count}"
+        f":required_{minimum_read_documents}_actual_{actual_evidence_count}"
     )
     reason = _append_guard_reason(reason, guard_reason)
     macro_reason = _append_guard_reason(macro_reason, guard_reason)
@@ -1029,6 +1355,28 @@ def _read_doc_ids_from_data_store(data_store: DataStore | None) -> list[str]:
     return _unique_strings(doc_ids)
 
 
+def _read_code_file_paths_from_data_store(data_store: DataStore | None) -> list[str]:
+    if data_store is None:
+        return []
+
+    paths: list[str] = []
+    for record in data_store.list_records():
+        if not _is_code_extract_record(record.data_type):
+            continue
+        payload = record.payload
+        if not isinstance(payload, dict):
+            continue
+        if payload.get("read_status") != "ok":
+            continue
+        text = payload.get("text")
+        if not isinstance(text, str) or not text.strip():
+            continue
+        file_path = payload.get("file_path")
+        if isinstance(file_path, str) and file_path:
+            paths.append(file_path)
+    return _unique_strings(paths)
+
+
 def _read_doc_previews_from_data_store(
     data_store: DataStore | None,
     *,
@@ -1066,8 +1414,80 @@ def _read_doc_previews_from_data_store(
     return previews
 
 
+def _read_code_file_previews_from_data_store(
+    data_store: DataStore | None,
+    *,
+    max_files: int = 3,
+    max_text_chars: int = 1200,
+) -> list[dict[str, object]]:
+    """Package read_code_file outputs for L3 LLM judgement without interpretation."""
+
+    if data_store is None:
+        return []
+
+    previews: list[dict[str, object]] = []
+    for record in data_store.list_records():
+        if not _is_code_extract_record(record.data_type):
+            continue
+        payload = record.payload
+        if not isinstance(payload, dict):
+            continue
+        if payload.get("read_status") != "ok":
+            continue
+        file_path = payload.get("file_path")
+        text = payload.get("text")
+        if not isinstance(file_path, str) or not file_path:
+            continue
+        if not isinstance(text, str):
+            text = ""
+        previews.append(
+            {
+                "source_data_id": record.data_id,
+                "file_path": file_path,
+                "char_count": payload.get("char_count"),
+                "line_count": payload.get("line_count"),
+                "text_preview": text[:max_text_chars],
+            }
+        )
+        if len(previews) >= max_files:
+            break
+    return previews
+
+
 def _is_document_extract_record(data_type: str) -> bool:
     return data_type.startswith("tool_result:read_doc") or data_type.startswith("tool_result:read_artifact")
+
+
+def _is_code_extract_record(data_type: str) -> bool:
+    return data_type.startswith("tool_result:read_code_file")
+
+
+def _source_code_evidence_expected(
+    *,
+    l1_goal: dict[str, object],
+    data_store: DataStore | None,
+    input_data_ids: list[str],
+) -> bool:
+    if _string_in_list(l1_goal.get("required_materials"), "source_code_file"):
+        return True
+    if data_store is None:
+        return False
+    for data_id in input_data_ids:
+        record = data_store.get_record(data_id)
+        if record is None or record.data_type != "node_output:L_tool_scope_frame":
+            continue
+        payload = record.payload
+        if not isinstance(payload, dict):
+            continue
+        if payload.get("tool_scope_mode") in {"code_only", "document_and_code", "mixed_evidence"}:
+            return True
+        if _string_in_list(payload.get("required_materials"), "source_code_file"):
+            return True
+    return False
+
+
+def _string_in_list(value: object, expected: str) -> bool:
+    return isinstance(value, list) and any(item == expected for item in value)
 
 
 def _doc_matches_hint(doc_id: str, hint: str) -> bool:

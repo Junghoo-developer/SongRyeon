@@ -17,6 +17,8 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
         f"- 상태: {result.get('status', 'unknown')}",
         f"- trace/data: {result.get('trace_count', 0)} / {result.get('data_record_count', 0)}",
     ]
+    if result.get("status") == "structure_failed":
+        lines.extend(_structure_failure_runtime_lines(result))
     session_memory = result.get("session_memory")
     if isinstance(session_memory, dict):
         lines.append(
@@ -452,11 +454,52 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
                     f" [{item.get('document_kind', 'unknown')}/{item.get('source_role', 'unknown')}{score_text}]"
                 )
 
-    read_record = _latest_document_extract_record(result)
-    read_payload = _payload_from_record(read_record)
-    if read_payload:
+    explicit_frames = _payloads_with_type(result, "node_output:explicit_artifact_reference_frame")
+    if explicit_frames:
+        frame = explicit_frames[-1]
+        extracted_count = frame.get("extracted_reference_count", 0)
+        if isinstance(extracted_count, int) and extracted_count > 0:
+            lines.append("- explicit_artifact_refs:")
+            resolved = frame.get("resolved_references")
+            if isinstance(resolved, list):
+                for item in resolved[:10]:
+                    if not isinstance(item, dict):
+                        continue
+                    status = item.get("resolve_status", "unknown")
+                    raw_ref = item.get("raw_ref", "")
+                    selected_doc_id = item.get("selected_doc_id")
+                    if status == "unique" and isinstance(selected_doc_id, str):
+                        lines.append(f"  - {raw_ref} -> unique: {selected_doc_id}")
+                    elif status == "ambiguous":
+                        lines.append(
+                            f"  - {raw_ref} -> ambiguous: "
+                            f"{item.get('candidate_count', 0)} candidates"
+                        )
+                    else:
+                        lines.append(f"  - {raw_ref} -> {status}")
+                if len(resolved) > 10:
+                    lines.append(f"  - ... +{len(resolved) - 10} refs")
+            lines.extend(
+                _metainfo_lines(
+                    indent=2,
+                    generated_by=str(frame.get("generated_by") or "CODE:EXPLICIT_ARTIFACT_RESOLVER"),
+                    info_class=str(frame.get("info_class") or "absolute_resolve_result"),
+                    source_data_ids=_source_data_ids(
+                        frame,
+                        fallback=[str(frame.get("frame_id") or "L:explicit_artifact_reference_frame")],
+                    ),
+                    semantic_judgement_status=str(
+                        frame.get("semantic_judgement_status") or "not_run"
+                    ),
+                )
+            )
+
+    for read_record in _document_extract_records_for_display(result):
+        read_payload = _payload_from_record(read_record)
+        if not read_payload:
+            continue
         read_data_id = str(read_record.get("data_id") or "tool_result:document_extract")
-        read_tool_name = "read_artifact" if read_data_id.startswith("tool_result:read_artifact") else "read_doc"
+        read_tool_name = _document_extract_tool_name(read_record)
         lines.append(
             f"- {read_tool_name} [TOOL_RESULT:DOCUMENT_EXTRACT | source={read_data_id}]: "
             f"{read_payload.get('doc_id', '')} "
@@ -472,6 +515,116 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
                 copied_from=f"{read_data_id}.payload.text",
                 selection_method=f"{read_tool_name}_payload",
                 truncated=False,
+            )
+        )
+
+    document_context_pack_frames = _payloads_with_type(
+        result,
+        "node_output:document_context_pack_frame",
+    )
+    if document_context_pack_frames:
+        frame = document_context_pack_frames[-1]
+        included_count = frame.get("included_document_count", 0)
+        excluded_count = frame.get("excluded_document_count", 0)
+        included_chars = frame.get("included_total_chars", 0)
+        max_chars = frame.get("max_document_context_chars", "?")
+        lines.append("- document_context_pack:")
+        lines.append(
+            "  - "
+            f"included={included_count} / excluded={excluded_count} / "
+            f"budget={included_chars}/{max_chars} {frame.get('budget_unit', 'chars')}"
+        )
+        lines.append(
+            "  - "
+            f"whole_document_only={str(frame.get('whole_document_only', False)).lower()} / "
+            f"strict_rank_order={str(frame.get('strict_rank_order', False)).lower()} / "
+            f"cutoff={frame.get('cutoff_reason', 'none')}"
+        )
+        included_documents = frame.get("included_documents")
+        if isinstance(included_documents, list) and included_documents:
+            lines.append("  - included:")
+            for item in included_documents[:5]:
+                if not isinstance(item, dict):
+                    continue
+                lines.append(
+                    "    - "
+                    f"{item.get('rank_index', '?')}. {item.get('doc_id', '')} "
+                    f"({item.get('char_count', 0)} chars, {item.get('selection_basis', '')})"
+                )
+            if len(included_documents) > 5:
+                lines.append(f"    - ... +{len(included_documents) - 5} included")
+        excluded_documents = frame.get("excluded_documents")
+        if isinstance(excluded_documents, list) and excluded_documents:
+            lines.append("  - excluded:")
+            for item in excluded_documents[:5]:
+                if not isinstance(item, dict):
+                    continue
+                lines.append(
+                    "    - "
+                    f"{item.get('rank_index', '?')}. {item.get('doc_id', '')} "
+                    f"({item.get('char_count', 0)} chars, {item.get('exclusion_reason', '')})"
+                )
+            if len(excluded_documents) > 5:
+                lines.append(f"    - ... +{len(excluded_documents) - 5} excluded")
+        lines.extend(
+            _metainfo_lines(
+                indent=2,
+                generated_by=str(frame.get("generated_by") or "CODE:DOCUMENT_CONTEXT_PACKER"),
+                info_class=str(frame.get("info_class") or "absolute_context_packing_result"),
+                source_data_ids=_source_data_ids(
+                    frame,
+                    fallback=[str(frame.get("frame_id") or "L:document_context_pack_frame")],
+                ),
+                semantic_judgement_status=str(
+                    frame.get("semantic_judgement_status") or "not_run"
+                ),
+            )
+        )
+
+    document_material_frames = _payloads_with_type(
+        result,
+        "node_output:node0_document_material_packet_frame",
+    )
+    if document_material_frames:
+        frame = document_material_frames[-1]
+        lines.append("- node_0 document material packet:")
+        lines.append(
+            "  - "
+            f"items={frame.get('item_count', 0)} / "
+            f"search_candidates={frame.get('search_candidate_count', 0)} / "
+            f"actual_read={frame.get('actual_tool_read_doc_count', 0)} / "
+            f"supplied_contexts={frame.get('supplied_document_context_count', 0)} / "
+            f"unread_candidates={frame.get('unread_candidate_count', 0)}"
+        )
+        items = frame.get("items")
+        if isinstance(items, list) and items:
+            lines.append("  - items:")
+            for item in items[:5]:
+                if not isinstance(item, dict):
+                    continue
+                roles = item.get("source_roles")
+                role_text = ",".join(roles) if isinstance(roles, list) else ""
+                lines.append(
+                    "    - "
+                    f"{item.get('document_name', item.get('doc_id', ''))} "
+                    f"[{role_text}]"
+                )
+            if len(items) > 5:
+                lines.append(f"    - ... +{len(items) - 5} items")
+        lines.extend(
+            _metainfo_lines(
+                indent=2,
+                generated_by=str(
+                    frame.get("generated_by") or "CODE:NODE0_DOCUMENT_MATERIAL_PACKET"
+                ),
+                info_class=str(frame.get("info_class") or "absolute_material_index"),
+                source_data_ids=_source_data_ids(
+                    frame,
+                    fallback=[str(frame.get("frame_id") or "node_0:document_material_packet_frame")],
+                ),
+                semantic_judgement_status=str(
+                    frame.get("semantic_judgement_status") or "not_run"
+                ),
             )
         )
 
@@ -512,6 +665,65 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
                 info_class="absolute_policy_decision",
                 source_data_ids=[str(budget_plan.get("goal_data_id") or "L1:goal_frame")],
                 semantic_judgement_status="not_run",
+            )
+        )
+
+    tool_scope_payloads = _payloads_with_type(result, "node_output:L_tool_scope_frame")
+    if tool_scope_payloads:
+        scope = tool_scope_payloads[-1]
+        lines.append("- L tool scope:")
+        lines.append(
+            "  -"
+            f" mode={scope.get('tool_scope_mode', 'unknown')}"
+            f" / groups={scope.get('allowed_tool_groups', [])}"
+            f" / materials={scope.get('required_materials', [])}"
+        )
+        reason = scope.get("scope_reason")
+        if reason:
+            lines.append(f"  - reason: {reason}")
+        lines.extend(
+            _metainfo_lines(
+                indent=2,
+                generated_by=str(scope.get("generated_by") or "unknown"),
+                info_class=str(scope.get("info_class") or "unknown"),
+                source_data_ids=_source_data_ids(
+                    scope,
+                    fallback=[str(scope.get("frame_id") or "L:tool_scope_frame")],
+                ),
+                semantic_judgement_status=str(scope.get("semantic_judgement_status") or "unknown"),
+            )
+        )
+
+    partition_payloads = _payloads_with_type(result, "node_output:L_tool_budget_partition_frame")
+    if partition_payloads:
+        partition = partition_payloads[-1]
+        lines.append("- L tool budget partition [CODE]:")
+        lines.append(
+            "  - document:"
+            f" tool={partition.get('document_tool_call_budget', 0)}"
+            f" / query={partition.get('document_query_budget', 0)}"
+            f" / read={partition.get('document_read_budget', 0)}"
+        )
+        lines.append(
+            "  - code:"
+            f" tool={partition.get('code_tool_call_budget', 0)}"
+            f" / query={partition.get('code_query_budget', 0)}"
+            f" / read={partition.get('code_read_budget', 0)}"
+        )
+        runtime_budget = partition.get("runtime_record_budget", 0)
+        if runtime_budget:
+            lines.append(f"  - runtime_record_budget={runtime_budget}")
+        lines.append(f"  - reason: {partition.get('partition_reason', 'unknown')}")
+        lines.extend(
+            _metainfo_lines(
+                indent=2,
+                generated_by=str(partition.get("generated_by") or "CODE:L_TOOL_BUDGET_PARTITION_POLICY"),
+                info_class=str(partition.get("info_class") or "absolute_policy_decision"),
+                source_data_ids=_source_data_ids(
+                    partition,
+                    fallback=[str(partition.get("frame_id") or "L:tool_budget_partition_frame")],
+                ),
+                semantic_judgement_status=str(partition.get("semantic_judgement_status") or "not_run"),
             )
         )
 
@@ -562,7 +774,8 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
             "  - evidence: "
             f"kind={frame.get('evidence_requirement_kind', 'unspecified')} "
             f"/ required_read={frame.get('required_min_read_documents', 0)} "
-            f"/ actual_read={frame.get('actual_read_doc_count', 0)} "
+            f"/ actual_read_doc={frame.get('actual_read_doc_count', 0)} "
+            f"/ actual_read_code_file={frame.get('actual_read_code_file_count', 0)} "
             f"/ candidates={frame.get('search_candidate_count', 0)}"
         )
         lines.append(
@@ -657,6 +870,11 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
             read_doc_ids = achievement.get("read_doc_ids")
             if isinstance(read_doc_ids, list) and read_doc_ids:
                 lines.append(f"  - read_doc_ids: {_format_source_ids(read_doc_ids)}")
+            read_code_file_paths = achievement.get("read_code_file_paths")
+            if isinstance(read_code_file_paths, list) and read_code_file_paths:
+                lines.append(
+                    f"  - read_code_file_paths: {_format_source_ids(read_code_file_paths)}"
+                )
             search_result_doc_ids = achievement.get("search_result_doc_ids")
             if isinstance(search_result_doc_ids, list) and search_result_doc_ids:
                 lines.append(
@@ -700,7 +918,8 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
             f"L2={route2_handoff.get('l2_query_present', False)} / "
             f"L3={route2_handoff.get('l3_preserved_present', False)} / "
             f"search={route2_handoff.get('search_result_count', 0)} / "
-            f"reportable_documents={route2_handoff.get('reportable_document_count', route2_handoff.get('read_doc_count', 0))}"
+            f"reportable_documents={route2_handoff.get('reportable_document_count', route2_handoff.get('read_doc_count', 0))} / "
+            f"reportable_code_files={route2_handoff.get('reportable_code_file_count', 0)}"
         )
         raw_extract_count = route2_handoff.get("raw_document_extract_record_count")
         reportable_count = route2_handoff.get("reportable_document_count")
@@ -711,6 +930,24 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
                 f"reportable={reportable_count if isinstance(reportable_count, int) else route2_handoff.get('read_doc_count', 0)} / "
                 f"raw_extract_records={raw_extract_count if isinstance(raw_extract_count, int) else route2_handoff.get('read_doc_count', 0)} / "
                 f"empty_extract_records={empty_extract_count if isinstance(empty_extract_count, int) else 0}"
+            )
+        raw_code_count = route2_handoff.get("raw_code_extract_record_count")
+        reportable_code_count = route2_handoff.get("reportable_code_file_count")
+        empty_code_count = route2_handoff.get("empty_code_extract_record_count")
+        if isinstance(raw_code_count, int) or isinstance(reportable_code_count, int):
+            lines.append(
+                "  - code counts: "
+                f"reportable={reportable_code_count if isinstance(reportable_code_count, int) else 0} / "
+                f"raw_extract_records={raw_code_count if isinstance(raw_code_count, int) else 0} / "
+                f"empty_extract_records={empty_code_count if isinstance(empty_code_count, int) else 0}"
+            )
+        pack_frame_id = route2_handoff.get("document_context_pack_frame_id")
+        if isinstance(pack_frame_id, str) and pack_frame_id:
+            lines.append(
+                "  - document_context_pack: "
+                f"included={route2_handoff.get('document_context_included_count', 0)} / "
+                f"excluded={route2_handoff.get('document_context_excluded_count', 0)} / "
+                f"cutoff={route2_handoff.get('document_context_cutoff_reason', 'none')}"
             )
         memory_selection_status = route2_handoff.get("memory_relevance_selection_status")
         if isinstance(memory_selection_status, str) and memory_selection_status:
@@ -773,6 +1010,77 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
             )
         )
 
+    answer_basis_record = _latest_run_scoped_record(
+        result,
+        records,
+        "node_2:answer_basis_frame",
+        data_type="node_output:node2_answer_basis_frame",
+    )
+    answer_basis = _payload_from_record(answer_basis_record)
+    if answer_basis:
+        lines.append(
+            "- node_2 answer basis: "
+            f"mode={answer_basis.get('answer_basis_mode', 'unknown')} / "
+            f"generated_by={answer_basis.get('generated_by', 'unknown')} / "
+            f"semantic={answer_basis.get('semantic_judgement_status', 'unknown')}"
+        )
+        reason_codes = answer_basis.get("basis_reason_codes")
+        if isinstance(reason_codes, list) and reason_codes:
+            lines.append(f"  - reason_codes: {reason_codes}")
+        reason = answer_basis.get("mode_selection_reason")
+        if isinstance(reason, str) and reason:
+            lines.append(f"  - mode_selection_reason: {reason}")
+        failure_type = answer_basis.get("answer_basis_failure_type")
+        if isinstance(failure_type, str) and failure_type and failure_type != "none":
+            lines.append(f"  - failure_type: {failure_type}")
+            parse_status = answer_basis.get("answer_basis_payload_parse_status")
+            if isinstance(parse_status, str) and parse_status:
+                lines.append(f"  - payload_parse_status: {parse_status}")
+            raw_text_present = answer_basis.get("answer_basis_raw_text_present")
+            if isinstance(raw_text_present, bool):
+                lines.append(f"  - raw_text_present: {str(raw_text_present).lower()}")
+            validation_error = answer_basis.get("answer_basis_validation_error")
+            if isinstance(validation_error, str) and validation_error:
+                lines.append(f"  - validation_error: {_short_display_text(validation_error)}")
+            llm_call_id = answer_basis.get("answer_basis_llm_call_data_id")
+            if isinstance(llm_call_id, str) and llm_call_id:
+                lines.append(f"  - llm_call: {llm_call_id}")
+            trace_event_id = answer_basis.get("answer_basis_trace_event_id")
+            if isinstance(trace_event_id, str) and trace_event_id:
+                lines.append(f"  - trace_event: {trace_event_id}")
+            prompt_ref = answer_basis.get("answer_basis_prompt_ref")
+            if isinstance(prompt_ref, str) and prompt_ref:
+                lines.append(f"  - prompt: {_display_document_name(prompt_ref)}")
+        evidence_roles = answer_basis.get("evidence_roles")
+        if isinstance(evidence_roles, list) and evidence_roles:
+            role_summary: list[str] = []
+            for role in evidence_roles[:3]:
+                if not isinstance(role, dict):
+                    continue
+                role_summary.append(
+                    f"{role.get('evidence_role', 'unknown')}:{role.get('source_data_id', '')}"
+                )
+            if role_summary:
+                lines.append(f"  - evidence_roles: {role_summary}")
+            if len(evidence_roles) > 3:
+                lines.append(f"  - evidence_roles_more: {len(evidence_roles) - 3}")
+        lines.extend(
+            _metainfo_lines(
+                indent=2,
+                generated_by=str(answer_basis.get("generated_by") or "unknown"),
+                info_class=str(answer_basis.get("info_class") or "mixed"),
+                source_data_ids=_source_data_ids(
+                    answer_basis,
+                    fallback=[
+                        str(answer_basis_record.get("data_id") or "node_2:answer_basis_frame")
+                    ],
+                ),
+                semantic_judgement_status=str(
+                    answer_basis.get("semantic_judgement_status") or "unknown"
+                ),
+            )
+        )
+
     node3_brief_record = _latest_run_scoped_record(
         result,
         records,
@@ -786,10 +1094,40 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
         allowed_claims = node3_brief.get("allowed_claims")
         memory_selection_material = node3_brief.get("memory_selection_material")
         selected_recent_memory_contexts = node3_brief.get("selected_recent_memory_contexts")
+        l3_document_summaries = node3_brief.get("l3_document_summaries")
+        source_code_outlines = node3_brief.get("source_code_outlines")
+        excluded_document_contexts = node3_brief.get("excluded_document_contexts")
+        document_material_items = node3_brief.get("document_material_items")
         runtime_tasks = node3_brief.get("runtime_tasks")
         doc_count = len(read_documents) if isinstance(read_documents, list) else 0
-        search_candidate_count = (
-            len(search_candidate_documents) if isinstance(search_candidate_documents, list) else 0
+        supplied_context_count = _payload_int(
+            node3_brief.get("supplied_document_context_count"),
+            fallback=doc_count,
+        )
+        actual_tool_read_doc_count = _payload_int(
+            node3_brief.get("actual_tool_read_doc_count"),
+            fallback=0,
+        )
+        actual_tool_read_code_file_count = _payload_int(
+            node3_brief.get("actual_tool_read_code_file_count"),
+            fallback=0,
+        )
+        supplied_source_code_context_count = _payload_int(
+            node3_brief.get("supplied_source_code_context_count"),
+            fallback=0,
+        )
+        final_search_candidate_count = _payload_int(
+            node3_brief.get("final_search_candidate_count"),
+            fallback=_payload_int(
+                node3_brief.get("search_candidate_count"),
+                fallback=len(search_candidate_documents)
+                if isinstance(search_candidate_documents, list)
+                else 0,
+            ),
+        )
+        accumulated_search_candidate_count = _payload_int(
+            node3_brief.get("accumulated_search_candidate_count"),
+            fallback=final_search_candidate_count,
         )
         claim_count = len(allowed_claims) if isinstance(allowed_claims, list) else 0
         selected_context_count = (
@@ -797,15 +1135,75 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
             if isinstance(selected_recent_memory_contexts, list)
             else 0
         )
+        excluded_context_count = (
+            len(excluded_document_contexts)
+            if isinstance(excluded_document_contexts, list)
+            else 0
+        )
+        material_item_count = (
+            len(document_material_items)
+            if isinstance(document_material_items, list)
+            else 0
+        )
+        l3_document_summary_count = (
+            len(l3_document_summaries)
+            if isinstance(l3_document_summaries, list)
+            else 0
+        )
+        source_code_outline_count = (
+            len(source_code_outlines)
+            if isinstance(source_code_outlines, list)
+            else 0
+        )
+        llm_raw_document_text_count = _payload_int(
+            node3_brief.get("llm_raw_document_text_count"),
+            fallback=supplied_context_count,
+        )
+        llm_l3_summary_context_count = _payload_int(
+            node3_brief.get("llm_l3_summary_context_count"),
+            fallback=l3_document_summary_count,
+        )
         runtime_task_count = len(runtime_tasks) if isinstance(runtime_tasks, list) else 0
         lines.append(
             "- node_3 input brief: "
             f"{node3_brief.get('brief_status', 'unknown')} / "
-            f"reportable_documents={doc_count} / search_candidates={search_candidate_count} / "
+            f"actual_read_doc={actual_tool_read_doc_count} / "
+            f"actual_read_code_file={actual_tool_read_code_file_count} / "
+            f"supplied_contexts={supplied_context_count} / "
+            f"source_code_contexts={supplied_source_code_context_count} / "
+            f"source_code_outlines={source_code_outline_count} / "
+            f"llm_raw_text={llm_raw_document_text_count} / "
+            f"llm_l3_summaries={llm_l3_summary_context_count} / "
+            f"search_candidates_final={final_search_candidate_count} / "
+            f"search_candidates_accumulated={accumulated_search_candidate_count} / "
+            f"excluded_contexts={excluded_context_count} / "
+            f"document_materials={material_item_count} / "
+            f"l3_document_summaries={l3_document_summary_count} / "
             f"claims={claim_count} / "
             f"selected_memory_contexts={selected_context_count} / "
             f"runtime_tasks={runtime_task_count}"
         )
+        pack_status = node3_brief.get("document_context_pack_status")
+        if isinstance(pack_status, str) and pack_status != "not_recorded":
+            lines.append(
+                "  - document context pack: "
+                f"status={pack_status} / "
+                f"frame={node3_brief.get('document_context_pack_frame_id', '')}"
+            )
+        material_frame_id = node3_brief.get("document_material_packet_frame_id")
+        if isinstance(material_frame_id, str) and material_frame_id:
+            unread_count = 0
+            if isinstance(document_material_items, list):
+                unread_count = sum(
+                    1
+                    for item in document_material_items
+                    if isinstance(item, dict) and item.get("was_unread_candidate") is True
+                )
+            lines.append(
+                "  - document material packet: "
+                f"items={material_item_count} / unread_candidates={unread_count} / "
+                f"frame={material_frame_id}"
+            )
         reasons = node3_brief.get("insufficiency_reasons")
         if isinstance(reasons, list) and reasons:
             lines.append(f"  - insufficiency: {reasons}")
@@ -819,6 +1217,33 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
             )
         if selected_context_count:
             lines.append(f"  - selected recent memory contexts: {selected_context_count}")
+        material_delivery_mode = node3_brief.get("material_delivery_mode")
+        if isinstance(material_delivery_mode, str) and material_delivery_mode:
+            lines.append(
+                "  - material delivery policy: "
+                f"mode={material_delivery_mode} / "
+                f"raw_policy={node3_brief.get('raw_document_policy', '')} / "
+                f"summary_policy={node3_brief.get('l3_summary_policy', '')} / "
+                f"reason={node3_brief.get('material_policy_reason_code', '')}"
+            )
+        l_loop_attitude_hint = node3_brief.get("l_loop_result_attitude_hint")
+        if isinstance(l_loop_attitude_hint, str) and l_loop_attitude_hint != "not_recorded":
+            lines.append(
+                "  - L loop result in brief: "
+                f"task={node3_brief.get('l_loop_task_status', 'unknown')} / "
+                f"failure={node3_brief.get('l_loop_failure_level', 'unknown')} / "
+                f"semantic={node3_brief.get('l3_semantic_goal_match_status', 'unknown')} / "
+                f"remaining_query={node3_brief.get('remaining_query_attempts', 0)} / "
+                f"hint={l_loop_attitude_hint}"
+            )
+        answer_basis_mode = node3_brief.get("answer_basis_mode")
+        if isinstance(answer_basis_mode, str) and answer_basis_mode:
+            lines.append(
+                "  - answer basis in brief: "
+                f"mode={answer_basis_mode} / "
+                f"reason_codes={node3_brief.get('basis_reason_codes', [])} / "
+                f"generated_by={node3_brief.get('answer_basis_generated_by', '')}"
+            )
         lines.extend(
             _metainfo_lines(
                 indent=2,
@@ -1001,6 +1426,13 @@ def render_chat_answer(result: dict[str, object], *, user_input: str) -> str:
             )
         return "\n".join(lines)
 
+    if result.get("status") == "structure_failed":
+        return _render_structure_failed_answer(
+            result,
+            search_payload=search_payload,
+            read_payload=read_payload,
+        )
+
     lines = [
         "[answer]",
         "[CODE/RENDERER | LLM_REPORTER=not_run]",
@@ -1055,6 +1487,80 @@ def render_chat_answer(result: dict[str, object], *, user_input: str) -> str:
 
     lines.append("")
     lines.append("주의: 여기서 확인한 것은 문서 ID, 검색 결과, 읽은 원문 같은 근거야. 문서 내용 자체의 최종 진실성까지 단정한 것은 아니야.")
+    return "\n".join(lines)
+
+
+def _render_structure_failed_answer(
+    result: dict[str, object],
+    *,
+    search_payload: dict[str, object],
+    read_payload: dict[str, object],
+) -> str:
+    lines = [
+        "[answer]",
+        "[CODE/RENDERER | LLM_REPORTER=not_run]",
+        "generated_by: CODE/RENDERER | info_class: rendered_view | semantic_judgement_status: LLM_REPORTER=not_run",
+        "이번 턴은 structure_failed 상태라서 송련의 정상 노드 흐름이 끝까지 기록되지 않았어.",
+        "node_3 최종 보고도 실행되지 않았고, 확인 가능한 trace/data 기록이 없거나 불완전해.",
+    ]
+    trace_count = result.get("trace_count")
+    data_record_count = result.get("data_record_count")
+    lines.append(f"확인된 trace/data 수: {trace_count or 0} / {data_record_count or 0}")
+
+    stage = result.get("structure_failure_stage")
+    exception_type = result.get("structure_failure_exception_type")
+    reason = result.get("structure_failure_reason") or result.get("reason")
+    diagnostics: list[str] = []
+    if isinstance(stage, str) and stage:
+        diagnostics.append(f"stage={stage}")
+    if isinstance(exception_type, str) and exception_type:
+        diagnostics.append(f"exception={exception_type}")
+    if isinstance(reason, str) and reason:
+        diagnostics.append(f"reason={_short_display_text(reason)}")
+    if diagnostics:
+        lines.append(f"짧은 진단: {', '.join(diagnostics)}")
+    budget_type = result.get("budget_failure_type")
+    if isinstance(budget_type, str) and budget_type:
+        lines.append(
+            "예산 진단: "
+            f"type={budget_type}, "
+            f"query={result.get('budget_failure_query_count', '?')}/"
+            f"{result.get('budget_failure_max_query_attempts', '?')}, "
+            f"tool={result.get('budget_failure_tool_calls', '?')}/"
+            f"{result.get('budget_failure_max_tool_calls', '?')}, "
+            f"read_doc={result.get('budget_failure_read_doc_count', '?')}/"
+            f"{result.get('budget_failure_max_read_doc', '?')}"
+        )
+        budget_stage = result.get("budget_failure_stage")
+        if isinstance(budget_stage, str) and budget_stage:
+            lines.append(f"예산 실패 단계: {budget_stage}")
+
+    if search_payload or read_payload:
+        lines.extend(["", "다만 DataStore에 검색/문서 payload가 남아 있어 그 범위만 재렌더링할 수 있어."])
+        if search_payload:
+            result_count = search_payload.get("result_count", 0)
+            lines.append(f"- search_docs payload: 후보 {result_count}개")
+            top_docs = _top_search_docs(search_payload, limit=3)
+            if top_docs:
+                for index, item in enumerate(top_docs, start=1):
+                    lines.append(f"  {index}. `{_display_document_name(item.get('doc_id'))}`")
+        else:
+            lines.append("- search_docs payload: 없음")
+        if read_payload:
+            doc_name = _display_document_name(read_payload.get("doc_id"))
+            char_count = read_payload.get("char_count", "?")
+            lines.append(f"- read_doc payload: `{doc_name}` ({char_count}자)")
+        else:
+            lines.append("- read_doc payload: 없음")
+    else:
+        lines.append("확인 가능한 search_docs/read_doc payload도 없어.")
+
+    lines.extend(
+        [
+            "",
+            "따라서 사용자 질문에 대한 의미 답변은 만들지 않고, 실패 상태만 보고할게.",
+        ]
+    )
     return "\n".join(lines)
 
 
@@ -1245,6 +1751,34 @@ def _first_record_with_type_prefix(result: dict[str, object], prefix: str) -> di
     return {}
 
 
+def _document_extract_records_for_display(result: dict[str, object]) -> list[dict[str, object]]:
+    records = result.get("data_records")
+    if not isinstance(records, list):
+        return []
+
+    extract_records: list[dict[str, object]] = []
+    for record in records:
+        if not isinstance(record, dict):
+            continue
+        data_type = record.get("data_type")
+        if not isinstance(data_type, str) or not _is_document_extract_data_type(data_type):
+            continue
+        extract_records.append(record)
+
+    latest_run_index = _latest_l_run_index(result)
+    if latest_run_index > 1:
+        latest_run_prefix = f"L:run:{latest_run_index:04d}:"
+        latest_run_records = [
+            record
+            for record in extract_records
+            if str(record.get("data_id") or "").startswith(latest_run_prefix)
+        ]
+        if latest_run_records:
+            return latest_run_records
+
+    return extract_records
+
+
 def _latest_document_extract_record(result: dict[str, object]) -> dict[str, object]:
     records = result.get("data_records")
     if not isinstance(records, list):
@@ -1275,6 +1809,14 @@ def _first_document_extract_record(result: dict[str, object]) -> dict[str, objec
 
 def _is_document_extract_data_type(data_type: str) -> bool:
     return data_type.startswith("tool_result:read_doc") or data_type.startswith("tool_result:read_artifact")
+
+
+def _document_extract_tool_name(record: dict[str, object]) -> str:
+    data_type = str(record.get("data_type") or "")
+    data_id = str(record.get("data_id") or "")
+    if data_type.startswith("tool_result:read_artifact") or "tool_result:read_artifact" in data_id:
+        return "read_artifact"
+    return "read_doc"
 
 
 def _payload_from_record(record: dict[str, object]) -> dict[str, object]:
@@ -1323,6 +1865,73 @@ def _metainfo_lines(
     if truncated is not None:
         lines.append(f"{prefix}truncated: {str(truncated).lower()}")
     return lines
+
+
+def _structure_failure_runtime_lines(result: dict[str, object]) -> list[str]:
+    lines: list[str] = []
+    field_labels = [
+        ("structure_failure_stage", "stage"),
+        ("structure_failure_node", "node"),
+        ("structure_failure_prompt_ref", "prompt"),
+        ("structure_failure_exception_type", "exception"),
+        ("structure_failure_reason", "reason"),
+        ("structure_failure_llm_call_data_id", "llm_call"),
+        ("structure_failure_trace_event_id", "trace_event"),
+    ]
+    for field_name, label in field_labels:
+        value = result.get(field_name)
+        if not isinstance(value, str) or not value:
+            continue
+        display_value = _display_document_name(value) if label == "prompt" else _short_display_text(value)
+        lines.append(f"- structure_failure_{label}: {display_value}")
+    budget_lines = _budget_failure_runtime_lines(result)
+    if budget_lines:
+        lines.extend(budget_lines)
+    return lines
+
+
+def _budget_failure_runtime_lines(result: dict[str, object]) -> list[str]:
+    budget_type = result.get("budget_failure_type")
+    if not isinstance(budget_type, str) or not budget_type:
+        return []
+    lines = [f"- budget_failure_type: {budget_type}"]
+    text_fields = [
+        ("budget_failure_stage", "stage"),
+        ("budget_failure_reason", "reason"),
+        ("budget_failure_frame_id", "frame"),
+        ("budget_failure_route", "route"),
+        ("budget_failure_l_run_id", "l_run"),
+    ]
+    for field_name, label in text_fields:
+        value = result.get(field_name)
+        if isinstance(value, str) and value:
+            lines.append(f"- budget_failure_{label}: {_short_display_text(value)}")
+    source_ids = result.get("budget_failure_source_data_ids")
+    if isinstance(source_ids, list):
+        lines.append(
+            "- budget_failure_source_data_ids: "
+            f"{_format_source_ids([item for item in source_ids if isinstance(item, str)])}"
+        )
+    count_fields = [
+        ("budget_failure_query_count", "query_count"),
+        ("budget_failure_max_query_attempts", "max_query_attempts"),
+        ("budget_failure_tool_calls", "tool_calls"),
+        ("budget_failure_max_tool_calls", "max_tool_calls"),
+        ("budget_failure_read_doc_count", "read_doc_count"),
+        ("budget_failure_max_read_doc", "max_read_doc"),
+    ]
+    for field_name, label in count_fields:
+        value = result.get(field_name)
+        if isinstance(value, int):
+            lines.append(f"- budget_failure_{label}: {value}")
+    return lines
+
+
+def _short_display_text(text: str, *, limit: int = 180) -> str:
+    compact = " ".join(text.split())
+    if len(compact) <= limit:
+        return compact
+    return f"{compact[: limit - 3]}..."
 
 
 def _source_data_ids(payload: dict[str, object], *, fallback: list[str]) -> list[str]:
@@ -1394,6 +2003,10 @@ def _top_search_docs(search_payload: dict[str, object], *, limit: int) -> list[d
 
 def _list_count(value: object) -> int:
     return len(value) if isinstance(value, list) else 0
+
+
+def _payload_int(value: object, *, fallback: int = 0) -> int:
+    return value if isinstance(value, int) and value >= 0 else fallback
 
 
 def _memory_item_type_count(value: object, item_type: str) -> int:

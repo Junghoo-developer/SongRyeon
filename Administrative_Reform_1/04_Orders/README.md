@@ -2,7 +2,7 @@
 
 발주서는 개발 지도에서 내려온 실무 계획서다.
 
-현재 정식 발주서는 `ORDER_001`부터 `ORDER_117`까지 있다.
+현재 정식 발주서는 `ORDER_001`부터 `ORDER_138`까지 있다.
 
 `ORDER_066`부터 `ORDER_075`까지는 메타정보 관리법을 실제 런타임과 LLM 노드 배선에 적용하기 위한 복구 로드맵이다.
 
@@ -73,6 +73,48 @@
 `ORDER_116`은 5000줄 이상으로 커진 `smoke_test.py`를 도메인별 smoke case와 pytest 파일로 분해하는 발주서다.
 
 `ORDER_117`은 compileall / pytest / smoke-test를 개발 루틴과 CI에 고정하는 발주서다.
+
+`ORDER_118`은 node_2가 node_3에게 `absolute_first`, `relative_allowed`, `mixed_or_uncertain` 3종 답변 근거 모드를 선택 이유와 함께 전달하도록 하는 발주서다.
+
+`ORDER_119`는 `structure_failed` fallback이 검색하지 않은 문서를 찾은 척하지 않게 하고, node_2 answer-basis selector 실패 원인을 runtime에 드러내는 정직성/진단 발주서다.
+
+`ORDER_120`은 `ToolUseBudgetFrame.query_count`가 `max_query_attempts`를 초과해 `structure_failed`가 발생하는 예산 count 불일치 원인을 찾고 진단 정보를 남기는 발주서다.
+
+`ORDER_121`은 node_2 answer-basis 근거 ID 허용 목록을 정렬하고, L3 실패/예산소진 신호가 node_3 답변 태도에 드러나게 하는 발주서다.
+
+`ORDER_122`는 L revision 흐름에서 unread search candidate를 `read_doc`으로 읽을 수 있게 하여, 검색 후보를 찾고도 원문 읽기를 적게 하는 병목을 줄이는 발주서다.
+
+`ORDER_123`은 실제 `read_doc` 도구 원문 읽기 수와 node_3 공급 문서 context 수를 구조적으로 분리해, 최종 답변이 두 count를 섞지 않게 하는 발주서다.
+
+`ORDER_124`는 L 이후 node_0이 검색 후보 / 실제 read_doc / node_3 공급 context / unread 후보를 문서별 절대정보 장부로 정리해 node_2와 node_3에 공급하는 발주서다.
+
+`ORDER_125`는 L3가 실제 읽은 문서별 요약 frame을 만들고, 담백 문서 요약(relative)과 상황 맞춤 요약(mixed)을 구분해 node_3에 전달하는 발주서다.
+
+`ORDER_126`은 terminal runtime view가 여러 `read_doc` / `read_artifact` document extract tool result를 최신 1개로 접지 않고 모두 표시하게 하는 발주서다.
+
+`ORDER_127`은 L revision에서 추가로 실행된 document extract record가 node_0 material packet과 node_3 actual read count에 누락되지 않게 병합하는 발주서다.
+
+`ORDER_128`은 node_3 actual read document count가 같은 파일명 문서를 하나로 합쳐 절대 count를 틀리지 않도록 `doc_id` identity 기준으로 정렬하는 발주서다.
+
+`ORDER_129`는 L3 문서별 요약을 열기 전에 node_0 material packet과 node_3 input brief의 search candidate count가 서로 다른 범위/identity 기준으로 세어지는지 감사하는 발주서다.
+
+`ORDER_130`은 node_3가 실제 read_doc, node_3 context 공급, search candidate, excluded/unread candidate 역할을 섞어 말하지 않게 하고 node_4가 명시 역할 claim 충돌을 막는 발주서다.
+
+`ORDER_131`은 `search_candidate_count`를 최종 검색 후보와 L3 preserved frame 누적 검색 후보로 분리해, 같은 숫자 이름이 서로 다른 범위를 가리키지 않게 하는 발주서다.
+
+`ORDER_132`는 node_2의 `answer_basis_mode`를 바탕으로 node_3가 원문 문서 context와 L3 문서별 요약을 어떤 태도로 사용할지 명시적인 material delivery policy로 전달하는 발주서다.
+
+`ORDER_133`은 송련이 내부 문서뿐 아니라 실제 source/config 파일 구조도 읽기 전용으로 검사할 수 있게 하는 codebase inspection MVP 발주서다.
+
+`ORDER_134`는 L2가 도구를 바로 고르기 전에 L루프가 먼저 tool scope와 도구군별 예산 분배를 명시 frame으로 확정하게 하는 발주서다.
+
+`ORDER_135`는 `read_code_file` 성공을 `read_doc`과 분리해 L3, return summary, node_3 grounding에서 source-code evidence로 인정하게 하는 발주서다.
+
+`ORDER_136`은 새 기능 확장 전에 현재 capability baseline과 live qwen 테스트 묶음을 문서화해, 다음 MVP가 기존 가능 범위를 잃지 않게 하는 발주서다.
+
+`ORDER_137`은 `read_code_file`로 읽은 source-code 원문에서 code가 문법적 outline을 만들고, node_3가 공개 함수/상수 coverage를 빠뜨리지 않게 하는 발주서다.
+
+`ORDER_138`은 ORDER_133 이후 빠르게 들어온 code inspection 계열과 심야정부 MVP를 새 기능 추가 없이 통합 기준선으로 묶고, dirty worktree/문서-현실 불일치를 정리하는 발주서다.
 
 ## 임시 발주서
 
@@ -172,3 +214,24 @@
 - [ORDER 115: Schema Module Split With Compatibility Layer v0](ORDER_115_SCHEMA_MODULE_SPLIT_COMPAT_LAYER_V0.md)
 - [ORDER 116: Smoke Test Decomposition To Pytest v0](ORDER_116_SMOKE_TEST_DECOMPOSITION_TO_PYTEST_V0.md)
 - [ORDER 117: CI And Development Routine Lock v0](ORDER_117_CI_AND_DEVELOPMENT_ROUTINE_LOCK_V0.md)
+- [ORDER 118: Node2 Answer Basis Mode Frame v0](ORDER_118_NODE2_ANSWER_BASIS_MODE_FRAME_V0.md)
+- [ORDER 119: Structure Failed Honesty And Answer Basis Failure Diagnostics v0](ORDER_119_STRUCTURE_FAILED_HONESTY_AND_ANSWER_BASIS_FAILURE_DIAGNOSTICS_V0.md)
+- [ORDER 120: Tool Use Budget Query Count Consistency Diagnostic v0](ORDER_120_TOOL_USE_BUDGET_QUERY_COUNT_CONSISTENCY_DIAGNOSTIC_V0.md)
+- [ORDER 121: Node2 Evidence Source Alignment And L3 Failure Attitude v0](ORDER_121_NODE2_EVIDENCE_SOURCE_ALIGNMENT_AND_L3_FAILURE_ATTITUDE_V0.md)
+- [ORDER 122: L Revision Unread Candidate Read Path v0](ORDER_122_L_REVISION_UNREAD_CANDIDATE_READ_PATH_V0.md)
+- [ORDER 123: Actual Read Doc Vs Context Pack Count Boundary v0](ORDER_123_ACTUAL_READ_DOC_VS_CONTEXT_PACK_COUNT_BOUNDARY_V0.md)
+- [ORDER 124: Node0 Post-L Document Material Packet v0](ORDER_124_NODE0_POST_L_DOCUMENT_MATERIAL_PACKET_V0.md)
+- [ORDER 125: L3 Per-Document Summary Frame v0](ORDER_125_L3_PER_DOCUMENT_SUMMARY_FRAME_DESIGN_V0.md)
+- [ORDER 126: Runtime All Document Extract Display v0](ORDER_126_RUNTIME_ALL_DOCUMENT_EXTRACT_DISPLAY_V0.md)
+- [ORDER 127: Revision Document Extract Count Alignment v0](ORDER_127_REVISION_DOCUMENT_EXTRACT_COUNT_ALIGNMENT_V0.md)
+- [ORDER 128: Node3 Actual Read Doc Identity Key v0](ORDER_128_NODE3_ACTUAL_READ_DOC_IDENTITY_KEY_V0.md)
+- [ORDER 129: Search Candidate Count Basis Audit v0](ORDER_129_SEARCH_CANDIDATE_COUNT_BASIS_AUDIT_V0.md)
+- [ORDER 130: Document Evidence Role Claim Guard v0](ORDER_130_DOCUMENT_EVIDENCE_ROLE_CLAIM_GUARD_V0.md)
+- [ORDER 131: Search Candidate Scope Split v0](ORDER_131_SEARCH_CANDIDATE_SCOPE_SPLIT_V0.md)
+- [ORDER 132: Node2 Answer Basis Material Delivery Policy v0](ORDER_132_NODE2_ANSWER_BASIS_MATERIAL_DELIVERY_POLICY_V0.md)
+- [ORDER 133: Codebase Readonly Inspection MVP v0](ORDER_133_CODEBASE_READONLY_INSPECTION_MVP_V0.md)
+- [ORDER 134: L Tool Scope And Budget Partition v0](ORDER_134_L_TOOL_SCOPE_AND_BUDGET_PARTITION_V0.md)
+- [ORDER 135: Code Evidence Accounting And L3 Success Boundary v0](ORDER_135_CODE_EVIDENCE_ACCOUNTING_AND_L3_SUCCESS_BOUNDARY_V0.md)
+- [ORDER 136: Current Capability Baseline And Live Test Pack v0](ORDER_136_CURRENT_CAPABILITY_BASELINE_AND_LIVE_TEST_PACK_V0.md)
+- [ORDER 137: Source Code Context Summary Coverage Guard v0](ORDER_137_SOURCE_CODE_CONTEXT_SUMMARY_COVERAGE_GUARD_V0.md)
+- [ORDER 138: Integration Baseline And Dirty Worktree Reconciliation v0](ORDER_138_INTEGRATION_BASELINE_AND_DIRTY_WORKTREE_RECONCILIATION_V0.md)

@@ -147,9 +147,19 @@ def build_node3_grounding_block(brief_frame: Node3InputBriefFrame) -> str:
     return "\n".join(
         [
             "근거 기준:",
-            f"- 읽은 문서: {len(brief_frame.read_documents)}개",
-            f"- 검색 후보 문서: {brief_frame.search_candidate_count}개",
+            f"- 실제 read_doc 도구 원문 읽기: {brief_frame.actual_tool_read_doc_count}개",
+            f"- 실제 read_code_file 도구 원문 읽기: {brief_frame.actual_tool_read_code_file_count}개",
+            f"- node_3 공급 문서 context: {brief_frame.supplied_document_context_count}개",
+            f"- node_3 공급 source-code context: {brief_frame.supplied_source_code_context_count}개",
+            f"- source-code 구조 목록: {len(brief_frame.source_code_outlines)}개",
+            f"- node_3 LLM 원문 text: {brief_frame.llm_raw_document_text_count}개",
+            f"- L3 문서별 요약 재료: {brief_frame.llm_l3_summary_context_count}개",
+            f"- 검색 후보 문서(최종): {brief_frame.final_search_candidate_count}개",
+            f"- 검색 후보 문서(누적): {brief_frame.accumulated_search_candidate_count}개",
             f"- 현재 턴 실행 순서 자료: {len(brief_frame.runtime_tasks)}개",
+            *_l_loop_grounding_lines(brief_frame),
+            f"- 답변 근거 자세: {_answer_basis_mode_label(brief_frame.answer_basis_mode)}",
+            f"- 재료 전달 정책: {_material_delivery_mode_label(brief_frame.material_delivery_mode)}",
             f"- 답변 한계: {_grounding_limit_text(brief_frame)}",
         ]
     )
@@ -162,7 +172,10 @@ def assemble_node3_report_markdown(
 ) -> str:
     """CODE count block과 LLM 본문을 합쳐 최종 node_3 보고문을 만든다."""
 
-    return f"{build_node3_grounding_block(brief_frame)}\n\n{body_markdown.strip()}"
+    body = _strip_accidental_grounding_block(body_markdown)
+    if not body:
+        return build_node3_grounding_block(brief_frame)
+    return f"{build_node3_grounding_block(brief_frame)}\n\n{body}"
 
 
 def record_report(
@@ -235,10 +248,13 @@ def _report_body_from_payload(payload: dict[str, object]) -> str:
 
 def _strip_accidental_grounding_block(markdown: str) -> str:
     stripped = markdown.strip()
-    if not stripped.startswith("근거 기준:"):
+    lines = stripped.splitlines()
+    if not lines:
+        return ""
+    first_line = lines[0].strip()
+    if first_line not in {"근거 기준:", "**근거 기준:**"}:
         return stripped
 
-    lines = stripped.splitlines()
     index = 1
     while index < len(lines):
         line = lines[index]
@@ -253,9 +269,50 @@ def _strip_accidental_grounding_block(markdown: str) -> str:
 
 
 def _grounding_limit_text(brief_frame: Node3InputBriefFrame) -> str:
+    if brief_frame.raw_document_policy == "omit_raw_text_from_llm_payload":
+        return "원문 record는 보존되어 있지만 node_3 LLM 입력에서는 원문 text를 생략하고 L3 요약 재료를 사용한다."
+    if brief_frame.l_loop_result_attitude_hint == "l_loop_budget_exhausted":
+        return "L 검색 목표가 예산 소진으로 닫힌 상태라, 공급된 문서가 있어도 검색 성공으로 단정하지 않는다."
+    if brief_frame.l_loop_result_attitude_hint == "l_loop_partial_or_failed":
+        return "L 검색 목표가 부분/실패 신호를 남겼으므로, 공급된 문서 범위와 한계를 분리해 말한다."
     if brief_frame.insufficiency_reasons:
         return "자료 부족 신호가 있어 제공된 문서/허용 주장/현재 턴 실행 순서 자료 범위 안에서만 답한다."
+    if brief_frame.answer_basis_mode == "absolute_first":
+        return "확인 가능한 코드/문서/trace/data 근거를 우선하고 확인되지 않은 내용은 단정하지 않는다."
+    if brief_frame.answer_basis_mode == "mixed_or_uncertain":
+        return "제공된 출처 묶음과 부분 근거의 한계를 드러내며 단정하지 않는다."
     return "제공된 문서/허용 주장/현재 턴 실행 순서 자료 범위 안에서만 답한다. 검색 후보는 읽은 문서가 아니다."
+
+
+def _l_loop_grounding_lines(brief_frame: Node3InputBriefFrame) -> list[str]:
+    if brief_frame.l_loop_result_attitude_hint == "not_recorded":
+        return []
+    return [
+        (
+            "- L 검색 목표 상태: "
+            f"{brief_frame.l_loop_task_status} / {brief_frame.l_loop_failure_level} "
+            f"/ semantic={brief_frame.l3_semantic_goal_match_status}"
+        )
+    ]
+
+
+def _answer_basis_mode_label(mode: str) -> str:
+    labels = {
+        "absolute_first": "절대정보 우선",
+        "relative_allowed": "해석 허용",
+        "mixed_or_uncertain": "혼합/불확실성 표시",
+    }
+    return labels.get(mode, "혼합/불확실성 표시")
+
+
+def _material_delivery_mode_label(mode: str) -> str:
+    labels = {
+        "raw_document_primary": "원문 우선",
+        "l3_summary_replaces_raw_context": "L3 요약이 원문 text 대체",
+        "l3_summary_replaces_raw_context_with_uncertainty": "L3 요약 대체/불확실성 표시",
+        "raw_document_fallback_no_l3_summary": "L3 요약 없음/raw fallback",
+    }
+    return labels.get(mode, "재료 전달 정책 불명")
 
 
 def _unique_strings(values: list[str | None]) -> list[str]:

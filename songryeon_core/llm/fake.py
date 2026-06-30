@@ -222,6 +222,42 @@ class RevisionQueryPlannerFakeLLMAdapter:
         macro_goal = str(revision_input.get("macro_goal") or "internal document evidence").strip()
         l3_status = str(revision_input.get("l3_goal_status") or "partial").strip()
         previous_query = str(revision_input.get("previous_query_text") or "").strip()
+        unread_candidate_doc_ids = revision_input.get("unread_candidate_doc_ids")
+        remaining_query_attempts = revision_input.get("remaining_query_attempts")
+        remaining_read_doc_calls = revision_input.get("remaining_read_doc_calls")
+        if (
+            isinstance(unread_candidate_doc_ids, list)
+            and unread_candidate_doc_ids
+            and remaining_query_attempts == 0
+            and isinstance(remaining_read_doc_calls, int)
+            and remaining_read_doc_calls > 0
+        ):
+            first_doc_id = next(
+                (item for item in unread_candidate_doc_ids if isinstance(item, str) and item),
+                None,
+            )
+            if first_doc_id:
+                payload = {
+                    "planner_mode": "revision_llm",
+                    "selected_candidate_id": "L2:revision_query_candidate_0001",
+                    "candidates": [
+                        {
+                            "candidate_id": "L2:revision_query_candidate_0001",
+                            "query_text": first_doc_id,
+                            "purpose": "query 예산이 소진되어 이미 보존된 unread candidate 원문을 읽는다.",
+                            "expected_signal": "해당 후보 문서의 read_doc 원문",
+                            "priority": 1,
+                            "target_tool_name": "read_doc",
+                            "source_data_ids": source_data_ids,
+                        }
+                    ],
+                }
+                return LLMResponse(
+                    text=json.dumps(payload, ensure_ascii=False),
+                    model_id=self.model_id,
+                    raw=payload,
+                )
+
         revised_query = f"{macro_goal} revised evidence after {l3_status}"
         if previous_query and revised_query == previous_query:
             revised_query = f"{previous_query} alternate evidence"
@@ -268,14 +304,21 @@ class SongRyeonAllNodesFakeLLMAdapter:
             payload = self._node_1_payload(request)
         elif "L1 Goal Setter" in prompt:
             payload = self._l1_payload()
+        elif "L Tool Scope Planner" in prompt:
+            payload = self._l_tool_scope_payload(request)
         elif "L3 Result Keeper" in prompt:
             payload = self._l3_payload(request)
+        elif "node_2 Answer Basis Selector" in prompt:
+            payload = self._node_2_answer_basis_payload(request)
         elif "node_2 Metainfo Boundary" in prompt:
             payload = self._node_2_payload(request)
         elif "node_3 Reporter" in prompt or "Final Reporter" in prompt:
             payload = self._node_3_payload(request)
         elif "node_4 Gatekeeper" in prompt:
-            payload = self._node_4_payload()
+            try:
+                payload = self._node_4_payload(request)
+            except TypeError:
+                payload = self._node_4_payload()
         elif "Memory Relevance Selector" in prompt:
             payload = MemoryRelevanceNoneSelectedFakeLLMAdapter().complete(request).raw
         elif "L2" in prompt or "query" in prompt.lower():
@@ -336,6 +379,15 @@ class SongRyeonAllNodesFakeLLMAdapter:
             "budget_request_reason": "fake smoke에서는 여러 후보와 최소 2개 문서 열람 요청을 재현하기 위해 보수적 추가 예산을 요청한다.",
         }
 
+    def _l_tool_scope_payload(self, request: LLMRequest) -> dict[str, object]:
+        return {
+            "tool_scope_mode": "document_only",
+            "allowed_tool_groups": ["document_tools"],
+            "required_materials": ["project_document"],
+            "scope_reason": "fake adapter selected document tools for smoke testing.",
+            "scope_reason_info_class": "mixed",
+        }
+
     def _l3_payload(self, request: LLMRequest) -> dict[str, object]:
         candidate_count = int(request.input_payload.get("candidate_count") or 0)
         controller_decision = request.input_payload.get("controller_decision")
@@ -367,11 +419,72 @@ class SongRyeonAllNodesFakeLLMAdapter:
             "excluded_claims": [],
         }
 
+    def _node_2_answer_basis_payload(self, request: LLMRequest) -> dict[str, object]:
+        user_question = str(request.input_payload.get("user_question") or "")
+        source_data_ids = request.input_payload.get("source_data_ids")
+        if not isinstance(source_data_ids, list):
+            source_data_ids = []
+        source_ids = [item for item in source_data_ids if isinstance(item, str) and item]
+        primary_source = source_ids[0] if source_ids else "not_supplied"
+        document_source = next(
+            (
+                source_id
+                for source_id in source_ids
+                if "boundary" in source_id or "handoff" in source_id or "L3" in source_id
+            ),
+            primary_source,
+        )
+        if any(
+            keyword in user_question
+            for keyword in ("몇 개", "count", "route", "smoke", "통과", "문서에 뭐", "원문", "trace")
+        ):
+            mode = "absolute_first"
+            reason_codes = ["code_verified_fact_required", "runtime_state_basis_present"]
+            reason = "사용자 요청이 count, route, trace, 문서 원문처럼 확인 가능한 값 중심 답변을 요구한다."
+        elif any(
+            keyword in user_question
+            for keyword in ("어때", "좋을까", "아이디어", "브레인스토밍", "설명해", "개선")
+        ):
+            mode = "relative_allowed"
+            reason_codes = ["user_asked_for_interpretation"]
+            reason = "사용자 요청이 구조 의견이나 설명처럼 해석을 허용하는 답변을 요구한다."
+        else:
+            mode = "mixed_or_uncertain"
+            reason_codes = ["multi_source_bundle", "partial_evidence_only"]
+            reason = "사용자 요청은 제공된 여러 source bundle과 부분 근거를 함께 보며 한계를 표시해야 한다."
+        return {
+            "answer_basis_mode": mode,
+            "basis_reason_codes": reason_codes,
+            "mode_selection_reason": reason,
+            "mode_selection_reason_info_class": "mixed",
+            "evidence_roles": [
+                {
+                    "source_data_id": document_source,
+                    "evidence_role": "primary_answer_basis",
+                    "role_reason": "fake adapter가 supplied source bundle 안에서 대표 근거 역할을 부여했다.",
+                    "role_reason_info_class": "mixed",
+                }
+            ]
+            if source_ids
+            else [],
+        }
+
     def _node_3_payload(self, request: LLMRequest) -> dict[str, object]:
-        extracts = request.input_payload.get("read_documents")
+        extracts = request.input_payload.get("supplied_document_contexts")
+        if not isinstance(extracts, list):
+            extracts = request.input_payload.get("read_documents")
         if not isinstance(extracts, list):
             extracts = request.input_payload.get("document_extracts")
         selected_contexts = request.input_payload.get("selected_recent_memory_contexts")
+        l_loop_result = request.input_payload.get("l_loop_result")
+        if not isinstance(l_loop_result, dict):
+            l_loop_result = {}
+        l_loop_attitude_hint = str(l_loop_result.get("attitude_hint") or "not_recorded")
+        l_loop_limit_note = ""
+        if l_loop_attitude_hint in {"l_loop_budget_exhausted", "l_loop_partial_or_failed"}:
+            l_loop_limit_note = (
+                "\n\nL 검색 목표는 완전 성공으로 기록되지 않았으므로, 아래 내용은 공급된 자료 범위의 제한적 답변이야."
+            )
         read_count = int(request.input_payload.get("available_document_extract_count") or 0)
         search_candidate_count = int(request.input_payload.get("available_search_candidate_document_count") or 0)
         runtime_task_count = int(request.input_payload.get("available_runtime_task_count") or 0)
@@ -395,9 +508,10 @@ class SongRyeonAllNodesFakeLLMAdapter:
             text = str(first.get("text") or "").strip()
             preview = " ".join(text.split())[:600]
             body_markdown = (
-                f"이번 턴에서는 `{doc_id}` 문서를 읽은 문서 근거로 사용했어.\n\n"
-                f"읽은 원문 미리보기: {preview}\n\n"
+                f"이번 턴에서는 `{doc_id}` 문서 context를 답변 근거로 사용했어.\n\n"
+                f"공급 원문 미리보기: {preview}\n\n"
                 "주의: 이것은 문서와 도구 결과에 근거한 보고이며, 문서 내용의 최종 진실성 판정은 아니다."
+                f"{l_loop_limit_note}"
             )
         else:
             body_markdown = (
@@ -405,7 +519,25 @@ class SongRyeonAllNodesFakeLLMAdapter:
             )
         return {"body_markdown": body_markdown}
 
-    def _node_4_payload(self) -> dict[str, object]:
+    def _node_4_payload(self, request: LLMRequest) -> dict[str, object]:
+        rendered_markdown = str(request.input_payload.get("rendered_markdown") or "")
+        brief = request.input_payload.get("node3_input_brief")
+        l_loop_result = brief.get("l_loop_result") if isinstance(brief, dict) else {}
+        if not isinstance(l_loop_result, dict):
+            l_loop_result = {}
+        if (
+            str(l_loop_result.get("attitude_hint") or "")
+            in {"l_loop_budget_exhausted", "l_loop_partial_or_failed"}
+            and "L 검색 목표가 성공" in rendered_markdown
+        ):
+            return {
+                "gate_status": "needs_revision",
+                "reason": "L loop 실패/예산소진 신호와 검색 성공 표현이 충돌한다.",
+                "checked_claims": ["l_loop_result_attitude"],
+                "unsupported_claims": ["L 검색 목표가 성공"],
+                "contradictions": ["l_loop_failure_hidden_as_success"],
+                "revision_targets": ["L 검색 목표 실패/예산소진 신호와 공급 자료 사용 범위를 분리해 말한다."],
+            }
         return {
             "gate_status": "pass",
             "reason": "보고문이 제공된 node3_input_brief 범위 안에서 작성되었다.",

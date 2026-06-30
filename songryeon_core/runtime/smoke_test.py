@@ -64,7 +64,11 @@ from songryeon_core.nodes.node_0_memory_supplier import (
 from songryeon_core.nodes.node_1_router import record_routing, route_next
 from songryeon_core.nodes.node_2_handoff import record_node3_input_brief, record_route2_handoff
 from songryeon_core.nodes.node_2_handoff import record_selected_recent_memory_context
-from songryeon_core.nodes.node_2_metainfo_boundary import build_metainfo_boundary, record_boundary
+from songryeon_core.nodes.node_2_metainfo_boundary import (
+    build_metainfo_boundary,
+    record_boundary,
+    run_node2_answer_basis_selection,
+)
 from songryeon_core.nodes.node_3_reporter import record_report, render_report
 from songryeon_core.nodes.node_4_gatekeeper import run_node4_gatekeeper
 from songryeon_core.runtime.dry_run import run_dry_turn
@@ -117,6 +121,7 @@ def run_smoke_tests() -> dict[str, object]:
         "L3:achievement_frame",
         "L3:preserved_info_frame",
         "node_2:handoff_frame",
+        "node_2:answer_basis_frame",
         "node_3:input_brief_frame",
         "report_dry_001",
         "L:run_frame:0001",
@@ -239,6 +244,12 @@ def run_smoke_tests() -> dict[str, object]:
         "runtime_count_reportable_documents": runtime_count_smoke["reportable_document_count"],
         "runtime_count_raw_extract_records": runtime_count_smoke["raw_document_extract_record_count"],
         "runtime_count_empty_extract_records": runtime_count_smoke["empty_document_extract_record_count"],
+        "node2_answer_basis_mode": result.get("node2_answer_basis_mode"),
+        "node2_answer_basis_reason_codes": result.get("node2_answer_basis_reason_codes"),
+        "node2_answer_basis_generated_by": result.get("node2_answer_basis_generated_by"),
+        "node2_answer_basis_semantic": result.get(
+            "node2_answer_basis_semantic_judgement_status"
+        ),
         "llm_call_records": llm_smoke["llm_call_records"],
         "llm_retry_failure_type": llm_smoke["llm_retry_failure_type"],
         "node1_router_fallback_policy": router_fallback_smoke["fallback_policy"],
@@ -1897,9 +1908,10 @@ def _check_route2_handoff_and_brief(records: dict[str, object]) -> None:
     """route=2 handoff와 node_3용 브리프가 새 경계를 지키는지 확인한다."""
 
     handoff = records["node_2:handoff_frame"]
+    answer_basis = records["node_2:answer_basis_frame"]
     brief = records["node_3:input_brief_frame"]
-    if not isinstance(handoff, dict) or not isinstance(brief, dict):
-        raise AssertionError("route2 handoff and node3 brief payloads must be dicts")
+    if not isinstance(handoff, dict) or not isinstance(answer_basis, dict) or not isinstance(brief, dict):
+        raise AssertionError("route2 handoff, answer basis, and node3 brief payloads must be dicts")
     if handoff.get("handoff_status") not in {"ready", "insufficient", "blocked"}:
         raise AssertionError("route2 handoff status is invalid")
     if "1:route=2" not in (handoff.get("route_path") or []):
@@ -1918,7 +1930,10 @@ def _check_route2_handoff_and_brief(records: dict[str, object]) -> None:
             raise AssertionError(f"route2 handoff {field_name} must be a non-negative integer")
     if handoff.get("read_doc_count") != handoff.get("reportable_document_count"):
         raise AssertionError("route2 handoff read_doc_count must mirror reportable_document_count")
-    if handoff.get("raw_document_extract_record_count") < handoff.get("reportable_document_count"):
+    if (
+        not handoff.get("document_context_pack_frame_id")
+        and handoff.get("raw_document_extract_record_count") < handoff.get("reportable_document_count")
+    ):
         raise AssertionError("route2 handoff raw extract count must cover reportable documents")
     controller_decisions = handoff.get("same_turn_l_reroute_controller_decisions")
     if not isinstance(controller_decisions, list):
@@ -1945,9 +1960,33 @@ def _check_route2_handoff_and_brief(records: dict[str, object]) -> None:
         raise AssertionError("node3 brief status is invalid")
     if brief.get("handoff_frame_id") != "node_2:handoff_frame":
         raise AssertionError("node3 brief must point back to route2 handoff internally")
+    if answer_basis.get("answer_basis_mode") not in {
+        "absolute_first",
+        "relative_allowed",
+        "mixed_or_uncertain",
+    }:
+        raise AssertionError("answer basis mode must be one of the three approved values")
+    if answer_basis.get("generated_by") != "CODE:FALLBACK":
+        raise AssertionError("default dry-run answer basis should reveal CODE fallback")
+    if answer_basis.get("basis_reason_codes") != ["llm_mode_selection_failed"]:
+        raise AssertionError("default dry-run answer basis fallback reason code is wrong")
+    if answer_basis.get("semantic_judgement_status") != "failed":
+        raise AssertionError("default dry-run answer basis fallback status must be failed")
+    if brief.get("answer_basis_frame_id") != "node_2:answer_basis_frame":
+        raise AssertionError("node3 brief must cite answer basis frame")
+    if brief.get("answer_basis_mode") != answer_basis.get("answer_basis_mode"):
+        raise AssertionError("node3 brief must preserve answer_basis_mode")
+    if brief.get("basis_reason_codes") != answer_basis.get("basis_reason_codes"):
+        raise AssertionError("node3 brief must preserve basis_reason_codes")
+    if brief.get("answer_basis_generated_by") != answer_basis.get("generated_by"):
+        raise AssertionError("node3 brief must preserve answer basis generated_by")
     read_documents = brief.get("read_documents")
     search_candidate_count = brief.get("search_candidate_count")
     search_candidate_documents = brief.get("search_candidate_documents")
+    final_search_candidate_count = brief.get("final_search_candidate_count")
+    final_search_candidate_documents = brief.get("final_search_candidate_documents")
+    accumulated_search_candidate_count = brief.get("accumulated_search_candidate_count")
+    accumulated_search_candidate_documents = brief.get("accumulated_search_candidate_documents")
     allowed_claims = brief.get("allowed_claims")
     memory_selection_material = brief.get("memory_selection_material")
     runtime_tasks = brief.get("runtime_tasks")
@@ -1955,6 +1994,8 @@ def _check_route2_handoff_and_brief(records: dict[str, object]) -> None:
     if (
         not isinstance(read_documents, list)
         or not isinstance(search_candidate_documents, list)
+        or not isinstance(final_search_candidate_documents, list)
+        or not isinstance(accumulated_search_candidate_documents, list)
         or not isinstance(allowed_claims, list)
         or not isinstance(runtime_tasks, list)
         or not isinstance(reporting_rules, list)
@@ -1966,6 +2007,25 @@ def _check_route2_handoff_and_brief(records: dict[str, object]) -> None:
         raise AssertionError("node3 brief search_candidate_count must be a non-negative integer")
     if search_candidate_count != len(search_candidate_documents):
         raise AssertionError("node3 brief search_candidate_count must match search_candidate_documents")
+    if final_search_candidate_count != search_candidate_count:
+        raise AssertionError("node3 brief final_search_candidate_count must mirror legacy search_candidate_count")
+    if final_search_candidate_documents != search_candidate_documents:
+        raise AssertionError("node3 brief final_search_candidate_documents must mirror legacy search_candidate_documents")
+    if not isinstance(accumulated_search_candidate_count, int) or accumulated_search_candidate_count < 0:
+        raise AssertionError("node3 brief accumulated_search_candidate_count must be non-negative")
+    if accumulated_search_candidate_count != len(accumulated_search_candidate_documents):
+        raise AssertionError("node3 brief accumulated_search_candidate_count must match accumulated documents")
+    pack_frame_id = brief.get("document_context_pack_frame_id")
+    if isinstance(pack_frame_id, str) and pack_frame_id:
+        if handoff.get("document_context_pack_frame_id") != pack_frame_id:
+            raise AssertionError("node3 brief must cite the handoff document context pack frame")
+        if len(read_documents) != handoff.get("document_context_included_count"):
+            raise AssertionError("node3 read_documents must mirror context pack included count")
+        excluded_contexts = brief.get("excluded_document_contexts")
+        if not isinstance(excluded_contexts, list):
+            raise AssertionError("node3 brief excluded document contexts must be a list")
+        if len(excluded_contexts) != handoff.get("document_context_excluded_count"):
+            raise AssertionError("node3 excluded contexts must mirror pack excluded count")
     if not read_documents and not allowed_claims and not runtime_tasks:
         raise AssertionError("default dry run should provide node3 with at least one report material")
     for document in read_documents:
@@ -2507,6 +2567,7 @@ def _run_l_loop_downstream_reroute_scope_smoke() -> dict[str, object]:
         first.node2_input_frame_id(turn_id),
         first.route2_handoff_frame_id(),
         first.metainfo_boundary_id(),
+        first.node2_answer_basis_frame_id(),
         first.node3_input_brief_frame_id(),
         first.node3_report_id(),
         first.node4_gatekeeper_frame_id(),
@@ -2516,6 +2577,7 @@ def _run_l_loop_downstream_reroute_scope_smoke() -> dict[str, object]:
         second.node2_input_frame_id(turn_id),
         second.route2_handoff_frame_id(),
         second.metainfo_boundary_id(),
+        second.node2_answer_basis_frame_id(),
         second.node3_input_brief_frame_id(),
         second.node3_report_id(),
         second.node4_gatekeeper_frame_id(),
@@ -2570,9 +2632,15 @@ def _run_l_loop_downstream_reroute_scope_smoke() -> dict[str, object]:
         raise AssertionError("second Node3InputBriefFrame.frame_id is not scoped")
     _assert_payload_sources_include(
         second_brief,
-        [second.route2_handoff_frame_id(), second.metainfo_boundary_id()],
+        [
+            second.route2_handoff_frame_id(),
+            second.metainfo_boundary_id(),
+            second.node2_answer_basis_frame_id(),
+        ],
         label="second Node3InputBriefFrame.source_data_ids",
     )
+    if second_brief.get("answer_basis_frame_id") != second.node2_answer_basis_frame_id():
+        raise AssertionError("second Node3InputBriefFrame answer_basis_frame_id is not scoped")
 
     second_report = _require_payload(records, second.node3_report_id())
     if second_report.get("report_id") != second.node3_report_id():
@@ -2586,6 +2654,7 @@ def _run_l_loop_downstream_reroute_scope_smoke() -> dict[str, object]:
             second.node3_report_id(),
             second.node3_input_brief_frame_id(),
             second.metainfo_boundary_id(),
+            second.node2_answer_basis_frame_id(),
         ],
         label="second Node4GatekeeperFrame.source_data_ids",
     )
@@ -2725,6 +2794,7 @@ def _run_policy_guarded_same_turn_l_reroute_smoke() -> dict[str, object]:
         second.node2_input_frame_id(str(policy_result["turn_id"])),
         second.route2_handoff_frame_id(),
         second.metainfo_boundary_id(),
+        second.node2_answer_basis_frame_id(),
         second.node3_input_brief_frame_id(),
         second.node3_report_id(),
         second.node4_gatekeeper_frame_id(),
@@ -2929,6 +2999,21 @@ def _record_downstream_after_l_run(
         boundary=boundary,
         input_ref=[node2_input_trace.event_id],
     )
+    answer_basis_trace_id, answer_basis_id, answer_basis_frame = (
+        run_node2_answer_basis_selection(
+            trace_store=trace_store,
+            data_store=data_store,
+            turn_id=turn_id,
+            user_question=user_question,
+            boundary_id=boundary_id,
+            boundary=boundary,
+            handoff_frame_id=handoff_id,
+            adapter=SongRyeonAllNodesFakeLLMAdapter(),
+            input_ref=[handoff_trace_id, boundary_trace_id],
+            source_data_ids=[node2_input_id, handoff_id, boundary_id],
+            id_namespace=run_ids,
+        )
+    )
     brief_trace_id, brief_id, brief_frame = record_node3_input_brief(
         trace_store=trace_store,
         data_store=data_store,
@@ -2936,8 +3021,9 @@ def _record_downstream_after_l_run(
         user_question=user_question,
         handoff_frame_id=handoff_id,
         boundary=boundary,
-        input_trace_ids=[handoff_trace_id, boundary_trace_id],
-        source_data_ids=[node2_input_id, handoff_id, boundary_id],
+        input_trace_ids=[handoff_trace_id, boundary_trace_id, answer_basis_trace_id],
+        source_data_ids=[node2_input_id, handoff_id, boundary_id, answer_basis_id],
+        answer_basis_frame=answer_basis_frame,
         id_namespace=run_ids,
     )
     report_id = run_ids.node3_report_id()
@@ -2952,7 +3038,7 @@ def _record_downstream_after_l_run(
         allowed_relative_info_ids=[info_ref.info_id for info_ref in boundary.relative_info],
         allowed_mixed_info_ids=[info_ref.info_id for info_ref in boundary.mixed_info],
         input_ref=[brief_trace_id],
-        source_data_ids=[brief_id, handoff_id, boundary_id, outcome_id, node2_input_id],
+        source_data_ids=[brief_id, handoff_id, boundary_id, answer_basis_id, outcome_id, node2_input_id],
     )
     gatekeeper_trace_id = run_node4_gatekeeper(
         trace_store=trace_store,
@@ -2964,7 +3050,7 @@ def _record_downstream_after_l_run(
         rendered_markdown=report,
         adapter=SongRyeonAllNodesFakeLLMAdapter(),
         input_ref=[report_trace_id],
-        source_data_ids=[report_id, brief_id, boundary_id],
+        source_data_ids=[report_id, brief_id, boundary_id, answer_basis_id],
         id_namespace=run_ids,
     )
     if not gatekeeper_trace_id:
@@ -2979,6 +3065,7 @@ def _record_downstream_after_l_run(
         "node2_input_id": node2_input_id,
         "handoff_id": handoff_id,
         "boundary_id": boundary_id,
+        "answer_basis_id": answer_basis_id,
         "brief_id": brief_id,
         "report_id": report_id,
         "gatekeeper_id": run_ids.node4_gatekeeper_frame_id(),
@@ -5170,19 +5257,26 @@ def _run_node4_grounding_count_guard_smoke() -> dict[str, object]:
     brief = records.get("node_3:input_brief_frame")
     if not isinstance(brief, dict):
         raise AssertionError("node3 brief missing")
-    expected_doc_count = len(brief.get("read_documents") or [])
-    expected_search_count = brief.get("search_candidate_count")
+    expected_tool_read_count = brief.get("actual_tool_read_doc_count")
+    expected_context_count = brief.get("supplied_document_context_count")
+    expected_final_search_count = brief.get("final_search_candidate_count")
+    expected_accumulated_search_count = brief.get("accumulated_search_candidate_count")
     expected_runtime_count = len(brief.get("runtime_tasks") or [])
     expected_lines = [
         "근거 기준:",
-        f"- 읽은 문서: {expected_doc_count}개",
-        f"- 검색 후보 문서: {expected_search_count}개",
+        f"- 실제 read_doc 도구 원문 읽기: {expected_tool_read_count}개",
+        f"- node_3 공급 문서 context: {expected_context_count}개",
+        f"- 검색 후보 문서(최종): {expected_final_search_count}개",
+        f"- 검색 후보 문서(누적): {expected_accumulated_search_count}개",
         f"- 현재 턴 실행 순서 자료: {expected_runtime_count}개",
     ]
     for line in expected_lines:
         if line not in rendered_markdown:
             raise AssertionError(f"code grounding block missing expected line: {line}")
-    if "- 읽은 문서: 0개" in rendered_markdown and expected_doc_count != 0:
+    if (
+        "- 실제 read_doc 도구 원문 읽기: 0개" in rendered_markdown
+        and expected_tool_read_count != 0
+    ):
         raise AssertionError("legacy LLM grounding count leaked into final report")
     answer = render_pretty_turn(result, user_input="count guard smoke")
     if "FINAL_BLOCKED_BY_GATEKEEPER" in answer:
@@ -5413,8 +5507,10 @@ def _report_with_grounding(body: str) -> str:
     return "\n".join(
         [
             "근거 기준:",
-            "- 읽은 문서: 0개",
-            "- 검색 후보 문서: 0개",
+            "- 실제 read_doc 도구 원문 읽기: 0개",
+            "- node_3 공급 문서 context: 0개",
+            "- 검색 후보 문서(최종): 0개",
+            "- 검색 후보 문서(누적): 0개",
             "- 현재 턴 실행 순서 자료: 0개",
             "- 답변 한계: 제공된 자료 범위 안에서만 답한다.",
             "",
@@ -5561,8 +5657,10 @@ class CountMismatchReporterFakeAdapter(SongRyeonAllNodesFakeLLMAdapter):
         return {
             "rendered_markdown": (
                 "근거 기준:\n"
-                "- 읽은 문서: 0개\n"
-                "- 검색 후보 문서: 0개\n"
+                "- 실제 read_doc 도구 원문 읽기: 0개\n"
+                "- node_3 공급 문서 context: 0개\n"
+                "- 검색 후보 문서(최종): 0개\n"
+                "- 검색 후보 문서(누적): 0개\n"
                 "- 현재 턴 실행 순서 자료: 0개\n"
                 "- 답변 한계: 일부러 brief count와 맞지 않는 smoke 보고문이다.\n\n"
                 "이 본문은 LLM이 틀린 count 블록을 포함해도 code assembly가 제거해야 하는 smoke 본문이다."
