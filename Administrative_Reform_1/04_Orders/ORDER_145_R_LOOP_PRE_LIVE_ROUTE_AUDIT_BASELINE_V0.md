@@ -4,6 +4,11 @@
 
 구현 완료.
 
+후속 변경:
+
+- ORDER_146 이후에도 기본 route=R은 닫혀 있다.
+- 단, 명시 실험 플래그가 있을 때만 `route=R`이 조건부로 허용될 수 있다.
+
 실행 기록:
 
 - `Administrative_Reform_1/05_Execution_Records/order_145_r_loop_pre_live_route_audit_baseline_2026_07_01_001.md`
@@ -57,7 +62,7 @@ qwen-chat/live node_1 route=R은 아직 열지 않는다.
 
 ## 6. 테스트 기준
 
-1. `RoutingDecisionFrame(route="R")`는 validator에서 실패해야 한다.
+1. 기본 `RoutingDecisionFrame(route="R")`는 validator에서 실패해야 한다.
 2. node_1 LLM router payload가 `route="R"`을 내면 실패해야 한다.
 3. 기본 `run_dry_turn()`은 R dry-run output을 만들지 않아야 한다.
 4. `run_dry_turn(enable_r_route_dry_run=True)`에서만 R dry-run output이 생겨야 한다.

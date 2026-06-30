@@ -8,6 +8,11 @@ Audited and locked the current R-loop boundary before opening any live route=R p
 
 This work did not add new runtime behavior. It added documentation and focused tests proving that R remains a dry-run-only skeleton unless explicitly enabled by `run_dry_turn(enable_r_route_dry_run=True)`.
 
+Follow-up note:
+
+- ORDER_146 later added an explicit experimental route=R gate.
+- The ORDER_145 baseline remains true for default runtime: route=R is still closed unless a later explicit experimental flag is enabled.
+
 ## Findings
 
 - `RoutingDecisionFrame` currently accepts only `L` and `2`.

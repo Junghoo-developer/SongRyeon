@@ -2337,6 +2337,12 @@ def _route_path(route_ids: list[str], *, actual_l_run_count: int) -> list[str]:
         elif route == "2":
             path.append("1:route=2")
             path.append("0:final_trace_for_2")
+        elif route == "R":
+            path.append("1:route=R_experimental")
+            path.append("0:r_loop_graph_guide_handoff")
+            path.append("R:R1_R2_R3_experimental_skeleton")
+            path.append("1:route=2_after_R_experimental")
+            path.append("0:final_trace_for_2")
     return path
 
 
@@ -2345,6 +2351,8 @@ def _route_value(route_id: str) -> str | None:
         return "L"
     if route_id == "route:2" or route_id.endswith(":route:2"):
         return "2"
+    if route_id == "route:R" or route_id.endswith(":route:R"):
+        return "R"
     return None
 
 

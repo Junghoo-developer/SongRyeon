@@ -3,9 +3,14 @@
 from dataclasses import asdict
 
 from songryeon_core.core.data_store import DataStore
-from songryeon_core.core.graph_memory import record_graph_memory_for_capsules
+from songryeon_core.core.graph_memory import (
+    build_graph_memory_snapshot_from_capsules,
+    record_graph_memory_for_capsules,
+)
 from songryeon_core.core.schemas import (
     Node2InputFrame,
+    R_ROUTE_EXPERIMENTAL_NEXT_0_MODE,
+    R_ROUTE_EXPERIMENTAL_POLICY_FLAG,
     TurnOutcomeFrame,
     TurnStateCapsule,
     ZeroState,
@@ -80,7 +85,10 @@ from songryeon_core.nodes.node_1_router import (
 )
 from songryeon_core.loops.l_loop import run_l_loop
 from songryeon_core.loops.l_loop_namespace import build_l_run_ids
-from songryeon_core.loops.r_loop_dry_run import run_r_loop_dry_run_skeleton
+from songryeon_core.loops.r_loop_dry_run import (
+    R_EXPERIMENTAL_ROUTE_GENERATOR,
+    run_r_loop_dry_run_skeleton,
+)
 from songryeon_core.nodes.node_2_metainfo_boundary import (
     build_metainfo_boundary,
     record_boundary,
@@ -127,6 +135,7 @@ def run_dry_turn(
     live_trace_sink: TraceEventSink | None = None,
     enable_r_route_dry_run: bool = False,
     r_route_dry_run_force_budget_exhausted: bool = False,
+    enable_r_route_experimental: bool = False,
 ) -> dict[str, object]:
     """한 턴의 구조 흐름을 trace/data로 실행한다.
 
@@ -158,6 +167,17 @@ def run_dry_turn(
     last_l_result = None
     reroute_controller_data_ids: list[str] = []
     final_reroute_controller: SameTurnLRerouteDecision | None = None
+    r_route_experimental_status = "not_run"
+    r_route_experimental_trace_event_ids: list[str] = []
+    r_route_experimental_output_data_ids: list[str] = []
+    r_route_experimental_handoff_packet_id: str | None = None
+    r_route_experimental_return_summary_id: str | None = None
+    r_route_experimental_close_route_id: str | None = None
+    r_route_experimental_graph_data_ids: list[str] = []
+    r_loop_memory_handoff_trace_id: str | None = None
+    r_loop_memory_handoff_data_id: str | None = None
+    r_loop_memory_handoff_frame = None
+    r_loop_dry_run_result = None
     policy = SameTurnLReroutePolicy(
         enabled=same_turn_l_reroute_enabled,
         max_l_runs_per_turn=max_l_runs_per_turn,
@@ -307,6 +327,7 @@ def run_dry_turn(
             force_l_route=force_l_route,
             fallback_policy=node_1_router_fallback_policy,
             fallback_allowed_by_runtime_policy=allow_node_1_router_fallback,
+            allow_r_route_experimental=enable_r_route_experimental,
         )
     else:
         decision = route_next(
@@ -372,6 +393,124 @@ def run_dry_turn(
             )
         )
         next_step_index += 1
+
+    route2_trace_id: str | None = None
+    route2_data_id: str | None = None
+
+    if decision.route == "R":
+        r_route_experimental_status = "selected"
+        r_graph_build = build_graph_memory_snapshot_from_capsules(
+            capsules=zero_state.previous_turn_capsules,
+            batch_id=f"{turn_id}:r_route_experimental",
+        )
+        r_graph_trace = trace_store.create_event(
+            turn_id=turn_id,
+            actor="graph_memory",
+            event_type="r_route_experimental_graph_snapshot",
+            input_ref=[route_trace_id],
+            output_ref=[
+                r_graph_build.snapshot.snapshot_id,
+                r_graph_build.guide_packet.packet_id,
+            ],
+            schema_status="passed",
+        )
+        r_route_experimental_graph_data_ids = []
+        append_movement(
+            node_id="graph_memory",
+            mode="r_route_experimental_graph_snapshot",
+            input_trace_ids=[route_trace_id],
+            output_trace_ids=[r_graph_trace.event_id],
+            input_data_ids=[route_data_id],
+            output_data_ids=r_route_experimental_graph_data_ids,
+            node_type="code",
+        )
+        (
+            r_route_handoff_trace_id,
+            r_route_handoff_data_id,
+            r_route_handoff_frame,
+        ) = record_r_loop_memory_handoff_packet(
+            trace_store=trace_store,
+            data_store=data_store,
+            turn_id=turn_id,
+            guide_packet=r_graph_build.guide_packet,
+            packet_id="node_0:r_loop_memory_handoff_packet_frame:r_route_experimental",
+            input_ref=[r_graph_trace.event_id],
+            source_data_ids=[
+                r_graph_build.snapshot.snapshot_id,
+                r_graph_build.guide_packet.packet_id,
+            ],
+            semantic_hint_status=r_graph_build.guide_packet.recommended_traversal_hints_status,
+        )
+        r_route_experimental_handoff_packet_id = r_route_handoff_data_id
+        append_movement(
+            node_id="node_0",
+            mode=R_ROUTE_EXPERIMENTAL_NEXT_0_MODE,
+            input_trace_ids=[r_graph_trace.event_id],
+            output_trace_ids=[r_route_handoff_trace_id],
+            input_data_ids=r_route_experimental_graph_data_ids,
+            output_data_ids=[r_route_handoff_data_id],
+        )
+        enter_loop(unified_state, "R")
+        r_route_result = run_r_loop_dry_run_skeleton(
+            trace_store=trace_store,
+            data_store=data_store,
+            turn_id=turn_id,
+            handoff_packet=r_route_handoff_frame,
+            input_ref=[r_route_handoff_trace_id],
+            frame_label="experimental",
+            generated_by=R_EXPERIMENTAL_ROUTE_GENERATOR,
+        )
+        exit_loop(unified_state, "R")
+        r_route_experimental_trace_event_ids = list(r_route_result.trace_event_ids)
+        r_route_experimental_output_data_ids = list(r_route_result.output_data_ids)
+        r_route_experimental_return_summary_id = r_route_result.return_summary.frame_id
+        append_movement(
+            node_id="R",
+            node_type="loop",
+            mode="R_route_experimental_skeleton",
+            input_trace_ids=[r_route_handoff_trace_id],
+            output_trace_ids=r_route_result.trace_event_ids,
+            input_data_ids=[r_route_handoff_data_id],
+            output_data_ids=r_route_result.output_data_ids,
+        )
+        close_decision = route_next(
+            user_input="보고",
+            memory_packet=packet_for_1,
+            schema_registry=schema_registry,
+        )
+        r_close_input_ref = _unique_strings(
+            [route_trace_id, *r_route_result.trace_event_ids]
+        )
+        r_close_source_data_ids = _unique_strings(
+            [
+                route_data_id,
+                r_route_handoff_data_id,
+                *r_route_result.output_data_ids,
+            ]
+        )
+        r_close_trace_id = record_routing(
+            trace_store=trace_store,
+            data_store=data_store,
+            turn_id=turn_id,
+            decision=close_decision,
+            input_ref=r_close_input_ref,
+            source_data_ids=r_close_source_data_ids,
+        )
+        r_route_experimental_close_route_id = f"route:{close_decision.route}"
+        route_data_ids.append(r_route_experimental_close_route_id)
+        set_current_route(unified_state, close_decision.route)
+        set_active_schema(unified_state, close_decision.required_schema)
+        append_movement(
+            node_id="node_1",
+            mode="routing_after_r_experimental_return",
+            input_trace_ids=r_close_input_ref,
+            output_trace_ids=[r_close_trace_id],
+            input_data_ids=r_close_source_data_ids,
+            output_data_ids=[r_route_experimental_close_route_id],
+        )
+        route2_trace_id = r_close_trace_id
+        route2_data_id = r_route_experimental_close_route_id
+        decision = close_decision
 
     # 4. route가 L이면 policy-guarded controller 아래에서 최대 2회차까지 다시 열 수 있다.
     if decision.route == "L":
@@ -617,7 +756,7 @@ def run_dry_turn(
                     output_data_ids=[route2_data_id],
                 )
             break
-    else:
+    elif route2_trace_id is None or route2_data_id is None:
         route2_trace_id = route_trace_id
         route2_data_id = route_data_id
 
@@ -711,6 +850,9 @@ def run_dry_turn(
             *l_return_summary_data_ids,
             *document_material_data_ids,
             *reroute_controller_data_ids,
+            *r_route_experimental_graph_data_ids,
+            r_route_experimental_handoff_packet_id,
+            *r_route_experimental_output_data_ids,
             node0_final_data_id,
             outcome_id,
         ]
@@ -1149,6 +1291,17 @@ def run_dry_turn(
         "r_loop_memory_handoff_semantic_judgement_status": (
             r_loop_memory_handoff_frame.semantic_judgement_status
         ),
+        "r_route_experimental_enabled": enable_r_route_experimental,
+        "r_route_experimental_status": r_route_experimental_status,
+        "r_route_experimental_policy_flag": (
+            R_ROUTE_EXPERIMENTAL_POLICY_FLAG if enable_r_route_experimental else None
+        ),
+        "r_route_experimental_handoff_packet_id": r_route_experimental_handoff_packet_id,
+        "r_route_experimental_return_summary_id": r_route_experimental_return_summary_id,
+        "r_route_experimental_close_route_id": r_route_experimental_close_route_id,
+        "r_route_experimental_output_data_ids": r_route_experimental_output_data_ids,
+        "r_route_experimental_trace_event_ids": r_route_experimental_trace_event_ids,
+        "r_route_experimental_graph_data_ids": r_route_experimental_graph_data_ids,
         "r_route_dry_run_enabled": enable_r_route_dry_run,
         "r_route_dry_run_status": (
             r_loop_dry_run_result.return_summary.r_loop_task_status

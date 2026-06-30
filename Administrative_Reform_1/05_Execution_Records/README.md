@@ -134,3 +134,4 @@
 - [order_143_r_loop_node0_memory_packet_handoff_2026_06_30_001.md](order_143_r_loop_node0_memory_packet_handoff_2026_06_30_001.md)
 - [order_144_r_route_dry_run_only_2026_06_30_001.md](order_144_r_route_dry_run_only_2026_06_30_001.md)
 - [order_145_r_loop_pre_live_route_audit_baseline_2026_07_01_001.md](order_145_r_loop_pre_live_route_audit_baseline_2026_07_01_001.md)
+- [order_146_r_route_experimental_gate_2026_07_01_001.md](order_146_r_route_experimental_gate_2026_07_01_001.md)

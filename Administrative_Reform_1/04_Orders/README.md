@@ -130,6 +130,8 @@
 
 `ORDER_145`는 live route=R을 열기 전에 현재 R skeleton이 dry-run opt-in 상태로 닫혀 있음을 문서와 테스트 기준선으로 감사하는 발주서다.
 
+`ORDER_146`은 기본 route set은 L/2로 유지하되, 명시 실험 플래그가 있을 때만 node_1 LLM이 `route=R`을 고르고 `R:experimental:*` skeleton을 실행할 수 있게 하는 발주서다.
+
 ## 임시 발주서
 
 - [TMP Auto Hunt Orders 2026-06-21](TMP_Auto_Hunt_2026_06_21/README.md): 지금까지의 철학 정리본을 바탕으로 만든 자동 사냥용 후보 발주서 묶음.
@@ -256,3 +258,4 @@
 - [ORDER 143: R Loop Node0 Memory Packet Handoff v0](ORDER_143_R_LOOP_NODE0_MEMORY_PACKET_HANDOFF_V0_CANDIDATE.md)
 - [ORDER 144: R Route Dry-Run Only v0](ORDER_144_R_ROUTE_DRY_RUN_ONLY_V0_CANDIDATE.md)
 - [ORDER 145: R Loop Pre-Live Route Audit Baseline v0](ORDER_145_R_LOOP_PRE_LIVE_ROUTE_AUDIT_BASELINE_V0.md)
+- [ORDER 146: R Route Experimental Gate And Allowed Route Set v0](ORDER_146_R_ROUTE_EXPERIMENTAL_GATE_AND_ALLOWED_ROUTE_SET_V0.md)

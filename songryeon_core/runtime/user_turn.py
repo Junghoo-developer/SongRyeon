@@ -39,6 +39,7 @@ def run_fake_user_turn(
     force_l_route: bool = False,
     same_turn_l_reroute_enabled: bool = False,
     max_l_runs_per_turn: int = 1,
+    enable_r_route_experimental: bool = False,
     live_trace: bool = False,
     turn_id: str | None = None,
     previous_turn_capsules: list[TurnStateCapsule] | None = None,
@@ -74,6 +75,7 @@ def run_fake_user_turn(
         force_l_route=force_l_route,
         same_turn_l_reroute_enabled=same_turn_l_reroute_enabled,
         max_l_runs_per_turn=max_l_runs_per_turn,
+        enable_r_route_experimental=enable_r_route_experimental,
         previous_turn_capsules=previous_turn_capsules,
         recent_raw_conversation=recent_raw_conversation,
         live_trace_sink=make_live_trace_sink(enabled=live_trace),
@@ -109,6 +111,7 @@ def run_qwen_user_turn(
     force_l_route: bool = False,
     same_turn_l_reroute_enabled: bool = False,
     max_l_runs_per_turn: int = 1,
+    enable_r_route_experimental: bool = False,
     live_trace: bool = False,
     turn_id: str | None = None,
     previous_turn_capsules: list[TurnStateCapsule] | None = None,
@@ -161,6 +164,7 @@ def run_qwen_user_turn(
             force_l_route=force_l_route,
             same_turn_l_reroute_enabled=same_turn_l_reroute_enabled,
             max_l_runs_per_turn=max_l_runs_per_turn,
+            enable_r_route_experimental=enable_r_route_experimental,
             allow_node_1_router_fallback=False,
             node_1_router_fallback_policy=ROUTER_FALLBACK_POLICY_QWEN_STRICT_BLOCKED,
             previous_turn_capsules=previous_turn_capsules,
@@ -212,6 +216,14 @@ def _turn_response(
         "tool_distillation_count": result.get("tool_distillation_count"),
         "tool_budget_frame_count": result.get("tool_budget_frame_count"),
         "l_loop_budget_plan_count": result.get("l_loop_budget_plan_count"),
+        "r_route_experimental_enabled": result.get("r_route_experimental_enabled"),
+        "r_route_experimental_status": result.get("r_route_experimental_status"),
+        "r_route_experimental_return_summary_id": result.get(
+            "r_route_experimental_return_summary_id"
+        ),
+        "r_route_experimental_close_route_id": result.get(
+            "r_route_experimental_close_route_id"
+        ),
         "task_frame_count": result.get("task_frame_count"),
         "task_result_count": result.get("task_result_count"),
         "search_top_k": result.get("search_top_k"),

@@ -144,6 +144,7 @@ def main() -> None:
             force_l_route=args.force_l,
             same_turn_l_reroute_enabled=args.same_turn_l_reroute,
             max_l_runs_per_turn=args.max_l_runs_per_turn,
+            enable_r_route_experimental=args.enable_r_route_experimental,
             live_trace=args.live_trace,
         )
         if args.pretty:
@@ -168,6 +169,7 @@ def main() -> None:
             force_l_route=args.force_l,
             same_turn_l_reroute_enabled=args.same_turn_l_reroute,
             max_l_runs_per_turn=args.max_l_runs_per_turn,
+            enable_r_route_experimental=args.enable_r_route_experimental,
             live_trace=args.live_trace,
         )
         if args.pretty:
@@ -200,6 +202,7 @@ def _add_turn_runtime_args(parser: argparse.ArgumentParser, *, include_qwen_args
     parser.add_argument("--force-l", action="store_true")
     parser.add_argument("--same-turn-l-reroute", action="store_true")
     parser.add_argument("--max-l-runs-per-turn", type=int, default=1)
+    parser.add_argument("--enable-r-route-experimental", action="store_true")
     parser.add_argument("--live-trace", action="store_true")
     if include_qwen_args:
         parser.add_argument("--endpoint", default=None)
@@ -254,6 +257,7 @@ def _run_qwen_chat(args: argparse.Namespace) -> None:
             force_l_route=args.force_l,
             same_turn_l_reroute_enabled=args.same_turn_l_reroute,
             max_l_runs_per_turn=args.max_l_runs_per_turn,
+            enable_r_route_experimental=args.enable_r_route_experimental,
             recent_raw_conversation=session_memory.recent_raw_conversation,
             previous_turn_capsules=session_memory.previous_turn_capsules,
             live_trace=args.live_trace,
@@ -319,6 +323,14 @@ def _summary(result: dict[str, object]) -> dict[str, object]:
         "node1_llm_routing_failed_count": result.get("node1_llm_routing_failed_count"),
         "node1_router_fallback_count": result.get("node1_router_fallback_count"),
         "node1_router_fallback_policy": result.get("node1_router_fallback_policy"),
+        "r_route_experimental_enabled": result.get("r_route_experimental_enabled"),
+        "r_route_experimental_status": result.get("r_route_experimental_status"),
+        "r_route_experimental_return_summary_id": result.get(
+            "r_route_experimental_return_summary_id"
+        ),
+        "r_route_experimental_close_route_id": result.get(
+            "r_route_experimental_close_route_id"
+        ),
         "recent_memory_relevance_selection_status": result.get(
             "recent_memory_relevance_selection_status"
         ),

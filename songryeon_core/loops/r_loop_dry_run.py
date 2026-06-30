@@ -24,6 +24,7 @@ from songryeon_core.core.trace_store import TraceStore
 
 
 R_DRY_RUN_GENERATOR = "CODE:R_LOOP_DRY_RUN_ONLY"
+R_EXPERIMENTAL_ROUTE_GENERATOR = "CODE:R_ROUTE_EXPERIMENTAL_GATE"
 
 
 @dataclass
@@ -46,6 +47,8 @@ def run_r_loop_dry_run_skeleton(
     handoff_packet: RLoopMemoryHandoffPacketFrame,
     input_ref: list[str] | None = None,
     force_budget_exhausted: bool = False,
+    frame_label: str = "dry_run",
+    generated_by: str = R_DRY_RUN_GENERATOR,
 ) -> RLoopDryRunResult:
     """Run a deterministic R-loop skeleton for dry-run tests only."""
 
@@ -53,17 +56,38 @@ def run_r_loop_dry_run_skeleton(
     if handoff_packet.packet_status != "available":
         raise ValueError("R dry-run skeleton requires an available graph guide handoff")
 
-    r1 = _build_r1_goal(handoff_packet=handoff_packet)
-    budget = _build_budget(r1=r1, force_budget_exhausted=force_budget_exhausted)
-    r2 = _build_r2_selection(handoff_packet=handoff_packet, r1=r1)
-    r3 = _build_r3_inspection(data_store=data_store, handoff_packet=handoff_packet, r2=r2)
+    frame_label = _safe_frame_label(frame_label)
+    r1 = _build_r1_goal(
+        handoff_packet=handoff_packet,
+        frame_label=frame_label,
+        generated_by=generated_by,
+    )
+    budget = _build_budget(
+        r1=r1,
+        force_budget_exhausted=force_budget_exhausted,
+        frame_label=frame_label,
+        generated_by=generated_by,
+    )
+    r2 = _build_r2_selection(
+        handoff_packet=handoff_packet,
+        r1=r1,
+        frame_label=frame_label,
+        generated_by=generated_by,
+    )
+    r3 = _build_r3_inspection(
+        data_store=data_store,
+        handoff_packet=handoff_packet,
+        r2=r2,
+        frame_label=frame_label,
+        generated_by=generated_by,
+    )
     continuation = decide_r_loop_continuation(
-        frame_id="R:dry_run:continuation_frame:0001",
+        frame_id=f"R:{frame_label}:continuation_frame:0001",
         r3_inspection=r3,
         budget=budget,
         source_trace_ids=input_ref or [],
     )
-    continuation.generated_by = R_DRY_RUN_GENERATOR
+    continuation.generated_by = generated_by
     validate_r_loop_continuation_frame(continuation)
     summary = _build_return_summary(
         handoff_packet=handoff_packet,
@@ -72,6 +96,8 @@ def run_r_loop_dry_run_skeleton(
         r2=r2,
         r3=r3,
         continuation=continuation,
+        frame_label=frame_label,
+        generated_by=generated_by,
     )
 
     frames: list[tuple[str, str, object]] = [
@@ -120,17 +146,22 @@ def run_r_loop_dry_run_skeleton(
     )
 
 
-def _build_r1_goal(*, handoff_packet: RLoopMemoryHandoffPacketFrame) -> R1GraphGoalFrame:
+def _build_r1_goal(
+    *,
+    handoff_packet: RLoopMemoryHandoffPacketFrame,
+    frame_label: str,
+    generated_by: str,
+) -> R1GraphGoalFrame:
     frame = R1GraphGoalFrame(
-        frame_id="R1:dry_run:graph_goal_frame",
-        graph_search_goal="CODE_STATUS:r_route_dry_run_inspect_graph_guide_handoff",
+        frame_id=f"R1:{frame_label}:graph_goal_frame",
+        graph_search_goal=f"CODE_STATUS:r_route_{frame_label}_inspect_graph_guide_handoff",
         required_information_granularity="unknown",
         allowed_summary_depth=max(handoff_packet.summary_depth_range),
         max_traversal_depth=2,
         max_branch_switches=1,
         max_node_reads=3,
         max_context_tokens=1200,
-        stop_condition="CODE_STATUS:r_route_dry_run_stop_after_first_continuation_check",
+        stop_condition=f"CODE_STATUS:r_route_{frame_label}_stop_after_first_continuation_check",
         source_graph_guide_packet_id=handoff_packet.r_loop_graph_guide_packet_id,
         source_data_ids=_unique_strings(
             [
@@ -140,7 +171,7 @@ def _build_r1_goal(*, handoff_packet: RLoopMemoryHandoffPacketFrame) -> R1GraphG
             ]
         ),
         source_trace_ids=list(handoff_packet.source_trace_ids),
-        generated_by=R_DRY_RUN_GENERATOR,
+        generated_by=generated_by,
         info_class="mixed",
         semantic_judgement_status="not_run",
     )
@@ -148,10 +179,16 @@ def _build_r1_goal(*, handoff_packet: RLoopMemoryHandoffPacketFrame) -> R1GraphG
     return frame
 
 
-def _build_budget(*, r1: R1GraphGoalFrame, force_budget_exhausted: bool) -> RLoopBudgetFrame:
+def _build_budget(
+    *,
+    r1: R1GraphGoalFrame,
+    force_budget_exhausted: bool,
+    frame_label: str,
+    generated_by: str,
+) -> RLoopBudgetFrame:
     used_node_reads = r1.max_node_reads if force_budget_exhausted else 1
     frame = RLoopBudgetFrame(
-        frame_id="R:dry_run:budget_frame",
+        frame_id=f"R:{frame_label}:budget_frame",
         source_r1_goal_frame_id=r1.frame_id,
         max_traversal_depth=r1.max_traversal_depth,
         max_branch_switches=r1.max_branch_switches,
@@ -164,7 +201,7 @@ def _build_budget(*, r1: R1GraphGoalFrame, force_budget_exhausted: bool) -> RLoo
         budget_status="exhausted" if force_budget_exhausted else "within_budget",
         source_data_ids=[r1.frame_id],
         source_trace_ids=list(r1.source_trace_ids),
-        generated_by=R_DRY_RUN_GENERATOR,
+        generated_by=generated_by,
         info_class="absolute",
         semantic_judgement_status="not_run",
     )
@@ -176,21 +213,23 @@ def _build_r2_selection(
     *,
     handoff_packet: RLoopMemoryHandoffPacketFrame,
     r1: R1GraphGoalFrame,
+    frame_label: str,
+    generated_by: str,
 ) -> R2GraphNodeSelectionFrame:
     selected_id = handoff_packet.available_entry_node_ids[0]
     frame = R2GraphNodeSelectionFrame(
-        frame_id="R2:dry_run:graph_node_selection_frame",
+        frame_id=f"R2:{frame_label}:graph_node_selection_frame",
         selection_scope="core_ego_graph_guide_handoff",
         available_graph_node_ids=list(handoff_packet.available_entry_node_ids),
         selection_status="selected",
         selected_graph_node_id=selected_id,
-        selection_reason="CODE_STATUS:dry_run_select_first_available_entry_node",
+        selection_reason=f"CODE_STATUS:{frame_label}_select_first_available_entry_node",
         expected_information_granularity="unknown",
         expected_source_kind="graph_entry_node",
         source_r1_goal_frame_id=r1.frame_id,
         source_data_ids=[r1.frame_id, handoff_packet.packet_id],
         source_trace_ids=list(handoff_packet.source_trace_ids),
-        generated_by=R_DRY_RUN_GENERATOR,
+        generated_by=generated_by,
         info_class="mixed",
         semantic_judgement_status="not_run",
     )
@@ -203,20 +242,28 @@ def _build_r3_inspection(
     data_store: DataStore,
     handoff_packet: RLoopMemoryHandoffPacketFrame,
     r2: R2GraphNodeSelectionFrame,
+    frame_label: str,
+    generated_by: str,
 ) -> R3GraphInspectionFrame:
     selected_id = r2.selected_graph_node_id
     if selected_id is None:
         raise ValueError("R dry-run R2 selection did not select a graph node")
     node_payload = _graph_node_payload(data_store=data_store, node_id=selected_id)
-    child_node_ids = _string_list(node_payload.get("source_graph_node_ids"))
-    node_kind = _text(node_payload.get("node_kind"), fallback="time_axis")
-    summary_depth = _int(node_payload.get("summary_depth"))
-    source_leaf_count = _int(node_payload.get("source_leaf_count"))
+    if node_payload:
+        child_node_ids = _string_list(node_payload.get("source_graph_node_ids"))
+        node_kind = _text(node_payload.get("node_kind"), fallback="time_axis")
+        summary_depth = _int(node_payload.get("summary_depth"))
+        source_leaf_count = _int(node_payload.get("source_leaf_count"))
+    else:
+        child_node_ids = list(handoff_packet.source_graph_node_ids)
+        node_kind = "time_axis"
+        summary_depth = min(handoff_packet.summary_depth_range)
+        source_leaf_count = max(handoff_packet.source_leaf_count_range)
     recommended_next_action = "deeper" if child_node_ids else "stop"
     granularity_status = "needs_lower_granularity" if child_node_ids else "none"
     sufficiency_status = "insufficient" if child_node_ids else "sufficient"
     frame = R3GraphInspectionFrame(
-        frame_id="R3:dry_run:graph_inspection_frame",
+        frame_id=f"R3:{frame_label}:graph_inspection_frame",
         inspected_graph_node_id=selected_id,
         node_kind=node_kind,
         child_node_count=len(child_node_ids),
@@ -228,11 +275,11 @@ def _build_r3_inspection(
         granularity_problem_status=granularity_status,
         branch_problem_status="none",
         recommended_next_action=recommended_next_action,
-        inspection_reason="CODE_STATUS:dry_run_copied_graph_node_child_coordinates",
+        inspection_reason=f"CODE_STATUS:{frame_label}_copied_graph_node_child_coordinates",
         source_r2_selection_frame_id=r2.frame_id,
         source_data_ids=[r2.frame_id, handoff_packet.packet_id, selected_id],
         source_trace_ids=list(handoff_packet.source_trace_ids),
-        generated_by=R_DRY_RUN_GENERATOR,
+        generated_by=generated_by,
         info_class="mixed",
         semantic_judgement_status="not_run",
     )
@@ -248,6 +295,8 @@ def _build_return_summary(
     r2: R2GraphNodeSelectionFrame,
     r3: R3GraphInspectionFrame,
     continuation: RLoopContinuationFrame,
+    frame_label: str,
+    generated_by: str,
 ) -> RLoopReturnSummaryFrame:
     if continuation.continuation_status == "stop_sufficient":
         task_status = "sufficient"
@@ -259,7 +308,7 @@ def _build_return_summary(
         [r2.selected_graph_node_id] if r2.selected_graph_node_id is not None else []
     )
     frame = RLoopReturnSummaryFrame(
-        frame_id="R:dry_run:return_summary_frame",
+        frame_id=f"R:{frame_label}:return_summary_frame",
         r_loop_task_status=task_status,
         selected_entry_node_ids=selected_entry_node_ids,
         inspected_graph_node_ids=[r3.inspected_graph_node_id],
@@ -291,7 +340,7 @@ def _build_return_summary(
                 *continuation.source_trace_ids,
             ]
         ),
-        generated_by=R_DRY_RUN_GENERATOR,
+        generated_by=generated_by,
         info_class="absolute",
         semantic_judgement_status="not_run",
     )
@@ -299,8 +348,19 @@ def _build_return_summary(
     return frame
 
 
+def _safe_frame_label(value: str) -> str:
+    normalized = value.strip().replace("-", "_").replace(" ", "_")
+    if not normalized:
+        return "dry_run"
+    if not all(ch.isalnum() or ch == "_" for ch in normalized):
+        raise ValueError("R loop frame_label must contain only letters, numbers, or underscore")
+    return normalized
+
+
 def _graph_node_payload(*, data_store: DataStore, node_id: str) -> dict[str, object]:
-    record = data_store.require_record(node_id)
+    record = data_store.get_record(node_id)
+    if record is None:
+        return {}
     if not isinstance(record.payload, dict):
         raise TypeError(f"graph node payload must be a dict: {node_id}")
     return record.payload

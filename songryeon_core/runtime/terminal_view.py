@@ -260,7 +260,15 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
     r_return_summaries = _payloads_with_type(result, "node_output:R_loop_return_summary_frame")
     if r_return_summaries:
         r_continuations = _payloads_with_type(result, "node_output:R_loop_continuation_frame")
-        lines.append("- R dry-run skeleton [CODE:R_LOOP_DRY_RUN_ONLY]:")
+        header_generator = str(
+            r_return_summaries[-1].get("generated_by") or "CODE:R_LOOP_DRY_RUN_ONLY"
+        )
+        header_label = (
+            "R experimental route skeleton"
+            if header_generator == "CODE:R_ROUTE_EXPERIMENTAL_GATE"
+            else "R dry-run skeleton"
+        )
+        lines.append(f"- {header_label} [{header_generator}]:")
         for summary in r_return_summaries:
             continuation_status = summary.get("continuation_status", "unknown")
             next_target = "unknown"

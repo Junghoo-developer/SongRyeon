@@ -6,6 +6,8 @@ from pathlib import Path
 from songryeon_core.core.data_store import DataStore
 from songryeon_core.core.schemas import (
     MemoryPacketFrom0,
+    R_ROUTE_EXPERIMENTAL_NEXT_0_MODE,
+    R_ROUTE_EXPERIMENTAL_POLICY_FLAG,
     RoutingDecision,
     RoutingDecisionFrame,
     validate_routing_decision_frame,
@@ -110,6 +112,7 @@ def route_next_with_llm(
     turn_id: str,
     input_ref: list[str],
     source_data_ids: list[str],
+    allow_r_route_experimental: bool = False,
     max_retries: int = 0,
 ) -> RoutingDecision:
     """LLM으로 1번 라우팅을 수행한다.
@@ -120,6 +123,14 @@ def route_next_with_llm(
 
     prompt_ref = "songryeon_core/prompts/node_1_router_v0.md"
     prompt = Path(prompt_ref).read_text(encoding="utf-8")
+    allowed_routes = ["L", "2"]
+    route_meanings = {
+        "L": "내부 문서/장기기억 검색 루프",
+        "2": "최종 메타정보 경계 및 보고 단계",
+    }
+    if allow_r_route_experimental:
+        allowed_routes.append("R")
+        route_meanings["R"] = "EXPERIMENTAL: graph memory R-loop skeleton; only available when the runtime flag is explicitly enabled."
     input_payload = {
         "user_input": user_input,
         "memory_packet": {
@@ -135,10 +146,14 @@ def route_next_with_llm(
             data_store=data_store,
             source_data_ids=source_data_ids,
         ),
-        "allowed_routes": ["L", "2"],
-        "route_meanings": {
-            "L": "내부 문서/장기기억 검색 루프",
-            "2": "최종 메타정보 경계 및 보고 단계",
+        "allowed_routes": allowed_routes,
+        "route_meanings": route_meanings,
+        "experimental_route_policy": {
+            "R": {
+                "enabled": allow_r_route_experimental,
+                "policy_flag": R_ROUTE_EXPERIMENTAL_POLICY_FLAG,
+                "expected_next_0_mode": R_ROUTE_EXPERIMENTAL_NEXT_0_MODE,
+            }
         },
         "source_data_ids": source_data_ids,
     }
@@ -153,7 +168,10 @@ def route_next_with_llm(
         input_ref=input_ref,
         source_data_ids=source_data_ids,
         max_retries=max_retries,
-        payload_validator=_validate_llm_routing_payload,
+        payload_validator=lambda payload: _validate_llm_routing_payload(
+            payload,
+            allow_r_route_experimental=allow_r_route_experimental,
+        ),
     )
     if llm_result.failure_type != "none" or llm_result.validation.payload is None:
         raise Node1RouterLLMFailure(
@@ -168,6 +186,7 @@ def route_next_with_llm(
         model_id=llm_result.model_id,
         llm_trace_event_id=llm_result.trace_event_id,
         llm_call_data_id=llm_result.call_data_id,
+        allow_r_route_experimental=allow_r_route_experimental,
     )
 
 
@@ -186,6 +205,7 @@ def route_next_with_llm_or_policy_fallback(
     force_l_route: bool = False,
     fallback_policy: str = ROUTER_FALLBACK_POLICY_DEV_SMOKE,
     fallback_allowed_by_runtime_policy: bool = True,
+    allow_r_route_experimental: bool = False,
     max_retries: int = 0,
 ) -> RoutingDecision:
     """LLM router 실패와 code fallback 결정을 분리해서 보존한다."""
@@ -201,6 +221,7 @@ def route_next_with_llm_or_policy_fallback(
             turn_id=turn_id,
             input_ref=input_ref,
             source_data_ids=source_data_ids,
+            allow_r_route_experimental=allow_r_route_experimental,
             max_retries=max_retries,
         )
     except Node1RouterLLMFailure as exc:
@@ -377,13 +398,18 @@ def _mark_llm_failure_fallback(
     return decision
 
 
-def _validate_llm_routing_payload(payload: dict[str, object]) -> None:
+def _validate_llm_routing_payload(
+    payload: dict[str, object],
+    *,
+    allow_r_route_experimental: bool = False,
+) -> None:
     _routing_decision_from_llm_payload(
         payload=payload,
         schema_registry=None,
         model_id="validation-model",
         llm_trace_event_id="validation_trace",
         llm_call_data_id="validation_call",
+        allow_r_route_experimental=allow_r_route_experimental,
     )
 
 
@@ -394,17 +420,30 @@ def _routing_decision_from_llm_payload(
     model_id: str,
     llm_trace_event_id: str | None,
     llm_call_data_id: str | None,
+    allow_r_route_experimental: bool = False,
 ) -> RoutingDecision:
     route = str(payload.get("route") or "").strip()
-    if route not in {"L", "2"}:
-        raise ValueError("node_1 route must be L or 2")
+    allowed_routes = {"L", "2"}
+    if allow_r_route_experimental:
+        allowed_routes.add("R")
+    if route not in allowed_routes:
+        raise ValueError(
+            "node_1 route must be L or 2"
+            if not allow_r_route_experimental
+            else "node_1 route must be L, 2, or experimental R"
+        )
 
     route_reason = str(payload.get("route_reason") or payload.get("reason") or "").strip()
     if not route_reason:
         raise ValueError("node_1 route_reason must not be empty")
 
     expected_next_0_mode = str(payload.get("expected_next_0_mode") or "").strip()
-    expected_for_route = "targeted_memory_supply" if route == "L" else "final_trace_for_2"
+    if route == "L":
+        expected_for_route = "targeted_memory_supply"
+    elif route == "R":
+        expected_for_route = R_ROUTE_EXPERIMENTAL_NEXT_0_MODE
+    else:
+        expected_for_route = "final_trace_for_2"
     if not expected_next_0_mode or expected_next_0_mode != expected_for_route:
         expected_next_0_mode = expected_for_route
 
@@ -412,7 +451,7 @@ def _routing_decision_from_llm_payload(
     if route_confidence is not None and (route_confidence < 0.0 or route_confidence > 1.0):
         raise ValueError("node_1 route_confidence must be between 0 and 1")
 
-    target_node = "node_2" if route == "2" else "L"
+    target_node = "node_2" if route == "2" else "L" if route == "L" else "R_LOOP"
     return RoutingDecision(
         route=route,
         route_reason=route_reason,
@@ -421,7 +460,11 @@ def _routing_decision_from_llm_payload(
         expected_next_0_mode=expected_next_0_mode,
         route_rule_id="llm_router",
         matched_keywords=[],
-        policy_flag=_optional_text(payload.get("policy_flag")),
+        policy_flag=(
+            R_ROUTE_EXPERIMENTAL_POLICY_FLAG
+            if route == "R"
+            else _optional_text(payload.get("policy_flag"))
+        ),
         route_confidence=route_confidence,
         needs_more_memory=bool(payload.get("needs_more_memory") or False),
         llm_routing_status="ran",

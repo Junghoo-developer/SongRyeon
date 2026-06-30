@@ -461,6 +461,7 @@ def record_memory_packet(
 def build_r_loop_memory_handoff_packet_frame(
     *,
     guide_packet: RLoopGraphGuidePacketFrame | None,
+    packet_id: str | None = None,
     source_trace_ids: list[str] | None = None,
     source_data_ids: list[str] | None = None,
     semantic_hint_status: str = "not_run",
@@ -468,7 +469,7 @@ def build_r_loop_memory_handoff_packet_frame(
 ) -> RLoopMemoryHandoffPacketFrame:
     """R loop이 나중에 읽을 graph guide 좌표를 node_0 absolute packet으로 복사한다."""
 
-    packet_id = r_loop_memory_handoff_packet_frame_data_id()
+    packet_id = packet_id or r_loop_memory_handoff_packet_frame_data_id()
     if guide_packet is None:
         frame = RLoopMemoryHandoffPacketFrame(
             packet_id=packet_id,
@@ -522,6 +523,7 @@ def record_r_loop_memory_handoff_packet(
     data_store: DataStore,
     turn_id: str,
     guide_packet: RLoopGraphGuidePacketFrame | None,
+    packet_id: str | None = None,
     input_ref: list[str] | None = None,
     source_data_ids: list[str] | None = None,
     semantic_hint_status: str = "not_run",
@@ -531,6 +533,7 @@ def record_r_loop_memory_handoff_packet(
 
     frame = build_r_loop_memory_handoff_packet_frame(
         guide_packet=guide_packet,
+        packet_id=packet_id,
         source_trace_ids=input_ref or [],
         source_data_ids=source_data_ids or [],
         semantic_hint_status=semantic_hint_status,

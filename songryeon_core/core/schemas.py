@@ -926,6 +926,10 @@ class RoutingDecisionFrame:
     schema_version: str = "0.2"
 
 
+R_ROUTE_EXPERIMENTAL_POLICY_FLAG = "enable_r_route_experimental"
+R_ROUTE_EXPERIMENTAL_NEXT_0_MODE = "r_loop_graph_guide_handoff"
+
+
 def validate_routing_decision_frame(frame: RoutingDecisionFrame) -> None:
     """RoutingDecisionFrame의 최소 절대정보 규칙을 확인한다."""
 
@@ -940,7 +944,18 @@ def validate_routing_decision_frame(frame: RoutingDecisionFrame) -> None:
     }.items():
         if not value:
             raise ValueError(f"RoutingDecisionFrame.{field_name} must not be empty")
-    if frame.route not in {"L", "2"}:
+    if frame.route == "R":
+        if frame.policy_flag != R_ROUTE_EXPERIMENTAL_POLICY_FLAG:
+            raise ValueError("RoutingDecisionFrame route=R requires experimental policy flag")
+        if frame.expected_next_0_mode != R_ROUTE_EXPERIMENTAL_NEXT_0_MODE:
+            raise ValueError("RoutingDecisionFrame route=R requires R graph handoff mode")
+        if not frame.route_source.startswith("LLM:"):
+            raise ValueError("RoutingDecisionFrame route=R must be selected by node_1 LLM")
+        if frame.llm_routing_status != "ran":
+            raise ValueError("RoutingDecisionFrame route=R requires llm_routing_status=ran")
+        if frame.route_rule_id != "llm_router":
+            raise ValueError("RoutingDecisionFrame route=R requires llm_router rule id")
+    elif frame.route not in {"L", "2"}:
         raise ValueError(f"unknown route: {frame.route}")
     if frame.llm_routing_status not in {"not_run", "ran", "failed"}:
         raise ValueError(f"unknown llm_routing_status: {frame.llm_routing_status}")
