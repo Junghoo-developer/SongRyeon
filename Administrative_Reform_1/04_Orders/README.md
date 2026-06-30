@@ -2,7 +2,7 @@
 
 발주서는 개발 지도에서 내려온 실무 계획서다.
 
-현재 정식 발주서는 `ORDER_001`부터 `ORDER_143`까지 있다.
+현재 정식 발주서는 `ORDER_001`부터 `ORDER_144`까지 있다.
 
 `ORDER_066`부터 `ORDER_075`까지는 메타정보 관리법을 실제 런타임과 LLM 노드 배선에 적용하기 위한 복구 로드맵이다.
 
@@ -125,6 +125,8 @@
 `ORDER_142`는 외부 그래프 DB 연결 전에 `songryeon-neo4j-vessel` 이름과 graph memory store adapter boundary를 예약하는 발주서다.
 
 `ORDER_143`은 node_0이 R_LOOP에게 graph guide 좌표를 넘기는 `RLoopMemoryHandoffPacketFrame`을 만들고 runtime에 status/count만 표시하게 하는 발주서다.
+
+`ORDER_144`는 qwen/live route=R을 열지 않고 dry-run opt-in fixture에서만 R1/R2/R3/continuation/return summary frame 골격을 실행해 보는 발주서다.
 
 ## 임시 발주서
 
@@ -250,4 +252,4 @@
 - [ORDER 141: CoreEgo Guide Worker LLM Hints v0](ORDER_141_CORE_EGO_GUIDE_WORKER_LLM_HINTS_V0_CANDIDATE.md)
 - [ORDER 142: External Graph DB Adapter Boundary v0](ORDER_142_EXTERNAL_GRAPH_DB_ADAPTER_BOUNDARY_V0_CANDIDATE.md)
 - [ORDER 143: R Loop Node0 Memory Packet Handoff v0](ORDER_143_R_LOOP_NODE0_MEMORY_PACKET_HANDOFF_V0_CANDIDATE.md)
-- [ORDER 144 Candidate: R Route Dry-Run Only v0](ORDER_144_R_ROUTE_DRY_RUN_ONLY_V0_CANDIDATE.md)
+- [ORDER 144: R Route Dry-Run Only v0](ORDER_144_R_ROUTE_DRY_RUN_ONLY_V0_CANDIDATE.md)

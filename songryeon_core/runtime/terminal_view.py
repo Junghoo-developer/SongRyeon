@@ -257,6 +257,39 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
                 )
             )
 
+    r_return_summaries = _payloads_with_type(result, "node_output:R_loop_return_summary_frame")
+    if r_return_summaries:
+        r_continuations = _payloads_with_type(result, "node_output:R_loop_continuation_frame")
+        lines.append("- R dry-run skeleton [CODE:R_LOOP_DRY_RUN_ONLY]:")
+        for summary in r_return_summaries:
+            continuation_status = summary.get("continuation_status", "unknown")
+            next_target = "unknown"
+            if r_continuations:
+                next_target = str(r_continuations[-1].get("next_target_node") or "unknown")
+            lines.append(
+                "  - "
+                f"task_status={summary.get('r_loop_task_status', 'unknown')} / "
+                f"selected_entries={_list_count(summary.get('selected_entry_node_ids'))} / "
+                f"inspected_nodes={_list_count(summary.get('inspected_graph_node_ids'))} / "
+                f"continuation={continuation_status} / "
+                f"next={next_target} / "
+                f"budget={summary.get('budget_status', 'unknown')}"
+            )
+            lines.extend(
+                _metainfo_lines(
+                    indent=4,
+                    generated_by=str(summary.get("generated_by") or "CODE:R_LOOP_DRY_RUN_ONLY"),
+                    info_class=str(summary.get("info_class") or "absolute"),
+                    source_data_ids=_source_data_ids(
+                        summary,
+                        fallback=[str(summary.get("frame_id") or "R:return_summary")],
+                    ),
+                    semantic_judgement_status=str(
+                        summary.get("semantic_judgement_status") or "not_run"
+                    ),
+                )
+            )
+
     relevance_selection_frames = _payloads_with_type(
         result,
         "node_output:memory_relevance_selection_frame",

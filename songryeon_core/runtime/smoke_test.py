@@ -213,6 +213,7 @@ def run_smoke_tests() -> dict[str, object]:
         raise AssertionError("search_docs returned no results")
     document_memory_smoke = _check_document_memory_index(records, search_result)
     graph_memory_guide_smoke = _check_graph_memory_guide(result, records)
+    r_route_dry_run_smoke = _run_r_route_dry_run_only_smoke()
 
     return {
         "status": "SMOKE_TEST_OK",
@@ -365,6 +366,10 @@ def run_smoke_tests() -> dict[str, object]:
         "r_loop_memory_handoff_semantic_hint_status": graph_memory_guide_smoke[
             "handoff_semantic_hint_status"
         ],
+        "r_route_dry_run_enabled": r_route_dry_run_smoke["enabled"],
+        "r_route_dry_run_status": r_route_dry_run_smoke["task_status"],
+        "r_route_dry_run_continuation": r_route_dry_run_smoke["continuation_status"],
+        "r_route_dry_run_not_default": r_route_dry_run_smoke["not_default"],
         "qwen_chat_continuity_external_turn_id": qwen_chat_continuity_smoke["external_turn_id"],
         "qwen_chat_continuity_two_turn_alignment": qwen_chat_continuity_smoke["two_turn_alignment"],
         "qwen_chat_continuity_stateless_default": qwen_chat_continuity_smoke["stateless_default"],
@@ -502,6 +507,53 @@ def _check_graph_memory_guide(
         "handoff_entry_count": len(entry_nodes),
         "handoff_semantic_hint_status": handoff.get("semantic_hint_status"),
         "not_in_node1_or_node3": True,
+    }
+
+
+def _run_r_route_dry_run_only_smoke() -> dict[str, object]:
+    default_result = run_dry_turn()
+    if default_result.get("r_route_dry_run_enabled") is not False:
+        raise AssertionError("R dry-run must be disabled by default")
+    if default_result.get("r_route_dry_run_status") != "not_run":
+        raise AssertionError("default dry-run must not run R skeleton")
+
+    result = run_dry_turn(enable_r_route_dry_run=True)
+    if result.get("r_route_dry_run_enabled") is not True:
+        raise AssertionError("R dry-run fixture did not enable")
+    if result.get("r_route_dry_run_status") != "partial":
+        raise AssertionError("R dry-run return summary should be partial")
+    if result.get("r_route_dry_run_continuation_status") != "continue_deeper":
+        raise AssertionError("R dry-run should preserve continue_deeper")
+    if result.get("r_route_dry_run_next_target_node") != "R2":
+        raise AssertionError("R dry-run continuation should target R2")
+    output_ids = result.get("r_route_dry_run_output_data_ids")
+    if not isinstance(output_ids, list) or len(output_ids) != 6:
+        raise AssertionError("R dry-run should record six output frames")
+
+    records = result.get("data_records")
+    if not isinstance(records, list):
+        raise AssertionError("R dry-run result has no data_records")
+    data_types = {
+        record.get("data_type")
+        for record in records
+        if isinstance(record, dict) and record.get("data_id") in output_ids
+    }
+    required_types = {
+        "node_output:R1_graph_goal_frame",
+        "node_output:R_loop_budget_frame",
+        "node_output:R2_graph_node_selection_frame",
+        "node_output:R3_graph_inspection_frame",
+        "node_output:R_loop_continuation_frame",
+        "node_output:R_loop_return_summary_frame",
+    }
+    if not required_types.issubset(data_types):
+        raise AssertionError("R dry-run output frame types are incomplete")
+
+    return {
+        "enabled": True,
+        "task_status": result.get("r_route_dry_run_status"),
+        "continuation_status": result.get("r_route_dry_run_continuation_status"),
+        "not_default": True,
     }
 
 

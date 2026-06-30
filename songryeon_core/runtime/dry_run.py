@@ -80,6 +80,7 @@ from songryeon_core.nodes.node_1_router import (
 )
 from songryeon_core.loops.l_loop import run_l_loop
 from songryeon_core.loops.l_loop_namespace import build_l_run_ids
+from songryeon_core.loops.r_loop_dry_run import run_r_loop_dry_run_skeleton
 from songryeon_core.nodes.node_2_metainfo_boundary import (
     build_metainfo_boundary,
     record_boundary,
@@ -124,6 +125,8 @@ def run_dry_turn(
     previous_turn_capsules: list[TurnStateCapsule] | None = None,
     recent_raw_conversation: list[dict[str, str]] | None = None,
     live_trace_sink: TraceEventSink | None = None,
+    enable_r_route_dry_run: bool = False,
+    r_route_dry_run_force_budget_exhausted: bool = False,
 ) -> dict[str, object]:
     """한 턴의 구조 흐름을 trace/data로 실행한다.
 
@@ -1020,6 +1023,16 @@ def run_dry_turn(
         source_data_ids=[graph_snapshot.snapshot_id, graph_guide.packet_id],
         semantic_hint_status=graph_guide.recommended_traversal_hints_status,
     )
+    r_loop_dry_run_result = None
+    if enable_r_route_dry_run:
+        r_loop_dry_run_result = run_r_loop_dry_run_skeleton(
+            trace_store=trace_store,
+            data_store=data_store,
+            turn_id=turn_id,
+            handoff_packet=r_loop_memory_handoff_frame,
+            input_ref=[r_loop_memory_handoff_trace_id],
+            force_budget_exhausted=r_route_dry_run_force_budget_exhausted,
+        )
 
     result = {
         "turn_id": turn_id,
@@ -1135,6 +1148,47 @@ def run_dry_turn(
         "r_loop_memory_handoff_info_class": r_loop_memory_handoff_frame.info_class,
         "r_loop_memory_handoff_semantic_judgement_status": (
             r_loop_memory_handoff_frame.semantic_judgement_status
+        ),
+        "r_route_dry_run_enabled": enable_r_route_dry_run,
+        "r_route_dry_run_status": (
+            r_loop_dry_run_result.return_summary.r_loop_task_status
+            if r_loop_dry_run_result is not None
+            else "not_run"
+        ),
+        "r_route_dry_run_continuation_status": (
+            r_loop_dry_run_result.continuation.continuation_status
+            if r_loop_dry_run_result is not None
+            else "not_run"
+        ),
+        "r_route_dry_run_next_target_node": (
+            r_loop_dry_run_result.continuation.next_target_node
+            if r_loop_dry_run_result is not None
+            else "not_run"
+        ),
+        "r_route_dry_run_output_data_ids": (
+            r_loop_dry_run_result.output_data_ids
+            if r_loop_dry_run_result is not None
+            else []
+        ),
+        "r_route_dry_run_trace_event_ids": (
+            r_loop_dry_run_result.trace_event_ids
+            if r_loop_dry_run_result is not None
+            else []
+        ),
+        "r_route_dry_run_selected_entry_node_ids": (
+            r_loop_dry_run_result.return_summary.selected_entry_node_ids
+            if r_loop_dry_run_result is not None
+            else []
+        ),
+        "r_route_dry_run_inspected_graph_node_ids": (
+            r_loop_dry_run_result.return_summary.inspected_graph_node_ids
+            if r_loop_dry_run_result is not None
+            else []
+        ),
+        "r_route_dry_run_budget_status": (
+            r_loop_dry_run_result.return_summary.budget_status
+            if r_loop_dry_run_result is not None
+            else "not_run"
         ),
         "llm_call_count": _count_records_by_type(data_store, "llm_call"),
         "tool_choice_count": _count_records_by_type(data_store, "tool_choice"),

@@ -1,12 +1,16 @@
-# ORDER_144_R_ROUTE_DRY_RUN_ONLY_V0_CANDIDATE
+# ORDER_144_R_ROUTE_DRY_RUN_ONLY_V0
 
-## Candidate Status
+## Status
 
-이 문서는 후보 발주서다.
+구현 완료.
 
-ORDER_139~143 완료 전 구현하지 않는다.
+ORDER_139~143 결과 위에서 구현한다.
 
 이 발주는 Qwen live R route가 아니다.
+
+실행 기록:
+
+- `Administrative_Reform_1/05_Execution_Records/order_144_r_route_dry_run_only_2026_06_30_001.md`
 
 ## 1. 목표
 
@@ -79,11 +83,9 @@ semantic_judgement_status
 5. qwen-turn/qwen-chat 기본 route에는 R이 열리지 않는다.
 6. terminal runtime은 dry-run R 상태를 code/fake로 표시한다.
 
-## 7. 완료 조건 후보
+## 7. 완료 조건
 
-아직 구현 금지.
-
-승격 시:
+구현 후 다음을 통과해야 한다.
 
 ```powershell
 python -m compileall songryeon_core main.py
@@ -91,4 +93,3 @@ python -m pytest
 python main.py smoke-test
 git diff --check
 ```
-
