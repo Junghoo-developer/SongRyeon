@@ -2,9 +2,11 @@
 
 ## Candidate Status
 
-이 문서는 후보 발주서다.
+이 문서는 후보 발주서로 작성되었고, 2026-06-30 사용자 승인 후 adapter boundary 구현으로 승격되었다.
 
-ORDER_139의 in-memory/DataStore 기반 graph memory foundation이 안정되기 전에는 구현하지 않는다.
+구현 기록:
+
+- `Administrative_Reform_1/05_Execution_Records/order_142_external_graph_db_adapter_boundary_2026_06_30_001.md`
 
 외부 DB를 바로 붙이는 발주가 아니다.
 
@@ -98,4 +100,3 @@ python -m pytest
 python main.py smoke-test
 git diff --check
 ```
-
