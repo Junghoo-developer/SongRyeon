@@ -17,6 +17,7 @@ from songryeon_core.core.schemas import (
     Node3L3DocumentSummaryMaterial,
     Node3MaterialDeliveryPolicyFrame,
     Node3MemorySelectionMaterial,
+    Node3RLoopResultMaterial,
     Node3SourceCodeOutline,
     Node3SourceCodeSymbol,
     Node3SelectedRecentMemoryContext,
@@ -510,6 +511,7 @@ def record_node3_input_brief(
         runtime_movements or [],
         assigned_model_by_node or {},
     )
+    r_loop_result_material = _node3_r_loop_result_material(data_store)
     # 학습 메모: node_3 brief는 claim의 의미 등급을 다시 판단하지 않는다.
     # node_2 boundary가 붙인 relative/mixed 라벨을 사용자 답변 재료까지 그대로 운반한다.
     allowed_claims = [
@@ -659,6 +661,7 @@ def record_node3_input_brief(
             material_policy_frame.semantic_judgement_status
         ),
         runtime_tasks=runtime_tasks,
+        r_loop_result_material=r_loop_result_material,
         l_loop_return_summary_frame_id=l_loop_return_summary_frame_id,
         l_loop_task_status=_text(l_loop_return_summary, "l_loop_task_status", fallback="not_recorded"),
         l_loop_failure_level=_text(l_loop_return_summary, "failure_level", fallback="none"),
@@ -741,6 +744,8 @@ def record_node3_input_brief(
             "answer_basis_mode=absolute_first이면 코드/문서/trace/data로 확인 가능한 사실을 우선하고 추측을 줄인다.",
             "answer_basis_mode=relative_allowed이면 해석/조언/비판/구상이 가능하되 절대정보처럼 단정하지 않는다.",
             "answer_basis_mode=mixed_or_uncertain이면 출처 묶음, 부분 근거, 불확실성을 드러내고 부족한 근거를 지어내지 않는다.",
+            "R route 실험 결과가 있으면 graph memory skeleton 실행 상태로만 말하고, 완전한 장기기억 탐색 성공처럼 말하지 않는다.",
+            "R loop result material은 R return summary 장부에서 복사된 절대 상태이며, R1/R2/R3 의미 판단이 실행됐다는 뜻이 아니다.",
         ],
         insufficiency_reasons=insufficiency_reasons,
         source_trace_ids=_unique_strings([*input_trace_ids, *runtime_trace_ids]),
@@ -765,6 +770,9 @@ def record_node3_input_brief(
                     for summary in l3_document_summaries
                     if summary.source_data_id
                 ],
+                r_loop_result_material.source_data_id
+                if r_loop_result_material is not None
+                else None,
                 *runtime_data_ids,
             ]
         ),
@@ -887,6 +895,68 @@ def _node3_material_delivery_policy_values(
         l3_document_summary_count,
         supplied_document_context_count,
     )
+
+
+def _node3_r_loop_result_material(
+    data_store: DataStore,
+) -> Node3RLoopResultMaterial | None:
+    data_id, payload = _latest_r_loop_return_summary(data_store)
+    if not data_id:
+        return None
+    return Node3RLoopResultMaterial(
+        source_data_id=data_id,
+        r_loop_task_status=_text(payload, "r_loop_task_status", fallback="not_run"),
+        continuation_status=_text(payload, "continuation_status", fallback="not_run"),
+        budget_status=_text(payload, "budget_status", fallback="not_run"),
+        final_information_granularity=_text(
+            payload,
+            "final_information_granularity",
+            fallback="unknown",
+        ),
+        summary_depth_used=_int(payload, "summary_depth_used"),
+        selected_entry_node_count=len(
+            _string_list(payload.get("selected_entry_node_ids"))
+        ),
+        inspected_graph_node_count=len(
+            _string_list(payload.get("inspected_graph_node_ids"))
+        ),
+        source_graph_node_count=len(_string_list(payload.get("source_graph_node_ids"))),
+        generated_by=_text(payload, "generated_by", fallback="unknown"),
+        info_class=_text(payload, "info_class", fallback="absolute"),
+        semantic_judgement_status=_text(
+            payload,
+            "semantic_judgement_status",
+            fallback="not_run",
+        ),
+        attitude_hint=_r_loop_result_attitude_hint(payload),
+    )
+
+
+def _latest_r_loop_return_summary(data_store: DataStore) -> tuple[str | None, dict[str, object]]:
+    for record in reversed(data_store.list_records()):
+        if record.data_type != "node_output:R_loop_return_summary_frame":
+            continue
+        if not isinstance(record.payload, dict):
+            continue
+        return record.data_id, record.payload
+    return None, {}
+
+
+def _r_loop_result_attitude_hint(payload: dict[str, object]) -> str:
+    if not payload:
+        return "not_recorded"
+    task_status = _text(payload, "r_loop_task_status", fallback="not_run")
+    continuation_status = _text(payload, "continuation_status", fallback="not_run")
+    budget_status = _text(payload, "budget_status", fallback="not_run")
+    if task_status == "sufficient":
+        return "r_loop_sufficient"
+    if task_status == "failed":
+        return "r_loop_failed"
+    if budget_status == "exhausted" or continuation_status == "stop_budget_exhausted":
+        return "r_loop_budget_exhausted"
+    if task_status == "partial":
+        return "r_loop_partial_or_skeleton_only"
+    return "not_recorded"
 
 
 def node3_brief_llm_payload(frame: Node3InputBriefFrame) -> dict[str, object]:
@@ -1122,6 +1192,9 @@ def node3_brief_llm_payload(frame: Node3InputBriefFrame) -> dict[str, object]:
             "remaining_read_doc_calls": frame.remaining_read_doc_calls,
             "attitude_hint": frame.l_loop_result_attitude_hint,
         },
+        "r_loop_result": _node3_r_loop_result_llm_payload(
+            frame.r_loop_result_material
+        ),
         "runtime_task_sequence_note": (
             "This sequence is captured before node_3 report generation. "
             "Later node_3 reporting and node_4 gatekeeping tasks may appear in the final runtime ledger."
@@ -1149,6 +1222,36 @@ def node3_brief_llm_payload(frame: Node3InputBriefFrame) -> dict[str, object]:
         ],
         "reporting_rules": list(frame.reporting_rules),
         "insufficiency_reasons": list(frame.insufficiency_reasons),
+    }
+
+
+def _node3_r_loop_result_llm_payload(
+    material: Node3RLoopResultMaterial | None,
+) -> dict[str, object]:
+    if material is None:
+        return {
+            "status": "not_recorded",
+            "boundary": "No R route result material was supplied to node_3.",
+        }
+    return {
+        "status": "present",
+        "task_status": material.r_loop_task_status,
+        "continuation_status": material.continuation_status,
+        "budget_status": material.budget_status,
+        "final_information_granularity": material.final_information_granularity,
+        "summary_depth_used": material.summary_depth_used,
+        "selected_entry_node_count": material.selected_entry_node_count,
+        "inspected_graph_node_count": material.inspected_graph_node_count,
+        "source_graph_node_count": material.source_graph_node_count,
+        "generated_by": material.generated_by,
+        "info_class": material.info_class,
+        "semantic_judgement_status": material.semantic_judgement_status,
+        "attitude_hint": material.attitude_hint,
+        "boundary": (
+            "This is a code-copied R return summary ledger. "
+            "It reports that an experimental R skeleton ran; it does not prove that "
+            "R graph traversal fully answered the user goal."
+        ),
     }
 
 

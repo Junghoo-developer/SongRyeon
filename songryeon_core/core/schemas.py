@@ -2110,6 +2110,25 @@ class Node3BriefRuntimeTask:
 
 
 @dataclass
+class Node3RLoopResultMaterial:
+    """node_3가 R route experimental 결과를 과장 없이 볼 수 있게 하는 장부."""
+
+    source_data_id: str
+    r_loop_task_status: str
+    continuation_status: str
+    budget_status: str
+    final_information_granularity: str
+    summary_depth_used: int
+    selected_entry_node_count: int
+    inspected_graph_node_count: int
+    source_graph_node_count: int
+    generated_by: str
+    info_class: str
+    semantic_judgement_status: str
+    attitude_hint: str = "r_loop_partial_or_skeleton_only"
+
+
+@dataclass
 class Node3SourceCodeSymbol:
     """read_code_file 원문에서 code가 문법적으로 확인한 top-level symbol."""
 
@@ -2205,6 +2224,7 @@ class Node3InputBriefFrame:
     material_policy_info_class: str = "absolute_policy_decision"
     material_policy_semantic_judgement_status: str = "not_run"
     runtime_tasks: list[Node3BriefRuntimeTask] = field(default_factory=list)
+    r_loop_result_material: Node3RLoopResultMaterial | None = None
     l_loop_return_summary_frame_id: str | None = None
     l_loop_task_status: str = "not_recorded"
     l_loop_failure_level: str = "none"
@@ -2367,6 +2387,12 @@ def validate_node3_input_brief_frame(frame: Node3InputBriefFrame) -> None:
     _validate_node3_material_delivery_fields(frame)
     for runtime_task in frame.runtime_tasks:
         _validate_node3_brief_runtime_task(runtime_task)
+    if frame.r_loop_result_material is not None:
+        _validate_node3_r_loop_result_material(frame.r_loop_result_material)
+        if frame.r_loop_result_material.source_data_id not in frame.source_data_ids:
+            raise ValueError(
+                "Node3InputBriefFrame.source_data_ids must include R loop result source_data_id"
+            )
     _validate_node3_l_loop_result_fields(frame)
     _validate_node3_answer_basis_fields(frame)
     for rule in frame.reporting_rules:
@@ -2513,6 +2539,66 @@ def _validate_node3_l_loop_result_fields(frame: Node3InputBriefFrame) -> None:
             "unknown Node3InputBriefFrame.l_loop_result_attitude_hint: "
             f"{frame.l_loop_result_attitude_hint}"
         )
+
+
+def _validate_node3_r_loop_result_material(material: Node3RLoopResultMaterial) -> None:
+    for field_name, value in {
+        "source_data_id": material.source_data_id,
+        "r_loop_task_status": material.r_loop_task_status,
+        "continuation_status": material.continuation_status,
+        "budget_status": material.budget_status,
+        "final_information_granularity": material.final_information_granularity,
+        "generated_by": material.generated_by,
+        "info_class": material.info_class,
+        "semantic_judgement_status": material.semantic_judgement_status,
+        "attitude_hint": material.attitude_hint,
+    }.items():
+        if not value:
+            raise ValueError(f"Node3RLoopResultMaterial.{field_name} must not be empty")
+    if material.r_loop_task_status not in {"not_run", "sufficient", "partial", "failed"}:
+        raise ValueError(
+            f"unknown Node3RLoopResultMaterial.r_loop_task_status: {material.r_loop_task_status}"
+        )
+    if material.continuation_status not in {
+        "stop_sufficient",
+        "continue_deeper",
+        "continue_switch_branch",
+        "stop_budget_exhausted",
+        "stop_no_actionable_path",
+        "stop_failed_final",
+        "not_run",
+    }:
+        raise ValueError(
+            f"unknown Node3RLoopResultMaterial.continuation_status: {material.continuation_status}"
+        )
+    if material.budget_status not in {"within_budget", "exhausted", "not_run"}:
+        raise ValueError(
+            f"unknown Node3RLoopResultMaterial.budget_status: {material.budget_status}"
+        )
+    if material.info_class != "absolute":
+        raise ValueError("Node3RLoopResultMaterial.info_class must be absolute")
+    if material.semantic_judgement_status != "not_run":
+        raise ValueError("Node3RLoopResultMaterial.semantic_judgement_status must be not_run")
+    if material.attitude_hint not in {
+        "not_recorded",
+        "r_loop_sufficient",
+        "r_loop_partial_or_skeleton_only",
+        "r_loop_budget_exhausted",
+        "r_loop_failed",
+    }:
+        raise ValueError(
+            f"unknown Node3RLoopResultMaterial.attitude_hint: {material.attitude_hint}"
+        )
+    for field_name, value in {
+        "summary_depth_used": material.summary_depth_used,
+        "selected_entry_node_count": material.selected_entry_node_count,
+        "inspected_graph_node_count": material.inspected_graph_node_count,
+        "source_graph_node_count": material.source_graph_node_count,
+    }.items():
+        if not isinstance(value, int):
+            raise TypeError(f"Node3RLoopResultMaterial.{field_name} must be an integer")
+        if value < 0:
+            raise ValueError(f"Node3RLoopResultMaterial.{field_name} must not be negative")
 
 
 def _validate_node3_l3_document_summary_material(

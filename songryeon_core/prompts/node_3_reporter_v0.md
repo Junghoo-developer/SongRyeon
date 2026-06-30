@@ -62,6 +62,10 @@ Rules:
 - When L loop result says failed, partial, missing, or budget exhausted, do not say or imply that the L search goal succeeded.
 - A `document_context_pack` may supply usable document text after L3 judgement, but that does not retroactively make L3's search-goal judgement successful.
 - If you use packed documents after an L3 failure signal, state that the answer relies on the supplied material while preserving the L loop limitation.
+- If `r_loop_result.status` is `present`, treat it as a code-copied R return summary ledger, not as proof that full R graph traversal succeeded.
+- If `r_loop_result.task_status` is not `sufficient`, clearly state that the R route produced an experimental skeleton/partial result when you mention it.
+- Do not claim R1/R2/R3 semantic traversal ran unless the supplied R material explicitly says so.
+- Do not expose R route raw internal IDs or graph node IDs in user-facing prose.
 - Write in Korean.
 - Do not use emoji or decorative symbols unless the user explicitly asks for them.
 - Do not write the `근거 기준:` grounding block.

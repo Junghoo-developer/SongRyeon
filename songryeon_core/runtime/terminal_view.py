@@ -1346,6 +1346,15 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
                 f"remaining_query={node3_brief.get('remaining_query_attempts', 0)} / "
                 f"hint={l_loop_attitude_hint}"
             )
+        r_loop_material = node3_brief.get("r_loop_result_material")
+        if isinstance(r_loop_material, dict):
+            lines.append(
+                "  - R loop result in brief: "
+                f"task={r_loop_material.get('r_loop_task_status', 'unknown')} / "
+                f"continuation={r_loop_material.get('continuation_status', 'unknown')} / "
+                f"budget={r_loop_material.get('budget_status', 'unknown')} / "
+                f"hint={r_loop_material.get('attitude_hint', 'unknown')}"
+            )
         answer_basis_mode = node3_brief.get("answer_basis_mode")
         if isinstance(answer_basis_mode, str) and answer_basis_mode:
             lines.append(

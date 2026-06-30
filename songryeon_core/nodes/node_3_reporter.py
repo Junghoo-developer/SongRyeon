@@ -158,6 +158,7 @@ def build_node3_grounding_block(brief_frame: Node3InputBriefFrame) -> str:
             f"- 검색 후보 문서(누적): {brief_frame.accumulated_search_candidate_count}개",
             f"- 현재 턴 실행 순서 자료: {len(brief_frame.runtime_tasks)}개",
             *_l_loop_grounding_lines(brief_frame),
+            *_r_loop_grounding_lines(brief_frame),
             f"- 답변 근거 자세: {_answer_basis_mode_label(brief_frame.answer_basis_mode)}",
             f"- 재료 전달 정책: {_material_delivery_mode_label(brief_frame.material_delivery_mode)}",
             f"- 답변 한계: {_grounding_limit_text(brief_frame)}",
@@ -275,6 +276,11 @@ def _grounding_limit_text(brief_frame: Node3InputBriefFrame) -> str:
         return "L 검색 목표가 예산 소진으로 닫힌 상태라, 공급된 문서가 있어도 검색 성공으로 단정하지 않는다."
     if brief_frame.l_loop_result_attitude_hint == "l_loop_partial_or_failed":
         return "L 검색 목표가 부분/실패 신호를 남겼으므로, 공급된 문서 범위와 한계를 분리해 말한다."
+    if (
+        brief_frame.r_loop_result_material is not None
+        and brief_frame.r_loop_result_material.attitude_hint != "r_loop_sufficient"
+    ):
+        return "R route 실험 결과는 skeleton/부분 장부이므로 graph memory 탐색 성공으로 단정하지 않는다."
     if brief_frame.insufficiency_reasons:
         return "자료 부족 신호가 있어 제공된 문서/허용 주장/현재 턴 실행 순서 자료 범위 안에서만 답한다."
     if brief_frame.answer_basis_mode == "absolute_first":
@@ -292,6 +298,19 @@ def _l_loop_grounding_lines(brief_frame: Node3InputBriefFrame) -> list[str]:
             "- L 검색 목표 상태: "
             f"{brief_frame.l_loop_task_status} / {brief_frame.l_loop_failure_level} "
             f"/ semantic={brief_frame.l3_semantic_goal_match_status}"
+        )
+    ]
+
+
+def _r_loop_grounding_lines(brief_frame: Node3InputBriefFrame) -> list[str]:
+    material = brief_frame.r_loop_result_material
+    if material is None:
+        return []
+    return [
+        (
+            "- R 탐색 실험 상태: "
+            f"{material.r_loop_task_status} / {material.continuation_status} "
+            f"/ budget={material.budget_status} / hint={material.attitude_hint}"
         )
     ]
 
