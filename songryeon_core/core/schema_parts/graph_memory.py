@@ -20,6 +20,8 @@ RLOOP_GRAPH_GUIDE_PACKET_FRAME_SCHEMA_NAME = "RLoopGraphGuidePacketFrame"
 RLOOP_GRAPH_GUIDE_PACKET_FRAME_SCHEMA_VERSION = "0.1"
 CORE_EGO_GUIDE_WORKER_HINT_FRAME_SCHEMA_NAME = "CoreEgoGuideWorkerHintFrame"
 CORE_EGO_GUIDE_WORKER_HINT_FRAME_SCHEMA_VERSION = "0.1"
+R_LOOP_MEMORY_HANDOFF_PACKET_FRAME_SCHEMA_NAME = "RLoopMemoryHandoffPacketFrame"
+R_LOOP_MEMORY_HANDOFF_PACKET_FRAME_SCHEMA_VERSION = "0.1"
 
 GRAPH_MEMORY_NODE_KINDS = {
     "raw_capsule",
@@ -46,6 +48,8 @@ CORE_EGO_GUIDE_WORKER_HINT_FAILURE_TYPES = {
 }
 CORE_EGO_GUIDE_WORKER_HINT_STATUSES = {"ran", "failed"}
 CORE_EGO_GUIDE_WORKER_PARSE_STATUSES = {"passed", "failed", "not_checked"}
+R_LOOP_MEMORY_HANDOFF_STATUSES = {"available", "missing"}
+R_LOOP_MEMORY_HANDOFF_SEMANTIC_HINT_STATUSES = {"not_run", "ran", "failed"}
 
 
 @dataclass
@@ -199,6 +203,33 @@ class CoreEgoGuideWorkerHintFrame:
     semantic_judgement_status: str = "failed"
     schema_name: str = CORE_EGO_GUIDE_WORKER_HINT_FRAME_SCHEMA_NAME
     schema_version: str = CORE_EGO_GUIDE_WORKER_HINT_FRAME_SCHEMA_VERSION
+
+
+@dataclass
+class RLoopMemoryHandoffPacketFrame:
+    """A node_0 handoff packet that copies graph guide coordinates for a future R loop."""
+
+    packet_id: str
+    target: str = "R_LOOP"
+    mode: str = "graph_guide_handoff"
+    packet_status: str = "missing"
+    graph_snapshot_id: str = ""
+    r_loop_graph_guide_packet_id: str = ""
+    available_entry_node_ids: list[str] = field(default_factory=list)
+    node_kind_counts: dict[str, int] = field(default_factory=dict)
+    data_kind_counts: dict[str, int] = field(default_factory=dict)
+    summary_depth_range: list[int] = field(default_factory=lambda: [0, 0])
+    source_leaf_count_range: list[int] = field(default_factory=lambda: [0, 0])
+    semantic_hint_status: str = "not_run"
+    semantic_hint_frame_id: str | None = None
+    source_graph_node_ids: list[str] = field(default_factory=list)
+    source_trace_ids: list[str] = field(default_factory=list)
+    source_data_ids: list[str] = field(default_factory=list)
+    generated_by: str = "CODE:node_0_memory_supplier"
+    info_class: str = "absolute"
+    semantic_judgement_status: str = "not_run"
+    schema_name: str = R_LOOP_MEMORY_HANDOFF_PACKET_FRAME_SCHEMA_NAME
+    schema_version: str = R_LOOP_MEMORY_HANDOFF_PACKET_FRAME_SCHEMA_VERSION
 
 
 def validate_graph_memory_node_frame(frame: GraphMemoryNodeFrame) -> None:
@@ -624,6 +655,107 @@ def validate_core_ego_guide_worker_hint_frame(frame: CoreEgoGuideWorkerHintFrame
         raise ValueError("failed CoreEgoGuideWorkerHintFrame must not include recommendations")
 
 
+def validate_r_loop_memory_handoff_packet_frame(frame: RLoopMemoryHandoffPacketFrame) -> None:
+    _require_text_fields(
+        "RLoopMemoryHandoffPacketFrame",
+        {
+            "packet_id": frame.packet_id,
+            "target": frame.target,
+            "mode": frame.mode,
+            "packet_status": frame.packet_status,
+            "semantic_hint_status": frame.semantic_hint_status,
+            "generated_by": frame.generated_by,
+            "info_class": frame.info_class,
+            "semantic_judgement_status": frame.semantic_judgement_status,
+            "schema_name": frame.schema_name,
+            "schema_version": frame.schema_version,
+        },
+    )
+    if frame.schema_name != R_LOOP_MEMORY_HANDOFF_PACKET_FRAME_SCHEMA_NAME:
+        raise ValueError(f"unknown RLoopMemoryHandoffPacketFrame schema_name: {frame.schema_name}")
+    if frame.schema_version != R_LOOP_MEMORY_HANDOFF_PACKET_FRAME_SCHEMA_VERSION:
+        raise ValueError(
+            f"unknown RLoopMemoryHandoffPacketFrame schema_version: {frame.schema_version}"
+        )
+    if frame.target != "R_LOOP":
+        raise ValueError("RLoopMemoryHandoffPacketFrame.target must be R_LOOP")
+    if frame.mode != "graph_guide_handoff":
+        raise ValueError("RLoopMemoryHandoffPacketFrame.mode must be graph_guide_handoff")
+    if frame.packet_status not in R_LOOP_MEMORY_HANDOFF_STATUSES:
+        raise ValueError(f"unknown RLoopMemoryHandoffPacketFrame.packet_status: {frame.packet_status}")
+    if frame.semantic_hint_status not in R_LOOP_MEMORY_HANDOFF_SEMANTIC_HINT_STATUSES:
+        raise ValueError(
+            f"unknown RLoopMemoryHandoffPacketFrame.semantic_hint_status: {frame.semantic_hint_status}"
+        )
+    if frame.generated_by != "CODE:node_0_memory_supplier":
+        raise ValueError("RLoopMemoryHandoffPacketFrame.generated_by must be node_0 code")
+    if frame.info_class != "absolute":
+        raise ValueError("RLoopMemoryHandoffPacketFrame.info_class must be absolute")
+    if frame.semantic_judgement_status != "not_run":
+        raise ValueError("RLoopMemoryHandoffPacketFrame.semantic_judgement_status must be not_run")
+
+    _validate_string_list(
+        "RLoopMemoryHandoffPacketFrame.available_entry_node_ids",
+        frame.available_entry_node_ids,
+    )
+    _validate_string_list(
+        "RLoopMemoryHandoffPacketFrame.source_graph_node_ids",
+        frame.source_graph_node_ids,
+    )
+    _validate_string_list("RLoopMemoryHandoffPacketFrame.source_trace_ids", frame.source_trace_ids)
+    _validate_string_list("RLoopMemoryHandoffPacketFrame.source_data_ids", frame.source_data_ids)
+    _validate_no_duplicates(
+        "RLoopMemoryHandoffPacketFrame.available_entry_node_ids",
+        frame.available_entry_node_ids,
+    )
+    _validate_no_duplicates(
+        "RLoopMemoryHandoffPacketFrame.source_graph_node_ids",
+        frame.source_graph_node_ids,
+    )
+    _validate_no_duplicates("RLoopMemoryHandoffPacketFrame.source_trace_ids", frame.source_trace_ids)
+    _validate_no_duplicates("RLoopMemoryHandoffPacketFrame.source_data_ids", frame.source_data_ids)
+    _validate_counts("RLoopMemoryHandoffPacketFrame.node_kind_counts", frame.node_kind_counts)
+    _validate_counts("RLoopMemoryHandoffPacketFrame.data_kind_counts", frame.data_kind_counts)
+    _validate_range("RLoopMemoryHandoffPacketFrame.summary_depth_range", frame.summary_depth_range)
+    _validate_range(
+        "RLoopMemoryHandoffPacketFrame.source_leaf_count_range",
+        frame.source_leaf_count_range,
+    )
+
+    if frame.packet_status == "available":
+        if not frame.graph_snapshot_id:
+            raise ValueError("available RLoopMemoryHandoffPacketFrame must include graph_snapshot_id")
+        if not frame.r_loop_graph_guide_packet_id:
+            raise ValueError(
+                "available RLoopMemoryHandoffPacketFrame must include r_loop_graph_guide_packet_id"
+            )
+        if not frame.available_entry_node_ids:
+            raise ValueError("available RLoopMemoryHandoffPacketFrame must include entry nodes")
+        if not frame.source_graph_node_ids:
+            raise ValueError("available RLoopMemoryHandoffPacketFrame must include source graph nodes")
+        if frame.graph_snapshot_id not in frame.source_data_ids:
+            raise ValueError(
+                "RLoopMemoryHandoffPacketFrame.source_data_ids must include graph_snapshot_id"
+            )
+        if frame.r_loop_graph_guide_packet_id not in frame.source_data_ids:
+            raise ValueError(
+                "RLoopMemoryHandoffPacketFrame.source_data_ids must include guide packet id"
+            )
+    else:
+        if frame.graph_snapshot_id or frame.r_loop_graph_guide_packet_id:
+            raise ValueError("missing RLoopMemoryHandoffPacketFrame must not cite graph guide IDs")
+        if frame.available_entry_node_ids or frame.source_graph_node_ids:
+            raise ValueError("missing RLoopMemoryHandoffPacketFrame must not include graph nodes")
+
+    if frame.semantic_hint_status in {"ran", "failed"}:
+        if not frame.semantic_hint_frame_id:
+            raise ValueError("semantic hint status ran/failed requires semantic_hint_frame_id")
+        if frame.semantic_hint_frame_id not in frame.source_data_ids:
+            raise ValueError(
+                "RLoopMemoryHandoffPacketFrame.source_data_ids must include semantic_hint_frame_id"
+            )
+
+
 def _require_text_fields(frame_name: str, fields: dict[str, str | None]) -> None:
     for field_name, value in fields.items():
         if not value:
@@ -673,16 +805,22 @@ __all__ = [
     "RLOOP_GRAPH_GUIDE_PACKET_FRAME_SCHEMA_NAME",
     "RLOOP_GRAPH_GUIDE_PACKET_FRAME_SCHEMA_VERSION",
     "RLOOP_GUIDE_CODE_GENERATOR",
+    "R_LOOP_MEMORY_HANDOFF_PACKET_FRAME_SCHEMA_NAME",
+    "R_LOOP_MEMORY_HANDOFF_PACKET_FRAME_SCHEMA_VERSION",
+    "R_LOOP_MEMORY_HANDOFF_SEMANTIC_HINT_STATUSES",
+    "R_LOOP_MEMORY_HANDOFF_STATUSES",
     "CoreEgoGuideWorkerHintFrame",
     "CoreEgoTimeAxisFrame",
     "GraphMemoryEdgeFrame",
     "GraphMemoryNodeFrame",
     "GraphMemorySnapshotFrame",
+    "RLoopMemoryHandoffPacketFrame",
     "RLoopGraphGuidePacketFrame",
     "validate_core_ego_guide_worker_hint_frame",
     "validate_core_ego_time_axis_frame",
     "validate_graph_memory_edge_frame",
     "validate_graph_memory_node_frame",
     "validate_graph_memory_snapshot_frame",
+    "validate_r_loop_memory_handoff_packet_frame",
     "validate_rloop_graph_guide_packet_frame",
 ]

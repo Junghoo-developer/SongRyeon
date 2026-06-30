@@ -12,10 +12,13 @@ from songryeon_core.core.schemas import (
     Node0DocumentMaterialItem,
     Node0DocumentMaterialPacketFrame,
     RawMemoryCompressionCandidateFrame,
+    RLoopGraphGuidePacketFrame,
+    RLoopMemoryHandoffPacketFrame,
     ZeroState,
     validate_l_loop_return_summary_frame,
     validate_memory_packet_payload,
     validate_node0_document_material_packet_frame,
+    validate_r_loop_memory_handoff_packet_frame,
 )
 from songryeon_core.core.trace_store import TraceStore
 from songryeon_core.loops.l_loop_namespace import LRunIds
@@ -39,6 +42,7 @@ RAW_MEMORY_COMPRESSION_BATCH_SIZE = 4
 L3_CONTINUATION_SUMMARY_MODE = "l3_continuation_summary_for_L2"
 L_LOOP_RETURN_SUMMARY_FRAME_DATA_ID = "L:return_summary_frame"
 NODE0_DOCUMENT_MATERIAL_PACKET_FRAME_DATA_ID = "node_0:document_material_packet_frame"
+NODE0_R_LOOP_MEMORY_HANDOFF_PACKET_FRAME_DATA_ID = "node_0:r_loop_memory_handoff_packet_frame"
 
 NODE_0_MODES = {
     "pre_route_report",
@@ -64,6 +68,12 @@ def document_material_packet_frame_data_id(*, id_namespace: LRunIds | None) -> s
     if id_namespace is None:
         return NODE0_DOCUMENT_MATERIAL_PACKET_FRAME_DATA_ID
     return id_namespace.scoped_data_id(NODE0_DOCUMENT_MATERIAL_PACKET_FRAME_DATA_ID)
+
+
+def r_loop_memory_handoff_packet_frame_data_id() -> str:
+    """R loop graph guide handoff frame ID를 만든다."""
+
+    return NODE0_R_LOOP_MEMORY_HANDOFF_PACKET_FRAME_DATA_ID
 
 
 def supply_memory(
@@ -446,6 +456,103 @@ def record_memory_packet(
             payload=asdict(payload),
         )
     return event.event_id
+
+
+def build_r_loop_memory_handoff_packet_frame(
+    *,
+    guide_packet: RLoopGraphGuidePacketFrame | None,
+    source_trace_ids: list[str] | None = None,
+    source_data_ids: list[str] | None = None,
+    semantic_hint_status: str = "not_run",
+    semantic_hint_frame_id: str | None = None,
+) -> RLoopMemoryHandoffPacketFrame:
+    """R loop이 나중에 읽을 graph guide 좌표를 node_0 absolute packet으로 복사한다."""
+
+    packet_id = r_loop_memory_handoff_packet_frame_data_id()
+    if guide_packet is None:
+        frame = RLoopMemoryHandoffPacketFrame(
+            packet_id=packet_id,
+            packet_status="missing",
+            semantic_hint_status="not_run",
+            source_trace_ids=_unique_strings(source_trace_ids or []),
+            source_data_ids=_unique_strings(source_data_ids or []),
+        )
+        validate_r_loop_memory_handoff_packet_frame(frame)
+        return frame
+
+    copied_source_data_ids = _unique_strings(
+        [
+            guide_packet.packet_id,
+            guide_packet.graph_snapshot_id,
+            *(source_data_ids or []),
+            *guide_packet.source_data_ids,
+            semantic_hint_frame_id,
+        ]
+    )
+    frame = RLoopMemoryHandoffPacketFrame(
+        packet_id=packet_id,
+        target="R_LOOP",
+        mode="graph_guide_handoff",
+        packet_status="available",
+        graph_snapshot_id=guide_packet.graph_snapshot_id,
+        r_loop_graph_guide_packet_id=guide_packet.packet_id,
+        available_entry_node_ids=list(guide_packet.available_entry_nodes),
+        node_kind_counts=dict(guide_packet.node_kind_counts),
+        data_kind_counts=dict(guide_packet.data_kind_counts),
+        summary_depth_range=list(guide_packet.summary_depth_range),
+        source_leaf_count_range=list(guide_packet.source_leaf_count_range),
+        semantic_hint_status=semantic_hint_status,
+        semantic_hint_frame_id=semantic_hint_frame_id,
+        source_graph_node_ids=list(guide_packet.source_graph_node_ids),
+        source_trace_ids=_unique_strings(
+            [*(source_trace_ids or []), *guide_packet.source_trace_ids]
+        ),
+        source_data_ids=copied_source_data_ids,
+        generated_by="CODE:node_0_memory_supplier",
+        info_class="absolute",
+        semantic_judgement_status="not_run",
+    )
+    validate_r_loop_memory_handoff_packet_frame(frame)
+    return frame
+
+
+def record_r_loop_memory_handoff_packet(
+    *,
+    trace_store: TraceStore,
+    data_store: DataStore,
+    turn_id: str,
+    guide_packet: RLoopGraphGuidePacketFrame | None,
+    input_ref: list[str] | None = None,
+    source_data_ids: list[str] | None = None,
+    semantic_hint_status: str = "not_run",
+    semantic_hint_frame_id: str | None = None,
+) -> tuple[str, str, RLoopMemoryHandoffPacketFrame]:
+    """0이 R_LOOP에게 graph guide 좌표를 공급했다는 사실을 trace/data에 남긴다."""
+
+    frame = build_r_loop_memory_handoff_packet_frame(
+        guide_packet=guide_packet,
+        source_trace_ids=input_ref or [],
+        source_data_ids=source_data_ids or [],
+        semantic_hint_status=semantic_hint_status,
+        semantic_hint_frame_id=semantic_hint_frame_id,
+    )
+    event = trace_store.create_event(
+        turn_id=turn_id,
+        actor="node_0",
+        event_type="memory_packet",
+        input_ref=input_ref or frame.source_trace_ids,
+        output_ref=[frame.packet_id],
+        schema_status="passed",
+    )
+    data_store.create_record(
+        data_id=frame.packet_id,
+        data_type="node_output:r_loop_memory_handoff_packet_frame",
+        exists=True,
+        created_at=event.timestamp,
+        source_trace_id=event.event_id,
+        payload=asdict(frame),
+    )
+    return event.event_id, frame.packet_id, frame
 
 
 def record_l3_continuation_summary_for_l2(

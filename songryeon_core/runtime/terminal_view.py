@@ -221,6 +221,42 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
                 )
             )
 
+    r_loop_handoffs = _payloads_with_type(
+        result,
+        "node_output:r_loop_memory_handoff_packet_frame",
+    )
+    if r_loop_handoffs:
+        lines.append("- R loop memory handoff:")
+        for packet in r_loop_handoffs:
+            packet_id = str(packet.get("packet_id") or "unknown")
+            depth_range = packet.get("summary_depth_range")
+            if isinstance(depth_range, list) and len(depth_range) == 2:
+                depth_display = f"{depth_range[0]}..{depth_range[1]}"
+            else:
+                depth_display = "unknown"
+            lines.append(
+                "  - "
+                f"status={packet.get('packet_status', 'unknown')} / "
+                f"target={packet.get('target', 'unknown')} / "
+                f"mode={packet.get('mode', 'unknown')} / "
+                f"entry_nodes={_list_count(packet.get('available_entry_node_ids'))} / "
+                f"summary_depth_range={depth_display} / "
+                f"semantic_hint_status={packet.get('semantic_hint_status', 'unknown')}"
+            )
+            lines.extend(
+                _metainfo_lines(
+                    indent=4,
+                    generated_by=str(
+                        packet.get("generated_by") or "CODE:node_0_memory_supplier"
+                    ),
+                    info_class=str(packet.get("info_class") or "absolute"),
+                    source_data_ids=_source_data_ids(packet, fallback=[packet_id]),
+                    semantic_judgement_status=str(
+                        packet.get("semantic_judgement_status") or "not_run"
+                    ),
+                )
+            )
+
     relevance_selection_frames = _payloads_with_type(
         result,
         "node_output:memory_relevance_selection_frame",

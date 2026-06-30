@@ -359,6 +359,12 @@ def run_smoke_tests() -> dict[str, object]:
         "rloop_graph_guide_hints_status": graph_memory_guide_smoke["hints_status"],
         "rloop_graph_guide_semantic_status": graph_memory_guide_smoke["semantic_status"],
         "rloop_graph_guide_not_in_node1_or_node3": graph_memory_guide_smoke["not_in_node1_or_node3"],
+        "r_loop_memory_handoff_packet_id": graph_memory_guide_smoke["handoff_packet_id"],
+        "r_loop_memory_handoff_status": graph_memory_guide_smoke["handoff_status"],
+        "r_loop_memory_handoff_entry_count": graph_memory_guide_smoke["handoff_entry_count"],
+        "r_loop_memory_handoff_semantic_hint_status": graph_memory_guide_smoke[
+            "handoff_semantic_hint_status"
+        ],
         "qwen_chat_continuity_external_turn_id": qwen_chat_continuity_smoke["external_turn_id"],
         "qwen_chat_continuity_two_turn_alignment": qwen_chat_continuity_smoke["two_turn_alignment"],
         "qwen_chat_continuity_stateless_default": qwen_chat_continuity_smoke["stateless_default"],
@@ -400,17 +406,23 @@ def _check_graph_memory_guide(
 ) -> dict[str, object]:
     snapshot_id = result.get("graph_memory_snapshot_id")
     guide_id = result.get("rloop_graph_guide_packet_id")
+    handoff_id = result.get("r_loop_memory_handoff_packet_id")
     if not isinstance(snapshot_id, str) or not snapshot_id:
         raise AssertionError("graph memory snapshot id is missing")
     if not isinstance(guide_id, str) or not guide_id:
         raise AssertionError("RLoop graph guide packet id is missing")
+    if not isinstance(handoff_id, str) or not handoff_id:
+        raise AssertionError("R loop memory handoff packet id is missing")
 
     snapshot = records.get(snapshot_id)
     guide = records.get(guide_id)
+    handoff = records.get(handoff_id)
     if not isinstance(snapshot, dict):
         raise AssertionError("graph memory snapshot payload is missing")
     if not isinstance(guide, dict):
         raise AssertionError("RLoop graph guide payload is missing")
+    if not isinstance(handoff, dict):
+        raise AssertionError("R loop memory handoff payload is missing")
 
     node_kind_counts = guide.get("node_kind_counts")
     if not isinstance(node_kind_counts, dict):
@@ -436,6 +448,30 @@ def _check_graph_memory_guide(
     if not isinstance(entry_nodes, list) or "graph:axis:time" not in entry_nodes:
         raise AssertionError("RLoop graph guide must expose graph:axis:time as entry")
 
+    if handoff.get("packet_status") != "available":
+        raise AssertionError("R loop handoff must be available when guide exists")
+    if handoff.get("target") != "R_LOOP":
+        raise AssertionError("R loop handoff target must be R_LOOP")
+    if handoff.get("mode") != "graph_guide_handoff":
+        raise AssertionError("R loop handoff mode must be graph_guide_handoff")
+    if handoff.get("r_loop_graph_guide_packet_id") != guide_id:
+        raise AssertionError("R loop handoff must preserve guide packet id")
+    if handoff.get("graph_snapshot_id") != snapshot_id:
+        raise AssertionError("R loop handoff must preserve graph snapshot id")
+    if handoff.get("available_entry_node_ids") != entry_nodes:
+        raise AssertionError("R loop handoff must copy available entry nodes")
+    if handoff.get("generated_by") != "CODE:node_0_memory_supplier":
+        raise AssertionError("R loop handoff generated_by must be node_0 code")
+    if handoff.get("info_class") != "absolute":
+        raise AssertionError("R loop handoff info_class must be absolute")
+    if handoff.get("semantic_judgement_status") != "not_run":
+        raise AssertionError("R loop handoff semantic judgement must remain not_run")
+    handoff_source_data_ids = handoff.get("source_data_ids")
+    if not isinstance(handoff_source_data_ids, list):
+        raise AssertionError("R loop handoff source_data_ids missing")
+    if guide_id not in handoff_source_data_ids or snapshot_id not in handoff_source_data_ids:
+        raise AssertionError("R loop handoff must cite guide and snapshot data ids")
+
     for record in result.get("data_records", []):
         if not isinstance(record, dict):
             continue
@@ -450,15 +486,21 @@ def _check_graph_memory_guide(
         source_data_ids = payload.get("source_data_ids")
         if isinstance(source_data_ids, list) and guide_id in source_data_ids:
             raise AssertionError("RLoop graph guide was injected into node_1 or node_3")
+        if isinstance(source_data_ids, list) and handoff_id in source_data_ids:
+            raise AssertionError("R loop handoff was injected into node_1 or node_3")
 
     return {
         "snapshot_id": snapshot_id,
         "guide_packet_id": guide_id,
+        "handoff_packet_id": handoff_id,
         "raw_capsule_nodes": raw_capsule_nodes,
         "time_bundle_nodes": time_bundle_nodes,
         "entry_count": len(entry_nodes),
         "hints_status": guide.get("recommended_traversal_hints_status"),
         "semantic_status": guide.get("semantic_judgement_status"),
+        "handoff_status": handoff.get("packet_status"),
+        "handoff_entry_count": len(entry_nodes),
+        "handoff_semantic_hint_status": handoff.get("semantic_hint_status"),
         "not_in_node1_or_node3": True,
     }
 

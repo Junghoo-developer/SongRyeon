@@ -131,3 +131,4 @@
 - [order_140_r_loop_frame_state_machine_2026_06_30_001.md](order_140_r_loop_frame_state_machine_2026_06_30_001.md)
 - [order_141_core_ego_guide_worker_hints_2026_06_30_001.md](order_141_core_ego_guide_worker_hints_2026_06_30_001.md)
 - [order_142_external_graph_db_adapter_boundary_2026_06_30_001.md](order_142_external_graph_db_adapter_boundary_2026_06_30_001.md)
+- [order_143_r_loop_node0_memory_packet_handoff_2026_06_30_001.md](order_143_r_loop_node0_memory_packet_handoff_2026_06_30_001.md)

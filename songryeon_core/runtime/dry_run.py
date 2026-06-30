@@ -65,6 +65,7 @@ from songryeon_core.nodes.node_0_memory_supplier import (
     document_material_packet_frame_data_id,
     memory_packet_data_id,
     record_l_loop_return_summary_for_node1,
+    record_r_loop_memory_handoff_packet,
     record_memory_packet,
     supply_memory,
 )
@@ -1006,6 +1007,19 @@ def run_dry_turn(
     task_counts = task_ledger_counts(data_store)
     graph_snapshot = graph_memory_record.build.snapshot
     graph_guide = graph_memory_record.build.guide_packet
+    (
+        r_loop_memory_handoff_trace_id,
+        r_loop_memory_handoff_data_id,
+        r_loop_memory_handoff_frame,
+    ) = record_r_loop_memory_handoff_packet(
+        trace_store=trace_store,
+        data_store=data_store,
+        turn_id=turn_id,
+        guide_packet=graph_guide,
+        input_ref=[graph_memory_record.trace_event_id],
+        source_data_ids=[graph_snapshot.snapshot_id, graph_guide.packet_id],
+        semantic_hint_status=graph_guide.recommended_traversal_hints_status,
+    )
 
     result = {
         "turn_id": turn_id,
@@ -1097,6 +1111,31 @@ def run_dry_turn(
             graph_guide.semantic_judgement_status
         ),
         "rloop_graph_guide_hints_status": graph_guide.recommended_traversal_hints_status,
+        "r_loop_memory_handoff_trace_id": r_loop_memory_handoff_trace_id,
+        "r_loop_memory_handoff_packet_id": r_loop_memory_handoff_data_id,
+        "r_loop_memory_handoff_status": r_loop_memory_handoff_frame.packet_status,
+        "r_loop_memory_handoff_target": r_loop_memory_handoff_frame.target,
+        "r_loop_memory_handoff_mode": r_loop_memory_handoff_frame.mode,
+        "r_loop_memory_handoff_guide_packet_id": (
+            r_loop_memory_handoff_frame.r_loop_graph_guide_packet_id
+        ),
+        "r_loop_memory_handoff_entry_node_count": len(
+            r_loop_memory_handoff_frame.available_entry_node_ids
+        ),
+        "r_loop_memory_handoff_source_graph_node_count": len(
+            r_loop_memory_handoff_frame.source_graph_node_ids
+        ),
+        "r_loop_memory_handoff_summary_depth_range": (
+            r_loop_memory_handoff_frame.summary_depth_range
+        ),
+        "r_loop_memory_handoff_semantic_hint_status": (
+            r_loop_memory_handoff_frame.semantic_hint_status
+        ),
+        "r_loop_memory_handoff_generated_by": r_loop_memory_handoff_frame.generated_by,
+        "r_loop_memory_handoff_info_class": r_loop_memory_handoff_frame.info_class,
+        "r_loop_memory_handoff_semantic_judgement_status": (
+            r_loop_memory_handoff_frame.semantic_judgement_status
+        ),
         "llm_call_count": _count_records_by_type(data_store, "llm_call"),
         "tool_choice_count": _count_records_by_type(data_store, "tool_choice"),
         "tool_result_count": _count_records_with_type_prefix(data_store, "tool_result:"),
