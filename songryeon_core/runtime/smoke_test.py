@@ -212,6 +212,7 @@ def run_smoke_tests() -> dict[str, object]:
     if search_result["result_count"] < 1:
         raise AssertionError("search_docs returned no results")
     document_memory_smoke = _check_document_memory_index(records, search_result)
+    graph_memory_guide_smoke = _check_graph_memory_guide(result, records)
 
     return {
         "status": "SMOKE_TEST_OK",
@@ -350,6 +351,14 @@ def run_smoke_tests() -> dict[str, object]:
         "raw_memory_window_count_13_older_unmanaged": raw_memory_window_smoke["count_13_older_unmanaged"],
         "raw_memory_window_no_semantic_compression": raw_memory_window_smoke["no_semantic_compression"],
         "raw_memory_window_original_kept": raw_memory_window_smoke["original_kept"],
+        "graph_memory_snapshot_id": graph_memory_guide_smoke["snapshot_id"],
+        "graph_memory_raw_capsule_nodes": graph_memory_guide_smoke["raw_capsule_nodes"],
+        "graph_memory_time_bundle_nodes": graph_memory_guide_smoke["time_bundle_nodes"],
+        "rloop_graph_guide_packet_id": graph_memory_guide_smoke["guide_packet_id"],
+        "rloop_graph_guide_entry_count": graph_memory_guide_smoke["entry_count"],
+        "rloop_graph_guide_hints_status": graph_memory_guide_smoke["hints_status"],
+        "rloop_graph_guide_semantic_status": graph_memory_guide_smoke["semantic_status"],
+        "rloop_graph_guide_not_in_node1_or_node3": graph_memory_guide_smoke["not_in_node1_or_node3"],
         "qwen_chat_continuity_external_turn_id": qwen_chat_continuity_smoke["external_turn_id"],
         "qwen_chat_continuity_two_turn_alignment": qwen_chat_continuity_smoke["two_turn_alignment"],
         "qwen_chat_continuity_stateless_default": qwen_chat_continuity_smoke["stateless_default"],
@@ -382,6 +391,75 @@ def run_smoke_tests() -> dict[str, object]:
         "node1_recent_memory_router_visibility_context_seen": node1_recent_memory_router_visibility_smoke["context_seen"],
         "node1_recent_memory_router_visibility_source_ids": node1_recent_memory_router_visibility_smoke["source_ids"],
         "top_doc": search_result["results"][0]["doc_id"],
+    }
+
+
+def _check_graph_memory_guide(
+    result: dict[str, object],
+    records: dict[str, object],
+) -> dict[str, object]:
+    snapshot_id = result.get("graph_memory_snapshot_id")
+    guide_id = result.get("rloop_graph_guide_packet_id")
+    if not isinstance(snapshot_id, str) or not snapshot_id:
+        raise AssertionError("graph memory snapshot id is missing")
+    if not isinstance(guide_id, str) or not guide_id:
+        raise AssertionError("RLoop graph guide packet id is missing")
+
+    snapshot = records.get(snapshot_id)
+    guide = records.get(guide_id)
+    if not isinstance(snapshot, dict):
+        raise AssertionError("graph memory snapshot payload is missing")
+    if not isinstance(guide, dict):
+        raise AssertionError("RLoop graph guide payload is missing")
+
+    node_kind_counts = guide.get("node_kind_counts")
+    if not isinstance(node_kind_counts, dict):
+        raise AssertionError("RLoop graph guide node_kind_counts is missing")
+    raw_capsule_nodes = node_kind_counts.get("raw_capsule")
+    time_bundle_nodes = node_kind_counts.get("time_bundle")
+    if not isinstance(raw_capsule_nodes, int) or raw_capsule_nodes < 1:
+        raise AssertionError("RLoop graph guide has no raw capsule node")
+    if not isinstance(time_bundle_nodes, int) or time_bundle_nodes < 1:
+        raise AssertionError("RLoop graph guide has no time bundle node")
+    if guide.get("generated_by") != "CODE:GRAPH_MEMORY_GUIDE_BUILDER":
+        raise AssertionError("RLoop graph guide generated_by is not code builder")
+    if guide.get("info_class") != "absolute":
+        raise AssertionError("RLoop graph guide info_class is not absolute")
+    if guide.get("semantic_judgement_status") != "not_run":
+        raise AssertionError("RLoop graph guide semantic judgement must remain not_run")
+    if guide.get("recommended_traversal_hints_status") != "not_run":
+        raise AssertionError("RLoop graph guide LLM hints must remain not_run")
+    if guide.get("recommended_traversal_hints"):
+        raise AssertionError("RLoop graph guide must not include LLM traversal hints")
+
+    entry_nodes = guide.get("available_entry_nodes")
+    if not isinstance(entry_nodes, list) or "graph:axis:time" not in entry_nodes:
+        raise AssertionError("RLoop graph guide must expose graph:axis:time as entry")
+
+    for record in result.get("data_records", []):
+        if not isinstance(record, dict):
+            continue
+        if record.get("data_type") not in {
+            "node_output:routing_decision",
+            "node_output:report",
+        }:
+            continue
+        payload = record.get("payload")
+        if not isinstance(payload, dict):
+            continue
+        source_data_ids = payload.get("source_data_ids")
+        if isinstance(source_data_ids, list) and guide_id in source_data_ids:
+            raise AssertionError("RLoop graph guide was injected into node_1 or node_3")
+
+    return {
+        "snapshot_id": snapshot_id,
+        "guide_packet_id": guide_id,
+        "raw_capsule_nodes": raw_capsule_nodes,
+        "time_bundle_nodes": time_bundle_nodes,
+        "entry_count": len(entry_nodes),
+        "hints_status": guide.get("recommended_traversal_hints_status"),
+        "semantic_status": guide.get("semantic_judgement_status"),
+        "not_in_node1_or_node3": True,
     }
 
 

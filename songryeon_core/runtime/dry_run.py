@@ -3,6 +3,7 @@
 from dataclasses import asdict
 
 from songryeon_core.core.data_store import DataStore
+from songryeon_core.core.graph_memory import record_graph_memory_for_capsules
 from songryeon_core.core.schemas import (
     Node2InputFrame,
     TurnOutcomeFrame,
@@ -992,10 +993,19 @@ def run_dry_turn(
         final_response_trace_id=node4_gate_trace_id or report_trace_id,
     )
     add_capsule_to_zero_state(zero_state, capsule)
+    graph_memory_record = record_graph_memory_for_capsules(
+        trace_store=trace_store,
+        data_store=data_store,
+        turn_id=turn_id,
+        capsules=zero_state.previous_turn_capsules,
+        batch_id=turn_id,
+    )
 
     # prompt_registry는 지금 실제 실행에 쓰이지 않지만, 드라이런에 구성품이 있음을 확인한다.
     prompt_registry.get("node_0")
     task_counts = task_ledger_counts(data_store)
+    graph_snapshot = graph_memory_record.build.snapshot
+    graph_guide = graph_memory_record.build.guide_packet
 
     result = {
         "turn_id": turn_id,
@@ -1056,6 +1066,37 @@ def run_dry_turn(
         "missing_selected_memory_context_count": (
             selected_memory_context_frame.missing_selected_memory_context_count
         ),
+        "graph_memory_snapshot_id": graph_snapshot.snapshot_id,
+        "graph_memory_node_count": len(graph_snapshot.graph_node_ids),
+        "graph_memory_edge_count": len(graph_snapshot.graph_edge_ids),
+        "graph_memory_node_kind_counts": graph_snapshot.node_kind_counts,
+        "graph_memory_data_kind_counts": graph_snapshot.data_kind_counts,
+        "graph_memory_raw_capsule_node_count": graph_snapshot.node_kind_counts.get(
+            "raw_capsule",
+            0,
+        ),
+        "graph_memory_time_bundle_count": graph_snapshot.node_kind_counts.get(
+            "time_bundle",
+            0,
+        ),
+        "graph_memory_record_trace_id": graph_memory_record.trace_event_id,
+        "graph_memory_created_data_ids": graph_memory_record.created_data_ids,
+        "graph_memory_existing_data_ids": graph_memory_record.existing_data_ids,
+        "rloop_graph_guide_packet_id": graph_guide.packet_id,
+        "rloop_graph_guide_target_consumer": graph_guide.target_consumer,
+        "rloop_graph_guide_entry_node_count": len(graph_guide.available_entry_nodes),
+        "rloop_graph_guide_available_entry_nodes": graph_guide.available_entry_nodes,
+        "rloop_graph_guide_summary_depth_range": graph_guide.summary_depth_range,
+        "rloop_graph_guide_source_leaf_count_range": graph_guide.source_leaf_count_range,
+        "rloop_graph_guide_risky_or_unreviewed_node_count": len(
+            graph_guide.risky_or_unreviewed_node_ids
+        ),
+        "rloop_graph_guide_generated_by": graph_guide.generated_by,
+        "rloop_graph_guide_info_class": graph_guide.info_class,
+        "rloop_graph_guide_semantic_judgement_status": (
+            graph_guide.semantic_judgement_status
+        ),
+        "rloop_graph_guide_hints_status": graph_guide.recommended_traversal_hints_status,
         "llm_call_count": _count_records_by_type(data_store, "llm_call"),
         "tool_choice_count": _count_records_by_type(data_store, "tool_choice"),
         "tool_result_count": _count_records_with_type_prefix(data_store, "tool_result:"),

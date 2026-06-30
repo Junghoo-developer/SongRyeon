@@ -188,6 +188,39 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
                 )
             )
 
+    graph_guides = _payloads_with_type(result, "graph_memory:rloop_guide_packet")
+    if graph_guides:
+        lines.append("- graph memory guide:")
+        for guide in graph_guides:
+            guide_id = str(guide.get("packet_id") or "unknown")
+            lines.append(
+                "  - "
+                f"source={guide_id} / "
+                f"snapshot={guide.get('graph_snapshot_id', 'unknown')} / "
+                f"target={guide.get('target_consumer', 'unknown')} / "
+                f"entries={_list_count(guide.get('available_entry_nodes'))} / "
+                f"hints={guide.get('recommended_traversal_hints_status', 'unknown')}"
+            )
+            lines.append(
+                "    "
+                f"node_kinds={guide.get('node_kind_counts', {})} / "
+                f"summary_depth_range={guide.get('summary_depth_range', [])} / "
+                f"source_leaf_count_range={guide.get('source_leaf_count_range', [])}"
+            )
+            lines.extend(
+                _metainfo_lines(
+                    indent=4,
+                    generated_by=str(
+                        guide.get("generated_by") or "CODE:GRAPH_MEMORY_GUIDE_BUILDER"
+                    ),
+                    info_class=str(guide.get("info_class") or "absolute"),
+                    source_data_ids=_source_data_ids(guide, fallback=[guide_id]),
+                    semantic_judgement_status=str(
+                        guide.get("semantic_judgement_status") or "not_run"
+                    ),
+                )
+            )
+
     relevance_selection_frames = _payloads_with_type(
         result,
         "node_output:memory_relevance_selection_frame",
