@@ -128,6 +128,8 @@
 
 `ORDER_144`는 qwen/live route=R을 열지 않고 dry-run opt-in fixture에서만 R1/R2/R3/continuation/return summary frame 골격을 실행해 보는 발주서다.
 
+`ORDER_145`는 live route=R을 열기 전에 현재 R skeleton이 dry-run opt-in 상태로 닫혀 있음을 문서와 테스트 기준선으로 감사하는 발주서다.
+
 ## 임시 발주서
 
 - [TMP Auto Hunt Orders 2026-06-21](TMP_Auto_Hunt_2026_06_21/README.md): 지금까지의 철학 정리본을 바탕으로 만든 자동 사냥용 후보 발주서 묶음.
@@ -253,3 +255,4 @@
 - [ORDER 142: External Graph DB Adapter Boundary v0](ORDER_142_EXTERNAL_GRAPH_DB_ADAPTER_BOUNDARY_V0_CANDIDATE.md)
 - [ORDER 143: R Loop Node0 Memory Packet Handoff v0](ORDER_143_R_LOOP_NODE0_MEMORY_PACKET_HANDOFF_V0_CANDIDATE.md)
 - [ORDER 144: R Route Dry-Run Only v0](ORDER_144_R_ROUTE_DRY_RUN_ONLY_V0_CANDIDATE.md)
+- [ORDER 145: R Loop Pre-Live Route Audit Baseline v0](ORDER_145_R_LOOP_PRE_LIVE_ROUTE_AUDIT_BASELINE_V0.md)
