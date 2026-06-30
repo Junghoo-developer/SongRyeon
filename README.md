@@ -10,6 +10,17 @@ SongRyeon Core is a tiny agent runtime that forces an LLM to separate **what the
 
 The goal is simple: when an agent answers, it should not blur facts, guesses, summaries, tool results, and internal routing decisions into one confident-looking paragraph.
 
+## Feedback Wanted
+
+SongRyeon Core is still an early research/runtime prototype. I am especially looking for feedback on:
+
+- Is the **absolute / relative / mixed information** split useful for building more trustworthy agents?
+- Is SongRyeon better framed as an **agent runtime**, an **audit layer**, or a **research prototype**?
+- What should be simplified first so another developer can assemble a small trustworthy agent with it?
+- Does the Qwen-vs-SongRyeon comparison make the runtime value clear?
+
+Please open a [feedback issue](https://github.com/Junghoo-developer/SongRyeon/issues/new?template=feedback.md) with criticism, confusion, or comparisons to projects like LangGraph, LangSmith, Dify, OpenHands, or SWE-agent.
+
 ## The Difference
 
 A normal agent might say:

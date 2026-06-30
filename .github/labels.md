@@ -7,8 +7,10 @@ Use it as a quick reference when configuring the repository labels.
 
 - `type:bug`
 - `type:docs`
+- `type:feedback`
 - `type:mvp`
 - `type:refactor`
+- `type:research`
 - `type:test`
 
 ## Area
@@ -19,6 +21,8 @@ Use it as a quick reference when configuring the repository labels.
 - `area:node-3`
 - `area:node-4`
 - `area:docs`
+- `area:github`
+- `area:onboarding`
 
 ## Status
 
@@ -32,3 +36,10 @@ Use it as a quick reference when configuring the repository labels.
 - `priority:p1`
 - `priority:p2`
 - `priority:p3`
+
+## Community
+
+- `help wanted`
+- `good first issue`
+- `question`
+- `design`
