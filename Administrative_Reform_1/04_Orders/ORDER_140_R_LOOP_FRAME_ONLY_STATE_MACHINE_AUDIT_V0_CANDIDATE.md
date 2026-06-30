@@ -2,9 +2,13 @@
 
 ## Candidate Status
 
-이 문서는 후보 발주서다.
+이 문서는 후보 발주서로 작성되었고, 2026-06-30 사용자 승인 후 frame-only 구현으로 승격되었다.
 
-사용자의 별도 결재와 ORDER_139 완료 전에는 구현하지 않는다.
+구현 기록:
+
+- `Administrative_Reform_1/05_Execution_Records/order_140_r_loop_frame_state_machine_2026_06_30_001.md`
+
+초기 후보 상태의 금지선은 계속 유지한다.
 
 이 발주서는 R루프를 실제 route로 여는 작업이 아니다.
 
@@ -172,4 +176,3 @@ python -m pytest
 python main.py smoke-test
 git diff --check
 ```
-

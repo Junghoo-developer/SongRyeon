@@ -128,3 +128,4 @@
 - [order_139_graph_memory_foundation_order_draft_2026_06_30_001.md](order_139_graph_memory_foundation_order_draft_2026_06_30_001.md)
 - [order_139_graph_memory_foundation_2026_06_30_001.md](order_139_graph_memory_foundation_2026_06_30_001.md)
 - [order_140_144_candidate_order_batch_2026_06_30_001.md](order_140_144_candidate_order_batch_2026_06_30_001.md)
+- [order_140_r_loop_frame_state_machine_2026_06_30_001.md](order_140_r_loop_frame_state_machine_2026_06_30_001.md)
