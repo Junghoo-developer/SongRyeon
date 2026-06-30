@@ -2,7 +2,7 @@
 
 발주서는 개발 지도에서 내려온 실무 계획서다.
 
-현재 정식 발주서는 `ORDER_001`부터 `ORDER_138`까지 있다.
+현재 정식 발주서는 `ORDER_001`부터 `ORDER_142`까지 있다.
 
 `ORDER_066`부터 `ORDER_075`까지는 메타정보 관리법을 실제 런타임과 LLM 노드 배선에 적용하기 위한 복구 로드맵이다.
 
@@ -115,6 +115,14 @@
 `ORDER_137`은 `read_code_file`로 읽은 source-code 원문에서 code가 문법적 outline을 만들고, node_3가 공개 함수/상수 coverage를 빠뜨리지 않게 하는 발주서다.
 
 `ORDER_138`은 ORDER_133 이후 빠르게 들어온 code inspection 계열과 심야정부 MVP를 새 기능 추가 없이 통합 기준선으로 묶고, dirty worktree/문서-현실 불일치를 정리하는 발주서다.
+
+`ORDER_139`는 `TurnStateCapsule`을 graph memory raw node로 옮기고 CoreEgo time axis와 RLoopGraphGuidePacket을 code-generated absolute 정보로 만드는 발주서다.
+
+`ORDER_140`은 R route를 열기 전에 R1/R2/R3/budget/continuation/return summary frame과 state-machine helper만 감사하는 발주서다.
+
+`ORDER_141`은 code-generated RLoopGraphGuidePacket 위에 CoreEgo guide worker LLM traversal hint를 별도 mixed frame으로 기록하는 발주서다.
+
+`ORDER_142`는 외부 그래프 DB 연결 전에 `songryeon-neo4j-vessel` 이름과 graph memory store adapter boundary를 예약하는 발주서다.
 
 ## 임시 발주서
 
@@ -237,7 +245,7 @@
 - [ORDER 138: Integration Baseline And Dirty Worktree Reconciliation v0](ORDER_138_INTEGRATION_BASELINE_AND_DIRTY_WORKTREE_RECONCILIATION_V0.md)
 - [ORDER 139: Graph Memory Foundation And RLoop Guide Packet v0](ORDER_139_GRAPH_MEMORY_FOUNDATION_AND_RLOOP_GUIDE_PACKET_V0.md)
 - [ORDER 140: R Loop Frame-Only State Machine Audit v0](ORDER_140_R_LOOP_FRAME_ONLY_STATE_MACHINE_AUDIT_V0_CANDIDATE.md)
-- [ORDER 141 Candidate: CoreEgo Guide Worker LLM Hints v0](ORDER_141_CORE_EGO_GUIDE_WORKER_LLM_HINTS_V0_CANDIDATE.md)
+- [ORDER 141: CoreEgo Guide Worker LLM Hints v0](ORDER_141_CORE_EGO_GUIDE_WORKER_LLM_HINTS_V0_CANDIDATE.md)
 - [ORDER 142: External Graph DB Adapter Boundary v0](ORDER_142_EXTERNAL_GRAPH_DB_ADAPTER_BOUNDARY_V0_CANDIDATE.md)
 - [ORDER 143 Candidate: R Loop Node0 Memory Packet Handoff v0](ORDER_143_R_LOOP_NODE0_MEMORY_PACKET_HANDOFF_V0_CANDIDATE.md)
 - [ORDER 144 Candidate: R Route Dry-Run Only v0](ORDER_144_R_ROUTE_DRY_RUN_ONLY_V0_CANDIDATE.md)

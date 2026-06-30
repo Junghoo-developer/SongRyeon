@@ -129,4 +129,5 @@
 - [order_139_graph_memory_foundation_2026_06_30_001.md](order_139_graph_memory_foundation_2026_06_30_001.md)
 - [order_140_144_candidate_order_batch_2026_06_30_001.md](order_140_144_candidate_order_batch_2026_06_30_001.md)
 - [order_140_r_loop_frame_state_machine_2026_06_30_001.md](order_140_r_loop_frame_state_machine_2026_06_30_001.md)
+- [order_141_core_ego_guide_worker_hints_2026_06_30_001.md](order_141_core_ego_guide_worker_hints_2026_06_30_001.md)
 - [order_142_external_graph_db_adapter_boundary_2026_06_30_001.md](order_142_external_graph_db_adapter_boundary_2026_06_30_001.md)

@@ -18,6 +18,8 @@ CORE_EGO_TIME_AXIS_FRAME_SCHEMA_NAME = "CoreEgoTimeAxisFrame"
 CORE_EGO_TIME_AXIS_FRAME_SCHEMA_VERSION = "0.1"
 RLOOP_GRAPH_GUIDE_PACKET_FRAME_SCHEMA_NAME = "RLoopGraphGuidePacketFrame"
 RLOOP_GRAPH_GUIDE_PACKET_FRAME_SCHEMA_VERSION = "0.1"
+CORE_EGO_GUIDE_WORKER_HINT_FRAME_SCHEMA_NAME = "CoreEgoGuideWorkerHintFrame"
+CORE_EGO_GUIDE_WORKER_HINT_FRAME_SCHEMA_VERSION = "0.1"
 
 GRAPH_MEMORY_NODE_KINDS = {
     "raw_capsule",
@@ -35,6 +37,15 @@ GRAPH_MEMORY_EDGE_KINDS = {
 }
 GRAPH_MEMORY_CODE_GENERATOR = "CODE:GRAPH_MEMORY_BUILDER"
 RLOOP_GUIDE_CODE_GENERATOR = "CODE:GRAPH_MEMORY_GUIDE_BUILDER"
+CORE_EGO_GUIDE_WORKER_HINT_FAILURE_TYPES = {
+    "none",
+    "adapter_missing",
+    "adapter_failed",
+    "parse_failed",
+    "schema_failed",
+}
+CORE_EGO_GUIDE_WORKER_HINT_STATUSES = {"ran", "failed"}
+CORE_EGO_GUIDE_WORKER_PARSE_STATUSES = {"passed", "failed", "not_checked"}
 
 
 @dataclass
@@ -155,6 +166,39 @@ class RLoopGraphGuidePacketFrame:
     semantic_judgement_status: str = "not_run"
     schema_name: str = RLOOP_GRAPH_GUIDE_PACKET_FRAME_SCHEMA_NAME
     schema_version: str = RLOOP_GRAPH_GUIDE_PACKET_FRAME_SCHEMA_VERSION
+
+
+@dataclass
+class CoreEgoGuideWorkerHintFrame:
+    """An LLM-generated traversal hint over a code-generated graph guide packet."""
+
+    frame_id: str
+    source_rloop_graph_guide_packet_id: str
+    graph_snapshot_id: str
+    available_entry_node_ids: list[str] = field(default_factory=list)
+    available_source_graph_node_ids: list[str] = field(default_factory=list)
+    recommended_entry_node_ids: list[str] = field(default_factory=list)
+    avoid_entry_node_ids: list[str] = field(default_factory=list)
+    traversal_strategy_hint: str = ""
+    reason_summary: str = ""
+    risk_notes: list[str] = field(default_factory=list)
+    expected_depth_policy: str = ""
+    hint_status: str = "failed"
+    failure_type: str = "adapter_missing"
+    payload_parse_status: str = "not_checked"
+    llm_call_data_id: str | None = None
+    llm_trace_event_id: str | None = None
+    prompt_ref: str = ""
+    source_graph_node_ids: list[str] = field(default_factory=list)
+    source_trace_ids: list[str] = field(default_factory=list)
+    source_data_ids: list[str] = field(default_factory=list)
+    generated_by: str = "LLM:unknown:core_ego_guide_worker"
+    info_class: str = "mixed"
+    source_mode: str = "source_bundle"
+    claim_alignment: str = "multi_source_bundle"
+    semantic_judgement_status: str = "failed"
+    schema_name: str = CORE_EGO_GUIDE_WORKER_HINT_FRAME_SCHEMA_NAME
+    schema_version: str = CORE_EGO_GUIDE_WORKER_HINT_FRAME_SCHEMA_VERSION
 
 
 def validate_graph_memory_node_frame(frame: GraphMemoryNodeFrame) -> None:
@@ -433,6 +477,153 @@ def validate_rloop_graph_guide_packet_frame(frame: RLoopGraphGuidePacketFrame) -
     )
 
 
+def validate_core_ego_guide_worker_hint_frame(frame: CoreEgoGuideWorkerHintFrame) -> None:
+    _require_text_fields(
+        "CoreEgoGuideWorkerHintFrame",
+        {
+            "frame_id": frame.frame_id,
+            "source_rloop_graph_guide_packet_id": frame.source_rloop_graph_guide_packet_id,
+            "graph_snapshot_id": frame.graph_snapshot_id,
+            "hint_status": frame.hint_status,
+            "failure_type": frame.failure_type,
+            "payload_parse_status": frame.payload_parse_status,
+            "prompt_ref": frame.prompt_ref,
+            "generated_by": frame.generated_by,
+            "info_class": frame.info_class,
+            "source_mode": frame.source_mode,
+            "claim_alignment": frame.claim_alignment,
+            "semantic_judgement_status": frame.semantic_judgement_status,
+            "schema_name": frame.schema_name,
+            "schema_version": frame.schema_version,
+        },
+    )
+    if frame.schema_name != CORE_EGO_GUIDE_WORKER_HINT_FRAME_SCHEMA_NAME:
+        raise ValueError(f"unknown CoreEgoGuideWorkerHintFrame schema_name: {frame.schema_name}")
+    if frame.schema_version != CORE_EGO_GUIDE_WORKER_HINT_FRAME_SCHEMA_VERSION:
+        raise ValueError(
+            f"unknown CoreEgoGuideWorkerHintFrame schema_version: {frame.schema_version}"
+        )
+    if frame.hint_status not in CORE_EGO_GUIDE_WORKER_HINT_STATUSES:
+        raise ValueError(f"unknown CoreEgoGuideWorkerHintFrame.hint_status: {frame.hint_status}")
+    if frame.failure_type not in CORE_EGO_GUIDE_WORKER_HINT_FAILURE_TYPES:
+        raise ValueError(f"unknown CoreEgoGuideWorkerHintFrame.failure_type: {frame.failure_type}")
+    if frame.payload_parse_status not in CORE_EGO_GUIDE_WORKER_PARSE_STATUSES:
+        raise ValueError(
+            f"unknown CoreEgoGuideWorkerHintFrame.payload_parse_status: {frame.payload_parse_status}"
+        )
+    if not frame.generated_by.startswith("LLM:"):
+        raise ValueError("CoreEgoGuideWorkerHintFrame.generated_by must start with LLM:")
+    if frame.info_class != "mixed":
+        raise ValueError("CoreEgoGuideWorkerHintFrame.info_class must be mixed")
+    if frame.source_mode != "source_bundle":
+        raise ValueError("CoreEgoGuideWorkerHintFrame.source_mode must be source_bundle")
+    if frame.claim_alignment != "multi_source_bundle":
+        raise ValueError("CoreEgoGuideWorkerHintFrame.claim_alignment must be multi_source_bundle")
+    if frame.semantic_judgement_status not in {"ran", "failed"}:
+        raise ValueError(
+            "CoreEgoGuideWorkerHintFrame.semantic_judgement_status must be ran or failed"
+        )
+
+    _validate_string_list(
+        "CoreEgoGuideWorkerHintFrame.available_entry_node_ids",
+        frame.available_entry_node_ids,
+    )
+    _validate_string_list(
+        "CoreEgoGuideWorkerHintFrame.available_source_graph_node_ids",
+        frame.available_source_graph_node_ids,
+    )
+    _validate_string_list(
+        "CoreEgoGuideWorkerHintFrame.recommended_entry_node_ids",
+        frame.recommended_entry_node_ids,
+    )
+    _validate_string_list(
+        "CoreEgoGuideWorkerHintFrame.avoid_entry_node_ids",
+        frame.avoid_entry_node_ids,
+    )
+    _validate_string_list("CoreEgoGuideWorkerHintFrame.risk_notes", frame.risk_notes)
+    _validate_string_list(
+        "CoreEgoGuideWorkerHintFrame.source_graph_node_ids",
+        frame.source_graph_node_ids,
+    )
+    _validate_string_list("CoreEgoGuideWorkerHintFrame.source_trace_ids", frame.source_trace_ids)
+    _validate_string_list("CoreEgoGuideWorkerHintFrame.source_data_ids", frame.source_data_ids)
+    _validate_no_duplicates(
+        "CoreEgoGuideWorkerHintFrame.available_entry_node_ids",
+        frame.available_entry_node_ids,
+    )
+    _validate_no_duplicates(
+        "CoreEgoGuideWorkerHintFrame.available_source_graph_node_ids",
+        frame.available_source_graph_node_ids,
+    )
+    _validate_no_duplicates(
+        "CoreEgoGuideWorkerHintFrame.recommended_entry_node_ids",
+        frame.recommended_entry_node_ids,
+    )
+    _validate_no_duplicates(
+        "CoreEgoGuideWorkerHintFrame.avoid_entry_node_ids",
+        frame.avoid_entry_node_ids,
+    )
+    _validate_no_duplicates(
+        "CoreEgoGuideWorkerHintFrame.source_graph_node_ids",
+        frame.source_graph_node_ids,
+    )
+    _validate_no_duplicates("CoreEgoGuideWorkerHintFrame.source_trace_ids", frame.source_trace_ids)
+    _validate_no_duplicates("CoreEgoGuideWorkerHintFrame.source_data_ids", frame.source_data_ids)
+
+    available_entries = set(frame.available_entry_node_ids)
+    for node_id in [*frame.recommended_entry_node_ids, *frame.avoid_entry_node_ids]:
+        if node_id not in available_entries:
+            raise ValueError("CoreEgoGuideWorkerHintFrame entry node id must be available")
+
+    available_source_nodes = set(frame.available_source_graph_node_ids)
+    for node_id in frame.source_graph_node_ids:
+        if node_id not in available_source_nodes:
+            raise ValueError("CoreEgoGuideWorkerHintFrame source_graph_node_ids must be in snapshot")
+
+    if frame.source_rloop_graph_guide_packet_id not in frame.source_data_ids:
+        raise ValueError(
+            "CoreEgoGuideWorkerHintFrame.source_data_ids must include source guide packet"
+        )
+    if frame.graph_snapshot_id not in frame.source_data_ids:
+        raise ValueError("CoreEgoGuideWorkerHintFrame.source_data_ids must include graph_snapshot_id")
+    if frame.llm_call_data_id is not None:
+        if not frame.llm_call_data_id:
+            raise ValueError("CoreEgoGuideWorkerHintFrame.llm_call_data_id must not be empty")
+        if frame.llm_call_data_id not in frame.source_data_ids:
+            raise ValueError("CoreEgoGuideWorkerHintFrame.source_data_ids must include llm_call_data_id")
+    if frame.llm_trace_event_id is not None:
+        if not frame.llm_trace_event_id:
+            raise ValueError("CoreEgoGuideWorkerHintFrame.llm_trace_event_id must not be empty")
+        if frame.llm_trace_event_id not in frame.source_trace_ids:
+            raise ValueError(
+                "CoreEgoGuideWorkerHintFrame.source_trace_ids must include llm_trace_event_id"
+            )
+
+    if frame.hint_status == "ran":
+        if frame.semantic_judgement_status != "ran":
+            raise ValueError("ran CoreEgoGuideWorkerHintFrame must have semantic_judgement_status=ran")
+        if frame.failure_type != "none":
+            raise ValueError("ran CoreEgoGuideWorkerHintFrame must have failure_type=none")
+        if frame.payload_parse_status != "passed":
+            raise ValueError("ran CoreEgoGuideWorkerHintFrame must have payload_parse_status=passed")
+        if not frame.traversal_strategy_hint.strip():
+            raise ValueError("CoreEgoGuideWorkerHintFrame.traversal_strategy_hint must not be empty")
+        if not frame.reason_summary.strip():
+            raise ValueError("CoreEgoGuideWorkerHintFrame.reason_summary must not be empty")
+        if not frame.expected_depth_policy.strip():
+            raise ValueError("CoreEgoGuideWorkerHintFrame.expected_depth_policy must not be empty")
+        if not frame.source_graph_node_ids:
+            raise ValueError("ran CoreEgoGuideWorkerHintFrame.source_graph_node_ids must not be empty")
+        return
+
+    if frame.semantic_judgement_status != "failed":
+        raise ValueError("failed CoreEgoGuideWorkerHintFrame must have semantic_judgement_status=failed")
+    if frame.failure_type == "none":
+        raise ValueError("failed CoreEgoGuideWorkerHintFrame must include failure_type")
+    if frame.recommended_entry_node_ids or frame.avoid_entry_node_ids:
+        raise ValueError("failed CoreEgoGuideWorkerHintFrame must not include recommendations")
+
+
 def _require_text_fields(frame_name: str, fields: dict[str, str | None]) -> None:
     for field_name, value in fields.items():
         if not value:
@@ -465,6 +656,11 @@ def _validate_range(field_name: str, values: list[int]) -> None:
 __all__ = [
     "CORE_EGO_TIME_AXIS_FRAME_SCHEMA_NAME",
     "CORE_EGO_TIME_AXIS_FRAME_SCHEMA_VERSION",
+    "CORE_EGO_GUIDE_WORKER_HINT_FAILURE_TYPES",
+    "CORE_EGO_GUIDE_WORKER_HINT_FRAME_SCHEMA_NAME",
+    "CORE_EGO_GUIDE_WORKER_HINT_FRAME_SCHEMA_VERSION",
+    "CORE_EGO_GUIDE_WORKER_HINT_STATUSES",
+    "CORE_EGO_GUIDE_WORKER_PARSE_STATUSES",
     "GRAPH_MEMORY_CODE_GENERATOR",
     "GRAPH_MEMORY_EDGE_FRAME_SCHEMA_NAME",
     "GRAPH_MEMORY_EDGE_FRAME_SCHEMA_VERSION",
@@ -477,11 +673,13 @@ __all__ = [
     "RLOOP_GRAPH_GUIDE_PACKET_FRAME_SCHEMA_NAME",
     "RLOOP_GRAPH_GUIDE_PACKET_FRAME_SCHEMA_VERSION",
     "RLOOP_GUIDE_CODE_GENERATOR",
+    "CoreEgoGuideWorkerHintFrame",
     "CoreEgoTimeAxisFrame",
     "GraphMemoryEdgeFrame",
     "GraphMemoryNodeFrame",
     "GraphMemorySnapshotFrame",
     "RLoopGraphGuidePacketFrame",
+    "validate_core_ego_guide_worker_hint_frame",
     "validate_core_ego_time_axis_frame",
     "validate_graph_memory_edge_frame",
     "validate_graph_memory_node_frame",

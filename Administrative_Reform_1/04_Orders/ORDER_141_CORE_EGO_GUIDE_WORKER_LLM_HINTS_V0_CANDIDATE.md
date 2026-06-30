@@ -1,10 +1,14 @@
-# ORDER_141_CORE_EGO_GUIDE_WORKER_LLM_HINTS_V0_CANDIDATE
+# ORDER_141_CORE_EGO_GUIDE_WORKER_LLM_HINTS_V0
 
-## Candidate Status
+## Status
 
-이 문서는 후보 발주서다.
+구현 완료.
 
-ORDER_139와 ORDER_140의 결과를 확인하기 전에는 구현하지 않는다.
+ORDER_139와 ORDER_140 결과 위에서 구현한다.
+
+실행 기록:
+
+- `Administrative_Reform_1/05_Execution_Records/order_141_core_ego_guide_worker_hints_2026_06_30_001.md`
 
 ## 1. 목표
 
@@ -93,11 +97,9 @@ LLM hint는 다음 검증을 통과해야 한다.
 4. hint는 `info_class=mixed`와 source bundle을 가진다.
 5. RLoopGraphGuidePacket의 code-generated count와 LLM hint가 분리된다.
 
-## 8. 완료 조건 후보
+## 8. 완료 조건
 
-아직 구현 금지.
-
-승격 시:
+구현 후 다음을 통과해야 한다.
 
 ```powershell
 python -m compileall songryeon_core main.py
@@ -105,4 +107,3 @@ python -m pytest
 python main.py smoke-test
 git diff --check
 ```
-
