@@ -1,5 +1,11 @@
 # ORDER_138_INTEGRATION_BASELINE_AND_DIRTY_WORKTREE_RECONCILIATION_V0
 
+## Status Note
+
+2026-06-30 기준, 이 문서에 기록된 심야정부 MVP(`songryeon_core/night_government`, `night-*` CLI, 전용 pytest)는 이후 감사에서 송련 Core의 TurnStateCapsule/TraceStore/ZeroState 기반 기억 체계와 맞지 않는 provisional 기능으로 판단되어 제거되었다.
+
+이 문서는 과거 기준선 기록으로만 남긴다. 심야정부를 다시 설계할 경우, 여기의 JSONL `MemoryRecord` 구조를 이어받지 말고 송련의 기존 trace/capsule/metainfo 원칙에서 다시 시작한다.
+
 ## 1. 목표
 
 ORDER_133 이후 codebase inspection, L tool scope, code evidence accounting, source-code outline, 그리고 심야정부 MVP가 빠르게 들어왔다.

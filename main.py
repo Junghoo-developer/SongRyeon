@@ -27,14 +27,6 @@ from songryeon_core.runtime.defaults import (
     DEFAULT_SEARCH_TOP_K,
 )
 from songryeon_core.llm.runtime import ping_qwen
-from songryeon_core.night_government.runtime import (
-    DEFAULT_NIGHT_DB_DIR,
-    ingest_memory_record,
-    load_active_memory_packet,
-    render_active_memory_packet_markdown,
-    run_night_government,
-)
-from songryeon_core.night_government.schemas import MEMORY_ROLES
 from songryeon_core.tools.document_tools import search_docs
 
 
@@ -65,30 +57,6 @@ def main() -> None:
 
     # show-orders는 현재 발주서 목록을 빠르게 훑기 위한 작은 보조 명령이다.
     subparsers.add_parser("show-orders")
-
-    # night-* commands are the first external-memory "night government" MVP.
-    # They do not train the model. They write durable memory fragments to an
-    # external JSONL DB, then prepare an active packet for the next work session.
-    night_ingest_parser = subparsers.add_parser("night-ingest")
-    night_ingest_parser.add_argument("--db-dir", default=DEFAULT_NIGHT_DB_DIR)
-    night_ingest_parser.add_argument("--text", required=True)
-    night_ingest_parser.add_argument("--record-type", default="manual_note")
-    night_ingest_parser.add_argument("--role", choices=sorted(MEMORY_ROLES), default="raw")
-    night_ingest_parser.add_argument("--confidence", default="unknown")
-    night_ingest_parser.add_argument("--review", default="unreviewed")
-    night_ingest_parser.add_argument("--tag", action="append", default=[])
-    night_ingest_parser.add_argument("--source-ref", action="append", default=[])
-    night_ingest_parser.add_argument("--record-id", default=None)
-
-    night_run_parser = subparsers.add_parser("night-run")
-    night_run_parser.add_argument("--db-dir", default=DEFAULT_NIGHT_DB_DIR)
-    night_run_parser.add_argument("--day-id", default=None)
-    night_run_parser.add_argument("--active-goal", default="")
-    night_run_parser.add_argument("--max-records", type=int, default=24)
-
-    night_active_parser = subparsers.add_parser("night-active")
-    night_active_parser.add_argument("--db-dir", default=DEFAULT_NIGHT_DB_DIR)
-    night_active_parser.add_argument("--format", choices=["json", "markdown"], default="json")
 
     # replay는 export로 저장한 실행 기록을 다시 읽을 때 쓴다.
     replay_parser = subparsers.add_parser("replay")
@@ -144,33 +112,6 @@ def main() -> None:
     elif args.command == "show-orders":
         for path in sorted(Path("Administrative_Reform_1/04_Orders").glob("*.md")):
             print(path.as_posix())
-    elif args.command == "night-ingest":
-        result = ingest_memory_record(
-            db_dir=args.db_dir,
-            text=args.text,
-            record_type=args.record_type,
-            memory_role=args.role,
-            confidence_label=args.confidence,
-            human_review_status=args.review,
-            tags=args.tag,
-            source_refs=args.source_ref,
-            record_id=args.record_id,
-        )
-        print(json.dumps(result, ensure_ascii=False, indent=2))
-    elif args.command == "night-run":
-        result = run_night_government(
-            db_dir=args.db_dir,
-            day_id=args.day_id,
-            active_goal=args.active_goal,
-            max_records=args.max_records,
-        )
-        print(json.dumps(result, ensure_ascii=False, indent=2))
-    elif args.command == "night-active":
-        packet = load_active_memory_packet(db_dir=args.db_dir)
-        if args.format == "markdown":
-            print(render_active_memory_packet_markdown(packet))
-        else:
-            print(json.dumps(packet or {"status": "NO_ACTIVE_MEMORY_PACKET"}, ensure_ascii=False, indent=2))
     elif args.command == "replay":
         print(replay_run(args.run_dir))
     elif args.command == "qwen-ping":
