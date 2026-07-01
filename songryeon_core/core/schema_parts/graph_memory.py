@@ -35,6 +35,8 @@ GRAPH_MEMORY_NODE_KINDS = {
     "time_axis",
     "time_bundle",
     "activity_ledger",
+    "raw_source",
+    "source_kind_bundle",
 }
 GRAPH_MEMORY_EDGE_KINDS = {
     "CONTAINS",
@@ -367,6 +369,20 @@ def validate_graph_memory_node_frame(frame: GraphMemoryNodeFrame) -> None:
             raise ValueError("raw capsule source_leaf_count must be 1")
         if frame.source_summary_count != 0:
             raise ValueError("raw capsule source_summary_count must be 0")
+    if frame.node_kind == "raw_source":
+        if frame.summary_depth != 0:
+            raise ValueError("raw source summary_depth must be 0")
+        if frame.source_leaf_count != 1:
+            raise ValueError("raw source source_leaf_count must be 1")
+        if frame.source_summary_count != 0:
+            raise ValueError("raw source source_summary_count must be 0")
+        if not frame.source_data_ids:
+            raise ValueError("raw source graph node must cite source file data")
+    if frame.node_kind == "source_kind_bundle":
+        if not frame.source_graph_node_ids:
+            raise ValueError("source kind bundle must contain raw source graph nodes")
+        if frame.source_leaf_count != len(frame.source_graph_node_ids):
+            raise ValueError("source kind bundle source_leaf_count must mirror children")
 
 
 def validate_graph_memory_edge_frame(frame: GraphMemoryEdgeFrame) -> None:
