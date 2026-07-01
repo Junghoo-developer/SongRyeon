@@ -972,8 +972,42 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
                 info_class="absolute_summary_from_structured_records",
                 source_data_ids=_source_data_ids(frame, fallback=["L:return_summary_frame"]),
                 semantic_judgement_status="not_run",
+                )
             )
-        )
+
+    l_activity_ledgers = _payloads_with_type(result, "loop_activity:l_loop_activity_ledger_frame")
+    if l_activity_ledgers:
+        lines.append("- L activity ledger:")
+        for frame in l_activity_ledgers:
+            lines.append(
+                "  - "
+                f"{frame.get('frame_id', 'unknown')} "
+                f"run={frame.get('run_index', '?')} "
+                f"outputs={frame.get('output_data_id_count', 0)} "
+                f"tools={frame.get('tool_result_count', 0)} "
+                f"search_docs={frame.get('search_candidate_doc_count', 0)} "
+                f"read_doc={frame.get('actual_read_doc_count', 0)} "
+                f"read_code={frame.get('actual_read_code_file_count', 0)}"
+            )
+            lines.append(
+                "    graph_anchor: "
+                f"{frame.get('turn_capsule_graph_node_id', 'unknown')} / "
+                f"material={frame.get('document_material_packet_frame_id', '')}"
+            )
+            lines.extend(
+                _metainfo_lines(
+                    indent=4,
+                    generated_by=str(frame.get("generated_by") or "CODE:L_LOOP_ACTIVITY_LEDGER"),
+                    info_class=str(frame.get("info_class") or "absolute"),
+                    source_data_ids=_source_data_ids(
+                        frame,
+                        fallback=[str(frame.get("frame_id") or "L:activity_ledger_frame")],
+                    ),
+                    semantic_judgement_status=str(
+                        frame.get("semantic_judgement_status") or "not_run"
+                    ),
+                )
+            )
 
     revision_queries = _payloads_with_type(result, "node_output:L2_revision_query_frame")
     if revision_queries:

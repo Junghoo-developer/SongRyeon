@@ -130,6 +130,7 @@ def run_smoke_tests() -> dict[str, object]:
         "tool_choice:L2:search_docs",
         "tool_choice:L_controller_0002:read_doc",
         "L:return_summary_frame",
+        "L:activity_ledger_frame",
         "L:control:0001",
         "L:control:0002",
         "L:control:0003",
@@ -160,6 +161,7 @@ def run_smoke_tests() -> dict[str, object]:
     _check_route2_handoff_and_brief(records)
     runtime_count_smoke = _run_runtime_count_consistency_smoke()
     return_summary_smoke = _check_l_loop_return_summary(records)
+    l_activity_ledger_smoke = _check_l_loop_activity_ledger(records)
     _check_runtime_explanation_fields(records)
     runtime_label_smoke = _check_runtime_metainfo_labels(result)
     live_trace_smoke = _run_live_trace_progress_stream_smoke()
@@ -264,6 +266,9 @@ def run_smoke_tests() -> dict[str, object]:
         "l_loop_final_decision": l_loop_control_smoke["final_decision"],
         "l_loop_return_summary_status": return_summary_smoke["task_status"],
         "l_loop_return_summary_route_hint": return_summary_smoke["route_hint"],
+        "l_loop_activity_ledger_outputs": l_activity_ledger_smoke["output_count"],
+        "l_loop_activity_ledger_tool_results": l_activity_ledger_smoke["tool_result_count"],
+        "l_loop_activity_ledger_read_doc": l_activity_ledger_smoke["actual_read_doc_count"],
         "l_loop_read_doc_used": l_loop_control_smoke["read_doc_used"],
         "tool_distillation_count": distillation_smoke["distillation_count"],
         "tool_distillation_sources_l3": distillation_smoke["l3_uses_distillation"],
@@ -2303,6 +2308,70 @@ def _check_l_loop_return_summary(records: dict[str, object]) -> dict[str, object
     return {
         "task_status": frame.get("l_loop_task_status"),
         "route_hint": frame.get("recommended_next_route_for_node1"),
+    }
+
+
+def _check_l_loop_activity_ledger(records: dict[str, object]) -> dict[str, object]:
+    """L루프 활동 장부가 의미 판단 없이 L 산출물 좌표를 묶는지 확인한다."""
+
+    frame = records.get("L:activity_ledger_frame")
+    if not isinstance(frame, dict):
+        raise AssertionError("L loop activity ledger frame is missing")
+    if frame.get("loop_id") != "L":
+        raise AssertionError("L activity ledger must target loop L")
+    if frame.get("run_index") != 1:
+        raise AssertionError("first L activity ledger run index must be 1")
+    if frame.get("turn_capsule_graph_node_id") != "graph:raw_capsule:turn_dry_001":
+        raise AssertionError("L activity ledger must expose turn raw capsule graph anchor")
+    if frame.get("generated_by") != "CODE:L_LOOP_ACTIVITY_LEDGER":
+        raise AssertionError("L activity ledger must reveal code generator")
+    if frame.get("info_class") != "absolute":
+        raise AssertionError("L activity ledger must be absolute")
+    if frame.get("semantic_judgement_status") != "not_run":
+        raise AssertionError("L activity ledger must not run semantic judgement")
+    source_data_ids = frame.get("source_data_ids")
+    if not isinstance(source_data_ids, list):
+        raise AssertionError("L activity ledger source_data_ids must be a list")
+    for data_id in [
+        "L:run_frame:0001",
+        "L1:goal_frame",
+        "L2:query_frame",
+        "L3:achievement_frame",
+        "L:return_summary_frame",
+        "node_0:document_material_packet_frame",
+    ]:
+        if data_id not in source_data_ids:
+            raise AssertionError(f"L activity ledger missing source data id: {data_id}")
+    activity_records = frame.get("activity_records")
+    if not isinstance(activity_records, list) or not activity_records:
+        raise AssertionError("L activity ledger activity_records must be non-empty")
+    stages = {
+        item.get("stage")
+        for item in activity_records
+        if isinstance(item, dict)
+    }
+    for stage in {"run_frame", "goal", "query", "tool_result", "l3_achievement", "return_summary"}:
+        if stage not in stages:
+            raise AssertionError(f"L activity ledger missing activity stage: {stage}")
+    output_data_ids = frame.get("output_data_ids")
+    if not isinstance(output_data_ids, list):
+        raise AssertionError("L activity ledger output_data_ids must be a list")
+    if frame.get("output_data_id_count") != len(output_data_ids):
+        raise AssertionError("L activity ledger output count must mirror output_data_ids")
+    tool_result_data_ids = frame.get("tool_result_data_ids")
+    if not isinstance(tool_result_data_ids, list):
+        raise AssertionError("L activity ledger tool_result_data_ids must be a list")
+    if frame.get("tool_result_count") != len(tool_result_data_ids):
+        raise AssertionError("L activity ledger tool result count must mirror tool_result_data_ids")
+    read_doc_ids = frame.get("read_doc_ids")
+    if not isinstance(read_doc_ids, list):
+        raise AssertionError("L activity ledger read_doc_ids must be a list")
+    if frame.get("actual_read_doc_count") != len(read_doc_ids):
+        raise AssertionError("L activity ledger read_doc count must mirror read_doc_ids")
+    return {
+        "output_count": frame.get("output_data_id_count"),
+        "tool_result_count": frame.get("tool_result_count"),
+        "actual_read_doc_count": frame.get("actual_read_doc_count"),
     }
 
 

@@ -84,6 +84,7 @@ from songryeon_core.nodes.node_1_router import (
     route_next_with_llm_or_policy_fallback,
 )
 from songryeon_core.loops.l_loop import run_l_loop
+from songryeon_core.loops.l_loop_activity_ledger import record_l_loop_activity_ledger
 from songryeon_core.loops.l_loop_namespace import build_l_run_ids
 from songryeon_core.loops.r_loop_dry_run import (
     R_EXPERIMENTAL_ROUTE_GENERATOR,
@@ -162,6 +163,7 @@ def run_dry_turn(
     node0_return_data_ids: list[str] = []
     l_return_summary_data_ids: list[str] = []
     document_material_data_ids: list[str] = []
+    l_activity_ledger_data_ids: list[str] = []
     l_run_ids = None
     l_results = []
     last_l_result = None
@@ -631,16 +633,29 @@ def run_dry_turn(
             document_material_data_ids.append(
                 document_material_packet_frame_data_id(id_namespace=l_run_ids)
             )
+            l_activity_trace_id, l_activity_ledger_data_id, _l_activity_ledger = (
+                record_l_loop_activity_ledger(
+                    trace_store=trace_store,
+                    data_store=data_store,
+                    turn_id=turn_id,
+                    l_result=l_result,
+                    return_summary_frame_id=l_return_summary_data_id,
+                    document_material_packet_frame_id=document_material_data_ids[-1],
+                    id_namespace=l_run_ids,
+                )
+            )
+            l_activity_ledger_data_ids.append(l_activity_ledger_data_id)
             append_movement(
                 node_id="node_0",
                 mode="loop_return_summary",
                 input_trace_ids=l_result.source_trace_ids,
-                output_trace_ids=[node0_return_trace_id],
+                output_trace_ids=[node0_return_trace_id, l_activity_trace_id],
                 input_data_ids=l_result.output_data_ids,
                 output_data_ids=[
                     node0_return_data_id,
                     l_return_summary_data_id,
                     document_material_data_ids[-1],
+                    l_activity_ledger_data_id,
                 ],
             )
 
@@ -860,6 +875,7 @@ def run_dry_turn(
             *node0_return_data_ids,
             *l_return_summary_data_ids,
             *document_material_data_ids,
+            *l_activity_ledger_data_ids,
             *reroute_controller_data_ids,
             *r_route_experimental_graph_data_ids,
             r_route_experimental_handoff_packet_id,
@@ -1454,6 +1470,8 @@ def run_dry_turn(
         "l_loop_final_continuation_status": last_l_result.final_continuation_status if last_l_result is not None else None,
         "l_loop_continuation_count": len(last_l_result.continuation_data_ids) if last_l_result is not None else 0,
         "l_loop_revision_query_count": len(last_l_result.revision_query_data_ids) if last_l_result is not None else 0,
+        "l_loop_activity_ledger_data_ids": l_activity_ledger_data_ids,
+        "l_loop_activity_ledger_count": len(l_activity_ledger_data_ids),
         "l2_query_source": _read_l2_query_source(data_store),
         "node1_llm_routing_count": _count_node1_llm_routes(data_store),
         "node1_llm_routing_failed_count": _count_node1_llm_failed_routes(data_store),

@@ -8,6 +8,7 @@ def test_core_import_baseline() -> None:
         "songryeon_core",
         "songryeon_core.core.schema_parts",
         "songryeon_core.core.schema_parts.base",
+        "songryeon_core.core.schema_parts.loop_activity",
         "songryeon_core.core.schema_parts.task_ledger",
         "songryeon_core.core.schema_parts.trace_data",
         "songryeon_core.core.schemas",

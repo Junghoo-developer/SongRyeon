@@ -84,6 +84,15 @@ from songryeon_core.core.schema_parts.r_loop import (
     validate_r_loop_continuation_frame,
     validate_r_loop_return_summary_frame,
 )
+from songryeon_core.core.schema_parts.loop_activity import (
+    L_LOOP_ACTIVITY_LEDGER_DATA_TYPE,
+    L_LOOP_ACTIVITY_LEDGER_FRAME_SCHEMA_NAME,
+    L_LOOP_ACTIVITY_LEDGER_FRAME_SCHEMA_VERSION,
+    L_LOOP_ACTIVITY_LEDGER_GENERATOR,
+    L_LOOP_ACTIVITY_STAGES,
+    LLoopActivityLedgerFrame,
+    validate_l_loop_activity_ledger_frame,
+)
 from songryeon_core.core.schema_parts.task_ledger import (
     TASK_FRAME_SCHEMA_NAME,
     TASK_FRAME_SCHEMA_VERSION,
@@ -128,6 +137,12 @@ __all__ = [
     "GraphMemoryEdgeFrame",
     "GraphMemoryNodeFrame",
     "GraphMemorySnapshotFrame",
+    "L_LOOP_ACTIVITY_LEDGER_DATA_TYPE",
+    "L_LOOP_ACTIVITY_LEDGER_FRAME_SCHEMA_NAME",
+    "L_LOOP_ACTIVITY_LEDGER_FRAME_SCHEMA_VERSION",
+    "L_LOOP_ACTIVITY_LEDGER_GENERATOR",
+    "L_LOOP_ACTIVITY_STAGES",
+    "LLoopActivityLedgerFrame",
     "MemoryPacketFrom0",
     "NodeMovement",
     "RLOOP_GRAPH_GUIDE_PACKET_FRAME_SCHEMA_NAME",
@@ -184,6 +199,7 @@ __all__ = [
     "validate_graph_memory_edge_frame",
     "validate_graph_memory_node_frame",
     "validate_graph_memory_snapshot_frame",
+    "validate_l_loop_activity_ledger_frame",
     "validate_r_loop_memory_handoff_packet_frame",
     "validate_r1_graph_goal_frame",
     "validate_r2_graph_node_selection_frame",
