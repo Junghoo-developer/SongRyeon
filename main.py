@@ -7,6 +7,7 @@ from pathlib import Path
 
 from songryeon_core.runtime.dry_run import run_dry_turn
 from songryeon_core.runtime.fast_test import run_fast_tests
+from songryeon_core.runtime.graph_vessel_first_write import run_local_vessel_first_write
 from songryeon_core.runtime.l_loop_smoke import run_qwen_l_loop_smoke
 from songryeon_core.runtime.replay import replay_run
 from songryeon_core.runtime.smoke_test import run_smoke_tests
@@ -97,6 +98,18 @@ def main() -> None:
     fast_test_parser.add_argument("--profile", choices=["core", "graph"], default="graph")
     fast_test_parser.add_argument("--skip-compileall", action="store_true")
     fast_test_parser.add_argument("--dry-run", action="store_true")
+
+    vessel_first_write_parser = subparsers.add_parser("vessel-first-write")
+    vessel_first_write_parser.add_argument("--root", default=".")
+    vessel_first_write_parser.add_argument("--batch-id", default="manual_vessel_first_write")
+    vessel_first_write_parser.add_argument("--turn-id", default="turn_vessel_first_write_0001")
+    vessel_first_write_parser.add_argument("--uri", default=None)
+    vessel_first_write_parser.add_argument("--user", default=None)
+    vessel_first_write_parser.add_argument("--password", default=None)
+    vessel_first_write_parser.add_argument("--database", default=None)
+    vessel_first_write_parser.add_argument("--allow-no-auth", action="store_true")
+    vessel_first_write_parser.add_argument("--include-source-manifest", action="store_true")
+    vessel_first_write_parser.add_argument("--store-text-snapshots", action="store_true")
 
     args = parser.parse_args()
 
@@ -193,6 +206,22 @@ def main() -> None:
         )
         print(json.dumps(result, ensure_ascii=False, indent=2))
         if result["status"] == "FAST_TEST_FAILED":
+            raise SystemExit(1)
+    elif args.command == "vessel-first-write":
+        result = run_local_vessel_first_write(
+            root_path=args.root,
+            batch_id=args.batch_id,
+            turn_id=args.turn_id,
+            uri=args.uri,
+            user=args.user,
+            password=args.password,
+            database=args.database,
+            allow_no_auth=args.allow_no_auth,
+            include_source_manifest=args.include_source_manifest,
+            store_text_snapshots=args.store_text_snapshots,
+        )
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        if result["write_status"] == "write_failed":
             raise SystemExit(1)
 
 
