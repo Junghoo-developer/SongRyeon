@@ -2,7 +2,7 @@
 
 발주서는 개발 지도에서 내려온 실무 계획서다.
 
-현재 정식 발주서는 `ORDER_001`부터 `ORDER_144`까지 있다.
+현재 정식 발주서는 `ORDER_001`부터 `ORDER_158`까지 있다.
 
 `ORDER_066`부터 `ORDER_075`까지는 메타정보 관리법을 실제 런타임과 LLM 노드 배선에 적용하기 위한 복구 로드맵이다.
 
@@ -270,3 +270,4 @@
 - [ORDER 155: Graph Source Kind Separated Ingest Foundation v0](ORDER_155_GRAPH_SOURCE_KIND_SEPARATED_INGEST_FOUNDATION_V0.md)
 - [ORDER 156: Graph Source Observation Time And CoreEgo Link v0](ORDER_156_GRAPH_SOURCE_OBSERVATION_TIME_AND_CORE_EGO_LINK_V0.md)
 - [ORDER 157: SongRyeon Core Source Ingest Manifest v0](ORDER_157_SONGRYEON_CORE_SOURCE_INGEST_MANIFEST_V0.md)
+- [ORDER 158: Graph Memory Export Packet v0](ORDER_158_GRAPH_MEMORY_EXPORT_PACKET_V0.md)
