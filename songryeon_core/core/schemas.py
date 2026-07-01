@@ -35,6 +35,10 @@ from songryeon_core.core.schema_parts.graph_memory import (
     R_LOOP_MEMORY_HANDOFF_PACKET_FRAME_SCHEMA_VERSION,
     R_LOOP_MEMORY_HANDOFF_SEMANTIC_HINT_STATUSES,
     R_LOOP_MEMORY_HANDOFF_STATUSES,
+    TURN_ACTIVITY_GRAPH_LINK_ACTIVITY_KINDS,
+    TURN_ACTIVITY_GRAPH_LINK_CODE_GENERATOR,
+    TURN_ACTIVITY_GRAPH_LINK_FRAME_SCHEMA_NAME,
+    TURN_ACTIVITY_GRAPH_LINK_FRAME_SCHEMA_VERSION,
     TURN_GRAPH_ACCESS_LEDGER_FRAME_SCHEMA_NAME,
     TURN_GRAPH_ACCESS_LEDGER_FRAME_SCHEMA_VERSION,
     CoreEgoGuideWorkerHintFrame,
@@ -44,6 +48,7 @@ from songryeon_core.core.schema_parts.graph_memory import (
     GraphMemorySnapshotFrame,
     RLoopGraphGuidePacketFrame,
     RLoopMemoryHandoffPacketFrame,
+    TurnActivityGraphLinkFrame,
     TurnGraphAccessLedgerFrame,
     validate_core_ego_guide_worker_hint_frame,
     validate_core_ego_time_axis_frame,
@@ -52,6 +57,7 @@ from songryeon_core.core.schema_parts.graph_memory import (
     validate_graph_memory_snapshot_frame,
     validate_r_loop_memory_handoff_packet_frame,
     validate_rloop_graph_guide_packet_frame,
+    validate_turn_activity_graph_link_frame,
     validate_turn_graph_access_ledger_frame,
 )
 from songryeon_core.core.schema_parts.r_loop import (

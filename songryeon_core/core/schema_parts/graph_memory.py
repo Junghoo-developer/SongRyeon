@@ -16,6 +16,8 @@ GRAPH_MEMORY_SNAPSHOT_FRAME_SCHEMA_NAME = "GraphMemorySnapshotFrame"
 GRAPH_MEMORY_SNAPSHOT_FRAME_SCHEMA_VERSION = "0.1"
 TURN_GRAPH_ACCESS_LEDGER_FRAME_SCHEMA_NAME = "TurnGraphAccessLedgerFrame"
 TURN_GRAPH_ACCESS_LEDGER_FRAME_SCHEMA_VERSION = "0.1"
+TURN_ACTIVITY_GRAPH_LINK_FRAME_SCHEMA_NAME = "TurnActivityGraphLinkFrame"
+TURN_ACTIVITY_GRAPH_LINK_FRAME_SCHEMA_VERSION = "0.1"
 CORE_EGO_TIME_AXIS_FRAME_SCHEMA_NAME = "CoreEgoTimeAxisFrame"
 CORE_EGO_TIME_AXIS_FRAME_SCHEMA_VERSION = "0.1"
 RLOOP_GRAPH_GUIDE_PACKET_FRAME_SCHEMA_NAME = "RLoopGraphGuidePacketFrame"
@@ -32,16 +34,19 @@ GRAPH_MEMORY_NODE_KINDS = {
     "core_ego",
     "time_axis",
     "time_bundle",
+    "activity_ledger",
 }
 GRAPH_MEMORY_EDGE_KINDS = {
     "CONTAINS",
     "CHILD_OF_TIME_AXIS",
     "NEXT",
+    "HAS_ACTIVITY_LEDGER",
     "SOURCE_OF",
     "SUMMARY_OF",
 }
 GRAPH_MEMORY_CODE_GENERATOR = "CODE:GRAPH_MEMORY_BUILDER"
 GRAPH_ACCESS_LEDGER_CODE_GENERATOR = "CODE:GRAPH_ACCESS_LEDGER"
+TURN_ACTIVITY_GRAPH_LINK_CODE_GENERATOR = "CODE:TURN_ACTIVITY_GRAPH_LINK_BUILDER"
 RLOOP_GUIDE_CODE_GENERATOR = "CODE:GRAPH_MEMORY_GUIDE_BUILDER"
 GRAPH_ACCESS_STAGES = {
     "candidate_seen",
@@ -61,6 +66,10 @@ CORE_EGO_GUIDE_WORKER_HINT_STATUSES = {"ran", "failed"}
 CORE_EGO_GUIDE_WORKER_PARSE_STATUSES = {"passed", "failed", "not_checked"}
 R_LOOP_MEMORY_HANDOFF_STATUSES = {"available", "missing"}
 R_LOOP_MEMORY_HANDOFF_SEMANTIC_HINT_STATUSES = {"not_run", "ran", "failed"}
+TURN_ACTIVITY_GRAPH_LINK_ACTIVITY_KINDS = {
+    "l_loop_activity_ledger",
+    "r_graph_access_ledger",
+}
 
 
 @dataclass
@@ -156,6 +165,27 @@ class TurnGraphAccessLedgerFrame:
     semantic_judgement_status: str = "not_run"
     schema_name: str = TURN_GRAPH_ACCESS_LEDGER_FRAME_SCHEMA_NAME
     schema_version: str = TURN_GRAPH_ACCESS_LEDGER_FRAME_SCHEMA_VERSION
+
+
+@dataclass
+class TurnActivityGraphLinkFrame:
+    """A code-generated graph link index from one raw capsule to activity ledgers."""
+
+    frame_id: str
+    turn_id: str
+    turn_capsule_graph_node_id: str
+    l_loop_activity_ledger_data_ids: list[str] = field(default_factory=list)
+    r_graph_access_ledger_data_ids: list[str] = field(default_factory=list)
+    activity_ledger_graph_node_ids: list[str] = field(default_factory=list)
+    activity_ledger_graph_edge_ids: list[str] = field(default_factory=list)
+    link_records: list[dict[str, str]] = field(default_factory=list)
+    source_trace_ids: list[str] = field(default_factory=list)
+    source_data_ids: list[str] = field(default_factory=list)
+    generated_by: str = TURN_ACTIVITY_GRAPH_LINK_CODE_GENERATOR
+    info_class: str = "absolute"
+    semantic_judgement_status: str = "not_run"
+    schema_name: str = TURN_ACTIVITY_GRAPH_LINK_FRAME_SCHEMA_NAME
+    schema_version: str = TURN_ACTIVITY_GRAPH_LINK_FRAME_SCHEMA_VERSION
 
 
 @dataclass
@@ -501,6 +531,107 @@ def validate_turn_graph_access_ledger_frame(frame: TurnGraphAccessLedgerFrame) -
         if source_frame_id not in frame.source_data_ids:
             raise ValueError(
                 "TurnGraphAccessLedgerFrame.source_data_ids must include access record source_frame_id"
+            )
+
+
+def validate_turn_activity_graph_link_frame(frame: TurnActivityGraphLinkFrame) -> None:
+    _require_text_fields(
+        "TurnActivityGraphLinkFrame",
+        {
+            "frame_id": frame.frame_id,
+            "turn_id": frame.turn_id,
+            "turn_capsule_graph_node_id": frame.turn_capsule_graph_node_id,
+            "generated_by": frame.generated_by,
+            "info_class": frame.info_class,
+            "semantic_judgement_status": frame.semantic_judgement_status,
+            "schema_name": frame.schema_name,
+            "schema_version": frame.schema_version,
+        },
+    )
+    if frame.schema_name != TURN_ACTIVITY_GRAPH_LINK_FRAME_SCHEMA_NAME:
+        raise ValueError(
+            f"unknown TurnActivityGraphLinkFrame.schema_name: {frame.schema_name}"
+        )
+    if frame.schema_version != TURN_ACTIVITY_GRAPH_LINK_FRAME_SCHEMA_VERSION:
+        raise ValueError(
+            f"unknown TurnActivityGraphLinkFrame.schema_version: {frame.schema_version}"
+        )
+    if frame.generated_by != TURN_ACTIVITY_GRAPH_LINK_CODE_GENERATOR:
+        raise ValueError("TurnActivityGraphLinkFrame.generated_by must reveal code builder")
+    if frame.info_class != "absolute":
+        raise ValueError("TurnActivityGraphLinkFrame.info_class must be absolute")
+    if frame.semantic_judgement_status != "not_run":
+        raise ValueError("TurnActivityGraphLinkFrame.semantic_judgement_status must be not_run")
+
+    list_fields = {
+        "l_loop_activity_ledger_data_ids": frame.l_loop_activity_ledger_data_ids,
+        "r_graph_access_ledger_data_ids": frame.r_graph_access_ledger_data_ids,
+        "activity_ledger_graph_node_ids": frame.activity_ledger_graph_node_ids,
+        "activity_ledger_graph_edge_ids": frame.activity_ledger_graph_edge_ids,
+        "source_trace_ids": frame.source_trace_ids,
+        "source_data_ids": frame.source_data_ids,
+    }
+    for field_name, values in list_fields.items():
+        _validate_string_list(f"TurnActivityGraphLinkFrame.{field_name}", values)
+        _validate_no_duplicates(f"TurnActivityGraphLinkFrame.{field_name}", values)
+
+    ledger_data_ids = {
+        *frame.l_loop_activity_ledger_data_ids,
+        *frame.r_graph_access_ledger_data_ids,
+    }
+    if len(frame.activity_ledger_graph_node_ids) != len(ledger_data_ids):
+        raise ValueError(
+            "TurnActivityGraphLinkFrame.activity_ledger_graph_node_ids must mirror ledger count"
+        )
+    if len(frame.activity_ledger_graph_edge_ids) != len(ledger_data_ids):
+        raise ValueError(
+            "TurnActivityGraphLinkFrame.activity_ledger_graph_edge_ids must mirror ledger count"
+        )
+    if len(frame.link_records) != len(ledger_data_ids):
+        raise ValueError("TurnActivityGraphLinkFrame.link_records must mirror ledger count")
+
+    source_data_ids = set(frame.source_data_ids)
+    required_sources = {
+        frame.turn_capsule_graph_node_id,
+        *ledger_data_ids,
+        *frame.activity_ledger_graph_node_ids,
+        *frame.activity_ledger_graph_edge_ids,
+    }
+    if not required_sources <= source_data_ids:
+        missing = sorted(required_sources - source_data_ids)
+        raise ValueError(
+            "TurnActivityGraphLinkFrame.source_data_ids must include graph/link sources: "
+            f"{missing}"
+        )
+
+    node_ids = set(frame.activity_ledger_graph_node_ids)
+    edge_ids = set(frame.activity_ledger_graph_edge_ids)
+    for index, record in enumerate(frame.link_records, start=1):
+        if not isinstance(record, dict):
+            raise ValueError("TurnActivityGraphLinkFrame.link_records must contain dict records")
+        activity_kind = record.get("activity_kind")
+        ledger_data_id = record.get("ledger_data_id")
+        graph_node_id = record.get("graph_node_id")
+        edge_id = record.get("edge_id")
+        source_field = record.get("source_field")
+        if not activity_kind or not ledger_data_id or not graph_node_id or not edge_id or not source_field:
+            raise ValueError(
+                "TurnActivityGraphLinkFrame.link_records entries require "
+                "activity_kind, ledger_data_id, graph_node_id, edge_id, source_field"
+            )
+        if activity_kind not in TURN_ACTIVITY_GRAPH_LINK_ACTIVITY_KINDS:
+            raise ValueError(f"unknown turn activity graph link kind: {activity_kind}")
+        if ledger_data_id not in ledger_data_ids:
+            raise ValueError(
+                f"TurnActivityGraphLinkFrame.link_records ledger_data_id is not listed at {index}"
+            )
+        if graph_node_id not in node_ids:
+            raise ValueError(
+                f"TurnActivityGraphLinkFrame.link_records graph_node_id is not listed at {index}"
+            )
+        if edge_id not in edge_ids:
+            raise ValueError(
+                f"TurnActivityGraphLinkFrame.link_records edge_id is not listed at {index}"
             )
 
 
@@ -912,6 +1043,10 @@ __all__ = [
     "GRAPH_MEMORY_NODE_KINDS",
     "GRAPH_MEMORY_SNAPSHOT_FRAME_SCHEMA_NAME",
     "GRAPH_MEMORY_SNAPSHOT_FRAME_SCHEMA_VERSION",
+    "TURN_ACTIVITY_GRAPH_LINK_ACTIVITY_KINDS",
+    "TURN_ACTIVITY_GRAPH_LINK_CODE_GENERATOR",
+    "TURN_ACTIVITY_GRAPH_LINK_FRAME_SCHEMA_NAME",
+    "TURN_ACTIVITY_GRAPH_LINK_FRAME_SCHEMA_VERSION",
     "TURN_GRAPH_ACCESS_LEDGER_FRAME_SCHEMA_NAME",
     "TURN_GRAPH_ACCESS_LEDGER_FRAME_SCHEMA_VERSION",
     "RLOOP_GRAPH_GUIDE_PACKET_FRAME_SCHEMA_NAME",
@@ -928,6 +1063,7 @@ __all__ = [
     "GraphMemorySnapshotFrame",
     "RLoopMemoryHandoffPacketFrame",
     "RLoopGraphGuidePacketFrame",
+    "TurnActivityGraphLinkFrame",
     "TurnGraphAccessLedgerFrame",
     "validate_core_ego_guide_worker_hint_frame",
     "validate_core_ego_time_axis_frame",
@@ -936,5 +1072,6 @@ __all__ = [
     "validate_graph_memory_snapshot_frame",
     "validate_r_loop_memory_handoff_packet_frame",
     "validate_rloop_graph_guide_packet_frame",
+    "validate_turn_activity_graph_link_frame",
     "validate_turn_graph_access_ledger_frame",
 ]

@@ -13,6 +13,7 @@ def test_core_import_baseline() -> None:
         "songryeon_core.core.schema_parts.trace_data",
         "songryeon_core.core.schemas",
         "songryeon_core.core.trace_store",
+        "songryeon_core.core.turn_activity_graph_links",
         "songryeon_core.runtime.dry_run",
         "songryeon_core.runtime.smoke_cases.document_memory",
         "songryeon_core.runtime.smoke_cases.router_fallback",

@@ -131,6 +131,8 @@ def run_smoke_tests() -> dict[str, object]:
         "tool_choice:L_controller_0002:read_doc",
         "L:return_summary_frame",
         "L:activity_ledger_frame",
+        "graph:turn_activity_graph_link:turn_dry_001",
+        "graph:activity_ledger:L:activity_ledger_frame",
         "L:control:0001",
         "L:control:0002",
         "L:control:0003",
@@ -162,6 +164,7 @@ def run_smoke_tests() -> dict[str, object]:
     runtime_count_smoke = _run_runtime_count_consistency_smoke()
     return_summary_smoke = _check_l_loop_return_summary(records)
     l_activity_ledger_smoke = _check_l_loop_activity_ledger(records)
+    turn_activity_graph_link_smoke = _check_turn_activity_graph_link(records)
     _check_runtime_explanation_fields(records)
     runtime_label_smoke = _check_runtime_metainfo_labels(result)
     live_trace_smoke = _run_live_trace_progress_stream_smoke()
@@ -269,6 +272,10 @@ def run_smoke_tests() -> dict[str, object]:
         "l_loop_activity_ledger_outputs": l_activity_ledger_smoke["output_count"],
         "l_loop_activity_ledger_tool_results": l_activity_ledger_smoke["tool_result_count"],
         "l_loop_activity_ledger_read_doc": l_activity_ledger_smoke["actual_read_doc_count"],
+        "turn_activity_graph_link_l_ledgers": turn_activity_graph_link_smoke["l_ledger_count"],
+        "turn_activity_graph_link_r_ledgers": turn_activity_graph_link_smoke["r_ledger_count"],
+        "turn_activity_graph_link_nodes": turn_activity_graph_link_smoke["node_count"],
+        "turn_activity_graph_link_edges": turn_activity_graph_link_smoke["edge_count"],
         "l_loop_read_doc_used": l_loop_control_smoke["read_doc_used"],
         "tool_distillation_count": distillation_smoke["distillation_count"],
         "tool_distillation_sources_l3": distillation_smoke["l3_uses_distillation"],
@@ -2372,6 +2379,76 @@ def _check_l_loop_activity_ledger(records: dict[str, object]) -> dict[str, objec
         "output_count": frame.get("output_data_id_count"),
         "tool_result_count": frame.get("tool_result_count"),
         "actual_read_doc_count": frame.get("actual_read_doc_count"),
+    }
+
+
+def _check_turn_activity_graph_link(records: dict[str, object]) -> dict[str, object]:
+    """raw capsule graph node와 L/R activity ledger graph node 연결을 확인한다."""
+
+    frame = records.get("graph:turn_activity_graph_link:turn_dry_001")
+    if not isinstance(frame, dict):
+        raise AssertionError("turn activity graph link frame is missing")
+    if frame.get("turn_capsule_graph_node_id") != "graph:raw_capsule:turn_dry_001":
+        raise AssertionError("turn activity graph link must point to raw capsule graph node")
+    if frame.get("generated_by") != "CODE:TURN_ACTIVITY_GRAPH_LINK_BUILDER":
+        raise AssertionError("turn activity graph link must reveal code builder")
+    if frame.get("info_class") != "absolute":
+        raise AssertionError("turn activity graph link must be absolute")
+    if frame.get("semantic_judgement_status") != "not_run":
+        raise AssertionError("turn activity graph link semantic judgement must be not_run")
+    l_ledger_ids = frame.get("l_loop_activity_ledger_data_ids")
+    r_ledger_ids = frame.get("r_graph_access_ledger_data_ids")
+    graph_node_ids = frame.get("activity_ledger_graph_node_ids")
+    graph_edge_ids = frame.get("activity_ledger_graph_edge_ids")
+    if l_ledger_ids != ["L:activity_ledger_frame"]:
+        raise AssertionError("turn activity graph link must include L activity ledger")
+    if r_ledger_ids != []:
+        raise AssertionError("default smoke should not include R access ledger in activity link")
+    if not isinstance(graph_node_ids, list) or len(graph_node_ids) != 1:
+        raise AssertionError("turn activity graph link must include one activity ledger node")
+    if not isinstance(graph_edge_ids, list) or len(graph_edge_ids) != 1:
+        raise AssertionError("turn activity graph link must include one activity ledger edge")
+
+    l_activity_node_id = "graph:activity_ledger:L:activity_ledger_frame"
+    l_activity_edge_id = (
+        "graph:edge:has_activity_ledger:"
+        "graph:raw_capsule:turn_dry_001:"
+        "graph:activity_ledger:L:activity_ledger_frame"
+    )
+    if graph_node_ids != [l_activity_node_id]:
+        raise AssertionError("turn activity graph link node id mismatch")
+    if graph_edge_ids != [l_activity_edge_id]:
+        raise AssertionError("turn activity graph link edge id mismatch")
+
+    node = records.get(l_activity_node_id)
+    if not isinstance(node, dict):
+        raise AssertionError("activity ledger graph node is missing")
+    if node.get("node_kind") != "activity_ledger":
+        raise AssertionError("activity ledger graph node kind mismatch")
+    if node.get("data_kind") != "l_loop_activity_ledger":
+        raise AssertionError("activity ledger graph node data kind mismatch")
+    if node.get("source_graph_node_ids") != ["graph:raw_capsule:turn_dry_001"]:
+        raise AssertionError("activity ledger graph node must point back to raw capsule")
+    if node.get("source_data_ids") != ["L:activity_ledger_frame"]:
+        raise AssertionError("activity ledger graph node must source L ledger")
+
+    edge = records.get(l_activity_edge_id)
+    if not isinstance(edge, dict):
+        raise AssertionError("activity ledger graph edge is missing")
+    if edge.get("edge_kind") != "HAS_ACTIVITY_LEDGER":
+        raise AssertionError("activity ledger graph edge kind mismatch")
+    if edge.get("from_node_id") != "graph:raw_capsule:turn_dry_001":
+        raise AssertionError("activity ledger graph edge source mismatch")
+    if edge.get("to_node_id") != l_activity_node_id:
+        raise AssertionError("activity ledger graph edge target mismatch")
+    if "L:activity_ledger_frame" not in edge.get("source_data_ids", []):
+        raise AssertionError("activity ledger graph edge must source L ledger")
+
+    return {
+        "l_ledger_count": len(l_ledger_ids),
+        "r_ledger_count": len(r_ledger_ids),
+        "node_count": len(graph_node_ids),
+        "edge_count": len(graph_edge_ids),
     }
 
 

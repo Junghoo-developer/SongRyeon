@@ -367,6 +367,44 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
                 )
             )
 
+    turn_activity_links = _payloads_with_type(
+        result,
+        "graph_memory:turn_activity_graph_link_frame",
+    )
+    if turn_activity_links:
+        lines.append("- Turn activity graph links:")
+        for frame in turn_activity_links:
+            lines.append(
+                "  - "
+                f"raw={frame.get('turn_capsule_graph_node_id', 'unknown')} / "
+                f"L_ledgers={_list_count(frame.get('l_loop_activity_ledger_data_ids'))} / "
+                f"R_ledgers={_list_count(frame.get('r_graph_access_ledger_data_ids'))} / "
+                f"nodes={_list_count(frame.get('activity_ledger_graph_node_ids'))} / "
+                f"edges={_list_count(frame.get('activity_ledger_graph_edge_ids'))}"
+            )
+            lines.extend(
+                _metainfo_lines(
+                    indent=4,
+                    generated_by=str(
+                        frame.get("generated_by")
+                        or "CODE:TURN_ACTIVITY_GRAPH_LINK_BUILDER"
+                    ),
+                    info_class=str(frame.get("info_class") or "absolute"),
+                    source_data_ids=_source_data_ids(
+                        frame,
+                        fallback=[
+                            str(
+                                frame.get("frame_id")
+                                or "graph:turn_activity_graph_link"
+                            )
+                        ],
+                    ),
+                    semantic_judgement_status=str(
+                        frame.get("semantic_judgement_status") or "not_run"
+                    ),
+                )
+            )
+
     relevance_selection_frames = _payloads_with_type(
         result,
         "node_output:memory_relevance_selection_frame",

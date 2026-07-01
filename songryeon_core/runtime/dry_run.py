@@ -7,6 +7,7 @@ from songryeon_core.core.graph_memory import (
     build_graph_memory_snapshot_from_capsules,
     record_graph_memory_for_capsules,
 )
+from songryeon_core.core.turn_activity_graph_links import record_turn_activity_graph_links
 from songryeon_core.core.schemas import (
     Node2InputFrame,
     R_ROUTE_EXPERIMENTAL_NEXT_0_MODE,
@@ -1202,6 +1203,16 @@ def run_dry_turn(
             input_ref=[r_loop_memory_handoff_trace_id],
             force_budget_exhausted=r_route_dry_run_force_budget_exhausted,
         )
+    (
+        turn_activity_graph_link_trace_id,
+        turn_activity_graph_link_frame_id,
+        turn_activity_graph_link_frame,
+    ) = record_turn_activity_graph_links(
+        trace_store=trace_store,
+        data_store=data_store,
+        turn_id=turn_id,
+        l_loop_activity_ledger_data_ids=l_activity_ledger_data_ids,
+    )
 
     result = {
         "turn_id": turn_id,
@@ -1368,6 +1379,20 @@ def run_dry_turn(
             r_loop_dry_run_result.access_ledger.frame_id
             if r_loop_dry_run_result is not None
             else None
+        ),
+        "turn_activity_graph_link_trace_id": turn_activity_graph_link_trace_id,
+        "turn_activity_graph_link_frame_id": turn_activity_graph_link_frame_id,
+        "turn_activity_graph_link_node_count": len(
+            turn_activity_graph_link_frame.activity_ledger_graph_node_ids
+        ),
+        "turn_activity_graph_link_edge_count": len(
+            turn_activity_graph_link_frame.activity_ledger_graph_edge_ids
+        ),
+        "turn_activity_graph_link_l_ledger_count": len(
+            turn_activity_graph_link_frame.l_loop_activity_ledger_data_ids
+        ),
+        "turn_activity_graph_link_r_ledger_count": len(
+            turn_activity_graph_link_frame.r_graph_access_ledger_data_ids
         ),
         "r_route_dry_run_candidate_surface_id": (
             r_loop_dry_run_result.candidate_surface.frame_id
