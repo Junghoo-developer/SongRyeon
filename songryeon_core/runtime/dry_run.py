@@ -4,6 +4,9 @@ from dataclasses import asdict
 
 from songryeon_core.core.data_store import DataStore
 from songryeon_core.core.graph_memory import (
+    CORE_EGO_ROOT_NODE_ID,
+    GraphMemoryBuildResult,
+    TIME_AXIS_NODE_ID,
     build_graph_memory_snapshot_from_capsules,
     record_graph_memory_for_capsules,
 )
@@ -408,23 +411,21 @@ def run_dry_turn(
             capsules=zero_state.previous_turn_capsules,
             batch_id=f"{turn_id}:r_route_experimental",
         )
-        r_graph_trace = trace_store.create_event(
+        (
+            r_graph_trace_id,
+            r_route_experimental_graph_data_ids,
+        ) = _record_r_route_experimental_graph_sources(
+            trace_store=trace_store,
+            data_store=data_store,
             turn_id=turn_id,
-            actor="graph_memory",
-            event_type="r_route_experimental_graph_snapshot",
+            graph_build=r_graph_build,
             input_ref=[route_trace_id],
-            output_ref=[
-                r_graph_build.snapshot.snapshot_id,
-                r_graph_build.guide_packet.packet_id,
-            ],
-            schema_status="passed",
         )
-        r_route_experimental_graph_data_ids = []
         append_movement(
             node_id="graph_memory",
             mode="r_route_experimental_graph_snapshot",
             input_trace_ids=[route_trace_id],
-            output_trace_ids=[r_graph_trace.event_id],
+            output_trace_ids=[r_graph_trace_id],
             input_data_ids=[route_data_id],
             output_data_ids=r_route_experimental_graph_data_ids,
             node_type="code",
@@ -439,7 +440,7 @@ def run_dry_turn(
             turn_id=turn_id,
             guide_packet=r_graph_build.guide_packet,
             packet_id="node_0:r_loop_memory_handoff_packet_frame:r_route_experimental",
-            input_ref=[r_graph_trace.event_id],
+            input_ref=[r_graph_trace_id],
             source_data_ids=[
                 r_graph_build.snapshot.snapshot_id,
                 r_graph_build.guide_packet.packet_id,
@@ -450,7 +451,7 @@ def run_dry_turn(
         append_movement(
             node_id="node_0",
             mode=R_ROUTE_EXPERIMENTAL_NEXT_0_MODE,
-            input_trace_ids=[r_graph_trace.event_id],
+            input_trace_ids=[r_graph_trace_id],
             output_trace_ids=[r_route_handoff_trace_id],
             input_data_ids=r_route_experimental_graph_data_ids,
             output_data_ids=[r_route_handoff_data_id],
@@ -1640,6 +1641,118 @@ def _unique_strings(values: list[str | None]) -> list[str]:
         seen.add(value)
         unique_values.append(value)
     return unique_values
+
+
+def _record_r_route_experimental_graph_sources(
+    *,
+    trace_store: TraceStore,
+    data_store: DataStore,
+    turn_id: str,
+    graph_build: GraphMemoryBuildResult,
+    input_ref: list[str],
+) -> tuple[str, list[str]]:
+    event = trace_store.create_event(
+        turn_id=turn_id,
+        actor="graph_memory",
+        event_type="r_route_experimental_graph_snapshot",
+        input_ref=input_ref,
+        output_ref=[
+            graph_build.snapshot.snapshot_id,
+            graph_build.guide_packet.packet_id,
+        ],
+        schema_status="passed",
+    )
+    recorded_data_ids: list[str] = []
+    skipped_shared_graph_ids = _r_route_experimental_shared_graph_ids()
+
+    for node in graph_build.nodes:
+        if node.node_id in skipped_shared_graph_ids:
+            continue
+        _record_payload_if_same_or_missing(
+            data_store=data_store,
+            data_id=node.node_id,
+            data_type=f"graph_memory:node:{node.node_kind}",
+            payload=asdict(node),
+            created_at=event.timestamp,
+            source_trace_id=event.event_id,
+            recorded_data_ids=recorded_data_ids,
+        )
+    for edge in graph_build.edges:
+        if edge.edge_id in skipped_shared_graph_ids:
+            continue
+        _record_payload_if_same_or_missing(
+            data_store=data_store,
+            data_id=edge.edge_id,
+            data_type=f"graph_memory:edge:{edge.edge_kind}",
+            payload=asdict(edge),
+            created_at=event.timestamp,
+            source_trace_id=event.event_id,
+            recorded_data_ids=recorded_data_ids,
+        )
+    for data_id, data_type, payload in [
+        (
+            graph_build.core_ego_time_axis.frame_id,
+            "graph_memory:core_ego_time_axis_frame",
+            asdict(graph_build.core_ego_time_axis),
+        ),
+        (
+            graph_build.snapshot.snapshot_id,
+            "graph_memory:snapshot",
+            asdict(graph_build.snapshot),
+        ),
+        (
+            graph_build.guide_packet.packet_id,
+            "graph_memory:rloop_guide_packet",
+            asdict(graph_build.guide_packet),
+        ),
+    ]:
+        _record_payload_if_same_or_missing(
+            data_store=data_store,
+            data_id=data_id,
+            data_type=data_type,
+            payload=payload,
+            created_at=event.timestamp,
+            source_trace_id=event.event_id,
+            recorded_data_ids=recorded_data_ids,
+        )
+
+    return event.event_id, _unique_strings(recorded_data_ids)
+
+
+def _r_route_experimental_shared_graph_ids() -> set[str]:
+    return {
+        CORE_EGO_ROOT_NODE_ID,
+        TIME_AXIS_NODE_ID,
+        f"graph:edge:contains:{CORE_EGO_ROOT_NODE_ID}:{TIME_AXIS_NODE_ID}",
+    }
+
+
+def _record_payload_if_same_or_missing(
+    *,
+    data_store: DataStore,
+    data_id: str,
+    data_type: str,
+    payload: dict[str, object],
+    created_at: str,
+    source_trace_id: str,
+    recorded_data_ids: list[str],
+) -> None:
+    existing = data_store.get_record(data_id)
+    if existing is not None:
+        if existing.data_type != data_type or existing.payload != payload:
+            raise ValueError(f"r experimental graph source collision: {data_id}")
+        recorded_data_ids.append(data_id)
+        return
+    data_store.create_record(
+        data_id=data_id,
+        data_type=data_type,
+        exists=True,
+        created_at=created_at,
+        source_trace_id=source_trace_id,
+        payload=payload,
+    )
+    recorded_data_ids.append(data_id)
+
 
 def _count_records_by_type(data_store: DataStore, data_type: str) -> int:
     return sum(1 for record in data_store.list_records() if record.data_type == data_type)

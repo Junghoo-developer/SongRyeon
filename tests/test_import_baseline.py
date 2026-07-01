@@ -12,6 +12,7 @@ def test_core_import_baseline() -> None:
         "songryeon_core.core.schema_parts.task_ledger",
         "songryeon_core.core.schema_parts.trace_data",
         "songryeon_core.core.schemas",
+        "songryeon_core.core.graph_memory_integrity",
         "songryeon_core.core.trace_store",
         "songryeon_core.core.turn_activity_graph_links",
         "songryeon_core.runtime.dry_run",
