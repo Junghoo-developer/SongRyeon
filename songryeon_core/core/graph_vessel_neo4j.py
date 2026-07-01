@@ -22,6 +22,15 @@ GRAPH_VESSEL_NEO4J_WRITE_RESULT_DATA_TYPE = "graph_vessel:neo4j_write_result"
 GRAPH_VESSEL_NEO4J_WRITER_GENERATOR = "CODE:GRAPH_VESSEL_NEO4J_WRITER"
 GRAPH_VESSEL_NEO4J_WRITE_POLICY_ID = "LOCAL_VESSEL_NEO4J_FIRST_WRITE_V0"
 GRAPH_VESSEL_NEO4J_WRITE_RESULT_SCHEMA_NAME = "GraphVesselNeo4jWriteResultFrame"
+GRAPH_VESSEL_BASE_LABEL = "VesselRecord"
+GRAPH_VESSEL_LEGACY_LABELS = (
+    "SongRyeonRecord",
+    "SongRyeonGraphNode",
+    "SongRyeonGraphEdgeRecord",
+    "SongRyeonSupportRecord",
+    "SongRyeonSourcePayload",
+)
+GRAPH_VESSEL_LEGACY_RELATIONSHIP_TYPE = "SONGRYEON_GRAPH_EDGE"
 GRAPH_VESSEL_NEO4J_WRITE_STATUSES = {
     "written",
     "adapter_unavailable",
@@ -390,7 +399,7 @@ def _execute_write_operation(
             record=record,
             graph_namespace=graph_namespace,
             written_at=written_at,
-            label="SongRyeonSourcePayload",
+            labels=["GraphMemorySource"],
         )
     elif operation_kind == "upsert_graph_node":
         _upsert_record_node(
@@ -398,7 +407,7 @@ def _execute_write_operation(
             record=record,
             graph_namespace=graph_namespace,
             written_at=written_at,
-            label="SongRyeonGraphNode",
+            labels=_graph_node_labels(record),
         )
     elif operation_kind == "upsert_graph_edge":
         _upsert_record_node(
@@ -406,7 +415,7 @@ def _execute_write_operation(
             record=record,
             graph_namespace=graph_namespace,
             written_at=written_at,
-            label="SongRyeonGraphEdgeRecord",
+            labels=["GraphMemoryEdgeRecord"],
         )
         _upsert_graph_relationship(
             tx,
@@ -420,7 +429,7 @@ def _execute_write_operation(
             record=record,
             graph_namespace=graph_namespace,
             written_at=written_at,
-            label="SongRyeonSupportRecord",
+            labels=_support_record_labels(record),
         )
     else:
         raise ValueError(f"unknown graph vessel operation_kind: {operation_kind}")
@@ -432,13 +441,15 @@ def _upsert_record_node(
     record: DataRecord,
     graph_namespace: str,
     written_at: str,
-    label: str,
+    labels: list[str],
 ) -> None:
+    label_clause = _label_clause([GRAPH_VESSEL_BASE_LABEL, *labels])
     tx.run(
         f"""
-        MERGE (n:SongRyeonRecord {{data_id: $data_id, graph_namespace: $graph_namespace}})
+        MERGE (n {{data_id: $data_id, graph_namespace: $graph_namespace}})
+        {_legacy_label_remove_clause("n")}
         SET n += $properties
-        SET n:{label}
+        SET n{label_clause}
         """,
         data_id=record.data_id,
         graph_namespace=graph_namespace,
@@ -459,11 +470,17 @@ def _upsert_graph_relationship(
     from_node_id = _require_str(record.payload, "from_node_id")
     to_node_id = _require_str(record.payload, "to_node_id")
     edge_kind = _require_str(record.payload, "edge_kind")
+    relationship_type = _relationship_type(record.payload)
     tx.run(
-        """
-        MERGE (from_node:SongRyeonRecord {data_id: $from_node_id, graph_namespace: $graph_namespace})
-        MERGE (to_node:SongRyeonRecord {data_id: $to_node_id, graph_namespace: $graph_namespace})
-        MERGE (from_node)-[r:SONGRYEON_GRAPH_EDGE {edge_id: $edge_id, graph_namespace: $graph_namespace}]->(to_node)
+        f"""
+        OPTIONAL MATCH ()-[old:{GRAPH_VESSEL_LEGACY_RELATIONSHIP_TYPE} {{edge_id: $edge_id, graph_namespace: $graph_namespace}}]->()
+        WITH collect(old) AS old_edges
+        FOREACH (old_edge IN old_edges | DELETE old_edge)
+        MERGE (from_node {{data_id: $from_node_id, graph_namespace: $graph_namespace}})
+        MERGE (to_node {{data_id: $to_node_id, graph_namespace: $graph_namespace}})
+        SET from_node:{GRAPH_VESSEL_BASE_LABEL}
+        SET to_node:{GRAPH_VESSEL_BASE_LABEL}
+        MERGE (from_node)-[r:{relationship_type} {{edge_id: $edge_id, graph_namespace: $graph_namespace}}]->(to_node)
         SET r += $properties
         """,
         from_node_id=from_node_id,
@@ -473,6 +490,7 @@ def _upsert_graph_relationship(
         properties={
             "edge_id": edge_id,
             "edge_kind": edge_kind,
+            "display_relationship_type": relationship_type,
             "source_data_id": record.data_id,
             "source_data_type": record.data_type,
             "payload_json": _json(record.payload),
@@ -490,14 +508,15 @@ def _upsert_graph_relationship(
 def _read_vessel_counts(tx: object, graph_namespace: str) -> tuple[int, int]:
     node_result = tx.run(
         """
-        MATCH (n:SongRyeonRecord {graph_namespace: $graph_namespace})
+        MATCH (n:VesselRecord {graph_namespace: $graph_namespace})
         RETURN count(n) AS count
         """,
         graph_namespace=graph_namespace,
     )
     edge_result = tx.run(
         """
-        MATCH ()-[r:SONGRYEON_GRAPH_EDGE {graph_namespace: $graph_namespace}]->()
+        MATCH ()-[r {graph_namespace: $graph_namespace}]->()
+        WHERE r.display_relationship_type IS NOT NULL
         RETURN count(r) AS count
         """,
         graph_namespace=graph_namespace,
@@ -523,6 +542,9 @@ def _record_properties(
             "payload_json": _json(record.payload),
             "payload_char_count": len(_json(record.payload)),
             "written_at": written_at,
+            "display_name": _display_name(record),
+            "display_kind": _display_kind(record),
+            "display_label": _display_label(record),
             "generated_by": _payload_str(payload, "generated_by"),
             "info_class": _payload_str(payload, "info_class"),
             "semantic_judgement_status": _payload_str(payload, "semantic_judgement_status"),
@@ -552,6 +574,131 @@ def _validate_write_result(result: GraphVesselNeo4jWriteResultFrame) -> None:
         raise ValueError("written result must mark external_write_status=written")
     if result.write_status != "written" and result.external_write_status != "not_run":
         raise ValueError("non-written result must mark external_write_status=not_run")
+
+
+def _graph_node_labels(record: DataRecord) -> list[str]:
+    payload = record.payload if isinstance(record.payload, dict) else {}
+    node_kind = _payload_str(payload, "node_kind")
+    label_by_node_kind = {
+        "core_ego": "CoreEgo",
+        "time_axis": "TimeAxis",
+        "time_bundle": "TimeBundle",
+        "raw_capsule": "RawCapsule",
+        "raw_source": "RawSource",
+        "source_kind_bundle": "SourceKindBundle",
+        "source_ingest_time_bundle": "SourceIngestBundle",
+    }
+    return ["GraphMemoryNode", label_by_node_kind.get(node_kind, "GraphMemoryNode")]
+
+
+def _support_record_labels(record: DataRecord) -> list[str]:
+    if record.data_type == "graph_memory:snapshot":
+        return ["GraphMemorySnapshot"]
+    if record.data_type == "graph_memory:rloop_guide_packet":
+        return ["RLoopGuide"]
+    return ["GraphMemoryIndex"]
+
+
+def _relationship_type(payload: dict[str, object]) -> str:
+    edge_kind = _require_str(payload, "edge_kind")
+    from_node_id = _require_str(payload, "from_node_id")
+    to_node_id = _require_str(payload, "to_node_id")
+    if edge_kind == "NEXT":
+        return "NEXT"
+    if edge_kind == "CHILD_OF_TIME_AXIS":
+        return "HAS_BUNDLE"
+    if edge_kind == "CONTAINS":
+        if from_node_id == "graph:core_ego:root" and to_node_id == "graph:axis:time":
+            return "HAS_AXIS"
+        if from_node_id.startswith("graph:time_bundle:") and to_node_id.startswith("graph:raw_capsule:"):
+            return "CONTAINS_MEMORY"
+        if from_node_id.startswith("graph:source_ingest_time_bundle:") and to_node_id.startswith("graph:source_kind_bundle:"):
+            return "HAS_SOURCE_KIND"
+        if from_node_id.startswith("graph:source_kind_bundle:") and to_node_id.startswith("graph:raw_source:"):
+            return "CONTAINS_SOURCE"
+        return "CONTAINS"
+    return _safe_relationship_type(edge_kind)
+
+
+def _display_name(record: DataRecord) -> str:
+    payload = record.payload if isinstance(record.payload, dict) else {}
+    node_kind = _payload_str(payload, "node_kind")
+    if node_kind == "core_ego":
+        return "CoreEgo"
+    if node_kind == "time_axis":
+        return "Time Axis"
+    if node_kind == "time_bundle":
+        return "Time Bundle"
+    if node_kind == "raw_capsule":
+        return f"Raw Capsule: {_payload_str(payload, 'source_turn_id') or record.data_id}"
+    if node_kind == "raw_source":
+        return f"Raw Source: {_payload_str(payload, 'data_kind') or record.data_id}"
+    if record.data_type == "graph_memory:snapshot":
+        return "Graph Memory Snapshot"
+    if record.data_type == "graph_memory:rloop_guide_packet":
+        return "R Loop Guide"
+    if record.data_type == "graph_memory:core_ego_time_axis_frame":
+        return "CoreEgo Time Axis Index"
+    if record.data_type.startswith("graph_source:"):
+        return f"Graph Source: {record.data_type}"
+    if record.data_type.startswith("graph_memory:edge:"):
+        return f"Graph Edge Record: {_payload_str(payload, 'edge_kind') or record.data_id}"
+    return record.data_id
+
+
+def _display_kind(record: DataRecord) -> str:
+    payload = record.payload if isinstance(record.payload, dict) else {}
+    return (
+        _payload_str(payload, "node_kind")
+        or _payload_str(payload, "edge_kind")
+        or record.data_type
+    )
+
+
+def _display_label(record: DataRecord) -> str:
+    labels = (
+        _graph_node_labels(record)
+        if record.data_type.startswith("graph_memory:node:")
+        else _support_record_labels(record)
+        if record.data_type in {
+            "graph_memory:snapshot",
+            "graph_memory:rloop_guide_packet",
+            "graph_memory:core_ego_time_axis_frame",
+            "graph_source:source_kind_ingest_frame",
+            "graph_source:songryeon_core_source_manifest_frame",
+        }
+        else ["GraphMemorySource"]
+        if record.data_type.startswith("graph_source:")
+        else ["GraphMemoryEdgeRecord"]
+        if record.data_type.startswith("graph_memory:edge:")
+        else [GRAPH_VESSEL_BASE_LABEL]
+    )
+    return labels[-1]
+
+
+def _label_clause(labels: list[str]) -> str:
+    return "".join(f":{_safe_label(label)}" for label in _unique_strings(labels))
+
+
+def _legacy_label_remove_clause(variable_name: str) -> str:
+    labels = "".join(f":{label}" for label in GRAPH_VESSEL_LEGACY_LABELS)
+    return f"REMOVE {variable_name}{labels}"
+
+
+def _safe_label(value: str) -> str:
+    if not value or not value.replace("_", "").isalnum() or not value[0].isalpha():
+        raise ValueError(f"unsafe Neo4j label: {value}")
+    return value
+
+
+def _safe_relationship_type(value: str) -> str:
+    candidate = "".join(char if char.isalnum() else "_" for char in value.upper())
+    while "__" in candidate:
+        candidate = candidate.replace("__", "_")
+    candidate = candidate.strip("_")
+    if not candidate or not candidate[0].isalpha():
+        raise ValueError(f"unsafe Neo4j relationship type: {value}")
+    return candidate
 
 
 def _record_payload_if_missing(

@@ -184,6 +184,46 @@ def test_neo4j_writer_does_not_create_semantic_fields() -> None:
     assert payload["semantic_judgement_status"] == "not_run"
 
 
+def test_neo4j_writer_uses_human_readable_display_vocabulary() -> None:
+    trace_store, data_store, plan_id = _store_with_write_plan()
+    fake_driver_factory = FakeNeo4jDriverFactory()
+
+    result = record_graph_vessel_neo4j_write_result(
+        trace_store=trace_store,
+        data_store=data_store,
+        turn_id="turn_order_161",
+        plan_id=plan_id,
+        config=_config(),
+        created_at=WRITTEN_AT,
+        driver_factory=fake_driver_factory,
+    )
+
+    assert result.result.write_status == "written"
+    assert fake_driver_factory.last_driver is not None
+    queries = "\n".join(query for query, _kwargs in fake_driver_factory.last_driver.queries)
+    assert "SET n:VesselRecord" in queries
+    assert "REMOVE n:SongRyeonRecord" in queries
+    assert ":CoreEgo" in queries
+    assert ":TimeAxis" in queries
+    assert ":TimeBundle" in queries
+    assert ":RawCapsule" in queries
+    assert "r:HAS_AXIS" in queries
+    assert "r:HAS_BUNDLE" in queries
+    assert "r:CONTAINS_MEMORY" in queries
+
+    property_sets = [
+        kwargs["properties"]
+        for _query, kwargs in fake_driver_factory.last_driver.queries
+        if isinstance(kwargs.get("properties"), dict)
+    ]
+    assert any(item.get("display_name") == "CoreEgo" for item in property_sets)
+    assert any(item.get("display_label") == "RawCapsule" for item in property_sets)
+    assert any(
+        item.get("display_relationship_type") == "HAS_AXIS"
+        for item in property_sets
+    )
+
+
 def test_neo4j_write_result_is_idempotent_for_same_plan_and_timestamp() -> None:
     trace_store, data_store, plan_id = _store_with_write_plan()
 

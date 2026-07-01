@@ -151,3 +151,4 @@
 - [order_158_graph_memory_export_packet_2026_07_01_001.md](order_158_graph_memory_export_packet_2026_07_01_001.md)
 - [order_159_vessel_adapter_write_plan_boundary_2026_07_01_001.md](order_159_vessel_adapter_write_plan_boundary_2026_07_01_001.md)
 - [order_160_local_vessel_neo4j_first_write_2026_07_01_001.md](order_160_local_vessel_neo4j_first_write_2026_07_01_001.md)
+- [order_161_vessel_display_vocabulary_2026_07_01_001.md](order_161_vessel_display_vocabulary_2026_07_01_001.md)
