@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 from songryeon_core.runtime.dry_run import run_dry_turn
+from songryeon_core.runtime.fast_test import run_fast_tests
 from songryeon_core.runtime.l_loop_smoke import run_qwen_l_loop_smoke
 from songryeon_core.runtime.replay import replay_run
 from songryeon_core.runtime.smoke_test import run_smoke_tests
@@ -92,6 +93,10 @@ def main() -> None:
 
     # smoke-test는 "지금 기준선이 깨졌는가?"를 빠르게 확인하는 자동 점검이다.
     subparsers.add_parser("smoke-test")
+    fast_test_parser = subparsers.add_parser("fast-test")
+    fast_test_parser.add_argument("--profile", choices=["core", "graph"], default="graph")
+    fast_test_parser.add_argument("--skip-compileall", action="store_true")
+    fast_test_parser.add_argument("--dry-run", action="store_true")
 
     args = parser.parse_args()
 
@@ -180,6 +185,15 @@ def main() -> None:
         _run_qwen_chat(args)
     elif args.command == "smoke-test":
         print(json.dumps(run_smoke_tests(), ensure_ascii=False, indent=2))
+    elif args.command == "fast-test":
+        result = run_fast_tests(
+            profile=args.profile,
+            skip_compileall=args.skip_compileall,
+            dry_run=args.dry_run,
+        )
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        if result["status"] == "FAST_TEST_FAILED":
+            raise SystemExit(1)
 
 
 def _add_turn_runtime_args(parser: argparse.ArgumentParser, *, include_qwen_args: bool) -> None:

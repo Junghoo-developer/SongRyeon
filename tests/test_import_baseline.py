@@ -15,6 +15,7 @@ def test_core_import_baseline() -> None:
         "songryeon_core.core.graph_memory_integrity",
         "songryeon_core.core.trace_store",
         "songryeon_core.core.turn_activity_graph_links",
+        "songryeon_core.runtime.fast_test",
         "songryeon_core.runtime.dry_run",
         "songryeon_core.runtime.smoke_cases.document_memory",
         "songryeon_core.runtime.smoke_cases.router_fallback",
