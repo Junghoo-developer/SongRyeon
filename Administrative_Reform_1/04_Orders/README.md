@@ -2,7 +2,7 @@
 
 발주서는 개발 지도에서 내려온 실무 계획서다.
 
-현재 정식 발주서는 `ORDER_001`부터 `ORDER_158`까지 있다.
+현재 정식 발주서는 `ORDER_001`부터 `ORDER_159`까지 있다.
 
 `ORDER_066`부터 `ORDER_075`까지는 메타정보 관리법을 실제 런타임과 LLM 노드 배선에 적용하기 위한 복구 로드맵이다.
 
@@ -131,6 +131,8 @@
 `ORDER_145`는 live route=R을 열기 전에 현재 R skeleton이 dry-run opt-in 상태로 닫혀 있음을 문서와 테스트 기준선으로 감사하는 발주서다.
 
 `ORDER_146`은 기본 route set은 L/2로 유지하되, 명시 실험 플래그가 있을 때만 node_1 LLM이 `route=R`을 고르고 `R:experimental:*` skeleton을 실행할 수 있게 하는 발주서다.
+
+`ORDER_147`부터 `ORDER_159`까지는 R 결과 전달, graph traversal, activity ledger, graph source ingest, export packet, Vessel write plan boundary를 순서대로 잠그는 그래프 메모리/심야정부 전초 작업이다.
 
 ## 임시 발주서
 
@@ -271,3 +273,4 @@
 - [ORDER 156: Graph Source Observation Time And CoreEgo Link v0](ORDER_156_GRAPH_SOURCE_OBSERVATION_TIME_AND_CORE_EGO_LINK_V0.md)
 - [ORDER 157: SongRyeon Core Source Ingest Manifest v0](ORDER_157_SONGRYEON_CORE_SOURCE_INGEST_MANIFEST_V0.md)
 - [ORDER 158: Graph Memory Export Packet v0](ORDER_158_GRAPH_MEMORY_EXPORT_PACKET_V0.md)
+- [ORDER 159: Vessel Adapter Write Plan Boundary v0](ORDER_159_VESSEL_ADAPTER_WRITE_PLAN_BOUNDARY_V0.md)

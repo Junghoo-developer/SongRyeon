@@ -15,6 +15,7 @@ def test_core_import_baseline() -> None:
         "songryeon_core.core.graph_memory_export",
         "songryeon_core.core.graph_memory_integrity",
         "songryeon_core.core.graph_source_ingest",
+        "songryeon_core.core.graph_vessel_adapter",
         "songryeon_core.core.songryeon_source_manifest",
         "songryeon_core.core.trace_store",
         "songryeon_core.core.turn_activity_graph_links",
