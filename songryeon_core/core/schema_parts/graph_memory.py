@@ -36,6 +36,7 @@ GRAPH_MEMORY_NODE_KINDS = {
     "time_bundle",
     "activity_ledger",
     "raw_source",
+    "source_ingest_time_bundle",
     "source_kind_bundle",
 }
 GRAPH_MEMORY_EDGE_KINDS = {
@@ -96,6 +97,11 @@ class GraphMemoryNodeFrame:
     char_budget: int | None = None
     source_char_count: int = 0
     char_budget_status: str = "not_applicable"
+    observed_at: str | None = None
+    ingested_at: str | None = None
+    source_last_modified_at: str | None = None
+    exists_at_ingest: bool | None = None
+    content_sha1: str | None = None
     source_graph_node_ids: list[str] = field(default_factory=list)
     source_trace_ids: list[str] = field(default_factory=list)
     source_data_ids: list[str] = field(default_factory=list)
@@ -378,11 +384,34 @@ def validate_graph_memory_node_frame(frame: GraphMemoryNodeFrame) -> None:
             raise ValueError("raw source source_summary_count must be 0")
         if not frame.source_data_ids:
             raise ValueError("raw source graph node must cite source file data")
+        if not frame.observed_at:
+            raise ValueError("raw source graph node must include observed_at")
+        if not frame.ingested_at:
+            raise ValueError("raw source graph node must include ingested_at")
+        if not frame.source_last_modified_at:
+            raise ValueError("raw source graph node must include source_last_modified_at")
+        if frame.exists_at_ingest is not True:
+            raise ValueError("raw source graph node must have exists_at_ingest=True")
+        if not frame.content_sha1:
+            raise ValueError("raw source graph node must include content_sha1")
+    if frame.node_kind == "source_ingest_time_bundle":
+        if not frame.source_graph_node_ids:
+            raise ValueError("source ingest time bundle must contain source kind bundles")
+        if frame.source_leaf_count < len(frame.source_graph_node_ids):
+            raise ValueError("source ingest time bundle source_leaf_count is too small")
+        if not frame.observed_at:
+            raise ValueError("source ingest time bundle must include observed_at")
+        if not frame.ingested_at:
+            raise ValueError("source ingest time bundle must include ingested_at")
     if frame.node_kind == "source_kind_bundle":
         if not frame.source_graph_node_ids:
             raise ValueError("source kind bundle must contain raw source graph nodes")
         if frame.source_leaf_count != len(frame.source_graph_node_ids):
             raise ValueError("source kind bundle source_leaf_count must mirror children")
+        if not frame.observed_at:
+            raise ValueError("source kind bundle must include observed_at")
+        if not frame.ingested_at:
+            raise ValueError("source kind bundle must include ingested_at")
 
 
 def validate_graph_memory_edge_frame(frame: GraphMemoryEdgeFrame) -> None:
