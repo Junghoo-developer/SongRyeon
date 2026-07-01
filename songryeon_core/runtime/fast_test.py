@@ -52,6 +52,7 @@ def build_fast_test_steps(
                 "tests/test_order_153_graph_memory_integrity.py",
                 "tests/test_order_155_graph_source_kind_ingest.py",
                 "tests/test_order_156_graph_source_observation_time_and_core_link.py",
+                "tests/test_order_157_songryeon_core_source_manifest.py",
             ]
         )
     steps.append(

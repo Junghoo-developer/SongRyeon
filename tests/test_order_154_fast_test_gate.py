@@ -24,6 +24,9 @@ def test_fast_test_graph_profile_includes_current_graph_boundary_tests() -> None
     assert "tests/test_order_147_r_result_to_node3_brief.py" in pytest_command
     assert "tests/test_order_152_raw_capsule_activity_graph_link.py" in pytest_command
     assert "tests/test_order_153_graph_memory_integrity.py" in pytest_command
+    assert "tests/test_order_155_graph_source_kind_ingest.py" in pytest_command
+    assert "tests/test_order_156_graph_source_observation_time_and_core_link.py" in pytest_command
+    assert "tests/test_order_157_songryeon_core_source_manifest.py" in pytest_command
 
 
 def test_fast_test_rejects_unknown_profile() -> None:

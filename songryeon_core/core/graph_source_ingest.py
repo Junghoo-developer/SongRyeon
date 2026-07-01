@@ -35,6 +35,7 @@ GRAPH_SOURCE_KIND_INGEST_GENERATOR = "CODE:GRAPH_SOURCE_KIND_INGEST"
 GRAPH_SOURCE_KIND_BUNDLE_POLICY_ID = "SOURCE_KIND_SEPARATED_INGEST_V0"
 GRAPH_SOURCE_OBSERVATION_POLICY_ID = "SOURCE_OBSERVATION_SNAPSHOT_V0"
 GRAPH_SOURCE_FILE_DATA_TYPE = "graph_source:file_metadata"
+GRAPH_SOURCE_TEXT_SNAPSHOT_DATA_TYPE = "graph_source:file_text_snapshot"
 GRAPH_SOURCE_INGEST_FRAME_DATA_TYPE = "graph_source:source_kind_ingest_frame"
 
 
@@ -43,6 +44,7 @@ class GraphSourceKindIngestResult:
     frame_id: str
     trace_event_id: str
     source_file_data_ids: list[str]
+    source_text_snapshot_data_ids: list[str]
     source_ingest_time_bundle_node_id: str
     raw_source_node_ids: list[str]
     source_kind_bundle_node_ids: list[str]
@@ -62,6 +64,8 @@ class _PreparedSourceFile:
     suffix: str
     char_count: int
     content_sha1: str
+    text: str
+    text_snapshot_data_id: str | None
     observed_at: str
     ingested_at: str
     source_last_modified_at: str
@@ -80,6 +84,7 @@ def record_graph_source_kind_ingest(
     input_ref: list[str] | None = None,
     observed_at: str | None = None,
     ingested_at: str | None = None,
+    store_text_snapshots: bool = False,
 ) -> GraphSourceKindIngestResult:
     """Record source-kind-separated file coordinates as graph memory leaves."""
 
@@ -95,12 +100,14 @@ def record_graph_source_kind_ingest(
         source_paths_by_kind,
         observed_at=observation_time,
         ingested_at=ingest_time,
+        store_text_snapshots=store_text_snapshots,
     )
     _require_core_ego_time_axis(data_store)
     raw_nodes: list[GraphMemoryNodeFrame] = []
     bundle_nodes: list[GraphMemoryNodeFrame] = []
     edges: list[GraphMemoryEdgeFrame] = []
     source_file_data_ids: list[str] = []
+    source_text_snapshot_data_ids: list[str] = []
     source_kind_counts: dict[str, int] = {}
 
     for source_kind in sorted(prepared_by_kind):
@@ -110,6 +117,11 @@ def record_graph_source_kind_ingest(
         source_kind_counts[source_kind] = len(prepared_files)
         source_file_data_ids.extend(
             prepared.source_file_data_id for prepared in prepared_files
+        )
+        source_text_snapshot_data_ids.extend(
+            prepared.text_snapshot_data_id
+            for prepared in prepared_files
+            if prepared.text_snapshot_data_id is not None
         )
 
         kind_raw_nodes = [
@@ -171,7 +183,7 @@ def record_graph_source_kind_ingest(
         source_kind_bundle_nodes=bundle_nodes,
         raw_nodes=raw_nodes,
         edges=edges,
-        source_file_data_ids=source_file_data_ids,
+        source_data_ids=[*source_file_data_ids, *source_text_snapshot_data_ids],
     )
     validate_graph_memory_snapshot_frame(graph_snapshot)
     guide_packet = _build_source_ingest_guide_packet(
@@ -184,6 +196,7 @@ def record_graph_source_kind_ingest(
             *raw_source_node_ids,
             *graph_edge_ids,
             *source_file_data_ids,
+            *source_text_snapshot_data_ids,
         ],
     )
     validate_rloop_graph_guide_packet_frame(guide_packet)
@@ -224,6 +237,17 @@ def record_graph_source_kind_ingest(
             created_data_ids=created_data_ids,
             existing_data_ids=existing_data_ids,
         )
+        if prepared.text_snapshot_data_id is not None:
+            _record_payload_if_missing(
+                data_store=data_store,
+                data_id=prepared.text_snapshot_data_id,
+                data_type=GRAPH_SOURCE_TEXT_SNAPSHOT_DATA_TYPE,
+                payload=_source_text_snapshot_payload(prepared),
+                created_at=timestamp,
+                source_trace_id=event.event_id,
+                created_data_ids=created_data_ids,
+                existing_data_ids=existing_data_ids,
+            )
 
     for node in [source_ingest_time_bundle_node, *bundle_nodes, *raw_nodes]:
         _record_payload_if_missing(
@@ -281,6 +305,8 @@ def record_graph_source_kind_ingest(
         "rloop_graph_guide_packet_id": guide_packet.packet_id,
         "source_kind_counts": source_kind_counts,
         "source_file_data_ids": source_file_data_ids,
+        "source_text_snapshot_data_ids": source_text_snapshot_data_ids,
+        "text_snapshot_status": "stored" if store_text_snapshots else "not_stored",
         "raw_source_node_ids": raw_source_node_ids,
         "source_kind_bundle_node_ids": source_kind_bundle_node_ids,
         "graph_edge_ids": graph_edge_ids,
@@ -295,6 +321,7 @@ def record_graph_source_kind_ingest(
             *raw_source_node_ids,
             *graph_edge_ids,
             *source_file_data_ids,
+            *source_text_snapshot_data_ids,
         ],
         "generated_by": GRAPH_SOURCE_KIND_INGEST_GENERATOR,
         "info_class": "absolute",
@@ -315,6 +342,7 @@ def record_graph_source_kind_ingest(
         frame_id=frame_id,
         trace_event_id=event.event_id,
         source_file_data_ids=source_file_data_ids,
+        source_text_snapshot_data_ids=source_text_snapshot_data_ids,
         source_ingest_time_bundle_node_id=source_ingest_time_bundle_node_id,
         raw_source_node_ids=raw_source_node_ids,
         source_kind_bundle_node_ids=source_kind_bundle_node_ids,
@@ -354,6 +382,16 @@ def source_file_data_id(
     return f"source_file:{source_kind}:{_source_digest(source_kind, path, content_sha1, observed_at)}"
 
 
+def source_text_snapshot_data_id(
+    *,
+    source_kind: str,
+    path: str | Path,
+    content_sha1: str,
+    observed_at: str,
+) -> str:
+    return f"source_text:{source_kind}:{_source_digest(source_kind, path, content_sha1, observed_at)}"
+
+
 def raw_source_graph_node_id(
     *,
     source_kind: str,
@@ -369,6 +407,7 @@ def _prepare_source_files_by_kind(
     *,
     observed_at: str,
     ingested_at: str,
+    store_text_snapshots: bool,
 ) -> dict[str, list[_PreparedSourceFile]]:
     prepared_by_kind: dict[str, list[_PreparedSourceFile]] = {}
     for source_kind, paths in source_paths_by_kind.items():
@@ -390,6 +429,16 @@ def _prepare_source_files_by_kind(
             ).isoformat(timespec="seconds")
             text = path.read_text(encoding="utf-8")
             content_sha1 = hashlib.sha1(text.encode("utf-8")).hexdigest()
+            text_snapshot_id = (
+                source_text_snapshot_data_id(
+                    source_kind=source_kind,
+                    path=path,
+                    content_sha1=content_sha1,
+                    observed_at=observed_at,
+                )
+                if store_text_snapshots
+                else None
+            )
             prepared_files.append(
                 _PreparedSourceFile(
                     source_kind=source_kind,
@@ -398,6 +447,8 @@ def _prepare_source_files_by_kind(
                     suffix=path.suffix,
                     char_count=len(text),
                     content_sha1=content_sha1,
+                    text=text,
+                    text_snapshot_data_id=text_snapshot_id,
                     observed_at=observed_at,
                     ingested_at=ingested_at,
                     source_last_modified_at=source_last_modified_at,
@@ -440,7 +491,12 @@ def _build_raw_source_node(prepared: _PreparedSourceFile) -> GraphMemoryNodeFram
         content_sha1=prepared.content_sha1,
         source_graph_node_ids=[],
         source_trace_ids=[],
-        source_data_ids=[prepared.source_file_data_id],
+        source_data_ids=_unique_strings(
+            [
+                prepared.source_file_data_id,
+                prepared.text_snapshot_data_id,
+            ]
+        ),
         generated_by=GRAPH_MEMORY_CODE_GENERATOR,
         info_class="absolute",
         semantic_judgement_status="not_run",
@@ -602,7 +658,7 @@ def _build_source_ingest_snapshot(
     source_kind_bundle_nodes: list[GraphMemoryNodeFrame],
     raw_nodes: list[GraphMemoryNodeFrame],
     edges: list[GraphMemoryEdgeFrame],
-    source_file_data_ids: list[str],
+    source_data_ids: list[str],
 ) -> GraphMemorySnapshotFrame:
     graph_node_ids = [
         CORE_EGO_ROOT_NODE_ID,
@@ -639,7 +695,7 @@ def _build_source_ingest_snapshot(
             [
                 *graph_node_ids,
                 *graph_edge_ids,
-                *source_file_data_ids,
+                *source_data_ids,
             ]
         ),
         generated_by=GRAPH_MEMORY_CODE_GENERATOR,
@@ -692,6 +748,21 @@ def _source_file_payload(prepared: _PreparedSourceFile) -> dict[str, object]:
         "content_sha1": prepared.content_sha1,
         "generated_by": GRAPH_SOURCE_KIND_INGEST_GENERATOR,
         "info_class": "absolute",
+        "semantic_judgement_status": "not_run",
+    }
+
+
+def _source_text_snapshot_payload(prepared: _PreparedSourceFile) -> dict[str, object]:
+    return {
+        "source_kind": prepared.source_kind,
+        "path": prepared.path,
+        "observed_at": prepared.observed_at,
+        "ingested_at": prepared.ingested_at,
+        "content_sha1": prepared.content_sha1,
+        "char_count": prepared.char_count,
+        "text": prepared.text,
+        "generated_by": GRAPH_SOURCE_KIND_INGEST_GENERATOR,
+        "info_class": "absolute_copied_source",
         "semantic_judgement_status": "not_run",
     }
 
@@ -805,6 +876,7 @@ __all__ = [
     "GRAPH_SOURCE_KIND_BUNDLE_POLICY_ID",
     "GRAPH_SOURCE_KIND_INGEST_GENERATOR",
     "GRAPH_SOURCE_OBSERVATION_POLICY_ID",
+    "GRAPH_SOURCE_TEXT_SNAPSHOT_DATA_TYPE",
     "GraphSourceKindIngestResult",
     "graph_source_ingest_snapshot_id",
     "graph_source_kind_ingest_frame_id",
@@ -813,4 +885,5 @@ __all__ = [
     "source_file_data_id",
     "source_ingest_time_bundle_graph_node_id",
     "source_kind_bundle_graph_node_id",
+    "source_text_snapshot_data_id",
 ]
