@@ -153,3 +153,4 @@
 - [order_160_local_vessel_neo4j_first_write_2026_07_01_001.md](order_160_local_vessel_neo4j_first_write_2026_07_01_001.md)
 - [order_161_vessel_display_vocabulary_2026_07_01_001.md](order_161_vessel_display_vocabulary_2026_07_01_001.md)
 - [order_162_vessel_readback_verification_2026_07_01_001.md](order_162_vessel_readback_verification_2026_07_01_001.md)
+- [order_163_vessel_inspect_manual_walk_2026_07_01_001.md](order_163_vessel_inspect_manual_walk_2026_07_01_001.md)

@@ -57,6 +57,7 @@ def build_fast_test_steps(
                 "tests/test_order_159_vessel_adapter_boundary.py",
                 "tests/test_order_160_local_vessel_neo4j_writer.py",
                 "tests/test_order_162_vessel_readback_verification.py",
+                "tests/test_order_163_vessel_inspect_manual_walk.py",
             ]
         )
     steps.append(

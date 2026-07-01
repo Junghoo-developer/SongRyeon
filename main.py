@@ -8,6 +8,10 @@ from pathlib import Path
 from songryeon_core.runtime.dry_run import run_dry_turn
 from songryeon_core.runtime.fast_test import run_fast_tests
 from songryeon_core.runtime.graph_vessel_first_write import run_local_vessel_first_write
+from songryeon_core.runtime.graph_vessel_inspect import (
+    render_vessel_inspect_text,
+    run_local_vessel_inspect,
+)
 from songryeon_core.runtime.graph_vessel_readback import run_local_vessel_readback
 from songryeon_core.runtime.l_loop_smoke import run_qwen_l_loop_smoke
 from songryeon_core.runtime.replay import replay_run
@@ -120,6 +124,17 @@ def main() -> None:
     vessel_readback_parser.add_argument("--password", default=None)
     vessel_readback_parser.add_argument("--database", default=None)
     vessel_readback_parser.add_argument("--allow-no-auth", action="store_true")
+
+    vessel_inspect_parser = subparsers.add_parser("vessel-inspect")
+    vessel_inspect_parser.add_argument("--batch-id", default="manual_vessel_inspect")
+    vessel_inspect_parser.add_argument("--turn-id", default="turn_vessel_inspect_0001")
+    vessel_inspect_parser.add_argument("--uri", default=None)
+    vessel_inspect_parser.add_argument("--user", default=None)
+    vessel_inspect_parser.add_argument("--password", default=None)
+    vessel_inspect_parser.add_argument("--database", default=None)
+    vessel_inspect_parser.add_argument("--allow-no-auth", action="store_true")
+    vessel_inspect_parser.add_argument("--limit", type=int, default=50)
+    vessel_inspect_parser.add_argument("--format", choices=["json", "text"], default="json")
 
     args = parser.parse_args()
 
@@ -245,6 +260,23 @@ def main() -> None:
         )
         print(json.dumps(result, ensure_ascii=False, indent=2))
         if result["readback_status"] in {"read_failed", "failed"}:
+            raise SystemExit(1)
+    elif args.command == "vessel-inspect":
+        result = run_local_vessel_inspect(
+            batch_id=args.batch_id,
+            turn_id=args.turn_id,
+            uri=args.uri,
+            user=args.user,
+            password=args.password,
+            database=args.database,
+            allow_no_auth=args.allow_no_auth,
+            limit=args.limit,
+        )
+        if args.format == "text":
+            print(render_vessel_inspect_text(result))
+        else:
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+        if result["inspect_status"] == "read_failed":
             raise SystemExit(1)
 
 
