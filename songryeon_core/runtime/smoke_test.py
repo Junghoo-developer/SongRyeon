@@ -520,15 +520,17 @@ def _run_r_route_dry_run_only_smoke() -> dict[str, object]:
     result = run_dry_turn(enable_r_route_dry_run=True)
     if result.get("r_route_dry_run_enabled") is not True:
         raise AssertionError("R dry-run fixture did not enable")
-    if result.get("r_route_dry_run_status") != "partial":
-        raise AssertionError("R dry-run return summary should be partial")
-    if result.get("r_route_dry_run_continuation_status") != "continue_deeper":
-        raise AssertionError("R dry-run should preserve continue_deeper")
-    if result.get("r_route_dry_run_next_target_node") != "R2":
-        raise AssertionError("R dry-run continuation should target R2")
+    if result.get("r_route_dry_run_status") != "sufficient":
+        raise AssertionError("R dry-run return summary should be sufficient")
+    if result.get("r_route_dry_run_continuation_status") != "stop_sufficient":
+        raise AssertionError("R dry-run should stop sufficient after multi-step traversal")
+    if result.get("r_route_dry_run_next_target_node") != "return_summary":
+        raise AssertionError("R dry-run final continuation should target return_summary")
+    if result.get("r_route_dry_run_traversal_step_count") != 3:
+        raise AssertionError("R dry-run should traverse three graph nodes")
     output_ids = result.get("r_route_dry_run_output_data_ids")
-    if not isinstance(output_ids, list) or len(output_ids) != 6:
-        raise AssertionError("R dry-run should record six output frames")
+    if not isinstance(output_ids, list) or len(output_ids) != 18:
+        raise AssertionError("R dry-run should record eighteen output frames")
 
     records = result.get("data_records")
     if not isinstance(records, list):
@@ -543,16 +545,27 @@ def _run_r_route_dry_run_only_smoke() -> dict[str, object]:
         "node_output:R_loop_budget_frame",
         "node_output:R2_graph_node_selection_frame",
         "node_output:R3_graph_inspection_frame",
+        "node_output:R_graph_traversal_candidate_surface_frame",
         "node_output:R_loop_continuation_frame",
         "node_output:R_loop_return_summary_frame",
+        "graph_memory:turn_access_ledger_frame",
     }
     if not required_types.issubset(data_types):
         raise AssertionError("R dry-run output frame types are incomplete")
+    ledger_id = result.get("r_route_dry_run_access_ledger_id")
+    if not isinstance(ledger_id, str) or ledger_id not in output_ids:
+        raise AssertionError("R dry-run access ledger id must be recorded")
+    candidate_surface_id = result.get("r_route_dry_run_candidate_surface_id")
+    if not isinstance(candidate_surface_id, str) or candidate_surface_id not in output_ids:
+        raise AssertionError("R dry-run candidate surface id must be recorded")
 
     return {
         "enabled": True,
         "task_status": result.get("r_route_dry_run_status"),
         "continuation_status": result.get("r_route_dry_run_continuation_status"),
+        "traversal_step_count": result.get("r_route_dry_run_traversal_step_count"),
+        "candidate_surface_id": candidate_surface_id,
+        "access_ledger_id": ledger_id,
         "not_default": True,
     }
 

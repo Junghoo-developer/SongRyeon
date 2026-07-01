@@ -82,7 +82,13 @@ def test_experimental_r_route_runs_skeleton_then_closes_to_route_2() -> None:
         "R:experimental:return_summary_frame"
     )
     assert result["r_route_experimental_close_route_id"] == "route:2"
-    assert len(result["r_route_experimental_output_data_ids"]) == 6
+    assert len(result["r_route_experimental_output_data_ids"]) == 13
+    assert result["r_route_experimental_candidate_surface_id"] in result[
+        "r_route_experimental_output_data_ids"
+    ]
+    assert result["r_route_experimental_access_ledger_id"] in result[
+        "r_route_experimental_output_data_ids"
+    ]
     assert "route:R" in result["data_ids"]
     assert "route:2" in result["data_ids"]
 
@@ -92,9 +98,21 @@ def test_experimental_r_route_runs_skeleton_then_closes_to_route_2() -> None:
     assert route_r["expected_next_0_mode"] == R_ROUTE_EXPERIMENTAL_NEXT_0_MODE
 
     summary = _payload(result, "R:experimental:return_summary_frame")
+    assert summary["r_loop_task_status"] == "sufficient"
+    assert summary["continuation_status"] == "stop_sufficient"
     assert summary["generated_by"] == "CODE:R_ROUTE_EXPERIMENTAL_GATE"
     assert summary["info_class"] == "absolute"
     assert summary["semantic_judgement_status"] == "not_run"
+
+    ledger = _payload(result, result["r_route_experimental_access_ledger_id"])
+    assert ledger["generated_by"] == "CODE:GRAPH_ACCESS_LEDGER"
+    assert ledger["info_class"] == "absolute"
+    assert ledger["semantic_judgement_status"] == "not_run"
+
+    surface = _payload(result, result["r_route_experimental_candidate_surface_id"])
+    assert surface["generated_by"] == "CODE:R_GRAPH_TRAVERSAL_CANDIDATE_SURFACE"
+    assert surface["info_class"] == "absolute"
+    assert surface["semantic_judgement_status"] == "not_run"
 
 
 def test_experimental_r_route_is_not_available_without_gate() -> None:

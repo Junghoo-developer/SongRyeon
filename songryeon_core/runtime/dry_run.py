@@ -172,6 +172,8 @@ def run_dry_turn(
     r_route_experimental_output_data_ids: list[str] = []
     r_route_experimental_handoff_packet_id: str | None = None
     r_route_experimental_return_summary_id: str | None = None
+    r_route_experimental_candidate_surface_id: str | None = None
+    r_route_experimental_access_ledger_id: str | None = None
     r_route_experimental_close_route_id: str | None = None
     r_route_experimental_graph_data_ids: list[str] = []
     r_loop_memory_handoff_trace_id: str | None = None
@@ -459,11 +461,20 @@ def run_dry_turn(
             input_ref=[r_route_handoff_trace_id],
             frame_label="experimental",
             generated_by=R_EXPERIMENTAL_ROUTE_GENERATOR,
+            graph_node_payloads={
+                node.node_id: asdict(node)
+                for node in r_graph_build.nodes
+            },
+            graph_edge_payloads=[asdict(edge) for edge in r_graph_build.edges],
         )
         exit_loop(unified_state, "R")
         r_route_experimental_trace_event_ids = list(r_route_result.trace_event_ids)
         r_route_experimental_output_data_ids = list(r_route_result.output_data_ids)
         r_route_experimental_return_summary_id = r_route_result.return_summary.frame_id
+        r_route_experimental_candidate_surface_id = (
+            r_route_result.candidate_surface.frame_id
+        )
+        r_route_experimental_access_ledger_id = r_route_result.access_ledger.frame_id
         append_movement(
             node_id="R",
             node_type="loop",
@@ -1298,6 +1309,10 @@ def run_dry_turn(
         ),
         "r_route_experimental_handoff_packet_id": r_route_experimental_handoff_packet_id,
         "r_route_experimental_return_summary_id": r_route_experimental_return_summary_id,
+        "r_route_experimental_candidate_surface_id": (
+            r_route_experimental_candidate_surface_id
+        ),
+        "r_route_experimental_access_ledger_id": r_route_experimental_access_ledger_id,
         "r_route_experimental_close_route_id": r_route_experimental_close_route_id,
         "r_route_experimental_output_data_ids": r_route_experimental_output_data_ids,
         "r_route_experimental_trace_event_ids": r_route_experimental_trace_event_ids,
@@ -1327,6 +1342,51 @@ def run_dry_turn(
             r_loop_dry_run_result.trace_event_ids
             if r_loop_dry_run_result is not None
             else []
+        ),
+        "r_route_dry_run_traversal_step_count": (
+            len(r_loop_dry_run_result.r3_inspections)
+            if r_loop_dry_run_result is not None
+            else 0
+        ),
+        "r_route_dry_run_access_ledger_id": (
+            r_loop_dry_run_result.access_ledger.frame_id
+            if r_loop_dry_run_result is not None
+            else None
+        ),
+        "r_route_dry_run_candidate_surface_id": (
+            r_loop_dry_run_result.candidate_surface.frame_id
+            if r_loop_dry_run_result is not None
+            else None
+        ),
+        "r_route_dry_run_candidate_surface_count": (
+            r_loop_dry_run_result.candidate_surface.candidate_count
+            if r_loop_dry_run_result is not None
+            else 0
+        ),
+        "r_route_dry_run_candidate_surface_next_count": (
+            len(r_loop_dry_run_result.candidate_surface.next_candidate_node_ids)
+            if r_loop_dry_run_result is not None
+            else 0
+        ),
+        "r_route_dry_run_candidate_surface_previous_count": (
+            len(r_loop_dry_run_result.candidate_surface.previous_candidate_node_ids)
+            if r_loop_dry_run_result is not None
+            else 0
+        ),
+        "r_route_dry_run_access_candidate_count": (
+            len(r_loop_dry_run_result.access_ledger.candidate_graph_node_ids)
+            if r_loop_dry_run_result is not None
+            else 0
+        ),
+        "r_route_dry_run_access_selected_count": (
+            len(r_loop_dry_run_result.access_ledger.selected_graph_node_ids)
+            if r_loop_dry_run_result is not None
+            else 0
+        ),
+        "r_route_dry_run_access_inspected_count": (
+            len(r_loop_dry_run_result.access_ledger.inspected_graph_node_ids)
+            if r_loop_dry_run_result is not None
+            else 0
         ),
         "r_route_dry_run_selected_entry_node_ids": (
             r_loop_dry_run_result.return_summary.selected_entry_node_ids

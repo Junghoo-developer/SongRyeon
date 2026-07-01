@@ -14,6 +14,8 @@ GRAPH_MEMORY_EDGE_FRAME_SCHEMA_NAME = "GraphMemoryEdgeFrame"
 GRAPH_MEMORY_EDGE_FRAME_SCHEMA_VERSION = "0.1"
 GRAPH_MEMORY_SNAPSHOT_FRAME_SCHEMA_NAME = "GraphMemorySnapshotFrame"
 GRAPH_MEMORY_SNAPSHOT_FRAME_SCHEMA_VERSION = "0.1"
+TURN_GRAPH_ACCESS_LEDGER_FRAME_SCHEMA_NAME = "TurnGraphAccessLedgerFrame"
+TURN_GRAPH_ACCESS_LEDGER_FRAME_SCHEMA_VERSION = "0.1"
 CORE_EGO_TIME_AXIS_FRAME_SCHEMA_NAME = "CoreEgoTimeAxisFrame"
 CORE_EGO_TIME_AXIS_FRAME_SCHEMA_VERSION = "0.1"
 RLOOP_GRAPH_GUIDE_PACKET_FRAME_SCHEMA_NAME = "RLoopGraphGuidePacketFrame"
@@ -34,11 +36,20 @@ GRAPH_MEMORY_NODE_KINDS = {
 GRAPH_MEMORY_EDGE_KINDS = {
     "CONTAINS",
     "CHILD_OF_TIME_AXIS",
+    "NEXT",
     "SOURCE_OF",
     "SUMMARY_OF",
 }
 GRAPH_MEMORY_CODE_GENERATOR = "CODE:GRAPH_MEMORY_BUILDER"
+GRAPH_ACCESS_LEDGER_CODE_GENERATOR = "CODE:GRAPH_ACCESS_LEDGER"
 RLOOP_GUIDE_CODE_GENERATOR = "CODE:GRAPH_MEMORY_GUIDE_BUILDER"
+GRAPH_ACCESS_STAGES = {
+    "candidate_seen",
+    "selected",
+    "inspected",
+    "read",
+    "used_as_answer_source",
+}
 CORE_EGO_GUIDE_WORKER_HINT_FAILURE_TYPES = {
     "none",
     "adapter_missing",
@@ -123,6 +134,28 @@ class GraphMemorySnapshotFrame:
     semantic_judgement_status: str = "not_run"
     schema_name: str = GRAPH_MEMORY_SNAPSHOT_FRAME_SCHEMA_NAME
     schema_version: str = GRAPH_MEMORY_SNAPSHOT_FRAME_SCHEMA_VERSION
+
+
+@dataclass
+class TurnGraphAccessLedgerFrame:
+    """A per-turn absolute ledger of graph nodes seen by an R traversal."""
+
+    frame_id: str
+    turn_id: str
+    turn_capsule_graph_node_id: str
+    candidate_graph_node_ids: list[str] = field(default_factory=list)
+    selected_graph_node_ids: list[str] = field(default_factory=list)
+    inspected_graph_node_ids: list[str] = field(default_factory=list)
+    read_graph_node_ids: list[str] = field(default_factory=list)
+    used_as_answer_source_graph_node_ids: list[str] = field(default_factory=list)
+    access_records: list[dict[str, str]] = field(default_factory=list)
+    source_trace_ids: list[str] = field(default_factory=list)
+    source_data_ids: list[str] = field(default_factory=list)
+    generated_by: str = GRAPH_ACCESS_LEDGER_CODE_GENERATOR
+    info_class: str = "absolute"
+    semantic_judgement_status: str = "not_run"
+    schema_name: str = TURN_GRAPH_ACCESS_LEDGER_FRAME_SCHEMA_NAME
+    schema_version: str = TURN_GRAPH_ACCESS_LEDGER_FRAME_SCHEMA_VERSION
 
 
 @dataclass
@@ -394,6 +427,81 @@ def validate_graph_memory_snapshot_frame(frame: GraphMemorySnapshotFrame) -> Non
     _validate_counts("GraphMemorySnapshotFrame.node_kind_counts", frame.node_kind_counts)
     _validate_counts("GraphMemorySnapshotFrame.edge_kind_counts", frame.edge_kind_counts)
     _validate_counts("GraphMemorySnapshotFrame.data_kind_counts", frame.data_kind_counts)
+
+
+def validate_turn_graph_access_ledger_frame(frame: TurnGraphAccessLedgerFrame) -> None:
+    _require_text_fields(
+        "TurnGraphAccessLedgerFrame",
+        {
+            "frame_id": frame.frame_id,
+            "turn_id": frame.turn_id,
+            "turn_capsule_graph_node_id": frame.turn_capsule_graph_node_id,
+            "generated_by": frame.generated_by,
+            "info_class": frame.info_class,
+            "semantic_judgement_status": frame.semantic_judgement_status,
+            "schema_name": frame.schema_name,
+            "schema_version": frame.schema_version,
+        },
+    )
+    if frame.schema_name != TURN_GRAPH_ACCESS_LEDGER_FRAME_SCHEMA_NAME:
+        raise ValueError(f"unknown turn graph access ledger schema_name: {frame.schema_name}")
+    if frame.schema_version != TURN_GRAPH_ACCESS_LEDGER_FRAME_SCHEMA_VERSION:
+        raise ValueError(f"unknown turn graph access ledger schema_version: {frame.schema_version}")
+    if frame.generated_by != GRAPH_ACCESS_LEDGER_CODE_GENERATOR:
+        raise ValueError("TurnGraphAccessLedgerFrame.generated_by must be graph access ledger code")
+    if frame.info_class != "absolute":
+        raise ValueError("TurnGraphAccessLedgerFrame.info_class must be absolute")
+    if frame.semantic_judgement_status != "not_run":
+        raise ValueError("TurnGraphAccessLedgerFrame.semantic_judgement_status must be not_run")
+
+    graph_id_fields = {
+        "candidate_graph_node_ids": frame.candidate_graph_node_ids,
+        "selected_graph_node_ids": frame.selected_graph_node_ids,
+        "inspected_graph_node_ids": frame.inspected_graph_node_ids,
+        "read_graph_node_ids": frame.read_graph_node_ids,
+        "used_as_answer_source_graph_node_ids": frame.used_as_answer_source_graph_node_ids,
+    }
+    for field_name, values in graph_id_fields.items():
+        _validate_string_list(f"TurnGraphAccessLedgerFrame.{field_name}", values)
+        _validate_no_duplicates(f"TurnGraphAccessLedgerFrame.{field_name}", values)
+    _validate_string_list("TurnGraphAccessLedgerFrame.source_trace_ids", frame.source_trace_ids)
+    _validate_string_list("TurnGraphAccessLedgerFrame.source_data_ids", frame.source_data_ids)
+    _validate_no_duplicates("TurnGraphAccessLedgerFrame.source_trace_ids", frame.source_trace_ids)
+    _validate_no_duplicates("TurnGraphAccessLedgerFrame.source_data_ids", frame.source_data_ids)
+
+    known_graph_node_ids = {
+        frame.turn_capsule_graph_node_id,
+        *frame.candidate_graph_node_ids,
+        *frame.selected_graph_node_ids,
+        *frame.inspected_graph_node_ids,
+        *frame.read_graph_node_ids,
+        *frame.used_as_answer_source_graph_node_ids,
+    }
+    if not frame.access_records:
+        raise ValueError("TurnGraphAccessLedgerFrame.access_records must not be empty")
+    for index, record in enumerate(frame.access_records, start=1):
+        if not isinstance(record, dict):
+            raise ValueError("TurnGraphAccessLedgerFrame.access_records must contain dict records")
+        stage = record.get("stage")
+        graph_node_id = record.get("graph_node_id")
+        source_frame_id = record.get("source_frame_id")
+        source_field = record.get("source_field")
+        if not stage or not graph_node_id or not source_frame_id or not source_field:
+            raise ValueError(
+                "TurnGraphAccessLedgerFrame.access_records entries require "
+                "stage, graph_node_id, source_frame_id, source_field"
+            )
+        if stage not in GRAPH_ACCESS_STAGES:
+            raise ValueError(f"unknown graph access stage: {stage}")
+        if graph_node_id not in known_graph_node_ids:
+            raise ValueError(
+                "TurnGraphAccessLedgerFrame.access_records graph_node_id must be listed "
+                f"in ledger graph node fields at index {index}"
+            )
+        if source_frame_id not in frame.source_data_ids:
+            raise ValueError(
+                "TurnGraphAccessLedgerFrame.source_data_ids must include access record source_frame_id"
+            )
 
 
 def validate_core_ego_time_axis_frame(frame: CoreEgoTimeAxisFrame) -> None:
@@ -793,6 +901,8 @@ __all__ = [
     "CORE_EGO_GUIDE_WORKER_HINT_FRAME_SCHEMA_VERSION",
     "CORE_EGO_GUIDE_WORKER_HINT_STATUSES",
     "CORE_EGO_GUIDE_WORKER_PARSE_STATUSES",
+    "GRAPH_ACCESS_LEDGER_CODE_GENERATOR",
+    "GRAPH_ACCESS_STAGES",
     "GRAPH_MEMORY_CODE_GENERATOR",
     "GRAPH_MEMORY_EDGE_FRAME_SCHEMA_NAME",
     "GRAPH_MEMORY_EDGE_FRAME_SCHEMA_VERSION",
@@ -802,6 +912,8 @@ __all__ = [
     "GRAPH_MEMORY_NODE_KINDS",
     "GRAPH_MEMORY_SNAPSHOT_FRAME_SCHEMA_NAME",
     "GRAPH_MEMORY_SNAPSHOT_FRAME_SCHEMA_VERSION",
+    "TURN_GRAPH_ACCESS_LEDGER_FRAME_SCHEMA_NAME",
+    "TURN_GRAPH_ACCESS_LEDGER_FRAME_SCHEMA_VERSION",
     "RLOOP_GRAPH_GUIDE_PACKET_FRAME_SCHEMA_NAME",
     "RLOOP_GRAPH_GUIDE_PACKET_FRAME_SCHEMA_VERSION",
     "RLOOP_GUIDE_CODE_GENERATOR",
@@ -816,6 +928,7 @@ __all__ = [
     "GraphMemorySnapshotFrame",
     "RLoopMemoryHandoffPacketFrame",
     "RLoopGraphGuidePacketFrame",
+    "TurnGraphAccessLedgerFrame",
     "validate_core_ego_guide_worker_hint_frame",
     "validate_core_ego_time_axis_frame",
     "validate_graph_memory_edge_frame",
@@ -823,4 +936,5 @@ __all__ = [
     "validate_graph_memory_snapshot_frame",
     "validate_r_loop_memory_handoff_packet_frame",
     "validate_rloop_graph_guide_packet_frame",
+    "validate_turn_graph_access_ledger_frame",
 ]

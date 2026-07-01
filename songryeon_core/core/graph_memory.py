@@ -182,6 +182,20 @@ def build_graph_memory_snapshot_from_capsules(
                     source_trace_ids=raw_node.source_trace_ids,
                 )
             )
+    for previous_raw_node, next_raw_node in zip(raw_nodes, raw_nodes[1:]):
+        edges.append(
+            _build_edge(
+                edge_kind="NEXT",
+                from_node_id=previous_raw_node.node_id,
+                to_node_id=next_raw_node.node_id,
+                source_trace_ids=_unique_strings(
+                    [
+                        *previous_raw_node.source_trace_ids,
+                        *next_raw_node.source_trace_ids,
+                    ]
+                ),
+            )
+        )
     for edge in edges:
         validate_graph_memory_edge_frame(edge)
 

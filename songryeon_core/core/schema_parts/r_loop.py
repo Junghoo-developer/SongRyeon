@@ -17,12 +17,19 @@ R2_GRAPH_NODE_SELECTION_FRAME_SCHEMA_NAME = "R2GraphNodeSelectionFrame"
 R2_GRAPH_NODE_SELECTION_FRAME_SCHEMA_VERSION = "0.1"
 R3_GRAPH_INSPECTION_FRAME_SCHEMA_NAME = "R3GraphInspectionFrame"
 R3_GRAPH_INSPECTION_FRAME_SCHEMA_VERSION = "0.1"
+R_GRAPH_TRAVERSAL_CANDIDATE_SURFACE_FRAME_SCHEMA_NAME = (
+    "RGraphTraversalCandidateSurfaceFrame"
+)
+R_GRAPH_TRAVERSAL_CANDIDATE_SURFACE_FRAME_SCHEMA_VERSION = "0.1"
 R_LOOP_CONTINUATION_FRAME_SCHEMA_NAME = "RLoopContinuationFrame"
 R_LOOP_CONTINUATION_FRAME_SCHEMA_VERSION = "0.1"
 R_LOOP_RETURN_SUMMARY_FRAME_SCHEMA_NAME = "RLoopReturnSummaryFrame"
 R_LOOP_RETURN_SUMMARY_FRAME_SCHEMA_VERSION = "0.1"
 
 R_LOOP_SCHEMA_ONLY_GENERATOR = "CODE:R_LOOP_SCHEMA_ONLY"
+R_GRAPH_TRAVERSAL_CANDIDATE_SURFACE_GENERATOR = (
+    "CODE:R_GRAPH_TRAVERSAL_CANDIDATE_SURFACE"
+)
 
 R_INFORMATION_GRANULARITIES = {
     "raw",
@@ -48,6 +55,7 @@ R_LOOP_NEXT_TARGETS = {"R2", "return_summary"}
 R_LOOP_TASK_STATUSES = {"not_run", "sufficient", "partial", "failed"}
 R_LOOP_INFO_CLASSES = {"relative", "mixed"}
 R_LOOP_SEMANTIC_STATUSES = {"not_run", "ran", "failed"}
+R_GRAPH_CANDIDATE_RELATIONS = {"child", "next", "previous"}
 
 
 @dataclass
@@ -136,6 +144,26 @@ class R3GraphInspectionFrame:
     semantic_judgement_status: str = "not_run"
     schema_name: str = R3_GRAPH_INSPECTION_FRAME_SCHEMA_NAME
     schema_version: str = R3_GRAPH_INSPECTION_FRAME_SCHEMA_VERSION
+
+
+@dataclass
+class RGraphTraversalCandidateSurfaceFrame:
+    frame_id: str
+    source_r3_inspection_frame_id: str
+    inspected_graph_node_id: str
+    child_candidate_node_ids: list[str] = field(default_factory=list)
+    next_candidate_node_ids: list[str] = field(default_factory=list)
+    previous_candidate_node_ids: list[str] = field(default_factory=list)
+    candidate_graph_node_ids: list[str] = field(default_factory=list)
+    candidate_records: list[dict[str, str]] = field(default_factory=list)
+    candidate_count: int = 0
+    source_data_ids: list[str] = field(default_factory=list)
+    source_trace_ids: list[str] = field(default_factory=list)
+    generated_by: str = R_GRAPH_TRAVERSAL_CANDIDATE_SURFACE_GENERATOR
+    info_class: str = "absolute"
+    semantic_judgement_status: str = "not_run"
+    schema_name: str = R_GRAPH_TRAVERSAL_CANDIDATE_SURFACE_FRAME_SCHEMA_NAME
+    schema_version: str = R_GRAPH_TRAVERSAL_CANDIDATE_SURFACE_FRAME_SCHEMA_VERSION
 
 
 @dataclass
@@ -404,6 +432,97 @@ def validate_r3_graph_inspection_frame(frame: R3GraphInspectionFrame) -> None:
         raise ValueError("R3GraphInspectionFrame.source_data_ids must include source_r2_selection_frame_id")
 
 
+def validate_r_graph_traversal_candidate_surface_frame(
+    frame: RGraphTraversalCandidateSurfaceFrame,
+) -> None:
+    _require_text_fields(
+        "RGraphTraversalCandidateSurfaceFrame",
+        {
+            "frame_id": frame.frame_id,
+            "source_r3_inspection_frame_id": frame.source_r3_inspection_frame_id,
+            "inspected_graph_node_id": frame.inspected_graph_node_id,
+            "generated_by": frame.generated_by,
+            "info_class": frame.info_class,
+            "semantic_judgement_status": frame.semantic_judgement_status,
+            "schema_name": frame.schema_name,
+            "schema_version": frame.schema_version,
+        },
+    )
+    _validate_schema(
+        frame.schema_name,
+        R_GRAPH_TRAVERSAL_CANDIDATE_SURFACE_FRAME_SCHEMA_NAME,
+        "RGraphTraversalCandidateSurfaceFrame",
+    )
+    _validate_schema_version(
+        frame.schema_version,
+        R_GRAPH_TRAVERSAL_CANDIDATE_SURFACE_FRAME_SCHEMA_VERSION,
+        "RGraphTraversalCandidateSurfaceFrame",
+    )
+    if frame.generated_by != R_GRAPH_TRAVERSAL_CANDIDATE_SURFACE_GENERATOR:
+        raise ValueError("RGraphTraversalCandidateSurfaceFrame.generated_by must be code")
+    if frame.info_class != "absolute":
+        raise ValueError("RGraphTraversalCandidateSurfaceFrame.info_class must be absolute")
+    if frame.semantic_judgement_status != "not_run":
+        raise ValueError(
+            "RGraphTraversalCandidateSurfaceFrame.semantic_judgement_status must be not_run"
+        )
+    graph_id_fields = {
+        "child_candidate_node_ids": frame.child_candidate_node_ids,
+        "next_candidate_node_ids": frame.next_candidate_node_ids,
+        "previous_candidate_node_ids": frame.previous_candidate_node_ids,
+        "candidate_graph_node_ids": frame.candidate_graph_node_ids,
+    }
+    for field_name, values in graph_id_fields.items():
+        _validate_string_list(f"RGraphTraversalCandidateSurfaceFrame.{field_name}", values)
+        _validate_no_duplicates(f"RGraphTraversalCandidateSurfaceFrame.{field_name}", values)
+    _validate_string_list("RGraphTraversalCandidateSurfaceFrame.source_data_ids", frame.source_data_ids)
+    _validate_string_list("RGraphTraversalCandidateSurfaceFrame.source_trace_ids", frame.source_trace_ids)
+    _validate_no_duplicates("RGraphTraversalCandidateSurfaceFrame.source_data_ids", frame.source_data_ids)
+    _validate_no_duplicates("RGraphTraversalCandidateSurfaceFrame.source_trace_ids", frame.source_trace_ids)
+    if frame.candidate_count != len(frame.candidate_graph_node_ids):
+        raise ValueError(
+            "RGraphTraversalCandidateSurfaceFrame.candidate_count must mirror candidate_graph_node_ids"
+        )
+    if frame.source_r3_inspection_frame_id not in frame.source_data_ids:
+        raise ValueError(
+            "RGraphTraversalCandidateSurfaceFrame.source_data_ids must include R3 frame"
+        )
+    expected_candidates = set(
+        [
+            *frame.child_candidate_node_ids,
+            *frame.next_candidate_node_ids,
+            *frame.previous_candidate_node_ids,
+        ]
+    )
+    if set(frame.candidate_graph_node_ids) != expected_candidates:
+        raise ValueError(
+            "RGraphTraversalCandidateSurfaceFrame.candidate_graph_node_ids must match relation fields"
+        )
+    for index, record in enumerate(frame.candidate_records, start=1):
+        if not isinstance(record, dict):
+            raise ValueError("RGraphTraversalCandidateSurfaceFrame.candidate_records must be dicts")
+        candidate_node_id = record.get("candidate_node_id")
+        relation = record.get("relation")
+        source_id = record.get("source_id")
+        source_field = record.get("source_field")
+        if not candidate_node_id or not relation or not source_id or not source_field:
+            raise ValueError(
+                "RGraphTraversalCandidateSurfaceFrame.candidate_records entries require "
+                "candidate_node_id, relation, source_id, source_field"
+            )
+        if relation not in R_GRAPH_CANDIDATE_RELATIONS:
+            raise ValueError(f"unknown R graph candidate relation: {relation}")
+        if candidate_node_id not in expected_candidates:
+            raise ValueError(
+                "RGraphTraversalCandidateSurfaceFrame candidate record node must be listed "
+                f"in relation fields at index {index}"
+            )
+        if source_id not in frame.source_data_ids:
+            raise ValueError(
+                "RGraphTraversalCandidateSurfaceFrame.source_data_ids must include candidate source_id"
+            )
+
+
 def validate_r_loop_continuation_frame(frame: RLoopContinuationFrame) -> None:
     _require_text_fields(
         "RLoopContinuationFrame",
@@ -564,6 +683,7 @@ __all__ = [
     "R1GraphGoalFrame",
     "R2GraphNodeSelectionFrame",
     "R3GraphInspectionFrame",
+    "RGraphTraversalCandidateSurfaceFrame",
     "RLoopBudgetFrame",
     "RLoopContinuationFrame",
     "RLoopReturnSummaryFrame",
@@ -573,6 +693,10 @@ __all__ = [
     "R2_GRAPH_NODE_SELECTION_FRAME_SCHEMA_VERSION",
     "R3_GRAPH_INSPECTION_FRAME_SCHEMA_NAME",
     "R3_GRAPH_INSPECTION_FRAME_SCHEMA_VERSION",
+    "R_GRAPH_CANDIDATE_RELATIONS",
+    "R_GRAPH_TRAVERSAL_CANDIDATE_SURFACE_FRAME_SCHEMA_NAME",
+    "R_GRAPH_TRAVERSAL_CANDIDATE_SURFACE_FRAME_SCHEMA_VERSION",
+    "R_GRAPH_TRAVERSAL_CANDIDATE_SURFACE_GENERATOR",
     "R_LOOP_BUDGET_FRAME_SCHEMA_NAME",
     "R_LOOP_BUDGET_FRAME_SCHEMA_VERSION",
     "R_LOOP_CONTINUATION_FRAME_SCHEMA_NAME",
@@ -584,6 +708,7 @@ __all__ = [
     "validate_r1_graph_goal_frame",
     "validate_r2_graph_node_selection_frame",
     "validate_r3_graph_inspection_frame",
+    "validate_r_graph_traversal_candidate_surface_frame",
     "validate_r_loop_budget_frame",
     "validate_r_loop_continuation_frame",
     "validate_r_loop_return_summary_frame",

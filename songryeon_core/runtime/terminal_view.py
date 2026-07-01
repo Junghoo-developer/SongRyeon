@@ -298,6 +298,75 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
                 )
             )
 
+    r_candidate_surfaces = _payloads_with_type(
+        result,
+        "node_output:R_graph_traversal_candidate_surface_frame",
+    )
+    if r_candidate_surfaces:
+        lines.append("- R graph traversal candidates:")
+        for surface in r_candidate_surfaces:
+            lines.append(
+                "  - "
+                f"inspected={surface.get('inspected_graph_node_id', 'unknown')} / "
+                f"candidates={surface.get('candidate_count', 'unknown')} / "
+                f"children={_list_count(surface.get('child_candidate_node_ids'))} / "
+                f"next={_list_count(surface.get('next_candidate_node_ids'))} / "
+                f"previous={_list_count(surface.get('previous_candidate_node_ids'))}"
+            )
+            lines.extend(
+                _metainfo_lines(
+                    indent=4,
+                    generated_by=str(
+                        surface.get("generated_by")
+                        or "CODE:R_GRAPH_TRAVERSAL_CANDIDATE_SURFACE"
+                    ),
+                    info_class=str(surface.get("info_class") or "absolute"),
+                    source_data_ids=_source_data_ids(
+                        surface,
+                        fallback=[
+                            str(
+                                surface.get("frame_id")
+                                or "R:graph_traversal_candidate_surface"
+                            )
+                        ],
+                    ),
+                    semantic_judgement_status=str(
+                        surface.get("semantic_judgement_status") or "not_run"
+                    ),
+                )
+            )
+
+    graph_access_ledgers = _payloads_with_type(
+        result,
+        "graph_memory:turn_access_ledger_frame",
+    )
+    if graph_access_ledgers:
+        lines.append("- R graph access ledger:")
+        for ledger in graph_access_ledgers:
+            lines.append(
+                "  - "
+                f"turn={ledger.get('turn_id', 'unknown')} / "
+                f"candidates={_list_count(ledger.get('candidate_graph_node_ids'))} / "
+                f"selected={_list_count(ledger.get('selected_graph_node_ids'))} / "
+                f"inspected={_list_count(ledger.get('inspected_graph_node_ids'))} / "
+                f"read={_list_count(ledger.get('read_graph_node_ids'))} / "
+                f"answer_sources={_list_count(ledger.get('used_as_answer_source_graph_node_ids'))}"
+            )
+            lines.extend(
+                _metainfo_lines(
+                    indent=4,
+                    generated_by=str(ledger.get("generated_by") or "CODE:GRAPH_ACCESS_LEDGER"),
+                    info_class=str(ledger.get("info_class") or "absolute"),
+                    source_data_ids=_source_data_ids(
+                        ledger,
+                        fallback=[str(ledger.get("frame_id") or "R:turn_graph_access_ledger")],
+                    ),
+                    semantic_judgement_status=str(
+                        ledger.get("semantic_judgement_status") or "not_run"
+                    ),
+                )
+            )
+
     relevance_selection_frames = _payloads_with_type(
         result,
         "node_output:memory_relevance_selection_frame",

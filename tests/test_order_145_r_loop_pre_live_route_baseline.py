@@ -68,17 +68,33 @@ def test_pre_live_opt_in_r_dry_run_frames_remain_code_generated_not_run() -> Non
     result = run_dry_turn(enable_r_route_dry_run=True)
 
     assert result["r_route_dry_run_enabled"] is True
-    assert result["r_route_dry_run_status"] == "partial"
+    assert result["r_route_dry_run_status"] == "sufficient"
 
     r_payloads = [
-        payload
-        for payload in _all_payloads(result)
-        if str(payload.get("frame_id", "")).startswith("R")
+        record["payload"]
+        for record in result["data_records"]
+        if str(record["payload"].get("frame_id", "")).startswith("R")
+        and record["data_type"] != "graph_memory:turn_access_ledger_frame"
+        and record["data_type"] != "node_output:R_graph_traversal_candidate_surface_frame"
     ]
     assert r_payloads
     for payload in r_payloads:
         assert payload.get("generated_by") == "CODE:R_LOOP_DRY_RUN_ONLY"
         assert payload.get("semantic_judgement_status") == "not_run"
+
+    access_ledgers = _payloads_with_type(result, "graph_memory:turn_access_ledger_frame")
+    assert len(access_ledgers) == 1
+    assert access_ledgers[0]["generated_by"] == "CODE:GRAPH_ACCESS_LEDGER"
+    assert access_ledgers[0]["semantic_judgement_status"] == "not_run"
+
+    candidate_surfaces = _payloads_with_type(
+        result,
+        "node_output:R_graph_traversal_candidate_surface_frame",
+    )
+    assert len(candidate_surfaces) == 3
+    for surface in candidate_surfaces:
+        assert surface["generated_by"] == "CODE:R_GRAPH_TRAVERSAL_CANDIDATE_SURFACE"
+        assert surface["semantic_judgement_status"] == "not_run"
 
 
 def test_pre_live_r_dry_run_control_frames_are_absolute() -> None:
@@ -95,7 +111,7 @@ def test_pre_live_r_dry_run_control_frames_are_absolute() -> None:
         if record["data_type"] in control_types
     ]
 
-    assert len(control_payloads) == 3
+    assert len(control_payloads) == 7
     for payload in control_payloads:
         assert payload["generated_by"] == "CODE:R_LOOP_DRY_RUN_ONLY"
         assert payload["info_class"] == "absolute"

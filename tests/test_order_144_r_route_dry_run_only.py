@@ -24,18 +24,28 @@ def test_r_route_dry_run_fixture_records_r1_r2_r3_continuation_and_summary() -> 
     result = run_dry_turn(enable_r_route_dry_run=True)
 
     assert result["r_route_dry_run_enabled"] is True
-    assert result["r_route_dry_run_status"] == "partial"
-    assert result["r_route_dry_run_continuation_status"] == "continue_deeper"
-    assert result["r_route_dry_run_next_target_node"] == "R2"
+    assert result["r_route_dry_run_status"] == "sufficient"
+    assert result["r_route_dry_run_continuation_status"] == "stop_sufficient"
+    assert result["r_route_dry_run_next_target_node"] == "return_summary"
     assert result["r_route_dry_run_budget_status"] == "within_budget"
-    assert result["r_route_dry_run_selected_entry_node_ids"] == ["graph:axis:time"]
-    assert result["r_route_dry_run_inspected_graph_node_ids"] == ["graph:axis:time"]
+    assert result["r_route_dry_run_traversal_step_count"] == 3
+    assert result["r_route_dry_run_selected_entry_node_ids"] == [
+        "graph:axis:time",
+        "graph:time_bundle:turn_dry_001",
+        "graph:raw_capsule:turn_dry_001",
+    ]
+    assert result["r_route_dry_run_inspected_graph_node_ids"] == [
+        "graph:axis:time",
+        "graph:time_bundle:turn_dry_001",
+        "graph:raw_capsule:turn_dry_001",
+    ]
 
     assert len(_payloads_with_type(result, "node_output:R1_graph_goal_frame")) == 1
-    assert len(_payloads_with_type(result, "node_output:R_loop_budget_frame")) == 1
-    assert len(_payloads_with_type(result, "node_output:R2_graph_node_selection_frame")) == 1
-    assert len(_payloads_with_type(result, "node_output:R3_graph_inspection_frame")) == 1
-    assert len(_payloads_with_type(result, "node_output:R_loop_continuation_frame")) == 1
+    assert len(_payloads_with_type(result, "node_output:R_loop_budget_frame")) == 3
+    assert len(_payloads_with_type(result, "node_output:R2_graph_node_selection_frame")) == 3
+    assert len(_payloads_with_type(result, "node_output:R3_graph_inspection_frame")) == 3
+    assert len(_payloads_with_type(result, "node_output:R_graph_traversal_candidate_surface_frame")) == 3
+    assert len(_payloads_with_type(result, "node_output:R_loop_continuation_frame")) == 3
     assert len(_payloads_with_type(result, "node_output:R_loop_return_summary_frame")) == 1
 
     summary = _payloads_with_type(result, "node_output:R_loop_return_summary_frame")[0]
@@ -80,8 +90,8 @@ def test_terminal_runtime_displays_r_dry_run_as_code_only_when_enabled() -> None
     enabled_result = run_dry_turn(enable_r_route_dry_run=True)
     enabled = render_runtime_view(enabled_result, user_input="R dry run enabled")
     assert "- R dry-run skeleton [CODE:R_LOOP_DRY_RUN_ONLY]:" in enabled
-    assert "task_status=partial" in enabled
-    assert "continuation=continue_deeper" in enabled
+    assert "task_status=sufficient" in enabled
+    assert "continuation=stop_sufficient" in enabled
     assert "semantic_judgement_status: not_run" in enabled
 
 

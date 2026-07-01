@@ -25,13 +25,13 @@ def test_experimental_r_summary_is_preserved_in_node3_brief() -> None:
     material = brief["r_loop_result_material"]
 
     assert material["source_data_id"] == "R:experimental:return_summary_frame"
-    assert material["r_loop_task_status"] == "partial"
-    assert material["continuation_status"] == "continue_deeper"
+    assert material["r_loop_task_status"] == "sufficient"
+    assert material["continuation_status"] == "stop_sufficient"
     assert material["budget_status"] == "within_budget"
     assert material["generated_by"] == "CODE:R_ROUTE_EXPERIMENTAL_GATE"
     assert material["info_class"] == "absolute"
     assert material["semantic_judgement_status"] == "not_run"
-    assert material["attitude_hint"] == "r_loop_partial_or_skeleton_only"
+    assert material["attitude_hint"] == "r_loop_sufficient"
     assert "R:experimental:return_summary_frame" in brief["source_data_ids"]
 
 
@@ -65,8 +65,8 @@ def test_terminal_marks_r_result_material_in_node3_brief() -> None:
 
     rendered = render_runtime_view(result, user_input="R experimental")
 
-    assert "R loop result in brief: task=partial" in rendered
-    assert "hint=r_loop_partial_or_skeleton_only" in rendered
+    assert "R loop result in brief: task=sufficient" in rendered
+    assert "hint=r_loop_sufficient" in rendered
 
 
 def _minimal_node3_brief_with_r_material() -> Node3InputBriefFrame:
