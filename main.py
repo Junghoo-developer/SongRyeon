@@ -8,6 +8,7 @@ from pathlib import Path
 from songryeon_core.runtime.dry_run import run_dry_turn
 from songryeon_core.runtime.fast_test import run_fast_tests
 from songryeon_core.runtime.graph_vessel_first_write import run_local_vessel_first_write
+from songryeon_core.runtime.graph_vessel_readback import run_local_vessel_readback
 from songryeon_core.runtime.l_loop_smoke import run_qwen_l_loop_smoke
 from songryeon_core.runtime.replay import replay_run
 from songryeon_core.runtime.smoke_test import run_smoke_tests
@@ -110,6 +111,15 @@ def main() -> None:
     vessel_first_write_parser.add_argument("--allow-no-auth", action="store_true")
     vessel_first_write_parser.add_argument("--include-source-manifest", action="store_true")
     vessel_first_write_parser.add_argument("--store-text-snapshots", action="store_true")
+
+    vessel_readback_parser = subparsers.add_parser("vessel-readback")
+    vessel_readback_parser.add_argument("--batch-id", default="manual_vessel_readback")
+    vessel_readback_parser.add_argument("--turn-id", default="turn_vessel_readback_0001")
+    vessel_readback_parser.add_argument("--uri", default=None)
+    vessel_readback_parser.add_argument("--user", default=None)
+    vessel_readback_parser.add_argument("--password", default=None)
+    vessel_readback_parser.add_argument("--database", default=None)
+    vessel_readback_parser.add_argument("--allow-no-auth", action="store_true")
 
     args = parser.parse_args()
 
@@ -222,6 +232,19 @@ def main() -> None:
         )
         print(json.dumps(result, ensure_ascii=False, indent=2))
         if result["write_status"] == "write_failed":
+            raise SystemExit(1)
+    elif args.command == "vessel-readback":
+        result = run_local_vessel_readback(
+            batch_id=args.batch_id,
+            turn_id=args.turn_id,
+            uri=args.uri,
+            user=args.user,
+            password=args.password,
+            database=args.database,
+            allow_no_auth=args.allow_no_auth,
+        )
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        if result["readback_status"] in {"read_failed", "failed"}:
             raise SystemExit(1)
 
 
