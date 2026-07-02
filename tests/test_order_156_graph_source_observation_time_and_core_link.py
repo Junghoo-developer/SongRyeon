@@ -147,7 +147,7 @@ def test_source_ingest_requires_existing_core_ego_time_axis(tmp_path) -> None:
         )
 
 
-def test_same_file_observed_at_different_times_creates_distinct_raw_snapshots(tmp_path) -> None:
+def test_same_file_same_content_check_reuses_raw_source_snapshot(tmp_path) -> None:
     source = tmp_path / "same_content.md"
     source.write_text("same content\n", encoding="utf-8")
     trace_store, data_store = _core_time_axis_store()
@@ -171,12 +171,13 @@ def test_same_file_observed_at_different_times_creates_distinct_raw_snapshots(tm
         ingested_at="2026-07-01T15:00:01",
     )
 
-    assert first.raw_source_node_ids != second.raw_source_node_ids
+    assert first.raw_source_node_ids == second.raw_source_node_ids
     assert first.source_file_data_ids != second.source_file_data_ids
     assert (
         data_store.require_record(first.raw_source_node_ids[0]).payload["content_sha1"]
         == data_store.require_record(second.raw_source_node_ids[0]).payload["content_sha1"]
     )
+    assert second.source_observation_status_counts == {"unchanged": 1}
 
 
 def _core_time_axis_store() -> tuple[TraceStore, DataStore]:

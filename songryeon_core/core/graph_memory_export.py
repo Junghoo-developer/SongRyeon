@@ -26,6 +26,9 @@ _GRAPH_SOURCE_DATA_TYPES = {
     "graph_source:file_text_snapshot",
     "graph_source:source_kind_ingest_frame",
     "graph_source:songryeon_core_source_manifest_frame",
+    "graph_source:source_version_lineage_frame",
+    "graph_source:source_observation_ledger_frame",
+    "graph_source:summary_invalidation_ledger_frame",
 }
 
 
@@ -48,6 +51,9 @@ class GraphMemoryExportPacket:
     source_text_snapshot_data_ids: list[str]
     source_ingest_frame_data_ids: list[str]
     source_manifest_frame_data_ids: list[str]
+    source_version_lineage_frame_data_ids: list[str]
+    source_observation_ledger_frame_data_ids: list[str]
+    summary_invalidation_ledger_frame_data_ids: list[str]
     included_data_ids: list[str]
     source_trace_ids: list[str]
     data_type_counts: dict[str, int]
@@ -88,6 +94,9 @@ def build_graph_memory_export_packet(
     source_text_snapshot_data_ids: list[str] = []
     source_ingest_frame_data_ids: list[str] = []
     source_manifest_frame_data_ids: list[str] = []
+    source_version_lineage_frame_data_ids: list[str] = []
+    source_observation_ledger_frame_data_ids: list[str] = []
+    summary_invalidation_ledger_frame_data_ids: list[str] = []
     included_records: list[DataRecord] = []
 
     for record in data_store.list_records():
@@ -119,6 +128,15 @@ def build_graph_memory_export_packet(
         elif data_type == "graph_source:songryeon_core_source_manifest_frame":
             source_manifest_frame_data_ids.append(record.data_id)
             included_records.append(record)
+        elif data_type == "graph_source:source_version_lineage_frame":
+            source_version_lineage_frame_data_ids.append(record.data_id)
+            included_records.append(record)
+        elif data_type == "graph_source:source_observation_ledger_frame":
+            source_observation_ledger_frame_data_ids.append(record.data_id)
+            included_records.append(record)
+        elif data_type == "graph_source:summary_invalidation_ledger_frame":
+            summary_invalidation_ledger_frame_data_ids.append(record.data_id)
+            included_records.append(record)
 
     integrity_report = audit_graph_memory_integrity(DataStore(included_records))
     packet = GraphMemoryExportPacket(
@@ -139,6 +157,9 @@ def build_graph_memory_export_packet(
         source_text_snapshot_data_ids=source_text_snapshot_data_ids,
         source_ingest_frame_data_ids=source_ingest_frame_data_ids,
         source_manifest_frame_data_ids=source_manifest_frame_data_ids,
+        source_version_lineage_frame_data_ids=source_version_lineage_frame_data_ids,
+        source_observation_ledger_frame_data_ids=source_observation_ledger_frame_data_ids,
+        summary_invalidation_ledger_frame_data_ids=summary_invalidation_ledger_frame_data_ids,
         included_data_ids=_unique_strings([record.data_id for record in included_records]),
         source_trace_ids=_unique_strings(
             [record.source_trace_id for record in included_records]

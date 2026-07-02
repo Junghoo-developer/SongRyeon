@@ -146,6 +146,9 @@ def build_graph_vessel_write_plan(
             *_string_list(packet.get("rloop_guide_packet_data_ids")),
             *_string_list(packet.get("source_ingest_frame_data_ids")),
             *_string_list(packet.get("source_manifest_frame_data_ids")),
+            *_string_list(packet.get("source_version_lineage_frame_data_ids")),
+            *_string_list(packet.get("source_observation_ledger_frame_data_ids")),
+            *_string_list(packet.get("summary_invalidation_ledger_frame_data_ids")),
         ],
     )
     plan = GraphVesselWritePlan(

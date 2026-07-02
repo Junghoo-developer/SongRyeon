@@ -639,6 +639,12 @@ def _display_name(record: DataRecord) -> str:
         return "R Loop Guide"
     if record.data_type == "graph_memory:core_ego_time_axis_frame":
         return "CoreEgo Time Axis Index"
+    if record.data_type == "graph_source:source_version_lineage_frame":
+        return "Source Version Lineage"
+    if record.data_type == "graph_source:source_observation_ledger_frame":
+        return "Source Observation Ledger"
+    if record.data_type == "graph_source:summary_invalidation_ledger_frame":
+        return "Summary Invalidation Ledger"
     if record.data_type.startswith("graph_source:"):
         return f"Graph Source: {record.data_type}"
     if record.data_type.startswith("graph_memory:edge:"):
@@ -666,6 +672,9 @@ def _display_label(record: DataRecord) -> str:
             "graph_memory:core_ego_time_axis_frame",
             "graph_source:source_kind_ingest_frame",
             "graph_source:songryeon_core_source_manifest_frame",
+            "graph_source:source_version_lineage_frame",
+            "graph_source:source_observation_ledger_frame",
+            "graph_source:summary_invalidation_ledger_frame",
         }
         else ["GraphMemorySource"]
         if record.data_type.startswith("graph_source:")

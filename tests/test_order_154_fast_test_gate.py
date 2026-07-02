@@ -30,6 +30,8 @@ def test_fast_test_graph_profile_includes_current_graph_boundary_tests() -> None
     assert "tests/test_order_158_graph_memory_export_packet.py" in pytest_command
     assert "tests/test_order_159_vessel_adapter_boundary.py" in pytest_command
     assert "tests/test_order_160_local_vessel_neo4j_writer.py" in pytest_command
+    assert "tests/test_order_164_source_version_lineage_and_invalidation.py" in pytest_command
+    assert "tests/test_order_165_same_content_observation_ledger.py" in pytest_command
 
 
 def test_fast_test_rejects_unknown_profile() -> None:

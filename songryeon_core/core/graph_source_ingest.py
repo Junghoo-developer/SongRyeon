@@ -23,6 +23,9 @@ from songryeon_core.core.schemas import (
     validate_graph_memory_snapshot_frame,
     validate_rloop_graph_guide_packet_frame,
 )
+from songryeon_core.core.source_version_lineage import (
+    record_source_version_lineage_and_summary_invalidation,
+)
 from songryeon_core.core.trace_store import TraceStore
 
 
@@ -51,6 +54,11 @@ class GraphSourceKindIngestResult:
     graph_edge_ids: list[str]
     graph_snapshot_id: str
     rloop_graph_guide_packet_id: str
+    source_version_lineage_frame_ids: list[str]
+    source_observation_ledger_frame_id: str
+    source_observation_status_counts: dict[str, int]
+    summary_invalidation_ledger_frame_id: str
+    invalidated_summary_node_ids: list[str]
     source_kind_counts: dict[str, int]
     created_data_ids: list[str]
     existing_data_ids: list[str]
@@ -125,7 +133,7 @@ def record_graph_source_kind_ingest(
         )
 
         kind_raw_nodes = [
-            _build_raw_source_node(prepared)
+            _build_raw_source_node(prepared, data_store=data_store)
             for prepared in prepared_files
         ]
         for node in kind_raw_nodes:
@@ -338,6 +346,18 @@ def record_graph_source_kind_ingest(
         existing_data_ids=existing_data_ids,
     )
 
+    lineage_result = record_source_version_lineage_and_summary_invalidation(
+        trace_store=trace_store,
+        data_store=data_store,
+        turn_id=turn_id,
+        batch_id=batch_id,
+        input_ref=[event.event_id],
+        observed_source_file_data_ids=source_file_data_ids,
+        created_at=timestamp,
+    )
+    created_data_ids.extend(lineage_result.created_data_ids)
+    existing_data_ids.extend(lineage_result.existing_data_ids)
+
     return GraphSourceKindIngestResult(
         frame_id=frame_id,
         trace_event_id=event.event_id,
@@ -349,6 +369,17 @@ def record_graph_source_kind_ingest(
         graph_edge_ids=graph_edge_ids,
         graph_snapshot_id=graph_snapshot.snapshot_id,
         rloop_graph_guide_packet_id=guide_packet.packet_id,
+        source_version_lineage_frame_ids=[
+            frame.frame_id for frame in lineage_result.lineage_frames
+        ],
+        source_observation_ledger_frame_id=lineage_result.observation_ledger.frame_id,
+        source_observation_status_counts=dict(
+            lineage_result.observation_ledger.observation_status_counts
+        ),
+        summary_invalidation_ledger_frame_id=lineage_result.invalidation_ledger.frame_id,
+        invalidated_summary_node_ids=list(
+            lineage_result.invalidation_ledger.invalidated_summary_node_ids
+        ),
         source_kind_counts=source_kind_counts,
         created_data_ids=created_data_ids,
         existing_data_ids=existing_data_ids,
@@ -399,7 +430,8 @@ def raw_source_graph_node_id(
     content_sha1: str,
     observed_at: str,
 ) -> str:
-    return f"graph:raw_source:{source_kind}:{_source_digest(source_kind, path, content_sha1, observed_at)}"
+    _ = observed_at
+    return f"graph:raw_source:{source_kind}:{_source_version_digest(source_kind, path, content_sha1)}"
 
 
 def _prepare_source_files_by_kind(
@@ -471,7 +503,20 @@ def _prepare_source_files_by_kind(
     return prepared_by_kind
 
 
-def _build_raw_source_node(prepared: _PreparedSourceFile) -> GraphMemoryNodeFrame:
+def _build_raw_source_node(
+    prepared: _PreparedSourceFile,
+    *,
+    data_store: DataStore,
+) -> GraphMemoryNodeFrame:
+    existing = data_store.get_record(prepared.raw_source_node_id)
+    if existing is not None:
+        if existing.data_type != "graph_memory:node:raw_source":
+            raise ValueError(
+                f"raw source data_id collision with different type: {prepared.raw_source_node_id}"
+            )
+        if not isinstance(existing.payload, dict):
+            raise TypeError("existing raw source payload must be dict")
+        return GraphMemoryNodeFrame(**existing.payload)
     return GraphMemoryNodeFrame(
         node_id=prepared.raw_source_node_id,
         node_kind="raw_source",
@@ -806,6 +851,17 @@ def _source_digest(
     _validate_source_kind(source_kind)
     normalized_path = Path(path).resolve().as_posix()
     digest_source = f"{source_kind}:{normalized_path}:{content_sha1}:{observed_at}"
+    return hashlib.sha1(digest_source.encode("utf-8")).hexdigest()[:16]
+
+
+def _source_version_digest(
+    source_kind: str,
+    path: str | Path,
+    content_sha1: str,
+) -> str:
+    _validate_source_kind(source_kind)
+    normalized_path = Path(path).resolve().as_posix()
+    digest_source = f"{source_kind}:{normalized_path}:{content_sha1}"
     return hashlib.sha1(digest_source.encode("utf-8")).hexdigest()[:16]
 
 

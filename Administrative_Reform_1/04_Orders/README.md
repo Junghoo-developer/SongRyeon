@@ -2,7 +2,7 @@
 
 발주서는 개발 지도에서 내려온 실무 계획서다.
 
-현재 정식 발주서는 `ORDER_001`부터 `ORDER_161`까지 있다.
+현재 정식 발주서는 `ORDER_001`부터 `ORDER_165`까지 있다.
 
 `ORDER_066`부터 `ORDER_075`까지는 메타정보 관리법을 실제 런타임과 LLM 노드 배선에 적용하기 위한 복구 로드맵이다.
 
@@ -133,6 +133,8 @@
 `ORDER_146`은 기본 route set은 L/2로 유지하되, 명시 실험 플래그가 있을 때만 node_1 LLM이 `route=R`을 고르고 `R:experimental:*` skeleton을 실행할 수 있게 하는 발주서다.
 
 `ORDER_147`부터 `ORDER_161`까지는 R 결과 전달, graph traversal, activity ledger, graph source ingest, export packet, Vessel write plan boundary, local Neo4j first write, Vessel display vocabulary를 순서대로 잠그는 그래프 메모리/심야정부 전초 작업이다.
+
+`ORDER_162`부터 `ORDER_165`까지는 Vessel readback/inspect와 동적 원본 변경 시 source version lineage, observation ledger, summary invalidation ledger를 남기는 외부 그래프 DB 안전장치 작업이다.
 
 ## 임시 발주서
 
@@ -278,3 +280,5 @@
 - [ORDER 161: Vessel Display Vocabulary v0](ORDER_161_VESSEL_DISPLAY_VOCABULARY_V0.md)
 - [ORDER 162: Vessel Readback Verification v0](ORDER_162_VESSEL_READBACK_VERIFICATION_V0.md)
 - [ORDER 163: Vessel Inspect Manual Walk v0](ORDER_163_VESSEL_INSPECT_MANUAL_WALK_V0.md)
+- [ORDER 164: Dynamic Source Version Lineage And Summary Invalidation Ledger v0](ORDER_164_DYNAMIC_SOURCE_VERSION_LINEAGE_AND_SUMMARY_INVALIDATION_LEDGER_V0.md)
+- [ORDER 165: Same-Content Reobserve Observation Ledger v0](ORDER_165_SAME_CONTENT_REOBSERVE_OBSERVATION_LEDGER_V0.md)

@@ -230,6 +230,75 @@ source_depth_max = 1
 - 너무 추상화된 기억인가?
 - R1이 직접 쓰기에는 위험한 고압축 정보인가?
 
+## 8.1 동적 원본 변경과 파생 요약 무효화
+
+코드 파일, 내부 문서, 진행 중 발주서처럼 나중에 바뀔 수 있는 원본은 정적 기억으로 취급하지 않는다.
+
+동적 원본은 다음처럼 관측 시점과 내용 해시를 가진 versioned raw source로 본다.
+
+```text
+source identity:
+- source kind
+- path
+- observed_at
+- ingested_at
+- source_last_modified_at
+- content hash
+```
+
+같은 path의 동적 원본이라도 content hash 또는 관측 시점이 달라지면 새 raw source version으로 기록한다.
+
+기존 raw source node와 그 위에 붙은 LLM summary node는 삭제하지 않는다.
+
+대신 새 관측 결과가 기존 동적 원본의 변경을 확인하면, 기존 원본 version에서 파생된 모든 LLM summary node는 현재 기준으로 무효화 처리한다.
+
+무효화 후보 필드:
+
+```text
+validity_status = invalidated_by_source_change
+invalidated_at = ...
+invalidated_by_source_graph_node_id = ...
+invalidated_reason_code = source_content_changed
+superseded_by_source_graph_node_id = ...
+```
+
+무효화의 의미:
+
+```text
+과거에 어떤 원본을 보고 어떤 판단을 했는지는 보존한다.
+하지만 바뀐 원본 기준으로 그 summary를 현재 사실처럼 쓰면 안 된다.
+```
+
+무효화는 삭제가 아니다.
+
+무효화는 추적 가능한 상태 변경이다.
+
+따라서 R루프와 심야정부 worker는 summary node를 사용할 때 다음을 확인해야 한다.
+
+```text
+1. source_graph_node_ids가 현재 유효한가?
+2. summary node 자체가 invalidated 상태인가?
+3. summary_depth가 너무 높은가?
+4. 동적 원본 변경 이후 재요약이 필요한가?
+```
+
+원칙:
+
+```text
+원본은 보존한다.
+요약도 보존한다.
+다만 동적 원본 변경 이후의 파생 요약은 현재 답변 근거로 쓰지 못하게 상태를 바꾼다.
+```
+
+이 정책은 외부 기억 시스템의 일반적인 invalidation 발상과 닮았을 수 있으나, 송련 Core에서는 외부 구현을 권위로 삼지 않는다.
+
+송련 Core의 기준은 다음이다.
+
+```text
+모든 상대/혼합 정보는 절대정보 source bundle에서 파생된다.
+source bundle이 바뀌면 파생 정보의 현재 유효성도 재검토해야 한다.
+```
+
 ## 9. CoreEgo 연결: 초기에는 시간축만
 
 초기 CoreEgo 직속 그래프 연결은 시간축만 사용한다.
@@ -323,4 +392,3 @@ summary depth를 계산한다.
 CoreEgo 직속 연결은 처음에는 시간축만 쓴다.
 의미축은 R1 부담이 실제로 관측된 뒤 연다.
 ```
-

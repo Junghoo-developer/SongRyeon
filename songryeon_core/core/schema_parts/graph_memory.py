@@ -26,6 +26,12 @@ CORE_EGO_GUIDE_WORKER_HINT_FRAME_SCHEMA_NAME = "CoreEgoGuideWorkerHintFrame"
 CORE_EGO_GUIDE_WORKER_HINT_FRAME_SCHEMA_VERSION = "0.1"
 R_LOOP_MEMORY_HANDOFF_PACKET_FRAME_SCHEMA_NAME = "RLoopMemoryHandoffPacketFrame"
 R_LOOP_MEMORY_HANDOFF_PACKET_FRAME_SCHEMA_VERSION = "0.1"
+SOURCE_VERSION_LINEAGE_FRAME_SCHEMA_NAME = "SourceVersionLineageFrame"
+SOURCE_VERSION_LINEAGE_FRAME_SCHEMA_VERSION = "0.1"
+SOURCE_OBSERVATION_LEDGER_FRAME_SCHEMA_NAME = "SourceObservationLedgerFrame"
+SOURCE_OBSERVATION_LEDGER_FRAME_SCHEMA_VERSION = "0.1"
+SUMMARY_INVALIDATION_LEDGER_FRAME_SCHEMA_NAME = "SummaryInvalidationLedgerFrame"
+SUMMARY_INVALIDATION_LEDGER_FRAME_SCHEMA_VERSION = "0.1"
 
 GRAPH_MEMORY_NODE_KINDS = {
     "raw_capsule",
@@ -72,6 +78,23 @@ R_LOOP_MEMORY_HANDOFF_SEMANTIC_HINT_STATUSES = {"not_run", "ran", "failed"}
 TURN_ACTIVITY_GRAPH_LINK_ACTIVITY_KINDS = {
     "l_loop_activity_ledger",
     "r_graph_access_ledger",
+}
+SOURCE_VERSION_LINEAGE_CODE_GENERATOR = "CODE:SOURCE_VERSION_LINEAGE_BUILDER"
+SOURCE_OBSERVATION_LEDGER_CODE_GENERATOR = "CODE:SOURCE_OBSERVATION_LEDGER_BUILDER"
+SUMMARY_INVALIDATION_LEDGER_CODE_GENERATOR = "CODE:SUMMARY_INVALIDATION_LEDGER_BUILDER"
+SOURCE_VERSION_LINEAGE_STATUSES = {
+    "single_version",
+    "content_changed",
+}
+SOURCE_OBSERVATION_LEDGER_STATUSES = {"no_observations", "recorded"}
+SOURCE_OBSERVATION_STATUSES = {
+    "new_source_version",
+    "unchanged",
+    "content_changed",
+}
+SUMMARY_INVALIDATION_LEDGER_STATUSES = {
+    "no_invalidations",
+    "invalidations_recorded",
 }
 
 
@@ -301,6 +324,75 @@ class RLoopMemoryHandoffPacketFrame:
     semantic_judgement_status: str = "not_run"
     schema_name: str = R_LOOP_MEMORY_HANDOFF_PACKET_FRAME_SCHEMA_NAME
     schema_version: str = R_LOOP_MEMORY_HANDOFF_PACKET_FRAME_SCHEMA_VERSION
+
+
+@dataclass
+class SourceVersionLineageFrame:
+    """A code-generated version lineage for one source_kind + path identity."""
+
+    frame_id: str
+    source_identity_key: str
+    source_kind: str
+    path: str
+    lineage_status: str
+    active_source_graph_node_id: str
+    version_source_graph_node_ids: list[str] = field(default_factory=list)
+    superseded_source_graph_node_ids: list[str] = field(default_factory=list)
+    source_file_data_ids: list[str] = field(default_factory=list)
+    version_records: list[dict[str, str]] = field(default_factory=list)
+    content_sha1_by_version: dict[str, str] = field(default_factory=dict)
+    observed_at_by_version: dict[str, str] = field(default_factory=dict)
+    source_graph_node_ids: list[str] = field(default_factory=list)
+    source_trace_ids: list[str] = field(default_factory=list)
+    source_data_ids: list[str] = field(default_factory=list)
+    generated_by: str = SOURCE_VERSION_LINEAGE_CODE_GENERATOR
+    info_class: str = "absolute"
+    semantic_judgement_status: str = "not_run"
+    schema_name: str = SOURCE_VERSION_LINEAGE_FRAME_SCHEMA_NAME
+    schema_version: str = SOURCE_VERSION_LINEAGE_FRAME_SCHEMA_VERSION
+
+
+@dataclass
+class SourceObservationLedgerFrame:
+    """A code-generated ledger of source checks that do not always create versions."""
+
+    frame_id: str
+    batch_id: str
+    ledger_status: str
+    observation_records: list[dict[str, str]] = field(default_factory=list)
+    observation_status_counts: dict[str, int] = field(default_factory=dict)
+    observed_source_file_data_ids: list[str] = field(default_factory=list)
+    active_source_graph_node_ids: list[str] = field(default_factory=list)
+    source_graph_node_ids: list[str] = field(default_factory=list)
+    source_trace_ids: list[str] = field(default_factory=list)
+    source_data_ids: list[str] = field(default_factory=list)
+    generated_by: str = SOURCE_OBSERVATION_LEDGER_CODE_GENERATOR
+    info_class: str = "absolute"
+    semantic_judgement_status: str = "not_run"
+    schema_name: str = SOURCE_OBSERVATION_LEDGER_FRAME_SCHEMA_NAME
+    schema_version: str = SOURCE_OBSERVATION_LEDGER_FRAME_SCHEMA_VERSION
+
+
+@dataclass
+class SummaryInvalidationLedgerFrame:
+    """A code-generated ledger of summaries invalidated by source changes."""
+
+    frame_id: str
+    batch_id: str
+    ledger_status: str
+    invalidated_summary_node_ids: list[str] = field(default_factory=list)
+    invalidation_records: list[dict[str, str]] = field(default_factory=list)
+    changed_source_lineage_frame_ids: list[str] = field(default_factory=list)
+    changed_source_graph_node_ids: list[str] = field(default_factory=list)
+    active_source_graph_node_ids: list[str] = field(default_factory=list)
+    source_graph_node_ids: list[str] = field(default_factory=list)
+    source_trace_ids: list[str] = field(default_factory=list)
+    source_data_ids: list[str] = field(default_factory=list)
+    generated_by: str = SUMMARY_INVALIDATION_LEDGER_CODE_GENERATOR
+    info_class: str = "absolute"
+    semantic_judgement_status: str = "not_run"
+    schema_name: str = SUMMARY_INVALIDATION_LEDGER_FRAME_SCHEMA_NAME
+    schema_version: str = SUMMARY_INVALIDATION_LEDGER_FRAME_SCHEMA_VERSION
 
 
 def validate_graph_memory_node_frame(frame: GraphMemoryNodeFrame) -> None:
@@ -1040,6 +1132,326 @@ def validate_r_loop_memory_handoff_packet_frame(frame: RLoopMemoryHandoffPacketF
             )
 
 
+def validate_source_version_lineage_frame(frame: SourceVersionLineageFrame) -> None:
+    _require_text_fields(
+        "SourceVersionLineageFrame",
+        {
+            "frame_id": frame.frame_id,
+            "source_identity_key": frame.source_identity_key,
+            "source_kind": frame.source_kind,
+            "path": frame.path,
+            "lineage_status": frame.lineage_status,
+            "active_source_graph_node_id": frame.active_source_graph_node_id,
+            "generated_by": frame.generated_by,
+            "info_class": frame.info_class,
+            "semantic_judgement_status": frame.semantic_judgement_status,
+            "schema_name": frame.schema_name,
+            "schema_version": frame.schema_version,
+        },
+    )
+    if frame.schema_name != SOURCE_VERSION_LINEAGE_FRAME_SCHEMA_NAME:
+        raise ValueError(f"unknown SourceVersionLineageFrame.schema_name: {frame.schema_name}")
+    if frame.schema_version != SOURCE_VERSION_LINEAGE_FRAME_SCHEMA_VERSION:
+        raise ValueError(
+            f"unknown SourceVersionLineageFrame.schema_version: {frame.schema_version}"
+        )
+    if frame.generated_by != SOURCE_VERSION_LINEAGE_CODE_GENERATOR:
+        raise ValueError("SourceVersionLineageFrame.generated_by must be code builder")
+    if frame.info_class != "absolute":
+        raise ValueError("SourceVersionLineageFrame.info_class must be absolute")
+    if frame.semantic_judgement_status != "not_run":
+        raise ValueError("SourceVersionLineageFrame.semantic_judgement_status must be not_run")
+    if frame.lineage_status not in SOURCE_VERSION_LINEAGE_STATUSES:
+        raise ValueError(f"unknown SourceVersionLineageFrame.lineage_status: {frame.lineage_status}")
+
+    _validate_string_list(
+        "SourceVersionLineageFrame.version_source_graph_node_ids",
+        frame.version_source_graph_node_ids,
+    )
+    _validate_string_list(
+        "SourceVersionLineageFrame.superseded_source_graph_node_ids",
+        frame.superseded_source_graph_node_ids,
+    )
+    _validate_string_list("SourceVersionLineageFrame.source_file_data_ids", frame.source_file_data_ids)
+    _validate_string_list(
+        "SourceVersionLineageFrame.source_graph_node_ids",
+        frame.source_graph_node_ids,
+    )
+    _validate_string_list("SourceVersionLineageFrame.source_trace_ids", frame.source_trace_ids)
+    _validate_string_list("SourceVersionLineageFrame.source_data_ids", frame.source_data_ids)
+    _validate_no_duplicates(
+        "SourceVersionLineageFrame.version_source_graph_node_ids",
+        frame.version_source_graph_node_ids,
+    )
+    _validate_no_duplicates(
+        "SourceVersionLineageFrame.superseded_source_graph_node_ids",
+        frame.superseded_source_graph_node_ids,
+    )
+    _validate_no_duplicates("SourceVersionLineageFrame.source_file_data_ids", frame.source_file_data_ids)
+    _validate_no_duplicates(
+        "SourceVersionLineageFrame.source_graph_node_ids",
+        frame.source_graph_node_ids,
+    )
+    _validate_no_duplicates("SourceVersionLineageFrame.source_trace_ids", frame.source_trace_ids)
+    _validate_no_duplicates("SourceVersionLineageFrame.source_data_ids", frame.source_data_ids)
+
+    if not frame.version_source_graph_node_ids:
+        raise ValueError("SourceVersionLineageFrame must include at least one source version")
+    if frame.active_source_graph_node_id not in frame.version_source_graph_node_ids:
+        raise ValueError("SourceVersionLineageFrame.active_source_graph_node_id must be a version")
+    version_set = set(frame.version_source_graph_node_ids)
+    superseded_set = set(frame.superseded_source_graph_node_ids)
+    if not superseded_set.issubset(version_set):
+        raise ValueError("SourceVersionLineageFrame superseded versions must be in version list")
+    if frame.active_source_graph_node_id in superseded_set:
+        raise ValueError("SourceVersionLineageFrame active version must not be superseded")
+    if set(frame.source_graph_node_ids) != version_set:
+        raise ValueError("SourceVersionLineageFrame.source_graph_node_ids must mirror versions")
+    if not set(frame.source_file_data_ids).issubset(set(frame.source_data_ids)):
+        raise ValueError("SourceVersionLineageFrame.source_data_ids must include source_file_data_ids")
+
+    if len(frame.version_records) != len(frame.version_source_graph_node_ids):
+        raise ValueError("SourceVersionLineageFrame.version_records must mirror versions")
+    required_record_fields = {
+        "version_index",
+        "source_graph_node_id",
+        "source_file_data_id",
+        "content_sha1",
+        "observed_at",
+        "ingested_at",
+        "source_last_modified_at",
+        "supersedes_source_graph_node_id",
+    }
+    for record in frame.version_records:
+        if not isinstance(record, dict):
+            raise TypeError("SourceVersionLineageFrame.version_records items must be dicts")
+        missing = required_record_fields - set(record)
+        if missing:
+            raise ValueError(
+                "SourceVersionLineageFrame.version_records missing fields: "
+                + ", ".join(sorted(missing))
+            )
+        for field_name, value in record.items():
+            if not isinstance(value, str):
+                raise TypeError(
+                    f"SourceVersionLineageFrame.version_records.{field_name} must be string"
+                )
+        if record["source_graph_node_id"] not in version_set:
+            raise ValueError("SourceVersionLineageFrame record source_graph_node_id unknown")
+        if record["source_file_data_id"] not in frame.source_file_data_ids:
+            raise ValueError("SourceVersionLineageFrame record source_file_data_id unknown")
+        if not record["content_sha1"]:
+            raise ValueError("SourceVersionLineageFrame record content_sha1 must not be empty")
+        if not record["observed_at"]:
+            raise ValueError("SourceVersionLineageFrame record observed_at must not be empty")
+
+    if set(frame.content_sha1_by_version) != version_set:
+        raise ValueError("SourceVersionLineageFrame.content_sha1_by_version must mirror versions")
+    if set(frame.observed_at_by_version) != version_set:
+        raise ValueError("SourceVersionLineageFrame.observed_at_by_version must mirror versions")
+    for value in [*frame.content_sha1_by_version.values(), *frame.observed_at_by_version.values()]:
+        if not value:
+            raise ValueError("SourceVersionLineageFrame version maps must not contain empty values")
+
+
+def validate_source_observation_ledger_frame(frame: SourceObservationLedgerFrame) -> None:
+    _require_text_fields(
+        "SourceObservationLedgerFrame",
+        {
+            "frame_id": frame.frame_id,
+            "batch_id": frame.batch_id,
+            "ledger_status": frame.ledger_status,
+            "generated_by": frame.generated_by,
+            "info_class": frame.info_class,
+            "semantic_judgement_status": frame.semantic_judgement_status,
+            "schema_name": frame.schema_name,
+            "schema_version": frame.schema_version,
+        },
+    )
+    if frame.schema_name != SOURCE_OBSERVATION_LEDGER_FRAME_SCHEMA_NAME:
+        raise ValueError(f"unknown SourceObservationLedgerFrame.schema_name: {frame.schema_name}")
+    if frame.schema_version != SOURCE_OBSERVATION_LEDGER_FRAME_SCHEMA_VERSION:
+        raise ValueError(
+            f"unknown SourceObservationLedgerFrame.schema_version: {frame.schema_version}"
+        )
+    if frame.generated_by != SOURCE_OBSERVATION_LEDGER_CODE_GENERATOR:
+        raise ValueError("SourceObservationLedgerFrame.generated_by must be code builder")
+    if frame.info_class != "absolute":
+        raise ValueError("SourceObservationLedgerFrame.info_class must be absolute")
+    if frame.semantic_judgement_status != "not_run":
+        raise ValueError("SourceObservationLedgerFrame.semantic_judgement_status must be not_run")
+    if frame.ledger_status not in SOURCE_OBSERVATION_LEDGER_STATUSES:
+        raise ValueError(f"unknown SourceObservationLedgerFrame.ledger_status: {frame.ledger_status}")
+
+    for field_name, values in {
+        "observed_source_file_data_ids": frame.observed_source_file_data_ids,
+        "active_source_graph_node_ids": frame.active_source_graph_node_ids,
+        "source_graph_node_ids": frame.source_graph_node_ids,
+        "source_trace_ids": frame.source_trace_ids,
+        "source_data_ids": frame.source_data_ids,
+    }.items():
+        _validate_string_list(f"SourceObservationLedgerFrame.{field_name}", values)
+        _validate_no_duplicates(f"SourceObservationLedgerFrame.{field_name}", values)
+
+    _validate_counts(
+        "SourceObservationLedgerFrame.observation_status_counts",
+        frame.observation_status_counts,
+    )
+    for key in frame.observation_status_counts:
+        if key not in SOURCE_OBSERVATION_STATUSES:
+            raise ValueError(f"unknown SourceObservationLedgerFrame status count key: {key}")
+
+    if frame.ledger_status == "no_observations":
+        if frame.observation_records or frame.observed_source_file_data_ids:
+            raise ValueError("no_observations ledger must not include observation records")
+    if frame.ledger_status == "recorded":
+        if not frame.observation_records:
+            raise ValueError("recorded SourceObservationLedgerFrame must include records")
+        if not frame.observed_source_file_data_ids:
+            raise ValueError("recorded SourceObservationLedgerFrame must include source file ids")
+
+    required_record_fields = {
+        "source_file_data_id",
+        "source_kind",
+        "path",
+        "observed_at",
+        "content_sha1",
+        "observation_status",
+        "active_source_graph_node_id",
+        "previous_active_source_graph_node_id",
+    }
+    for record in frame.observation_records:
+        if not isinstance(record, dict):
+            raise TypeError("SourceObservationLedgerFrame.observation_records items must be dicts")
+        missing = required_record_fields - set(record)
+        if missing:
+            raise ValueError(
+                "SourceObservationLedgerFrame.observation_records missing fields: "
+                + ", ".join(sorted(missing))
+            )
+        for field_name, value in record.items():
+            if not isinstance(value, str):
+                raise TypeError(
+                    f"SourceObservationLedgerFrame.observation_records.{field_name} must be string"
+                )
+        for field_name in required_record_fields - {"previous_active_source_graph_node_id"}:
+            if not record[field_name]:
+                raise ValueError(
+                    f"SourceObservationLedgerFrame.observation_records.{field_name} must not be empty"
+                )
+        if record["observation_status"] not in SOURCE_OBSERVATION_STATUSES:
+            raise ValueError(
+                f"unknown SourceObservationLedgerFrame observation_status: {record['observation_status']}"
+            )
+        if record["source_file_data_id"] not in frame.observed_source_file_data_ids:
+            raise ValueError("SourceObservationLedgerFrame record source_file_data_id not listed")
+        if record["active_source_graph_node_id"] not in frame.active_source_graph_node_ids:
+            raise ValueError("SourceObservationLedgerFrame record active source id not listed")
+        if record["active_source_graph_node_id"] not in frame.source_graph_node_ids:
+            raise ValueError("SourceObservationLedgerFrame source_graph_node_ids missing active id")
+
+    counted = _count_observation_statuses(frame.observation_records)
+    if counted != frame.observation_status_counts:
+        raise ValueError("SourceObservationLedgerFrame.observation_status_counts mismatch")
+
+
+def validate_summary_invalidation_ledger_frame(frame: SummaryInvalidationLedgerFrame) -> None:
+    _require_text_fields(
+        "SummaryInvalidationLedgerFrame",
+        {
+            "frame_id": frame.frame_id,
+            "batch_id": frame.batch_id,
+            "ledger_status": frame.ledger_status,
+            "generated_by": frame.generated_by,
+            "info_class": frame.info_class,
+            "semantic_judgement_status": frame.semantic_judgement_status,
+            "schema_name": frame.schema_name,
+            "schema_version": frame.schema_version,
+        },
+    )
+    if frame.schema_name != SUMMARY_INVALIDATION_LEDGER_FRAME_SCHEMA_NAME:
+        raise ValueError(
+            f"unknown SummaryInvalidationLedgerFrame.schema_name: {frame.schema_name}"
+        )
+    if frame.schema_version != SUMMARY_INVALIDATION_LEDGER_FRAME_SCHEMA_VERSION:
+        raise ValueError(
+            f"unknown SummaryInvalidationLedgerFrame.schema_version: {frame.schema_version}"
+        )
+    if frame.generated_by != SUMMARY_INVALIDATION_LEDGER_CODE_GENERATOR:
+        raise ValueError("SummaryInvalidationLedgerFrame.generated_by must be code builder")
+    if frame.info_class != "absolute":
+        raise ValueError("SummaryInvalidationLedgerFrame.info_class must be absolute")
+    if frame.semantic_judgement_status != "not_run":
+        raise ValueError(
+            "SummaryInvalidationLedgerFrame.semantic_judgement_status must be not_run"
+        )
+    if frame.ledger_status not in SUMMARY_INVALIDATION_LEDGER_STATUSES:
+        raise ValueError(
+            f"unknown SummaryInvalidationLedgerFrame.ledger_status: {frame.ledger_status}"
+        )
+
+    for field_name, values in {
+        "invalidated_summary_node_ids": frame.invalidated_summary_node_ids,
+        "changed_source_lineage_frame_ids": frame.changed_source_lineage_frame_ids,
+        "changed_source_graph_node_ids": frame.changed_source_graph_node_ids,
+        "active_source_graph_node_ids": frame.active_source_graph_node_ids,
+        "source_graph_node_ids": frame.source_graph_node_ids,
+        "source_trace_ids": frame.source_trace_ids,
+        "source_data_ids": frame.source_data_ids,
+    }.items():
+        _validate_string_list(f"SummaryInvalidationLedgerFrame.{field_name}", values)
+        _validate_no_duplicates(f"SummaryInvalidationLedgerFrame.{field_name}", values)
+
+    if frame.ledger_status == "no_invalidations":
+        if frame.invalidated_summary_node_ids or frame.invalidation_records:
+            raise ValueError("no_invalidations ledger must not include invalidation records")
+    if frame.ledger_status == "invalidations_recorded":
+        if not frame.invalidated_summary_node_ids:
+            raise ValueError("invalidations_recorded ledger must include summary ids")
+        if not frame.invalidation_records:
+            raise ValueError("invalidations_recorded ledger must include records")
+
+    required_record_fields = {
+        "summary_graph_node_id",
+        "invalidated_reason_code",
+        "source_lineage_frame_id",
+        "superseded_source_graph_node_id",
+        "superseding_source_graph_node_id",
+        "invalidated_at",
+        "validity_status",
+    }
+    for record in frame.invalidation_records:
+        if not isinstance(record, dict):
+            raise TypeError("SummaryInvalidationLedgerFrame.invalidation_records items must be dicts")
+        missing = required_record_fields - set(record)
+        if missing:
+            raise ValueError(
+                "SummaryInvalidationLedgerFrame.invalidation_records missing fields: "
+                + ", ".join(sorted(missing))
+            )
+        for field_name, value in record.items():
+            if not isinstance(value, str):
+                raise TypeError(
+                    f"SummaryInvalidationLedgerFrame.invalidation_records.{field_name} must be string"
+                )
+            if not value:
+                raise ValueError(
+                    f"SummaryInvalidationLedgerFrame.invalidation_records.{field_name} must not be empty"
+                )
+        if record["summary_graph_node_id"] not in frame.invalidated_summary_node_ids:
+            raise ValueError("SummaryInvalidationLedgerFrame record summary id not listed")
+        if record["source_lineage_frame_id"] not in frame.changed_source_lineage_frame_ids:
+            raise ValueError("SummaryInvalidationLedgerFrame record lineage id not listed")
+        if record["superseded_source_graph_node_id"] not in frame.changed_source_graph_node_ids:
+            raise ValueError("SummaryInvalidationLedgerFrame record superseded source id not listed")
+        if record["superseding_source_graph_node_id"] not in frame.active_source_graph_node_ids:
+            raise ValueError("SummaryInvalidationLedgerFrame record active source id not listed")
+        if record["invalidated_reason_code"] != "source_content_changed":
+            raise ValueError("SummaryInvalidationLedgerFrame reason code must be source_content_changed")
+        if record["validity_status"] != "invalidated_by_source_change":
+            raise ValueError("SummaryInvalidationLedgerFrame validity_status is invalid")
+
+
 def _require_text_fields(frame_name: str, fields: dict[str, str | None]) -> None:
     for field_name, value in fields.items():
         if not value:
@@ -1067,6 +1479,16 @@ def _validate_range(field_name: str, values: list[int]) -> None:
         raise ValueError(f"{field_name} values must be >= 0")
     if values[0] > values[1]:
         raise ValueError(f"{field_name} is inverted")
+
+
+def _count_observation_statuses(records: list[dict[str, str]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for record in records:
+        status = record.get("observation_status", "")
+        if not status:
+            continue
+        counts[status] = counts.get(status, 0) + 1
+    return counts
 
 
 __all__ = [
@@ -1101,6 +1523,19 @@ __all__ = [
     "R_LOOP_MEMORY_HANDOFF_PACKET_FRAME_SCHEMA_VERSION",
     "R_LOOP_MEMORY_HANDOFF_SEMANTIC_HINT_STATUSES",
     "R_LOOP_MEMORY_HANDOFF_STATUSES",
+    "SOURCE_VERSION_LINEAGE_CODE_GENERATOR",
+    "SOURCE_VERSION_LINEAGE_FRAME_SCHEMA_NAME",
+    "SOURCE_VERSION_LINEAGE_FRAME_SCHEMA_VERSION",
+    "SOURCE_VERSION_LINEAGE_STATUSES",
+    "SOURCE_OBSERVATION_LEDGER_CODE_GENERATOR",
+    "SOURCE_OBSERVATION_LEDGER_FRAME_SCHEMA_NAME",
+    "SOURCE_OBSERVATION_LEDGER_FRAME_SCHEMA_VERSION",
+    "SOURCE_OBSERVATION_LEDGER_STATUSES",
+    "SOURCE_OBSERVATION_STATUSES",
+    "SUMMARY_INVALIDATION_LEDGER_CODE_GENERATOR",
+    "SUMMARY_INVALIDATION_LEDGER_FRAME_SCHEMA_NAME",
+    "SUMMARY_INVALIDATION_LEDGER_FRAME_SCHEMA_VERSION",
+    "SUMMARY_INVALIDATION_LEDGER_STATUSES",
     "CoreEgoGuideWorkerHintFrame",
     "CoreEgoTimeAxisFrame",
     "GraphMemoryEdgeFrame",
@@ -1108,6 +1543,9 @@ __all__ = [
     "GraphMemorySnapshotFrame",
     "RLoopMemoryHandoffPacketFrame",
     "RLoopGraphGuidePacketFrame",
+    "SourceObservationLedgerFrame",
+    "SourceVersionLineageFrame",
+    "SummaryInvalidationLedgerFrame",
     "TurnActivityGraphLinkFrame",
     "TurnGraphAccessLedgerFrame",
     "validate_core_ego_guide_worker_hint_frame",
@@ -1117,6 +1555,9 @@ __all__ = [
     "validate_graph_memory_snapshot_frame",
     "validate_r_loop_memory_handoff_packet_frame",
     "validate_rloop_graph_guide_packet_frame",
+    "validate_source_observation_ledger_frame",
+    "validate_source_version_lineage_frame",
+    "validate_summary_invalidation_ledger_frame",
     "validate_turn_activity_graph_link_frame",
     "validate_turn_graph_access_ledger_frame",
 ]
