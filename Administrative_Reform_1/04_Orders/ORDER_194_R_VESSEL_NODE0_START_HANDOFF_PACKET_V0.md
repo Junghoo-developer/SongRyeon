@@ -4,7 +4,8 @@
 
 Prepared on 2026-07-03 as the first implementation step after ORDER 193.
 
-This order is implementation-ready, but it should be implemented before ORDER 195-199.
+Implemented on 2026-07-03 in
+`Administrative_Reform_1/05_Execution_Records/order_194_r_vessel_node0_start_handoff_implementation_2026_07_03_001.md`.
 
 ## Trigger
 

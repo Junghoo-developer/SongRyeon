@@ -8,6 +8,9 @@ from songryeon_core.core.graph_vessel_neo4j import graph_vessel_neo4j_config_fro
 from songryeon_core.core.r_loop_vessel_read_packet import (
     record_r_loop_vessel_read_packet,
 )
+from songryeon_core.core.r_loop_vessel_start_handoff import (
+    record_r_loop_vessel_start_handoff_packet,
+)
 from songryeon_core.core.trace_store import TraceStore
 from songryeon_core.llm.runtime import (
     build_llm_adapter,
@@ -153,6 +156,7 @@ def run_local_r_loop_vessel_traverse(
     endpoint: str | None = None,
     model_id: str | None = None,
     timeout_seconds: int | None = None,
+    driver_factory_for_test: object | None = None,
 ) -> dict[str, object]:
     """Read a Vessel packet and run a guarded multi-step R traversal."""
 
@@ -174,6 +178,15 @@ def run_local_r_loop_vessel_traverse(
         config=config,
         created_at=now,
         limit=limit,
+        driver_factory=driver_factory_for_test,
+    )
+    start_handoff = record_r_loop_vessel_start_handoff_packet(
+        trace_store=trace_store,
+        data_store=data_store,
+        turn_id=turn_id,
+        batch_id=f"{batch_id}:start_handoff",
+        read_packet=read_packet.packet,
+        source_read_packet_trace_event_id=read_packet.trace_event_id,
     )
     runtime_config = build_llm_runtime_config(
         mode=llm_mode,
@@ -194,7 +207,8 @@ def run_local_r_loop_vessel_traverse(
         read_packet=read_packet.packet,
         adapter=adapter,
         frame_label=batch_id,
-        input_ref=[read_packet.trace_event_id],
+        input_ref=[read_packet.trace_event_id, start_handoff.trace_event_id],
+        start_handoff_packet_id=start_handoff.packet.packet_id,
     )
 
     return {
@@ -208,6 +222,9 @@ def run_local_r_loop_vessel_traverse(
         "failure_payload_summary": run.result_frame.failure_payload_summary,
         "read_packet_status": read_packet.packet.read_status,
         "packet_id": read_packet.packet.packet_id,
+        "start_handoff_packet_status": start_handoff.packet.packet_status,
+        "start_handoff_packet_id": start_handoff.packet.packet_id,
+        "start_handoff_trace_event_id": start_handoff.trace_event_id,
         "entry_candidate_count": read_packet.packet.entry_candidate_count,
         "summary_candidate_count": read_packet.packet.summary_candidate_count,
         "step_count": run.result_frame.step_count,
@@ -238,6 +255,7 @@ def run_local_r_loop_vessel_traverse(
         "neo4j_allow_no_auth": config.allow_no_auth,
         "trace_count": len(trace_store.list_events()),
         "data_record_count": len(data_store.list_records()),
+        "start_handoff_packet_frame": asdict(start_handoff.packet),
         "result_frame": asdict(run.result_frame),
         "r1_goal_frame": asdict(run.r1_goal) if run.r1_goal is not None else None,
         "r2_selection_frames": [asdict(frame) for frame in run.r2_selections],
@@ -301,6 +319,9 @@ def render_r_loop_vessel_traverse_text(result: dict[str, object]) -> str:
         f"status: {result.get('status')}",
         f"traverse_status: {result.get('traverse_status')}",
         f"read_packet_status: {result.get('read_packet_status')}",
+        "node_0 Vessel R start handoff: "
+        f"status={result.get('start_handoff_packet_status')} / "
+        f"packet={result.get('start_handoff_packet_id')}",
         f"entry_candidate_count: {result.get('entry_candidate_count')}",
         f"summary_candidate_count: {result.get('summary_candidate_count')}",
         f"step_count: {result.get('step_count')}",

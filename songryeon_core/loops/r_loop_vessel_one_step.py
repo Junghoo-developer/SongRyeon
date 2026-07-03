@@ -888,9 +888,11 @@ def run_r_loop_vessel_traverse(
     max_branch_switches: int = R_TRAVERSE_MAX_BRANCH_SWITCHES,
     max_context_tokens: int = R_TRAVERSE_MAX_CONTEXT_TOKENS,
     max_raw_original_material_reads: int = R_TRAVERSE_MAX_RAW_ORIGINAL_MATERIAL_READS,
+    start_handoff_packet_id: str | None = None,
 ) -> RLoopVesselTraverseRun:
     frame_label = _safe_frame_label(frame_label)
     source_trace_ids = _unique_strings([*(input_ref or []), *read_packet.source_trace_ids])
+    base_source_data_ids = _unique_strings([read_packet.packet_id, start_handoff_packet_id])
     result_frame_id = _traverse_result_frame_id(frame_label)
     if read_packet.read_status != "passed":
         return _record_traverse_failure_result(
@@ -903,7 +905,7 @@ def run_r_loop_vessel_traverse(
             failure_stage="read_packet",
             failure_type=read_packet.failure_type or "read_packet_not_passed",
             failure_reason=read_packet.failure_reason or "R Vessel read packet is not passed.",
-            source_data_ids=[read_packet.packet_id],
+            source_data_ids=base_source_data_ids,
             source_trace_ids=source_trace_ids,
         )
     if adapter is None:
@@ -917,7 +919,7 @@ def run_r_loop_vessel_traverse(
             failure_stage="adapter",
             failure_type="adapter_missing",
             failure_reason="R Vessel traversal requires an LLM adapter.",
-            source_data_ids=[read_packet.packet_id],
+            source_data_ids=base_source_data_ids,
             source_trace_ids=source_trace_ids,
         )
 
@@ -953,7 +955,7 @@ def run_r_loop_vessel_traverse(
         turn_id=turn_id,
         prompt_ref=R1_VESSEL_GOAL_PROMPT_REF,
         input_ref=source_trace_ids,
-        source_data_ids=[read_packet.packet_id],
+        source_data_ids=base_source_data_ids,
         payload_validator=lambda payload: _validate_r1_payload(
             payload,
             read_packet=read_packet,
@@ -972,7 +974,7 @@ def run_r_loop_vessel_traverse(
             failure_stage="R1",
             failure_type=r1_result.failure_type,
             failure_reason=r1_result.validation.error or "R1 payload validation failed.",
-            source_data_ids=_unique_strings([read_packet.packet_id, r1_result.call_data_id]),
+            source_data_ids=_unique_strings([*base_source_data_ids, r1_result.call_data_id]),
             source_trace_ids=_unique_strings([*source_trace_ids, r1_result.trace_event_id]),
             llm_call_data_ids=llm_call_data_ids,
         )
@@ -1048,7 +1050,11 @@ def run_r_loop_vessel_traverse(
             turn_id=turn_id,
             prompt_ref=R2_VESSEL_SELECTOR_PROMPT_REF,
             input_ref=_unique_strings([*source_trace_ids, *trace_event_ids]),
-            source_data_ids=[read_packet.packet_id, r1.frame_id, candidate_layer_surface.frame_id],
+            source_data_ids=[
+                *base_source_data_ids,
+                r1.frame_id,
+                candidate_layer_surface.frame_id,
+            ],
             payload_validator=lambda payload, surface=candidate_layer_surface, ids=available_graph_node_ids: _validate_r2_payload(
                 payload,
                 available_graph_node_ids=ids,
@@ -1069,7 +1075,7 @@ def run_r_loop_vessel_traverse(
                 failure_reason=r2_result.validation.error or "R2 payload validation failed.",
                 source_data_ids=_unique_strings(
                     [
-                        read_packet.packet_id,
+                        *base_source_data_ids,
                         r1.frame_id,
                         candidate_layer_surface.frame_id,
                         r2_result.call_data_id,
@@ -1176,7 +1182,12 @@ def run_r_loop_vessel_traverse(
             turn_id=turn_id,
             prompt_ref=R3_VESSEL_INSPECTOR_PROMPT_REF,
             input_ref=_unique_strings([*source_trace_ids, *trace_event_ids]),
-            source_data_ids=[read_packet.packet_id, r1.frame_id, r2.frame_id, r2.selected_graph_node_id],
+            source_data_ids=[
+                *base_source_data_ids,
+                r1.frame_id,
+                r2.frame_id,
+                r2.selected_graph_node_id,
+            ],
             payload_validator=_validate_r3_payload,
         )
         _append_llm_refs(r3_result, llm_call_data_ids, trace_event_ids)
@@ -1193,7 +1204,7 @@ def run_r_loop_vessel_traverse(
                 failure_reason=r3_result.validation.error or "R3 payload validation failed.",
                 source_data_ids=_unique_strings(
                     [
-                        read_packet.packet_id,
+                        *base_source_data_ids,
                         r1.frame_id,
                         candidate_layer_surface.frame_id,
                         r2.frame_id,
@@ -1404,7 +1415,7 @@ def run_r_loop_vessel_traverse(
         continuations=continuations,
         llm_call_data_ids=llm_call_data_ids,
         output_data_ids=output_data_ids,
-        source_data_ids=[read_packet.packet_id],
+        source_data_ids=base_source_data_ids,
         source_trace_ids=_unique_strings([*source_trace_ids, *trace_event_ids]),
         terminal_material_seen_count=terminal_material_seen_count,
         min_terminal_material_count=R_TRAVERSE_MIN_TERMINAL_MATERIAL_READS,
