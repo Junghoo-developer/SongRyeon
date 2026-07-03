@@ -23,6 +23,9 @@ from songryeon_core.loops.r_loop_vessel_one_step import (
     run_r_loop_vessel_one_step,
     run_r_loop_vessel_traverse,
 )
+from songryeon_core.loops.r_loop_vessel_activity_ledger import (
+    record_r_loop_vessel_activity_ledger,
+)
 
 
 def run_local_r_loop_vessel_one_step(
@@ -210,6 +213,18 @@ def run_local_r_loop_vessel_traverse(
         input_ref=[read_packet.trace_event_id, start_handoff.trace_event_id],
         start_handoff_packet_id=start_handoff.packet.packet_id,
     )
+    (
+        activity_ledger_trace_event_id,
+        activity_ledger_frame_id,
+        activity_ledger,
+    ) = record_r_loop_vessel_activity_ledger(
+        trace_store=trace_store,
+        data_store=data_store,
+        turn_id=turn_id,
+        traverse_run=run,
+        frame_label=batch_id,
+        source_start_handoff_packet_id=start_handoff.packet.packet_id,
+    )
 
     return {
         "status": "R_LOOP_VESSEL_TRAVERSE_OK"
@@ -234,6 +249,12 @@ def run_local_r_loop_vessel_traverse(
         "final_sufficiency_status": run.result_frame.final_sufficiency_status,
         "final_continuation_status": run.result_frame.final_continuation_status,
         "r_loop_task_status": run.result_frame.r_loop_task_status,
+        "activity_ledger_frame_id": activity_ledger_frame_id,
+        "activity_ledger_trace_event_id": activity_ledger_trace_event_id,
+        "activity_ledger_task_status": activity_ledger.r_loop_task_status,
+        "activity_ledger_selected_count": len(activity_ledger.selected_graph_node_ids),
+        "activity_ledger_inspected_count": len(activity_ledger.inspected_graph_node_ids),
+        "activity_ledger_candidate_count": len(activity_ledger.candidate_graph_node_ids),
         "terminal_material_seen_count": run.result_frame.terminal_material_seen_count,
         "min_terminal_material_count": run.result_frame.min_terminal_material_count,
         "raw_original_material_seen_count": (
@@ -256,6 +277,7 @@ def run_local_r_loop_vessel_traverse(
         "trace_count": len(trace_store.list_events()),
         "data_record_count": len(data_store.list_records()),
         "start_handoff_packet_frame": asdict(start_handoff.packet),
+        "activity_ledger_frame": asdict(activity_ledger),
         "result_frame": asdict(run.result_frame),
         "r1_goal_frame": asdict(run.r1_goal) if run.r1_goal is not None else None,
         "r2_selection_frames": [asdict(frame) for frame in run.r2_selections],
@@ -329,6 +351,11 @@ def render_r_loop_vessel_traverse_text(result: dict[str, object]) -> str:
         f"final_sufficiency_status: {result.get('final_sufficiency_status')}",
         f"final_continuation_status: {result.get('final_continuation_status')}",
         f"r_loop_task_status: {result.get('r_loop_task_status')}",
+        "R Vessel activity ledger: "
+        f"status={result.get('activity_ledger_task_status')} / "
+        f"selected={result.get('activity_ledger_selected_count')} / "
+        f"inspected={result.get('activity_ledger_inspected_count')} / "
+        f"candidates={result.get('activity_ledger_candidate_count')}",
         f"terminal_material_seen_count: {result.get('terminal_material_seen_count')}",
         f"min_terminal_material_count: {result.get('min_terminal_material_count')}",
         f"raw_original_material_seen_count: {result.get('raw_original_material_seen_count')}",

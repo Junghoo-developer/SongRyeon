@@ -4,7 +4,8 @@
 
 Prepared on 2026-07-03 as the second implementation step after ORDER 194.
 
-This order depends on ORDER 194.
+Implemented on 2026-07-03 in
+`Administrative_Reform_1/05_Execution_Records/order_195_r_vessel_activity_ledger_implementation_2026_07_03_001.md`.
 
 ## Trigger
 
