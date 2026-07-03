@@ -295,6 +295,20 @@ def run_local_r_loop_vessel_traverse(
         "graph_traversal_candidate_surface_frame_ids": (
             run.result_frame.graph_traversal_candidate_surface_frame_ids
         ),
+        "r_vessel_checkpoint_count": len(run.continuation_checkpoints),
+        "r_vessel_checkpoint_latest_step": (
+            run.continuation_checkpoints[-1].step_index
+            if run.continuation_checkpoints
+            else None
+        ),
+        "r_vessel_checkpoint_latest_next_candidate_count": (
+            run.continuation_checkpoints[-1].next_candidate_count
+            if run.continuation_checkpoints
+            else 0
+        ),
+        "r_vessel_checkpoint_packet_ids": [
+            frame.packet_id for frame in run.continuation_checkpoints
+        ],
         "llm_runtime": llm_runtime_status(runtime_config),
         "neo4j_uri": config.uri,
         "neo4j_user": config.user,
@@ -310,6 +324,9 @@ def run_local_r_loop_vessel_traverse(
         "r2_selection_frames": [asdict(frame) for frame in run.r2_selections],
         "r3_inspection_frames": [asdict(frame) for frame in run.r3_inspections],
         "continuation_frames": [asdict(frame) for frame in run.continuations],
+        "continuation_checkpoint_packets": [
+            asdict(frame) for frame in run.continuation_checkpoints
+        ],
         "return_summary_frame": asdict(run.return_summary)
         if run.return_summary is not None
         else None,
@@ -393,6 +410,10 @@ def render_r_loop_vessel_traverse_text(result: dict[str, object]) -> str:
         f"max_raw_original_material_count: {result.get('max_raw_original_material_count')}",
         f"raw_original_read_cap_reached: {result.get('raw_original_read_cap_reached')}",
         f"early_stop_guard_trigger_count: {result.get('early_stop_guard_trigger_count')}",
+        "R Vessel checkpoints: "
+        f"count={result.get('r_vessel_checkpoint_count')} / "
+        f"latest_step={result.get('r_vessel_checkpoint_latest_step')} / "
+        f"next_candidates={result.get('r_vessel_checkpoint_latest_next_candidate_count')}",
     ]
     failure_stage = result.get("failure_stage")
     failure_type = result.get("failure_type")

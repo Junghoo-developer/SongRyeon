@@ -7,6 +7,10 @@ from pathlib import Path
 
 from songryeon_core.core.data_store import DataStore
 from songryeon_core.core.r_loop_state_machine import decide_r_loop_continuation
+from songryeon_core.core.r_loop_vessel_continuation_checkpoint import (
+    RLoopVesselContinuationCheckpointPacketFrame,
+    record_r_loop_vessel_continuation_checkpoint_packet,
+)
 from songryeon_core.core.r_loop_vessel_read_packet import RLoopVesselReadPacketFrame
 from songryeon_core.core.schemas import (
     R1GraphGoalFrame,
@@ -212,6 +216,7 @@ class RLoopVesselTraverseRun:
     candidate_layer_surfaces: list[RLoopVesselCandidateLayerSurfaceFrame]
     surface_selections: list[RLoopVesselSurfaceSelectionFrame]
     graph_traversal_candidate_surfaces: list[RGraphTraversalCandidateSurfaceFrame]
+    continuation_checkpoints: list[RLoopVesselContinuationCheckpointPacketFrame]
     trace_event_ids: list[str]
     output_data_ids: list[str]
 
@@ -933,6 +938,7 @@ def run_r_loop_vessel_traverse(
     r3_inspections: list[R3GraphInspectionFrame] = []
     graph_surfaces: list[RGraphTraversalCandidateSurfaceFrame] = []
     continuations: list[RLoopContinuationFrame] = []
+    continuation_checkpoints: list[RLoopVesselContinuationCheckpointPacketFrame] = []
     terminal_material_seen_count = 0
     raw_original_material_seen_count = 0
     raw_original_read_cap_reached = False
@@ -1096,6 +1102,7 @@ def run_r_loop_vessel_traverse(
                 r3_inspections=r3_inspections,
                 graph_surfaces=graph_surfaces,
                 continuations=continuations,
+                continuation_checkpoints=continuation_checkpoints,
             )
 
         surface_selection = _surface_selection_frame_from_payload(
@@ -1221,6 +1228,7 @@ def run_r_loop_vessel_traverse(
                 r3_inspections=r3_inspections,
                 graph_surfaces=graph_surfaces,
                 continuations=continuations,
+                continuation_checkpoints=continuation_checkpoints,
             )
 
         r3 = _r3_frame_from_payload(
@@ -1356,6 +1364,43 @@ def run_r_loop_vessel_traverse(
                     forced_continuation_status="stop_no_actionable_path",
                 )
                 break
+            checkpoint = record_r_loop_vessel_continuation_checkpoint_packet(
+                trace_store=trace_store,
+                data_store=data_store,
+                turn_id=turn_id,
+                frame_label=frame_label,
+                step_index=step_index,
+                source_start_handoff_packet_id=start_handoff_packet_id,
+                source_read_packet_id=read_packet.packet_id,
+                source_candidate_surface_frame_id=next_candidate_surface.frame_id,
+                source_r2_selection_frame_id=r2.frame_id,
+                source_r3_inspection_frame_id=r3.frame_id,
+                source_continuation_frame_id=final_continuation.frame_id,
+                selected_graph_node_ids_so_far=[
+                    frame.selected_graph_node_id
+                    for frame in r2_selections
+                    if frame.selected_graph_node_id
+                ],
+                inspected_graph_node_ids_so_far=[
+                    frame.inspected_graph_node_id for frame in r3_inspections
+                ],
+                next_candidate_graph_node_ids=_surface_all_candidate_ids(
+                    next_candidate_surface
+                ),
+                remaining_node_reads=final_continuation.remaining_node_reads,
+                remaining_traversal_depth=(
+                    final_continuation.remaining_traversal_depth
+                ),
+                terminal_material_seen_count=terminal_material_seen_count,
+                raw_original_material_seen_count=raw_original_material_seen_count,
+                raw_original_read_cap_reached=raw_original_read_cap_reached,
+                continuation_status=final_continuation.continuation_status,
+                next_target_node=final_continuation.next_target_node,
+                source_trace_ids=_unique_strings([*source_trace_ids, *trace_event_ids]),
+            )
+            continuation_checkpoints.append(checkpoint.packet)
+            trace_event_ids.append(checkpoint.trace_event_id)
+            output_data_ids.append(checkpoint.packet.packet_id)
             continue
 
         return_summary = _return_summary_for_traverse(
@@ -1443,6 +1488,7 @@ def run_r_loop_vessel_traverse(
         candidate_layer_surfaces=candidate_layer_surfaces,
         surface_selections=surface_selections,
         graph_traversal_candidate_surfaces=graph_surfaces,
+        continuation_checkpoints=continuation_checkpoints,
         trace_event_ids=trace_event_ids,
         output_data_ids=output_data_ids,
     )
@@ -2366,6 +2412,7 @@ def _record_traverse_failure_result(
     r3_inspections: list[R3GraphInspectionFrame] | None = None,
     graph_surfaces: list[RGraphTraversalCandidateSurfaceFrame] | None = None,
     continuations: list[RLoopContinuationFrame] | None = None,
+    continuation_checkpoints: list[RLoopVesselContinuationCheckpointPacketFrame] | None = None,
 ) -> RLoopVesselTraverseRun:
     result_frame = _traverse_result_frame(
         frame_id=frame_id,
@@ -2410,6 +2457,7 @@ def _record_traverse_failure_result(
         candidate_layer_surfaces=list(candidate_layer_surfaces or []),
         surface_selections=list(surface_selections or []),
         graph_traversal_candidate_surfaces=list(graph_surfaces or []),
+        continuation_checkpoints=list(continuation_checkpoints or []),
         trace_event_ids=trace_event_ids,
         output_data_ids=final_output_data_ids,
     )

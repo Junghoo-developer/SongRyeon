@@ -2,9 +2,13 @@
 
 ## Status
 
-Prepared on 2026-07-03 as the fourth implementation step after ORDER 196.
+Implemented on 2026-07-03 as the fourth implementation step after ORDER 196.
 
 This order depends on ORDER 194 and ORDER 195. It may be implemented before ORDER 196 if needed, but ORDER 196 should still link its resulting ledger later.
+
+Execution record:
+
+- `Administrative_Reform_1/05_Execution_Records/order_197_r_vessel_node0_continuation_checkpoint_implementation_2026_07_03_001.md`
 
 ## Trigger
 
