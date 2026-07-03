@@ -46,6 +46,7 @@ SELECTED_MEMORY_RAW_ASSISTANT_TEXT_MAX_CHARS = 1200
 SELECTED_MEMORY_MAX_ITEMS = 3
 R_LOOP_VESSEL_TRAVERSE_RESULT_DATA_TYPE = "r_loop:vessel_traverse_result"
 R_LOOP_VESSEL_READ_PACKET_DATA_TYPE = "r_loop:vessel_read_packet"
+R_LOOP_VESSEL_RETURN_PACKET_DATA_TYPE = "r_loop:vessel_return_packet"
 NODE3_VESSEL_R_MATERIAL_SUMMARY_MAX_CHARS = 1200
 
 
@@ -1002,18 +1003,53 @@ def _r_loop_result_attitude_hint(payload: dict[str, object]) -> str:
 def _node3_vessel_r_material(
     data_store: DataStore,
 ) -> Node3VesselRMaterial | None:
-    data_id, payload = _latest_vessel_r_traverse_result(data_store)
+    return_packet_id, return_packet_payload = _latest_vessel_r_return_packet(data_store)
+    traverse_source_id = ""
+    if return_packet_id:
+        traverse_source_id = _text(
+            return_packet_payload,
+            "source_traverse_result_frame_id",
+            fallback="",
+        )
+        data_id = return_packet_id
+        payload = _payload_by_id(data_store, traverse_source_id)
+    else:
+        data_id, payload = _latest_vessel_r_traverse_result(data_store)
+        return_packet_payload = {}
+        traverse_source_id = data_id or ""
     if not data_id:
         return None
 
-    packet_id = _text(payload, "source_packet_id", fallback="")
+    packet_id = _text(
+        return_packet_payload,
+        "source_read_packet_id",
+        fallback=_text(payload, "source_packet_id", fallback=""),
+    )
     read_packet_payload = _payload_by_id(data_store, packet_id)
-    traverse_status = _text(payload, "traverse_status", fallback="failed")
-    r_loop_task_status = _text(payload, "r_loop_task_status", fallback="failed")
+    traverse_status = _text(
+        return_packet_payload,
+        "traverse_status",
+        fallback=_text(payload, "traverse_status", fallback="failed"),
+    )
+    r_loop_task_status = _text(
+        return_packet_payload,
+        "r_loop_task_status",
+        fallback=_text(payload, "r_loop_task_status", fallback="failed"),
+    )
     selected_ids = _string_list(payload.get("selected_graph_node_ids"))
     inspected_ids = _string_list(payload.get("inspected_graph_node_ids"))
-    source_trace_ids = _string_list(payload.get("source_trace_ids"))
-    material_status = "present" if traverse_status == "completed" else "failed"
+    source_trace_ids = _unique_strings(
+        [
+            *_string_list(return_packet_payload.get("source_trace_ids")),
+            *_string_list(payload.get("source_trace_ids")),
+        ]
+    )
+    return_status = _text(return_packet_payload, "return_status", fallback="")
+    material_status = (
+        "present"
+        if traverse_status == "completed" and return_status != "failed"
+        else "failed"
+    )
 
     material_items: list[Node3VesselRMaterialItem] = []
     if material_status == "present" and read_packet_payload:
@@ -1033,8 +1069,21 @@ def _node3_vessel_r_material(
     source_data_ids = _unique_strings(
         [
             data_id,
+            traverse_source_id or None,
+            _text(
+                return_packet_payload,
+                "source_activity_ledger_frame_id",
+                fallback="",
+            )
+            or None,
             packet_id or None,
-            _text(payload, "return_summary_frame_id", fallback="") or None,
+            _text(
+                return_packet_payload,
+                "source_return_summary_frame_id",
+                fallback=_text(payload, "return_summary_frame_id", fallback=""),
+            )
+            or None,
+            *_string_list(return_packet_payload.get("node3_material_source_data_ids")),
             *selected_ids,
             *inspected_ids,
             *[
@@ -1049,8 +1098,10 @@ def _node3_vessel_r_material(
         material_status=material_status,
         traverse_status=traverse_status,
         r_loop_task_status=r_loop_task_status,
-        failure_type=_optional_text(payload.get("failure_type")),
-        failure_reason=_optional_text(payload.get("failure_reason")),
+        failure_type=_optional_text(return_packet_payload.get("failure_type"))
+        or _optional_text(payload.get("failure_type")),
+        failure_reason=_optional_text(return_packet_payload.get("failure_reason"))
+        or _optional_text(payload.get("failure_reason")),
         traversal_path_count=len(inspected_ids),
         selected_graph_node_ids=selected_ids,
         inspected_graph_node_ids=inspected_ids,
@@ -1064,6 +1115,16 @@ def _node3_vessel_r_material(
         source_data_ids=source_data_ids,
         source_trace_ids=source_trace_ids,
     )
+
+
+def _latest_vessel_r_return_packet(data_store: DataStore) -> tuple[str | None, dict[str, object]]:
+    for record in reversed(data_store.list_records()):
+        if record.data_type != R_LOOP_VESSEL_RETURN_PACKET_DATA_TYPE:
+            continue
+        if not isinstance(record.payload, dict):
+            continue
+        return record.data_id, record.payload
+    return None, {}
 
 
 def _latest_vessel_r_traverse_result(data_store: DataStore) -> tuple[str | None, dict[str, object]]:
@@ -1497,7 +1558,7 @@ def _node3_vessel_r_material_llm_payload(
         "info_class": material.info_class,
         "semantic_judgement_status": material.semantic_judgement_status,
         "boundary": (
-            "This is read-only graph-memory material copied by CODE from a Vessel R traversal result. "
+            "This is read-only graph-memory material copied by CODE from a node_0 Vessel R return packet or its compatible traversal fallback. "
             "It is not read_doc evidence, not read_code_file evidence, and not proof that the normal live answer route is R-powered. "
             "Do not expose raw graph node ids."
         ),

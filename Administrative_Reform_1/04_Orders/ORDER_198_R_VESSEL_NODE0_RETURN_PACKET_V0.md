@@ -2,9 +2,13 @@
 
 ## Status
 
-Prepared on 2026-07-03 as the fifth implementation step after ORDER 195.
+Implemented on 2026-07-03 as the fifth implementation step after ORDER 195.
 
 This order depends on ORDER 194 and ORDER 195. ORDER 196 and ORDER 197 improve its traceability but are not strict prerequisites.
+
+Execution record:
+
+- `Administrative_Reform_1/05_Execution_Records/order_198_r_vessel_node0_return_packet_implementation_2026_07_03_001.md`
 
 ## Trigger
 
