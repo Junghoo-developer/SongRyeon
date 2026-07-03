@@ -2,9 +2,11 @@
 
 ## Status
 
-Prepared on 2026-07-03 as the next narrow MVP after the Vessel graph memory and R traversal baseline was merged to `main`.
+Implemented on 2026-07-03 after the user approved the narrow MVP.
 
-Do not implement this order until the user explicitly approves implementation.
+Implementation record:
+
+- `Administrative_Reform_1/05_Execution_Records/order_193_r_result_to_node3_vessel_material_implementation_2026_07_03_001.md`
 
 ## Trigger
 

@@ -18,6 +18,8 @@ from songryeon_core.core.schemas import (
     Node3MaterialDeliveryPolicyFrame,
     Node3MemorySelectionMaterial,
     Node3RLoopResultMaterial,
+    Node3VesselRMaterial,
+    Node3VesselRMaterialItem,
     Node3SourceCodeOutline,
     Node3SourceCodeSymbol,
     Node3SelectedRecentMemoryContext,
@@ -42,6 +44,9 @@ NODE3_MATERIAL_DELIVERY_POLICY_FRAME_DATA_ID = "node_3:material_delivery_policy_
 SELECTED_MEMORY_RAW_USER_TEXT_MAX_CHARS = 800
 SELECTED_MEMORY_RAW_ASSISTANT_TEXT_MAX_CHARS = 1200
 SELECTED_MEMORY_MAX_ITEMS = 3
+R_LOOP_VESSEL_TRAVERSE_RESULT_DATA_TYPE = "r_loop:vessel_traverse_result"
+R_LOOP_VESSEL_READ_PACKET_DATA_TYPE = "r_loop:vessel_read_packet"
+NODE3_VESSEL_R_MATERIAL_SUMMARY_MAX_CHARS = 1200
 
 
 def selected_recent_memory_context_frame_data_id(selection_frame_id: str) -> str:
@@ -512,6 +517,7 @@ def record_node3_input_brief(
         assigned_model_by_node or {},
     )
     r_loop_result_material = _node3_r_loop_result_material(data_store)
+    vessel_r_material = _node3_vessel_r_material(data_store)
     # 학습 메모: node_3 brief는 claim의 의미 등급을 다시 판단하지 않는다.
     # node_2 boundary가 붙인 relative/mixed 라벨을 사용자 답변 재료까지 그대로 운반한다.
     allowed_claims = [
@@ -543,6 +549,14 @@ def record_node3_input_brief(
     )
     has_selected_memory_context = bool(selected_recent_memory_contexts)
     has_l3_document_summary_material = bool(l3_document_summaries)
+    has_r_loop_result_material = r_loop_result_material is not None
+    has_vessel_r_material = (
+        vessel_r_material is not None
+        and (
+            vessel_r_material.material_status == "present"
+            or bool(vessel_r_material.material_items)
+        )
+    )
     if (
         not read_documents
         and not allowed_claims
@@ -550,6 +564,8 @@ def record_node3_input_brief(
         and not has_selected_memory_material
         and not has_selected_memory_context
         and not has_l3_document_summary_material
+        and not has_r_loop_result_material
+        and not has_vessel_r_material
     ):
         insufficiency_reasons.append("no_document_or_claim_material")
 
@@ -662,6 +678,22 @@ def record_node3_input_brief(
         ),
         runtime_tasks=runtime_tasks,
         r_loop_result_material=r_loop_result_material,
+        vessel_r_material_status=(
+            vessel_r_material.material_status
+            if vessel_r_material is not None
+            else "not_recorded"
+        ),
+        vessel_r_material_count=(
+            len(vessel_r_material.material_items)
+            if vessel_r_material is not None
+            else 0
+        ),
+        vessel_r_material_source_data_ids=(
+            list(vessel_r_material.source_data_ids)
+            if vessel_r_material is not None
+            else []
+        ),
+        vessel_r_material=vessel_r_material,
         l_loop_return_summary_frame_id=l_loop_return_summary_frame_id,
         l_loop_task_status=_text(l_loop_return_summary, "l_loop_task_status", fallback="not_recorded"),
         l_loop_failure_level=_text(l_loop_return_summary, "failure_level", fallback="none"),
@@ -746,6 +778,9 @@ def record_node3_input_brief(
             "answer_basis_mode=mixed_or_uncertain이면 출처 묶음, 부분 근거, 불확실성을 드러내고 부족한 근거를 지어내지 않는다.",
             "R route 실험 결과가 있으면 graph memory skeleton 실행 상태로만 말하고, 완전한 장기기억 탐색 성공처럼 말하지 않는다.",
             "R loop result material은 R return summary 장부에서 복사된 절대 상태이며, R1/R2/R3 의미 판단이 실행됐다는 뜻이 아니다.",
+            "Vessel R material은 graph memory 탐색 결과에서 code가 복사한 read-only 재료이며, read_doc 문서나 read_code_file 원문이 아니다.",
+            "Vessel R material의 summary_text는 graph memory에 이미 저장된 요약 재료이고, code가 새로 작성한 요약이 아니다.",
+            "Vessel R material status가 present가 아니거나 r_loop_task_status가 sufficient가 아니면 R 탐색 성공으로 단정하지 않는다.",
         ],
         insufficiency_reasons=insufficiency_reasons,
         source_trace_ids=_unique_strings([*input_trace_ids, *runtime_trace_ids]),
@@ -773,6 +808,11 @@ def record_node3_input_brief(
                 r_loop_result_material.source_data_id
                 if r_loop_result_material is not None
                 else None,
+                *(
+                    vessel_r_material.source_data_ids
+                    if vessel_r_material is not None
+                    else []
+                ),
                 *runtime_data_ids,
             ]
         ),
@@ -957,6 +997,183 @@ def _r_loop_result_attitude_hint(payload: dict[str, object]) -> str:
     if task_status == "partial":
         return "r_loop_partial_or_skeleton_only"
     return "not_recorded"
+
+
+def _node3_vessel_r_material(
+    data_store: DataStore,
+) -> Node3VesselRMaterial | None:
+    data_id, payload = _latest_vessel_r_traverse_result(data_store)
+    if not data_id:
+        return None
+
+    packet_id = _text(payload, "source_packet_id", fallback="")
+    read_packet_payload = _payload_by_id(data_store, packet_id)
+    traverse_status = _text(payload, "traverse_status", fallback="failed")
+    r_loop_task_status = _text(payload, "r_loop_task_status", fallback="failed")
+    selected_ids = _string_list(payload.get("selected_graph_node_ids"))
+    inspected_ids = _string_list(payload.get("inspected_graph_node_ids"))
+    source_trace_ids = _string_list(payload.get("source_trace_ids"))
+    material_status = "present" if traverse_status == "completed" else "failed"
+
+    material_items: list[Node3VesselRMaterialItem] = []
+    if material_status == "present" and read_packet_payload:
+        records_by_id = _vessel_read_packet_records_by_id(read_packet_payload)
+        material_ids = _unique_strings([*selected_ids, *inspected_ids])
+        for graph_node_id in material_ids:
+            record = records_by_id.get(graph_node_id)
+            if record is None:
+                continue
+            item = _node3_vessel_r_material_item(
+                graph_node_id=graph_node_id,
+                record=record,
+                index=len(material_items) + 1,
+            )
+            material_items.append(item)
+
+    source_data_ids = _unique_strings(
+        [
+            data_id,
+            packet_id or None,
+            _text(payload, "return_summary_frame_id", fallback="") or None,
+            *selected_ids,
+            *inspected_ids,
+            *[
+                source_id
+                for item in material_items
+                for source_id in item.source_data_ids
+            ],
+        ]
+    )
+    return Node3VesselRMaterial(
+        source_data_id=data_id,
+        material_status=material_status,
+        traverse_status=traverse_status,
+        r_loop_task_status=r_loop_task_status,
+        failure_type=_optional_text(payload.get("failure_type")),
+        failure_reason=_optional_text(payload.get("failure_reason")),
+        traversal_path_count=len(inspected_ids),
+        selected_graph_node_ids=selected_ids,
+        inspected_graph_node_ids=inspected_ids,
+        summary_material_count=sum(
+            1 for item in material_items if item.material_kind == "summary"
+        ),
+        raw_original_material_count=sum(
+            1 for item in material_items if item.material_kind == "raw_original"
+        ),
+        material_items=material_items,
+        source_data_ids=source_data_ids,
+        source_trace_ids=source_trace_ids,
+    )
+
+
+def _latest_vessel_r_traverse_result(data_store: DataStore) -> tuple[str | None, dict[str, object]]:
+    for record in reversed(data_store.list_records()):
+        if record.data_type != R_LOOP_VESSEL_TRAVERSE_RESULT_DATA_TYPE:
+            continue
+        if not isinstance(record.payload, dict):
+            continue
+        return record.data_id, record.payload
+    return None, {}
+
+
+def _payload_by_id(data_store: DataStore, data_id: str) -> dict[str, object]:
+    if not data_id:
+        return {}
+    record = data_store.get_record(data_id)
+    if record is None or not isinstance(record.payload, dict):
+        return {}
+    return record.payload
+
+
+def _vessel_read_packet_records_by_id(
+    read_packet_payload: dict[str, object],
+) -> dict[str, dict[str, object]]:
+    records: dict[str, dict[str, object]] = {}
+    for record in _dict_list(read_packet_payload.get("entry_candidate_records")):
+        graph_node_id = record.get("candidate_node_id")
+        if isinstance(graph_node_id, str) and graph_node_id:
+            records[graph_node_id] = dict(record)
+    for record in _dict_list(read_packet_payload.get("summary_candidate_records")):
+        graph_node_id = record.get("summary_node_id")
+        if isinstance(graph_node_id, str) and graph_node_id:
+            records[graph_node_id] = dict(record)
+    return records
+
+
+def _node3_vessel_r_material_item(
+    *,
+    graph_node_id: str,
+    record: dict[str, object],
+    index: int,
+) -> Node3VesselRMaterialItem:
+    is_summary = isinstance(record.get("summary_node_id"), str)
+    node_kind = "summary" if is_summary else _text(record, "node_kind", fallback="graph_node")
+    candidate_kind = _text(record, "candidate_kind", fallback="")
+    material_kind = "graph_node"
+    if is_summary:
+        material_kind = "summary"
+    elif node_kind in {"raw_source", "raw_capsule"} or candidate_kind in {
+        "raw_source",
+        "raw_capsule",
+    }:
+        material_kind = "raw_original"
+
+    summary_text = ""
+    summary_text_char_count = 0
+    text_payload_status = "metadata_only"
+    if is_summary:
+        raw_summary_text = _text(record, "summary_text", fallback="")
+        summary_text = raw_summary_text[:NODE3_VESSEL_R_MATERIAL_SUMMARY_MAX_CHARS]
+        summary_text_char_count = _int(record, "summary_text_char_count")
+        if not summary_text_char_count and summary_text:
+            summary_text_char_count = len(summary_text)
+        text_payload_status = "included_summary_text" if summary_text else "metadata_only"
+
+    item_source_data_ids = _unique_strings(
+        [
+            graph_node_id,
+            *(
+                _string_list(record.get("source_data_ids"))
+                if is_summary
+                else []
+            ),
+            *(
+                _string_list(record.get("source_graph_node_ids"))
+                if is_summary
+                else []
+            ),
+            _text(record, "target_graph_node_id", fallback="") if is_summary else None,
+        ]
+    )
+    return Node3VesselRMaterialItem(
+        graph_node_id=graph_node_id,
+        material_label=f"Vessel R material #{index}",
+        material_kind=material_kind,
+        display_name=(
+            _text(record, "summary_display_name", fallback="")
+            if is_summary
+            else _text(record, "display_name", fallback="")
+        ) or f"Vessel graph material #{index}",
+        node_kind=node_kind,
+        data_kind=_text(record, "data_kind", fallback="unknown"),
+        summary_depth=_int(record, "summary_depth"),
+        source_leaf_count=_int(record, "source_leaf_count"),
+        source_summary_count=_int(record, "source_summary_count"),
+        info_class=(
+            _text(record, "info_class", fallback="mixed")
+            if is_summary
+            else "absolute"
+        ),
+        generated_by=(
+            _text(record, "generated_by", fallback="unknown")
+            if is_summary
+            else "CODE:VESSEL_GRAPH_RECORD"
+        ),
+        summary_text=summary_text,
+        summary_text_char_count=summary_text_char_count,
+        text_payload_status=text_payload_status,
+        source_data_ids=item_source_data_ids,
+    )
 
 
 def node3_brief_llm_payload(frame: Node3InputBriefFrame) -> dict[str, object]:
@@ -1195,6 +1412,9 @@ def node3_brief_llm_payload(frame: Node3InputBriefFrame) -> dict[str, object]:
         "r_loop_result": _node3_r_loop_result_llm_payload(
             frame.r_loop_result_material
         ),
+        "vessel_r_material": _node3_vessel_r_material_llm_payload(
+            frame.vessel_r_material
+        ),
         "runtime_task_sequence_note": (
             "This sequence is captured before node_3 report generation. "
             "Later node_3 reporting and node_4 gatekeeping tasks may appear in the final runtime ledger."
@@ -1252,6 +1472,53 @@ def _node3_r_loop_result_llm_payload(
             "It reports that an experimental R skeleton ran; it does not prove that "
             "R graph traversal fully answered the user goal."
         ),
+    }
+
+
+def _node3_vessel_r_material_llm_payload(
+    material: Node3VesselRMaterial | None,
+) -> dict[str, object]:
+    if material is None:
+        return {
+            "status": "not_recorded",
+            "boundary": "No Vessel R traversal material was supplied to node_3.",
+            "items": [],
+        }
+    return {
+        "status": material.material_status,
+        "traverse_status": material.traverse_status,
+        "task_status": material.r_loop_task_status,
+        "failure_type": material.failure_type,
+        "failure_reason": material.failure_reason,
+        "traversal_path_count": material.traversal_path_count,
+        "summary_material_count": material.summary_material_count,
+        "raw_original_material_count": material.raw_original_material_count,
+        "generated_by": material.generated_by,
+        "info_class": material.info_class,
+        "semantic_judgement_status": material.semantic_judgement_status,
+        "boundary": (
+            "This is read-only graph-memory material copied by CODE from a Vessel R traversal result. "
+            "It is not read_doc evidence, not read_code_file evidence, and not proof that the normal live answer route is R-powered. "
+            "Do not expose raw graph node ids."
+        ),
+        "items": [
+            {
+                "material_label": item.material_label,
+                "material_kind": item.material_kind,
+                "display_name": item.display_name,
+                "node_kind": item.node_kind,
+                "data_kind": item.data_kind,
+                "summary_depth": item.summary_depth,
+                "source_leaf_count": item.source_leaf_count,
+                "source_summary_count": item.source_summary_count,
+                "info_class": item.info_class,
+                "generated_by": item.generated_by,
+                "summary_text": item.summary_text,
+                "summary_text_char_count": item.summary_text_char_count,
+                "text_payload_status": item.text_payload_status,
+            }
+            for item in material.material_items
+        ],
     }
 
 
@@ -2547,6 +2814,10 @@ def _text(payload: dict[str, object], field_name: str, *, fallback: str) -> str:
     return fallback
 
 
+def _optional_text(value: object) -> str | None:
+    return value if isinstance(value, str) and value.strip() else None
+
+
 def _int(payload: dict[str, object], field_name: str) -> int:
     value = payload.get(field_name)
     return value if isinstance(value, int) else 0
@@ -2556,6 +2827,12 @@ def _string_list(value: object) -> list[str]:
     if not isinstance(value, list):
         return []
     return [item for item in value if isinstance(item, str) and item]
+
+
+def _dict_list(value: object) -> list[dict[str, object]]:
+    if not isinstance(value, list):
+        return []
+    return [dict(item) for item in value if isinstance(item, dict)]
 
 
 def _current_namespace_ids(

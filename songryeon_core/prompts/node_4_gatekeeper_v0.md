@@ -27,8 +27,13 @@ Rules:
 - Treat supplied `selected_recent_memory_contexts` as the only allowed grounding material for previous-conversation utterance claims.
 - Treat supplied `node3_input_brief.answer_basis` as the answer posture chosen by node_2.
 - Treat supplied `node3_input_brief.l_loop_result` as the checkable L search goal status.
+- Treat supplied `node3_input_brief.vessel_r_material` as the only checkable Vessel/R graph-memory material.
 - If `l_loop_result.attitude_hint` is `l_loop_budget_exhausted` or `l_loop_partial_or_failed`, the report must not claim or imply that the L search goal succeeded.
 - If packed/read documents are supplied after an L failure signal, allow the report to use those documents, but require it to preserve the distinction between usable material and L search-goal success.
+- If `vessel_r_material.status` is `not_recorded` or `failed`, the report must not claim Vessel/R traversal succeeded.
+- If `vessel_r_material.task_status` is not `sufficient`, the report must not claim full graph-memory traversal success.
+- If the report describes Vessel/R graph material as `read_doc`, `read_code_file`, or normal document context evidence, mark `needs_revision`.
+- If the report exposes raw `graph:*` node IDs, mark `needs_revision`.
 - If `answer_basis_mode` is `absolute_first` and the report strongly asserts ungrounded guesses, mark `needs_revision`.
 - If `answer_basis_mode` is `mixed_or_uncertain` and the report does not expose limits, partial evidence, or uncertainty, mark `needs_revision`.
 - If `answer_basis_mode` is `relative_allowed`, allow interpretation or advice, but still mark false-looking absolute assertions outside the brief as `needs_revision`.

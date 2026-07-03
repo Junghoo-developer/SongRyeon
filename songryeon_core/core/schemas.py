@@ -2193,6 +2193,55 @@ class Node3RLoopResultMaterial:
 
 
 @dataclass
+class Node3VesselRMaterialItem:
+    """Vessel R traversal이 고른 graph material 하나를 node_3용으로 안전하게 표시한다."""
+
+    # 절대 정보: LLM payload에는 이 값 대신 material_label을 우선 노출한다.
+    graph_node_id: str
+    # 사용자-facing 안전 표지. 예: Vessel R material #1.
+    material_label: str
+    # summary, raw_original, graph_node 중 하나.
+    material_kind: str
+    display_name: str
+    node_kind: str
+    data_kind: str
+    summary_depth: int
+    source_leaf_count: int
+    source_summary_count: int
+    # 요약 node가 이미 가진 정보 등급. raw/graph node에는 absolute를 쓴다.
+    info_class: str
+    generated_by: str
+    # 이미 graph memory에 저장된 요약 text. code가 새 요약을 만들지 않는다.
+    summary_text: str = ""
+    summary_text_char_count: int = 0
+    text_payload_status: str = "metadata_only"
+    source_data_ids: list[str] = field(default_factory=list)
+
+
+@dataclass
+class Node3VesselRMaterial:
+    """Vessel R traversal 결과를 node_3에게 read-only graph memory 재료로 넘기는 장부."""
+
+    source_data_id: str
+    material_status: str
+    traverse_status: str
+    r_loop_task_status: str
+    failure_type: str | None
+    failure_reason: str | None
+    traversal_path_count: int
+    selected_graph_node_ids: list[str]
+    inspected_graph_node_ids: list[str]
+    summary_material_count: int
+    raw_original_material_count: int
+    material_items: list[Node3VesselRMaterialItem] = field(default_factory=list)
+    generated_by: str = "CODE:NODE3_VESSEL_R_MATERIAL_BUILDER"
+    info_class: str = "absolute"
+    semantic_judgement_status: str = "not_run"
+    source_data_ids: list[str] = field(default_factory=list)
+    source_trace_ids: list[str] = field(default_factory=list)
+
+
+@dataclass
 class Node3SourceCodeSymbol:
     """read_code_file 원문에서 code가 문법적으로 확인한 top-level symbol."""
 
@@ -2289,6 +2338,10 @@ class Node3InputBriefFrame:
     material_policy_semantic_judgement_status: str = "not_run"
     runtime_tasks: list[Node3BriefRuntimeTask] = field(default_factory=list)
     r_loop_result_material: Node3RLoopResultMaterial | None = None
+    vessel_r_material_status: str = "not_recorded"
+    vessel_r_material_count: int = 0
+    vessel_r_material_source_data_ids: list[str] = field(default_factory=list)
+    vessel_r_material: Node3VesselRMaterial | None = None
     l_loop_return_summary_frame_id: str | None = None
     l_loop_task_status: str = "not_recorded"
     l_loop_failure_level: str = "none"
@@ -2457,6 +2510,7 @@ def validate_node3_input_brief_frame(frame: Node3InputBriefFrame) -> None:
             raise ValueError(
                 "Node3InputBriefFrame.source_data_ids must include R loop result source_data_id"
             )
+    _validate_node3_vessel_r_material_fields(frame)
     _validate_node3_l_loop_result_fields(frame)
     _validate_node3_answer_basis_fields(frame)
     for rule in frame.reporting_rules:
@@ -2663,6 +2717,142 @@ def _validate_node3_r_loop_result_material(material: Node3RLoopResultMaterial) -
             raise TypeError(f"Node3RLoopResultMaterial.{field_name} must be an integer")
         if value < 0:
             raise ValueError(f"Node3RLoopResultMaterial.{field_name} must not be negative")
+
+
+def _validate_node3_vessel_r_material_fields(frame: Node3InputBriefFrame) -> None:
+    if frame.vessel_r_material_status not in {"not_recorded", "present", "failed"}:
+        raise ValueError(
+            "unknown Node3InputBriefFrame.vessel_r_material_status: "
+            f"{frame.vessel_r_material_status}"
+        )
+    if not isinstance(frame.vessel_r_material_count, int):
+        raise TypeError("Node3InputBriefFrame.vessel_r_material_count must be an integer")
+    if frame.vessel_r_material_count < 0:
+        raise ValueError("Node3InputBriefFrame.vessel_r_material_count must not be negative")
+    for data_id in frame.vessel_r_material_source_data_ids:
+        if not data_id:
+            raise ValueError(
+                "Node3InputBriefFrame.vessel_r_material_source_data_ids must not contain empty values"
+            )
+    if frame.vessel_r_material is None:
+        if frame.vessel_r_material_status != "not_recorded":
+            raise ValueError("vessel_r_material_status requires vessel_r_material")
+        if frame.vessel_r_material_count != 0:
+            raise ValueError("vessel_r_material_count must be 0 without vessel_r_material")
+        if frame.vessel_r_material_source_data_ids:
+            raise ValueError(
+                "vessel_r_material_source_data_ids must be empty without vessel_r_material"
+            )
+        return
+
+    _validate_node3_vessel_r_material(frame.vessel_r_material)
+    if frame.vessel_r_material_status != frame.vessel_r_material.material_status:
+        raise ValueError("vessel_r_material_status must mirror vessel_r_material.material_status")
+    if frame.vessel_r_material_count != len(frame.vessel_r_material.material_items):
+        raise ValueError("vessel_r_material_count must mirror material_items length")
+    if frame.vessel_r_material_source_data_ids != frame.vessel_r_material.source_data_ids:
+        raise ValueError(
+            "vessel_r_material_source_data_ids must mirror vessel_r_material.source_data_ids"
+        )
+    for data_id in frame.vessel_r_material.source_data_ids:
+        if data_id not in frame.source_data_ids:
+            raise ValueError(
+                "Node3InputBriefFrame.source_data_ids must include vessel R material source_data_ids"
+            )
+
+
+def _validate_node3_vessel_r_material(material: Node3VesselRMaterial) -> None:
+    for field_name, value in {
+        "source_data_id": material.source_data_id,
+        "material_status": material.material_status,
+        "traverse_status": material.traverse_status,
+        "r_loop_task_status": material.r_loop_task_status,
+        "generated_by": material.generated_by,
+        "info_class": material.info_class,
+        "semantic_judgement_status": material.semantic_judgement_status,
+    }.items():
+        if not value:
+            raise ValueError(f"Node3VesselRMaterial.{field_name} must not be empty")
+    if material.material_status not in {"present", "failed"}:
+        raise ValueError(f"unknown Node3VesselRMaterial.material_status: {material.material_status}")
+    if material.traverse_status not in {"completed", "failed", "not_run"}:
+        raise ValueError(f"unknown Node3VesselRMaterial.traverse_status: {material.traverse_status}")
+    if material.r_loop_task_status not in {"not_run", "sufficient", "partial", "failed"}:
+        raise ValueError(
+            f"unknown Node3VesselRMaterial.r_loop_task_status: {material.r_loop_task_status}"
+        )
+    if material.info_class != "absolute":
+        raise ValueError("Node3VesselRMaterial.info_class must be absolute")
+    if material.semantic_judgement_status != "not_run":
+        raise ValueError("Node3VesselRMaterial.semantic_judgement_status must be not_run")
+    for field_name, value in {
+        "traversal_path_count": material.traversal_path_count,
+        "summary_material_count": material.summary_material_count,
+        "raw_original_material_count": material.raw_original_material_count,
+    }.items():
+        if not isinstance(value, int):
+            raise TypeError(f"Node3VesselRMaterial.{field_name} must be an integer")
+        if value < 0:
+            raise ValueError(f"Node3VesselRMaterial.{field_name} must not be negative")
+    if material.traversal_path_count != len(material.inspected_graph_node_ids):
+        raise ValueError("Node3VesselRMaterial.traversal_path_count must mirror inspected ids")
+    if material.summary_material_count != sum(
+        1 for item in material.material_items if item.material_kind == "summary"
+    ):
+        raise ValueError("Node3VesselRMaterial.summary_material_count must mirror summary items")
+    if material.raw_original_material_count != sum(
+        1 for item in material.material_items if item.material_kind == "raw_original"
+    ):
+        raise ValueError(
+            "Node3VesselRMaterial.raw_original_material_count must mirror raw original items"
+        )
+    if material.material_status == "failed" and material.material_items:
+        raise ValueError("failed Node3VesselRMaterial must not contain material_items")
+    if material.source_data_id not in material.source_data_ids:
+        raise ValueError("Node3VesselRMaterial.source_data_ids must include source_data_id")
+    for item in material.material_items:
+        _validate_node3_vessel_r_material_item(item)
+
+
+def _validate_node3_vessel_r_material_item(item: Node3VesselRMaterialItem) -> None:
+    for field_name, value in {
+        "graph_node_id": item.graph_node_id,
+        "material_label": item.material_label,
+        "material_kind": item.material_kind,
+        "display_name": item.display_name,
+        "node_kind": item.node_kind,
+        "data_kind": item.data_kind,
+        "info_class": item.info_class,
+        "generated_by": item.generated_by,
+        "text_payload_status": item.text_payload_status,
+    }.items():
+        if not value:
+            raise ValueError(f"Node3VesselRMaterialItem.{field_name} must not be empty")
+    if item.material_kind not in {"summary", "raw_original", "graph_node"}:
+        raise ValueError(f"unknown Node3VesselRMaterialItem.material_kind: {item.material_kind}")
+    if item.info_class not in {"absolute", "relative", "mixed"}:
+        raise ValueError(f"unknown Node3VesselRMaterialItem.info_class: {item.info_class}")
+    if item.text_payload_status not in {"included_summary_text", "metadata_only"}:
+        raise ValueError(
+            "unknown Node3VesselRMaterialItem.text_payload_status: "
+            f"{item.text_payload_status}"
+        )
+    for field_name, value in {
+        "summary_depth": item.summary_depth,
+        "source_leaf_count": item.source_leaf_count,
+        "source_summary_count": item.source_summary_count,
+        "summary_text_char_count": item.summary_text_char_count,
+    }.items():
+        if not isinstance(value, int):
+            raise TypeError(f"Node3VesselRMaterialItem.{field_name} must be an integer")
+        if value < 0:
+            raise ValueError(f"Node3VesselRMaterialItem.{field_name} must not be negative")
+    if item.text_payload_status == "included_summary_text" and not item.summary_text:
+        raise ValueError("included_summary_text requires summary_text")
+    if item.text_payload_status == "metadata_only" and item.summary_text:
+        raise ValueError("metadata_only item must not contain summary_text")
+    if item.graph_node_id not in item.source_data_ids:
+        raise ValueError("Node3VesselRMaterialItem.source_data_ids must include graph_node_id")
 
 
 def _validate_node3_l3_document_summary_material(

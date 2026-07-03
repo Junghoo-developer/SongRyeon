@@ -1496,6 +1496,16 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
                 f"budget={r_loop_material.get('budget_status', 'unknown')} / "
                 f"hint={r_loop_material.get('attitude_hint', 'unknown')}"
             )
+        vessel_r_material = node3_brief.get("vessel_r_material")
+        if isinstance(vessel_r_material, dict):
+            lines.append(
+                "  - Vessel R material in brief: "
+                f"status={vessel_r_material.get('material_status', 'unknown')} / "
+                f"task={vessel_r_material.get('r_loop_task_status', 'unknown')} / "
+                f"items={len(vessel_r_material.get('material_items', []))} / "
+                f"summaries={vessel_r_material.get('summary_material_count', 0)} / "
+                f"raw_originals={vessel_r_material.get('raw_original_material_count', 0)}"
+            )
         answer_basis_mode = node3_brief.get("answer_basis_mode")
         if isinstance(answer_basis_mode, str) and answer_basis_mode:
             lines.append(
