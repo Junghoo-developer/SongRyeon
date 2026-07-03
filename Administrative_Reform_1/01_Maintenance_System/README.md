@@ -9,3 +9,4 @@
 - [LOOP_AUTHORITY_AND_W_POLICY_v0.md](LOOP_AUTHORITY_AND_W_POLICY_v0.md): 루프별 권한, W 문제감지 루프, 포기/보류/루프경제성 원칙.
 - [DEVELOPMENT_CYCLE_POLICY_v0.md](DEVELOPMENT_CYCLE_POLICY_v0.md): 목표 지정, MVP 구현, 학습 회고를 한 개발 주기로 묶는 운영 규칙.
 - [AGENT_WORKING_RULES_FROM_MAIN_PROJECT.md](AGENT_WORKING_RULES_FROM_MAIN_PROJECT.md): 송련 본점 AGENTS 지침을 Core 연습판에 이식한 인코딩, 역할 분담, 메타정보, 안전 작업 규칙.
+- [NEO4J_CONTEXT_GRAPH_LESSONS_FOR_SONGRYEON_NIGHT_GOVERNMENT_V0.md](NEO4J_CONTEXT_GRAPH_LESSONS_FOR_SONGRYEON_NIGHT_GOVERNMENT_V0.md): Neo4j Agent Memory/Context Graph 자료에서 심야정부와 R루프가 배울 구조와 금지선을 정리한 학습 문서.

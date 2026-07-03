@@ -17,7 +17,9 @@ Return only one JSON object with these keys:
 
 Rules:
 
-- Allowed routes are only `L` and `2`.
+- Use only the route values listed in the supplied `allowed_routes` payload.
+- In normal runtime this is `L` and `2`.
+- If `R` is included, it is an explicit experimental graph-memory route. Use `R` only when the user request is better served by graph memory traversal than by document lookup or direct reporting.
 - `memory_packet_records` may contain `memory_items` made by node_0. Use these as supplied context, especially `l_loop_return_summary` items after an L loop returns.
 - `recent_memory_router_context` may contain a memory relevance selection frame and a selected recent memory context frame. These are supplied records, not a command.
 - If `selected_recent_memory_context_records` directly cover the user's current question, use `2` unless the user also requires internal/project document evidence.
@@ -27,5 +29,6 @@ Rules:
 - Use `L` when the user asks who SongRyeon is, who "you" are, or asks for the agent/project identity, because identity must be grounded in internal documents.
 - Use `2` when the turn can go directly to metainfo boundary/reporting without document lookup.
 - If `route` is `L`, `expected_next_0_mode` must be `targeted_memory_supply`.
+- If `route` is experimental `R`, `expected_next_0_mode` must be `r_loop_graph_guide_handoff`.
 - If `route` is `2`, `expected_next_0_mode` must be `final_trace_for_2`.
 - Do not claim facts outside the supplied payload.

@@ -64,7 +64,11 @@ from songryeon_core.nodes.node_0_memory_supplier import (
 from songryeon_core.nodes.node_1_router import record_routing, route_next
 from songryeon_core.nodes.node_2_handoff import record_node3_input_brief, record_route2_handoff
 from songryeon_core.nodes.node_2_handoff import record_selected_recent_memory_context
-from songryeon_core.nodes.node_2_metainfo_boundary import build_metainfo_boundary, record_boundary
+from songryeon_core.nodes.node_2_metainfo_boundary import (
+    build_metainfo_boundary,
+    record_boundary,
+    run_node2_answer_basis_selection,
+)
 from songryeon_core.nodes.node_3_reporter import record_report, render_report
 from songryeon_core.nodes.node_4_gatekeeper import run_node4_gatekeeper
 from songryeon_core.runtime.dry_run import run_dry_turn
@@ -117,6 +121,7 @@ def run_smoke_tests() -> dict[str, object]:
         "L3:achievement_frame",
         "L3:preserved_info_frame",
         "node_2:handoff_frame",
+        "node_2:answer_basis_frame",
         "node_3:input_brief_frame",
         "report_dry_001",
         "L:run_frame:0001",
@@ -125,6 +130,9 @@ def run_smoke_tests() -> dict[str, object]:
         "tool_choice:L2:search_docs",
         "tool_choice:L_controller_0002:read_doc",
         "L:return_summary_frame",
+        "L:activity_ledger_frame",
+        "graph:turn_activity_graph_link:turn_dry_001",
+        "graph:activity_ledger:L:activity_ledger_frame",
         "L:control:0001",
         "L:control:0002",
         "L:control:0003",
@@ -155,6 +163,8 @@ def run_smoke_tests() -> dict[str, object]:
     _check_route2_handoff_and_brief(records)
     runtime_count_smoke = _run_runtime_count_consistency_smoke()
     return_summary_smoke = _check_l_loop_return_summary(records)
+    l_activity_ledger_smoke = _check_l_loop_activity_ledger(records)
+    turn_activity_graph_link_smoke = _check_turn_activity_graph_link(records)
     _check_runtime_explanation_fields(records)
     runtime_label_smoke = _check_runtime_metainfo_labels(result)
     live_trace_smoke = _run_live_trace_progress_stream_smoke()
@@ -207,6 +217,8 @@ def run_smoke_tests() -> dict[str, object]:
     if search_result["result_count"] < 1:
         raise AssertionError("search_docs returned no results")
     document_memory_smoke = _check_document_memory_index(records, search_result)
+    graph_memory_guide_smoke = _check_graph_memory_guide(result, records)
+    r_route_dry_run_smoke = _run_r_route_dry_run_only_smoke()
 
     return {
         "status": "SMOKE_TEST_OK",
@@ -239,6 +251,12 @@ def run_smoke_tests() -> dict[str, object]:
         "runtime_count_reportable_documents": runtime_count_smoke["reportable_document_count"],
         "runtime_count_raw_extract_records": runtime_count_smoke["raw_document_extract_record_count"],
         "runtime_count_empty_extract_records": runtime_count_smoke["empty_document_extract_record_count"],
+        "node2_answer_basis_mode": result.get("node2_answer_basis_mode"),
+        "node2_answer_basis_reason_codes": result.get("node2_answer_basis_reason_codes"),
+        "node2_answer_basis_generated_by": result.get("node2_answer_basis_generated_by"),
+        "node2_answer_basis_semantic": result.get(
+            "node2_answer_basis_semantic_judgement_status"
+        ),
         "llm_call_records": llm_smoke["llm_call_records"],
         "llm_retry_failure_type": llm_smoke["llm_retry_failure_type"],
         "node1_router_fallback_policy": router_fallback_smoke["fallback_policy"],
@@ -251,6 +269,13 @@ def run_smoke_tests() -> dict[str, object]:
         "l_loop_final_decision": l_loop_control_smoke["final_decision"],
         "l_loop_return_summary_status": return_summary_smoke["task_status"],
         "l_loop_return_summary_route_hint": return_summary_smoke["route_hint"],
+        "l_loop_activity_ledger_outputs": l_activity_ledger_smoke["output_count"],
+        "l_loop_activity_ledger_tool_results": l_activity_ledger_smoke["tool_result_count"],
+        "l_loop_activity_ledger_read_doc": l_activity_ledger_smoke["actual_read_doc_count"],
+        "turn_activity_graph_link_l_ledgers": turn_activity_graph_link_smoke["l_ledger_count"],
+        "turn_activity_graph_link_r_ledgers": turn_activity_graph_link_smoke["r_ledger_count"],
+        "turn_activity_graph_link_nodes": turn_activity_graph_link_smoke["node_count"],
+        "turn_activity_graph_link_edges": turn_activity_graph_link_smoke["edge_count"],
         "l_loop_read_doc_used": l_loop_control_smoke["read_doc_used"],
         "tool_distillation_count": distillation_smoke["distillation_count"],
         "tool_distillation_sources_l3": distillation_smoke["l3_uses_distillation"],
@@ -339,6 +364,24 @@ def run_smoke_tests() -> dict[str, object]:
         "raw_memory_window_count_13_older_unmanaged": raw_memory_window_smoke["count_13_older_unmanaged"],
         "raw_memory_window_no_semantic_compression": raw_memory_window_smoke["no_semantic_compression"],
         "raw_memory_window_original_kept": raw_memory_window_smoke["original_kept"],
+        "graph_memory_snapshot_id": graph_memory_guide_smoke["snapshot_id"],
+        "graph_memory_raw_capsule_nodes": graph_memory_guide_smoke["raw_capsule_nodes"],
+        "graph_memory_time_bundle_nodes": graph_memory_guide_smoke["time_bundle_nodes"],
+        "rloop_graph_guide_packet_id": graph_memory_guide_smoke["guide_packet_id"],
+        "rloop_graph_guide_entry_count": graph_memory_guide_smoke["entry_count"],
+        "rloop_graph_guide_hints_status": graph_memory_guide_smoke["hints_status"],
+        "rloop_graph_guide_semantic_status": graph_memory_guide_smoke["semantic_status"],
+        "rloop_graph_guide_not_in_node1_or_node3": graph_memory_guide_smoke["not_in_node1_or_node3"],
+        "r_loop_memory_handoff_packet_id": graph_memory_guide_smoke["handoff_packet_id"],
+        "r_loop_memory_handoff_status": graph_memory_guide_smoke["handoff_status"],
+        "r_loop_memory_handoff_entry_count": graph_memory_guide_smoke["handoff_entry_count"],
+        "r_loop_memory_handoff_semantic_hint_status": graph_memory_guide_smoke[
+            "handoff_semantic_hint_status"
+        ],
+        "r_route_dry_run_enabled": r_route_dry_run_smoke["enabled"],
+        "r_route_dry_run_status": r_route_dry_run_smoke["task_status"],
+        "r_route_dry_run_continuation": r_route_dry_run_smoke["continuation_status"],
+        "r_route_dry_run_not_default": r_route_dry_run_smoke["not_default"],
         "qwen_chat_continuity_external_turn_id": qwen_chat_continuity_smoke["external_turn_id"],
         "qwen_chat_continuity_two_turn_alignment": qwen_chat_continuity_smoke["two_turn_alignment"],
         "qwen_chat_continuity_stateless_default": qwen_chat_continuity_smoke["stateless_default"],
@@ -371,6 +414,171 @@ def run_smoke_tests() -> dict[str, object]:
         "node1_recent_memory_router_visibility_context_seen": node1_recent_memory_router_visibility_smoke["context_seen"],
         "node1_recent_memory_router_visibility_source_ids": node1_recent_memory_router_visibility_smoke["source_ids"],
         "top_doc": search_result["results"][0]["doc_id"],
+    }
+
+
+def _check_graph_memory_guide(
+    result: dict[str, object],
+    records: dict[str, object],
+) -> dict[str, object]:
+    snapshot_id = result.get("graph_memory_snapshot_id")
+    guide_id = result.get("rloop_graph_guide_packet_id")
+    handoff_id = result.get("r_loop_memory_handoff_packet_id")
+    if not isinstance(snapshot_id, str) or not snapshot_id:
+        raise AssertionError("graph memory snapshot id is missing")
+    if not isinstance(guide_id, str) or not guide_id:
+        raise AssertionError("RLoop graph guide packet id is missing")
+    if not isinstance(handoff_id, str) or not handoff_id:
+        raise AssertionError("R loop memory handoff packet id is missing")
+
+    snapshot = records.get(snapshot_id)
+    guide = records.get(guide_id)
+    handoff = records.get(handoff_id)
+    if not isinstance(snapshot, dict):
+        raise AssertionError("graph memory snapshot payload is missing")
+    if not isinstance(guide, dict):
+        raise AssertionError("RLoop graph guide payload is missing")
+    if not isinstance(handoff, dict):
+        raise AssertionError("R loop memory handoff payload is missing")
+
+    node_kind_counts = guide.get("node_kind_counts")
+    if not isinstance(node_kind_counts, dict):
+        raise AssertionError("RLoop graph guide node_kind_counts is missing")
+    raw_capsule_nodes = node_kind_counts.get("raw_capsule")
+    time_bundle_nodes = node_kind_counts.get("time_bundle")
+    if not isinstance(raw_capsule_nodes, int) or raw_capsule_nodes < 1:
+        raise AssertionError("RLoop graph guide has no raw capsule node")
+    if not isinstance(time_bundle_nodes, int) or time_bundle_nodes < 1:
+        raise AssertionError("RLoop graph guide has no time bundle node")
+    if guide.get("generated_by") != "CODE:GRAPH_MEMORY_GUIDE_BUILDER":
+        raise AssertionError("RLoop graph guide generated_by is not code builder")
+    if guide.get("info_class") != "absolute":
+        raise AssertionError("RLoop graph guide info_class is not absolute")
+    if guide.get("semantic_judgement_status") != "not_run":
+        raise AssertionError("RLoop graph guide semantic judgement must remain not_run")
+    if guide.get("recommended_traversal_hints_status") != "not_run":
+        raise AssertionError("RLoop graph guide LLM hints must remain not_run")
+    if guide.get("recommended_traversal_hints"):
+        raise AssertionError("RLoop graph guide must not include LLM traversal hints")
+
+    entry_nodes = guide.get("available_entry_nodes")
+    if not isinstance(entry_nodes, list) or "graph:axis:time" not in entry_nodes:
+        raise AssertionError("RLoop graph guide must expose graph:axis:time as entry")
+
+    if handoff.get("packet_status") != "available":
+        raise AssertionError("R loop handoff must be available when guide exists")
+    if handoff.get("target") != "R_LOOP":
+        raise AssertionError("R loop handoff target must be R_LOOP")
+    if handoff.get("mode") != "graph_guide_handoff":
+        raise AssertionError("R loop handoff mode must be graph_guide_handoff")
+    if handoff.get("r_loop_graph_guide_packet_id") != guide_id:
+        raise AssertionError("R loop handoff must preserve guide packet id")
+    if handoff.get("graph_snapshot_id") != snapshot_id:
+        raise AssertionError("R loop handoff must preserve graph snapshot id")
+    if handoff.get("available_entry_node_ids") != entry_nodes:
+        raise AssertionError("R loop handoff must copy available entry nodes")
+    if handoff.get("generated_by") != "CODE:node_0_memory_supplier":
+        raise AssertionError("R loop handoff generated_by must be node_0 code")
+    if handoff.get("info_class") != "absolute":
+        raise AssertionError("R loop handoff info_class must be absolute")
+    if handoff.get("semantic_judgement_status") != "not_run":
+        raise AssertionError("R loop handoff semantic judgement must remain not_run")
+    handoff_source_data_ids = handoff.get("source_data_ids")
+    if not isinstance(handoff_source_data_ids, list):
+        raise AssertionError("R loop handoff source_data_ids missing")
+    if guide_id not in handoff_source_data_ids or snapshot_id not in handoff_source_data_ids:
+        raise AssertionError("R loop handoff must cite guide and snapshot data ids")
+
+    for record in result.get("data_records", []):
+        if not isinstance(record, dict):
+            continue
+        if record.get("data_type") not in {
+            "node_output:routing_decision",
+            "node_output:report",
+        }:
+            continue
+        payload = record.get("payload")
+        if not isinstance(payload, dict):
+            continue
+        source_data_ids = payload.get("source_data_ids")
+        if isinstance(source_data_ids, list) and guide_id in source_data_ids:
+            raise AssertionError("RLoop graph guide was injected into node_1 or node_3")
+        if isinstance(source_data_ids, list) and handoff_id in source_data_ids:
+            raise AssertionError("R loop handoff was injected into node_1 or node_3")
+
+    return {
+        "snapshot_id": snapshot_id,
+        "guide_packet_id": guide_id,
+        "handoff_packet_id": handoff_id,
+        "raw_capsule_nodes": raw_capsule_nodes,
+        "time_bundle_nodes": time_bundle_nodes,
+        "entry_count": len(entry_nodes),
+        "hints_status": guide.get("recommended_traversal_hints_status"),
+        "semantic_status": guide.get("semantic_judgement_status"),
+        "handoff_status": handoff.get("packet_status"),
+        "handoff_entry_count": len(entry_nodes),
+        "handoff_semantic_hint_status": handoff.get("semantic_hint_status"),
+        "not_in_node1_or_node3": True,
+    }
+
+
+def _run_r_route_dry_run_only_smoke() -> dict[str, object]:
+    default_result = run_dry_turn()
+    if default_result.get("r_route_dry_run_enabled") is not False:
+        raise AssertionError("R dry-run must be disabled by default")
+    if default_result.get("r_route_dry_run_status") != "not_run":
+        raise AssertionError("default dry-run must not run R skeleton")
+
+    result = run_dry_turn(enable_r_route_dry_run=True)
+    if result.get("r_route_dry_run_enabled") is not True:
+        raise AssertionError("R dry-run fixture did not enable")
+    if result.get("r_route_dry_run_status") != "sufficient":
+        raise AssertionError("R dry-run return summary should be sufficient")
+    if result.get("r_route_dry_run_continuation_status") != "stop_sufficient":
+        raise AssertionError("R dry-run should stop sufficient after multi-step traversal")
+    if result.get("r_route_dry_run_next_target_node") != "return_summary":
+        raise AssertionError("R dry-run final continuation should target return_summary")
+    if result.get("r_route_dry_run_traversal_step_count") != 3:
+        raise AssertionError("R dry-run should traverse three graph nodes")
+    output_ids = result.get("r_route_dry_run_output_data_ids")
+    if not isinstance(output_ids, list) or len(output_ids) != 18:
+        raise AssertionError("R dry-run should record eighteen output frames")
+
+    records = result.get("data_records")
+    if not isinstance(records, list):
+        raise AssertionError("R dry-run result has no data_records")
+    data_types = {
+        record.get("data_type")
+        for record in records
+        if isinstance(record, dict) and record.get("data_id") in output_ids
+    }
+    required_types = {
+        "node_output:R1_graph_goal_frame",
+        "node_output:R_loop_budget_frame",
+        "node_output:R2_graph_node_selection_frame",
+        "node_output:R3_graph_inspection_frame",
+        "node_output:R_graph_traversal_candidate_surface_frame",
+        "node_output:R_loop_continuation_frame",
+        "node_output:R_loop_return_summary_frame",
+        "graph_memory:turn_access_ledger_frame",
+    }
+    if not required_types.issubset(data_types):
+        raise AssertionError("R dry-run output frame types are incomplete")
+    ledger_id = result.get("r_route_dry_run_access_ledger_id")
+    if not isinstance(ledger_id, str) or ledger_id not in output_ids:
+        raise AssertionError("R dry-run access ledger id must be recorded")
+    candidate_surface_id = result.get("r_route_dry_run_candidate_surface_id")
+    if not isinstance(candidate_surface_id, str) or candidate_surface_id not in output_ids:
+        raise AssertionError("R dry-run candidate surface id must be recorded")
+
+    return {
+        "enabled": True,
+        "task_status": result.get("r_route_dry_run_status"),
+        "continuation_status": result.get("r_route_dry_run_continuation_status"),
+        "traversal_step_count": result.get("r_route_dry_run_traversal_step_count"),
+        "candidate_surface_id": candidate_surface_id,
+        "access_ledger_id": ledger_id,
+        "not_default": True,
     }
 
 
@@ -1897,9 +2105,10 @@ def _check_route2_handoff_and_brief(records: dict[str, object]) -> None:
     """route=2 handoff와 node_3용 브리프가 새 경계를 지키는지 확인한다."""
 
     handoff = records["node_2:handoff_frame"]
+    answer_basis = records["node_2:answer_basis_frame"]
     brief = records["node_3:input_brief_frame"]
-    if not isinstance(handoff, dict) or not isinstance(brief, dict):
-        raise AssertionError("route2 handoff and node3 brief payloads must be dicts")
+    if not isinstance(handoff, dict) or not isinstance(answer_basis, dict) or not isinstance(brief, dict):
+        raise AssertionError("route2 handoff, answer basis, and node3 brief payloads must be dicts")
     if handoff.get("handoff_status") not in {"ready", "insufficient", "blocked"}:
         raise AssertionError("route2 handoff status is invalid")
     if "1:route=2" not in (handoff.get("route_path") or []):
@@ -1918,7 +2127,10 @@ def _check_route2_handoff_and_brief(records: dict[str, object]) -> None:
             raise AssertionError(f"route2 handoff {field_name} must be a non-negative integer")
     if handoff.get("read_doc_count") != handoff.get("reportable_document_count"):
         raise AssertionError("route2 handoff read_doc_count must mirror reportable_document_count")
-    if handoff.get("raw_document_extract_record_count") < handoff.get("reportable_document_count"):
+    if (
+        not handoff.get("document_context_pack_frame_id")
+        and handoff.get("raw_document_extract_record_count") < handoff.get("reportable_document_count")
+    ):
         raise AssertionError("route2 handoff raw extract count must cover reportable documents")
     controller_decisions = handoff.get("same_turn_l_reroute_controller_decisions")
     if not isinstance(controller_decisions, list):
@@ -1945,9 +2157,33 @@ def _check_route2_handoff_and_brief(records: dict[str, object]) -> None:
         raise AssertionError("node3 brief status is invalid")
     if brief.get("handoff_frame_id") != "node_2:handoff_frame":
         raise AssertionError("node3 brief must point back to route2 handoff internally")
+    if answer_basis.get("answer_basis_mode") not in {
+        "absolute_first",
+        "relative_allowed",
+        "mixed_or_uncertain",
+    }:
+        raise AssertionError("answer basis mode must be one of the three approved values")
+    if answer_basis.get("generated_by") != "CODE:FALLBACK":
+        raise AssertionError("default dry-run answer basis should reveal CODE fallback")
+    if answer_basis.get("basis_reason_codes") != ["llm_mode_selection_failed"]:
+        raise AssertionError("default dry-run answer basis fallback reason code is wrong")
+    if answer_basis.get("semantic_judgement_status") != "failed":
+        raise AssertionError("default dry-run answer basis fallback status must be failed")
+    if brief.get("answer_basis_frame_id") != "node_2:answer_basis_frame":
+        raise AssertionError("node3 brief must cite answer basis frame")
+    if brief.get("answer_basis_mode") != answer_basis.get("answer_basis_mode"):
+        raise AssertionError("node3 brief must preserve answer_basis_mode")
+    if brief.get("basis_reason_codes") != answer_basis.get("basis_reason_codes"):
+        raise AssertionError("node3 brief must preserve basis_reason_codes")
+    if brief.get("answer_basis_generated_by") != answer_basis.get("generated_by"):
+        raise AssertionError("node3 brief must preserve answer basis generated_by")
     read_documents = brief.get("read_documents")
     search_candidate_count = brief.get("search_candidate_count")
     search_candidate_documents = brief.get("search_candidate_documents")
+    final_search_candidate_count = brief.get("final_search_candidate_count")
+    final_search_candidate_documents = brief.get("final_search_candidate_documents")
+    accumulated_search_candidate_count = brief.get("accumulated_search_candidate_count")
+    accumulated_search_candidate_documents = brief.get("accumulated_search_candidate_documents")
     allowed_claims = brief.get("allowed_claims")
     memory_selection_material = brief.get("memory_selection_material")
     runtime_tasks = brief.get("runtime_tasks")
@@ -1955,6 +2191,8 @@ def _check_route2_handoff_and_brief(records: dict[str, object]) -> None:
     if (
         not isinstance(read_documents, list)
         or not isinstance(search_candidate_documents, list)
+        or not isinstance(final_search_candidate_documents, list)
+        or not isinstance(accumulated_search_candidate_documents, list)
         or not isinstance(allowed_claims, list)
         or not isinstance(runtime_tasks, list)
         or not isinstance(reporting_rules, list)
@@ -1966,6 +2204,25 @@ def _check_route2_handoff_and_brief(records: dict[str, object]) -> None:
         raise AssertionError("node3 brief search_candidate_count must be a non-negative integer")
     if search_candidate_count != len(search_candidate_documents):
         raise AssertionError("node3 brief search_candidate_count must match search_candidate_documents")
+    if final_search_candidate_count != search_candidate_count:
+        raise AssertionError("node3 brief final_search_candidate_count must mirror legacy search_candidate_count")
+    if final_search_candidate_documents != search_candidate_documents:
+        raise AssertionError("node3 brief final_search_candidate_documents must mirror legacy search_candidate_documents")
+    if not isinstance(accumulated_search_candidate_count, int) or accumulated_search_candidate_count < 0:
+        raise AssertionError("node3 brief accumulated_search_candidate_count must be non-negative")
+    if accumulated_search_candidate_count != len(accumulated_search_candidate_documents):
+        raise AssertionError("node3 brief accumulated_search_candidate_count must match accumulated documents")
+    pack_frame_id = brief.get("document_context_pack_frame_id")
+    if isinstance(pack_frame_id, str) and pack_frame_id:
+        if handoff.get("document_context_pack_frame_id") != pack_frame_id:
+            raise AssertionError("node3 brief must cite the handoff document context pack frame")
+        if len(read_documents) != handoff.get("document_context_included_count"):
+            raise AssertionError("node3 read_documents must mirror context pack included count")
+        excluded_contexts = brief.get("excluded_document_contexts")
+        if not isinstance(excluded_contexts, list):
+            raise AssertionError("node3 brief excluded document contexts must be a list")
+        if len(excluded_contexts) != handoff.get("document_context_excluded_count"):
+            raise AssertionError("node3 excluded contexts must mirror pack excluded count")
     if not read_documents and not allowed_claims and not runtime_tasks:
         raise AssertionError("default dry run should provide node3 with at least one report material")
     for document in read_documents:
@@ -2058,6 +2315,140 @@ def _check_l_loop_return_summary(records: dict[str, object]) -> dict[str, object
     return {
         "task_status": frame.get("l_loop_task_status"),
         "route_hint": frame.get("recommended_next_route_for_node1"),
+    }
+
+
+def _check_l_loop_activity_ledger(records: dict[str, object]) -> dict[str, object]:
+    """L루프 활동 장부가 의미 판단 없이 L 산출물 좌표를 묶는지 확인한다."""
+
+    frame = records.get("L:activity_ledger_frame")
+    if not isinstance(frame, dict):
+        raise AssertionError("L loop activity ledger frame is missing")
+    if frame.get("loop_id") != "L":
+        raise AssertionError("L activity ledger must target loop L")
+    if frame.get("run_index") != 1:
+        raise AssertionError("first L activity ledger run index must be 1")
+    if frame.get("turn_capsule_graph_node_id") != "graph:raw_capsule:turn_dry_001":
+        raise AssertionError("L activity ledger must expose turn raw capsule graph anchor")
+    if frame.get("generated_by") != "CODE:L_LOOP_ACTIVITY_LEDGER":
+        raise AssertionError("L activity ledger must reveal code generator")
+    if frame.get("info_class") != "absolute":
+        raise AssertionError("L activity ledger must be absolute")
+    if frame.get("semantic_judgement_status") != "not_run":
+        raise AssertionError("L activity ledger must not run semantic judgement")
+    source_data_ids = frame.get("source_data_ids")
+    if not isinstance(source_data_ids, list):
+        raise AssertionError("L activity ledger source_data_ids must be a list")
+    for data_id in [
+        "L:run_frame:0001",
+        "L1:goal_frame",
+        "L2:query_frame",
+        "L3:achievement_frame",
+        "L:return_summary_frame",
+        "node_0:document_material_packet_frame",
+    ]:
+        if data_id not in source_data_ids:
+            raise AssertionError(f"L activity ledger missing source data id: {data_id}")
+    activity_records = frame.get("activity_records")
+    if not isinstance(activity_records, list) or not activity_records:
+        raise AssertionError("L activity ledger activity_records must be non-empty")
+    stages = {
+        item.get("stage")
+        for item in activity_records
+        if isinstance(item, dict)
+    }
+    for stage in {"run_frame", "goal", "query", "tool_result", "l3_achievement", "return_summary"}:
+        if stage not in stages:
+            raise AssertionError(f"L activity ledger missing activity stage: {stage}")
+    output_data_ids = frame.get("output_data_ids")
+    if not isinstance(output_data_ids, list):
+        raise AssertionError("L activity ledger output_data_ids must be a list")
+    if frame.get("output_data_id_count") != len(output_data_ids):
+        raise AssertionError("L activity ledger output count must mirror output_data_ids")
+    tool_result_data_ids = frame.get("tool_result_data_ids")
+    if not isinstance(tool_result_data_ids, list):
+        raise AssertionError("L activity ledger tool_result_data_ids must be a list")
+    if frame.get("tool_result_count") != len(tool_result_data_ids):
+        raise AssertionError("L activity ledger tool result count must mirror tool_result_data_ids")
+    read_doc_ids = frame.get("read_doc_ids")
+    if not isinstance(read_doc_ids, list):
+        raise AssertionError("L activity ledger read_doc_ids must be a list")
+    if frame.get("actual_read_doc_count") != len(read_doc_ids):
+        raise AssertionError("L activity ledger read_doc count must mirror read_doc_ids")
+    return {
+        "output_count": frame.get("output_data_id_count"),
+        "tool_result_count": frame.get("tool_result_count"),
+        "actual_read_doc_count": frame.get("actual_read_doc_count"),
+    }
+
+
+def _check_turn_activity_graph_link(records: dict[str, object]) -> dict[str, object]:
+    """raw capsule graph node와 L/R activity ledger graph node 연결을 확인한다."""
+
+    frame = records.get("graph:turn_activity_graph_link:turn_dry_001")
+    if not isinstance(frame, dict):
+        raise AssertionError("turn activity graph link frame is missing")
+    if frame.get("turn_capsule_graph_node_id") != "graph:raw_capsule:turn_dry_001":
+        raise AssertionError("turn activity graph link must point to raw capsule graph node")
+    if frame.get("generated_by") != "CODE:TURN_ACTIVITY_GRAPH_LINK_BUILDER":
+        raise AssertionError("turn activity graph link must reveal code builder")
+    if frame.get("info_class") != "absolute":
+        raise AssertionError("turn activity graph link must be absolute")
+    if frame.get("semantic_judgement_status") != "not_run":
+        raise AssertionError("turn activity graph link semantic judgement must be not_run")
+    l_ledger_ids = frame.get("l_loop_activity_ledger_data_ids")
+    r_ledger_ids = frame.get("r_graph_access_ledger_data_ids")
+    graph_node_ids = frame.get("activity_ledger_graph_node_ids")
+    graph_edge_ids = frame.get("activity_ledger_graph_edge_ids")
+    if l_ledger_ids != ["L:activity_ledger_frame"]:
+        raise AssertionError("turn activity graph link must include L activity ledger")
+    if r_ledger_ids != []:
+        raise AssertionError("default smoke should not include R access ledger in activity link")
+    if not isinstance(graph_node_ids, list) or len(graph_node_ids) != 1:
+        raise AssertionError("turn activity graph link must include one activity ledger node")
+    if not isinstance(graph_edge_ids, list) or len(graph_edge_ids) != 1:
+        raise AssertionError("turn activity graph link must include one activity ledger edge")
+
+    l_activity_node_id = "graph:activity_ledger:L:activity_ledger_frame"
+    l_activity_edge_id = (
+        "graph:edge:has_activity_ledger:"
+        "graph:raw_capsule:turn_dry_001:"
+        "graph:activity_ledger:L:activity_ledger_frame"
+    )
+    if graph_node_ids != [l_activity_node_id]:
+        raise AssertionError("turn activity graph link node id mismatch")
+    if graph_edge_ids != [l_activity_edge_id]:
+        raise AssertionError("turn activity graph link edge id mismatch")
+
+    node = records.get(l_activity_node_id)
+    if not isinstance(node, dict):
+        raise AssertionError("activity ledger graph node is missing")
+    if node.get("node_kind") != "activity_ledger":
+        raise AssertionError("activity ledger graph node kind mismatch")
+    if node.get("data_kind") != "l_loop_activity_ledger":
+        raise AssertionError("activity ledger graph node data kind mismatch")
+    if node.get("source_graph_node_ids") != ["graph:raw_capsule:turn_dry_001"]:
+        raise AssertionError("activity ledger graph node must point back to raw capsule")
+    if node.get("source_data_ids") != ["L:activity_ledger_frame"]:
+        raise AssertionError("activity ledger graph node must source L ledger")
+
+    edge = records.get(l_activity_edge_id)
+    if not isinstance(edge, dict):
+        raise AssertionError("activity ledger graph edge is missing")
+    if edge.get("edge_kind") != "HAS_ACTIVITY_LEDGER":
+        raise AssertionError("activity ledger graph edge kind mismatch")
+    if edge.get("from_node_id") != "graph:raw_capsule:turn_dry_001":
+        raise AssertionError("activity ledger graph edge source mismatch")
+    if edge.get("to_node_id") != l_activity_node_id:
+        raise AssertionError("activity ledger graph edge target mismatch")
+    if "L:activity_ledger_frame" not in edge.get("source_data_ids", []):
+        raise AssertionError("activity ledger graph edge must source L ledger")
+
+    return {
+        "l_ledger_count": len(l_ledger_ids),
+        "r_ledger_count": len(r_ledger_ids),
+        "node_count": len(graph_node_ids),
+        "edge_count": len(graph_edge_ids),
     }
 
 
@@ -2507,6 +2898,7 @@ def _run_l_loop_downstream_reroute_scope_smoke() -> dict[str, object]:
         first.node2_input_frame_id(turn_id),
         first.route2_handoff_frame_id(),
         first.metainfo_boundary_id(),
+        first.node2_answer_basis_frame_id(),
         first.node3_input_brief_frame_id(),
         first.node3_report_id(),
         first.node4_gatekeeper_frame_id(),
@@ -2516,6 +2908,7 @@ def _run_l_loop_downstream_reroute_scope_smoke() -> dict[str, object]:
         second.node2_input_frame_id(turn_id),
         second.route2_handoff_frame_id(),
         second.metainfo_boundary_id(),
+        second.node2_answer_basis_frame_id(),
         second.node3_input_brief_frame_id(),
         second.node3_report_id(),
         second.node4_gatekeeper_frame_id(),
@@ -2570,9 +2963,15 @@ def _run_l_loop_downstream_reroute_scope_smoke() -> dict[str, object]:
         raise AssertionError("second Node3InputBriefFrame.frame_id is not scoped")
     _assert_payload_sources_include(
         second_brief,
-        [second.route2_handoff_frame_id(), second.metainfo_boundary_id()],
+        [
+            second.route2_handoff_frame_id(),
+            second.metainfo_boundary_id(),
+            second.node2_answer_basis_frame_id(),
+        ],
         label="second Node3InputBriefFrame.source_data_ids",
     )
+    if second_brief.get("answer_basis_frame_id") != second.node2_answer_basis_frame_id():
+        raise AssertionError("second Node3InputBriefFrame answer_basis_frame_id is not scoped")
 
     second_report = _require_payload(records, second.node3_report_id())
     if second_report.get("report_id") != second.node3_report_id():
@@ -2586,6 +2985,7 @@ def _run_l_loop_downstream_reroute_scope_smoke() -> dict[str, object]:
             second.node3_report_id(),
             second.node3_input_brief_frame_id(),
             second.metainfo_boundary_id(),
+            second.node2_answer_basis_frame_id(),
         ],
         label="second Node4GatekeeperFrame.source_data_ids",
     )
@@ -2725,6 +3125,7 @@ def _run_policy_guarded_same_turn_l_reroute_smoke() -> dict[str, object]:
         second.node2_input_frame_id(str(policy_result["turn_id"])),
         second.route2_handoff_frame_id(),
         second.metainfo_boundary_id(),
+        second.node2_answer_basis_frame_id(),
         second.node3_input_brief_frame_id(),
         second.node3_report_id(),
         second.node4_gatekeeper_frame_id(),
@@ -2929,6 +3330,21 @@ def _record_downstream_after_l_run(
         boundary=boundary,
         input_ref=[node2_input_trace.event_id],
     )
+    answer_basis_trace_id, answer_basis_id, answer_basis_frame = (
+        run_node2_answer_basis_selection(
+            trace_store=trace_store,
+            data_store=data_store,
+            turn_id=turn_id,
+            user_question=user_question,
+            boundary_id=boundary_id,
+            boundary=boundary,
+            handoff_frame_id=handoff_id,
+            adapter=SongRyeonAllNodesFakeLLMAdapter(),
+            input_ref=[handoff_trace_id, boundary_trace_id],
+            source_data_ids=[node2_input_id, handoff_id, boundary_id],
+            id_namespace=run_ids,
+        )
+    )
     brief_trace_id, brief_id, brief_frame = record_node3_input_brief(
         trace_store=trace_store,
         data_store=data_store,
@@ -2936,8 +3352,9 @@ def _record_downstream_after_l_run(
         user_question=user_question,
         handoff_frame_id=handoff_id,
         boundary=boundary,
-        input_trace_ids=[handoff_trace_id, boundary_trace_id],
-        source_data_ids=[node2_input_id, handoff_id, boundary_id],
+        input_trace_ids=[handoff_trace_id, boundary_trace_id, answer_basis_trace_id],
+        source_data_ids=[node2_input_id, handoff_id, boundary_id, answer_basis_id],
+        answer_basis_frame=answer_basis_frame,
         id_namespace=run_ids,
     )
     report_id = run_ids.node3_report_id()
@@ -2952,7 +3369,7 @@ def _record_downstream_after_l_run(
         allowed_relative_info_ids=[info_ref.info_id for info_ref in boundary.relative_info],
         allowed_mixed_info_ids=[info_ref.info_id for info_ref in boundary.mixed_info],
         input_ref=[brief_trace_id],
-        source_data_ids=[brief_id, handoff_id, boundary_id, outcome_id, node2_input_id],
+        source_data_ids=[brief_id, handoff_id, boundary_id, answer_basis_id, outcome_id, node2_input_id],
     )
     gatekeeper_trace_id = run_node4_gatekeeper(
         trace_store=trace_store,
@@ -2964,7 +3381,7 @@ def _record_downstream_after_l_run(
         rendered_markdown=report,
         adapter=SongRyeonAllNodesFakeLLMAdapter(),
         input_ref=[report_trace_id],
-        source_data_ids=[report_id, brief_id, boundary_id],
+        source_data_ids=[report_id, brief_id, boundary_id, answer_basis_id],
         id_namespace=run_ids,
     )
     if not gatekeeper_trace_id:
@@ -2979,6 +3396,7 @@ def _record_downstream_after_l_run(
         "node2_input_id": node2_input_id,
         "handoff_id": handoff_id,
         "boundary_id": boundary_id,
+        "answer_basis_id": answer_basis_id,
         "brief_id": brief_id,
         "report_id": report_id,
         "gatekeeper_id": run_ids.node4_gatekeeper_frame_id(),
@@ -5170,19 +5588,26 @@ def _run_node4_grounding_count_guard_smoke() -> dict[str, object]:
     brief = records.get("node_3:input_brief_frame")
     if not isinstance(brief, dict):
         raise AssertionError("node3 brief missing")
-    expected_doc_count = len(brief.get("read_documents") or [])
-    expected_search_count = brief.get("search_candidate_count")
+    expected_tool_read_count = brief.get("actual_tool_read_doc_count")
+    expected_context_count = brief.get("supplied_document_context_count")
+    expected_final_search_count = brief.get("final_search_candidate_count")
+    expected_accumulated_search_count = brief.get("accumulated_search_candidate_count")
     expected_runtime_count = len(brief.get("runtime_tasks") or [])
     expected_lines = [
         "근거 기준:",
-        f"- 읽은 문서: {expected_doc_count}개",
-        f"- 검색 후보 문서: {expected_search_count}개",
+        f"- 실제 read_doc 도구 원문 읽기: {expected_tool_read_count}개",
+        f"- node_3 공급 문서 context: {expected_context_count}개",
+        f"- 검색 후보 문서(최종): {expected_final_search_count}개",
+        f"- 검색 후보 문서(누적): {expected_accumulated_search_count}개",
         f"- 현재 턴 실행 순서 자료: {expected_runtime_count}개",
     ]
     for line in expected_lines:
         if line not in rendered_markdown:
             raise AssertionError(f"code grounding block missing expected line: {line}")
-    if "- 읽은 문서: 0개" in rendered_markdown and expected_doc_count != 0:
+    if (
+        "- 실제 read_doc 도구 원문 읽기: 0개" in rendered_markdown
+        and expected_tool_read_count != 0
+    ):
         raise AssertionError("legacy LLM grounding count leaked into final report")
     answer = render_pretty_turn(result, user_input="count guard smoke")
     if "FINAL_BLOCKED_BY_GATEKEEPER" in answer:
@@ -5413,8 +5838,10 @@ def _report_with_grounding(body: str) -> str:
     return "\n".join(
         [
             "근거 기준:",
-            "- 읽은 문서: 0개",
-            "- 검색 후보 문서: 0개",
+            "- 실제 read_doc 도구 원문 읽기: 0개",
+            "- node_3 공급 문서 context: 0개",
+            "- 검색 후보 문서(최종): 0개",
+            "- 검색 후보 문서(누적): 0개",
             "- 현재 턴 실행 순서 자료: 0개",
             "- 답변 한계: 제공된 자료 범위 안에서만 답한다.",
             "",
@@ -5561,8 +5988,10 @@ class CountMismatchReporterFakeAdapter(SongRyeonAllNodesFakeLLMAdapter):
         return {
             "rendered_markdown": (
                 "근거 기준:\n"
-                "- 읽은 문서: 0개\n"
-                "- 검색 후보 문서: 0개\n"
+                "- 실제 read_doc 도구 원문 읽기: 0개\n"
+                "- node_3 공급 문서 context: 0개\n"
+                "- 검색 후보 문서(최종): 0개\n"
+                "- 검색 후보 문서(누적): 0개\n"
                 "- 현재 턴 실행 순서 자료: 0개\n"
                 "- 답변 한계: 일부러 brief count와 맞지 않는 smoke 보고문이다.\n\n"
                 "이 본문은 LLM이 틀린 count 블록을 포함해도 code assembly가 제거해야 하는 smoke 본문이다."

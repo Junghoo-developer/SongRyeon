@@ -87,8 +87,26 @@ def _build_distillation_frame(
             max_preview_chars=max_search_preview_chars,
             limits=limits,
         )
+    elif tool_result.tool_name == "list_code_files":
+        items = _distill_list_code_files(
+            payload=tool_result.payload,
+            max_preview_chars=max_search_preview_chars,
+            limits=limits,
+        )
+    elif tool_result.tool_name == "search_code":
+        items = _distill_search_code(
+            payload=tool_result.payload,
+            max_preview_chars=max_search_preview_chars,
+            limits=limits,
+        )
     elif tool_result.tool_name in {"read_doc", "read_artifact"}:
         items = _distill_document_extract(
+            payload=tool_result.payload,
+            max_preview_chars=max_read_preview_chars,
+            limits=limits,
+        )
+    elif tool_result.tool_name == "read_code_file":
+        items = _distill_read_code_file(
             payload=tool_result.payload,
             max_preview_chars=max_read_preview_chars,
             limits=limits,
@@ -198,6 +216,148 @@ def _distill_document_extract(
             source_role=_optional_text(payload.get("source_role")),
             document_memory_index_id=_optional_text(payload.get("document_memory_index_id")),
             snapshot_id=_optional_text(payload.get("snapshot_id")),
+        )
+    ]
+
+
+def _distill_list_code_files(
+    *,
+    payload: object,
+    max_preview_chars: int,
+    limits: list[str],
+) -> list[ToolResultDistilledItem]:
+    if not isinstance(payload, dict):
+        limits.append("list_code_files payload가 dict가 아니어서 결과를 추출하지 못했다.")
+        return []
+
+    files = payload.get("files")
+    if not isinstance(files, list):
+        limits.append("list_code_files payload에 files 목록이 없어서 결과를 추출하지 못했다.")
+        return []
+
+    items: list[ToolResultDistilledItem] = []
+    for index, raw_item in enumerate(files, start=1):
+        if not isinstance(raw_item, dict):
+            continue
+        file_path = str(raw_item.get("file_path") or "")
+        if not file_path:
+            continue
+        preview = _shorten(
+            (
+                f"{file_path} "
+                f"extension={raw_item.get('extension')}; "
+                f"line_count={raw_item.get('line_count')}; "
+                f"size_bytes={raw_item.get('size_bytes')}"
+            ),
+            max_preview_chars,
+        )
+        items.append(
+            ToolResultDistilledItem(
+                item_id=f"distilled_code_file_{index:04d}",
+                item_kind="search_result",
+                source_field_path=f"files[{index - 1}]",
+                doc_id=file_path,
+                chunk_id=f"{file_path}#file_listing",
+                result_id=f"code_file_{index:04d}",
+                score=1.0,
+                embedding_model_id="code-file-list",
+                text_preview=preview,
+                document_kind="source_code",
+                source_role="codebase_file_listing",
+            )
+        )
+
+    if payload.get("truncated") is True:
+        limits.append("list_code_files 결과가 max_files 제한으로 잘렸다.")
+    if not items:
+        limits.append("list_code_files 결과 파일이 없어서 distillation item이 비어 있다.")
+    return items
+
+
+def _distill_search_code(
+    *,
+    payload: object,
+    max_preview_chars: int,
+    limits: list[str],
+) -> list[ToolResultDistilledItem]:
+    if not isinstance(payload, dict):
+        limits.append("search_code payload가 dict가 아니어서 결과를 추출하지 못했다.")
+        return []
+
+    results = payload.get("results")
+    if not isinstance(results, list):
+        limits.append("search_code payload에 results 목록이 없어서 결과를 추출하지 못했다.")
+        return []
+
+    items: list[ToolResultDistilledItem] = []
+    for index, raw_item in enumerate(results, start=1):
+        if not isinstance(raw_item, dict):
+            continue
+        file_path = str(raw_item.get("file_path") or "")
+        if not file_path:
+            continue
+        line_number = raw_item.get("line_number")
+        line_text = str(raw_item.get("line_text") or "")
+        preview = _shorten(
+            f"{file_path}:{line_number}: {line_text}",
+            max_preview_chars,
+        )
+        items.append(
+            ToolResultDistilledItem(
+                item_id=f"distilled_code_match_{index:04d}",
+                item_kind="search_result",
+                source_field_path=f"results[{index - 1}]",
+                doc_id=file_path,
+                chunk_id=f"{file_path}#L{line_number}",
+                result_id=str(raw_item.get("result_id") or f"code_match_{index:04d}"),
+                score=1.0,
+                embedding_model_id="code-substring-search",
+                text_preview=preview,
+                document_kind="source_code",
+                source_role="code_search_match",
+            )
+        )
+
+    if payload.get("truncated") is True:
+        limits.append("search_code 결과가 max_results 제한으로 잘렸다.")
+    if not items:
+        limits.append("search_code 결과 후보가 없어서 distillation item이 비어 있다.")
+    return items
+
+
+def _distill_read_code_file(
+    *,
+    payload: object,
+    max_preview_chars: int,
+    limits: list[str],
+) -> list[ToolResultDistilledItem]:
+    if not isinstance(payload, dict):
+        limits.append("read_code_file payload가 dict가 아니어서 원문 발췌를 만들지 못했다.")
+        return []
+
+    file_path = str(payload.get("file_path") or "")
+    read_status = str(payload.get("read_status") or "")
+    text = str(payload.get("text") or "")
+    if read_status != "ok" or not file_path or not text:
+        limits.append(f"read_code_file has no readable source text: {read_status or 'unknown'}")
+        return []
+    char_count = payload.get("char_count")
+    if not isinstance(char_count, int):
+        char_count = len(text)
+    preview = _shorten(" ".join(text.split()), max_preview_chars)
+    if payload.get("truncated") is True:
+        limits.append("read_code_file 원문이 max_chars 제한으로 잘렸다.")
+
+    return [
+        ToolResultDistilledItem(
+            item_id="distilled_read_code_file_0001",
+            item_kind="read_doc_excerpt",
+            source_field_path="text",
+            doc_id=file_path,
+            char_count=char_count,
+            text_preview=preview,
+            document_kind="source_code",
+            source_role="code_file_extract",
         )
     ]
 

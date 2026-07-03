@@ -3,8 +3,18 @@
 from dataclasses import asdict
 
 from songryeon_core.core.data_store import DataStore
+from songryeon_core.core.graph_memory import (
+    CORE_EGO_ROOT_NODE_ID,
+    GraphMemoryBuildResult,
+    TIME_AXIS_NODE_ID,
+    build_graph_memory_snapshot_from_capsules,
+    record_graph_memory_for_capsules,
+)
+from songryeon_core.core.turn_activity_graph_links import record_turn_activity_graph_links
 from songryeon_core.core.schemas import (
     Node2InputFrame,
+    R_ROUTE_EXPERIMENTAL_NEXT_0_MODE,
+    R_ROUTE_EXPERIMENTAL_POLICY_FLAG,
     TurnOutcomeFrame,
     TurnStateCapsule,
     ZeroState,
@@ -17,6 +27,7 @@ from songryeon_core.llm.fake import MemoryRelevanceNoneSelectedFakeLLMAdapter
 from songryeon_core.runtime.artifact_export import export_runtime_artifacts
 from songryeon_core.runtime.defaults import (
     DEFAULT_DOCUMENT_ROOT,
+    DEFAULT_MAX_DOCUMENT_CONTEXT_CHARS,
     DEFAULT_MAX_INPUT_CHARS,
     DEFAULT_MAX_QUERY_ATTEMPTS,
     DEFAULT_MAX_READ_DOC_CALLS,
@@ -60,8 +71,10 @@ from songryeon_core.nodes.node_0_memory_supplier import (
     build_pre_route_memory_items,
     build_recent_raw_conversation_compression_candidate,
     build_recent_memory_relevance_candidate_frames,
+    document_material_packet_frame_data_id,
     memory_packet_data_id,
     record_l_loop_return_summary_for_node1,
+    record_r_loop_memory_handoff_packet,
     record_memory_packet,
     supply_memory,
 )
@@ -75,10 +88,16 @@ from songryeon_core.nodes.node_1_router import (
     route_next_with_llm_or_policy_fallback,
 )
 from songryeon_core.loops.l_loop import run_l_loop
+from songryeon_core.loops.l_loop_activity_ledger import record_l_loop_activity_ledger
 from songryeon_core.loops.l_loop_namespace import build_l_run_ids
+from songryeon_core.loops.r_loop_dry_run import (
+    R_EXPERIMENTAL_ROUTE_GENERATOR,
+    run_r_loop_dry_run_skeleton,
+)
 from songryeon_core.nodes.node_2_metainfo_boundary import (
     build_metainfo_boundary,
     record_boundary,
+    run_node2_answer_basis_selection,
     run_node2_boundary_review,
 )
 from songryeon_core.nodes.node_2_handoff import (
@@ -98,6 +117,7 @@ def run_dry_turn(
     node_1_router_adapter: LLMAdapter | None = None,
     memory_relevance_selector_adapter: LLMAdapter | None = None,
     l1_goal_adapter: LLMAdapter | None = None,
+    l_tool_scope_adapter: LLMAdapter | None = None,
     l2_query_planner_adapter: LLMAdapter | None = None,
     l3_result_adapter: LLMAdapter | None = None,
     node_2_boundary_adapter: LLMAdapter | None = None,
@@ -109,6 +129,7 @@ def run_dry_turn(
     max_query_candidates: int | None = None,
     max_read_doc_calls: int = DEFAULT_MAX_READ_DOC_CALLS,
     max_input_chars: int = DEFAULT_MAX_INPUT_CHARS,
+    max_document_context_chars: int = DEFAULT_MAX_DOCUMENT_CONTEXT_CHARS,
     force_l_route: bool = False,
     same_turn_l_reroute_enabled: bool = False,
     max_l_runs_per_turn: int = 1,
@@ -117,6 +138,9 @@ def run_dry_turn(
     previous_turn_capsules: list[TurnStateCapsule] | None = None,
     recent_raw_conversation: list[dict[str, str]] | None = None,
     live_trace_sink: TraceEventSink | None = None,
+    enable_r_route_dry_run: bool = False,
+    r_route_dry_run_force_budget_exhausted: bool = False,
+    enable_r_route_experimental: bool = False,
 ) -> dict[str, object]:
     """한 턴의 구조 흐름을 trace/data로 실행한다.
 
@@ -142,11 +166,26 @@ def run_dry_turn(
     node0_return_data_id: str | None = None
     node0_return_data_ids: list[str] = []
     l_return_summary_data_ids: list[str] = []
+    document_material_data_ids: list[str] = []
+    l_activity_ledger_data_ids: list[str] = []
     l_run_ids = None
     l_results = []
     last_l_result = None
     reroute_controller_data_ids: list[str] = []
     final_reroute_controller: SameTurnLRerouteDecision | None = None
+    r_route_experimental_status = "not_run"
+    r_route_experimental_trace_event_ids: list[str] = []
+    r_route_experimental_output_data_ids: list[str] = []
+    r_route_experimental_handoff_packet_id: str | None = None
+    r_route_experimental_return_summary_id: str | None = None
+    r_route_experimental_candidate_surface_id: str | None = None
+    r_route_experimental_access_ledger_id: str | None = None
+    r_route_experimental_close_route_id: str | None = None
+    r_route_experimental_graph_data_ids: list[str] = []
+    r_loop_memory_handoff_trace_id: str | None = None
+    r_loop_memory_handoff_data_id: str | None = None
+    r_loop_memory_handoff_frame = None
+    r_loop_dry_run_result = None
     policy = SameTurnLReroutePolicy(
         enabled=same_turn_l_reroute_enabled,
         max_l_runs_per_turn=max_l_runs_per_turn,
@@ -296,6 +335,7 @@ def run_dry_turn(
             force_l_route=force_l_route,
             fallback_policy=node_1_router_fallback_policy,
             fallback_allowed_by_runtime_policy=allow_node_1_router_fallback,
+            allow_r_route_experimental=enable_r_route_experimental,
         )
     else:
         decision = route_next(
@@ -362,6 +402,131 @@ def run_dry_turn(
         )
         next_step_index += 1
 
+    route2_trace_id: str | None = None
+    route2_data_id: str | None = None
+
+    if decision.route == "R":
+        r_route_experimental_status = "selected"
+        r_graph_build = build_graph_memory_snapshot_from_capsules(
+            capsules=zero_state.previous_turn_capsules,
+            batch_id=f"{turn_id}:r_route_experimental",
+        )
+        (
+            r_graph_trace_id,
+            r_route_experimental_graph_data_ids,
+        ) = _record_r_route_experimental_graph_sources(
+            trace_store=trace_store,
+            data_store=data_store,
+            turn_id=turn_id,
+            graph_build=r_graph_build,
+            input_ref=[route_trace_id],
+        )
+        append_movement(
+            node_id="graph_memory",
+            mode="r_route_experimental_graph_snapshot",
+            input_trace_ids=[route_trace_id],
+            output_trace_ids=[r_graph_trace_id],
+            input_data_ids=[route_data_id],
+            output_data_ids=r_route_experimental_graph_data_ids,
+            node_type="code",
+        )
+        (
+            r_route_handoff_trace_id,
+            r_route_handoff_data_id,
+            r_route_handoff_frame,
+        ) = record_r_loop_memory_handoff_packet(
+            trace_store=trace_store,
+            data_store=data_store,
+            turn_id=turn_id,
+            guide_packet=r_graph_build.guide_packet,
+            packet_id="node_0:r_loop_memory_handoff_packet_frame:r_route_experimental",
+            input_ref=[r_graph_trace_id],
+            source_data_ids=[
+                r_graph_build.snapshot.snapshot_id,
+                r_graph_build.guide_packet.packet_id,
+            ],
+            semantic_hint_status=r_graph_build.guide_packet.recommended_traversal_hints_status,
+        )
+        r_route_experimental_handoff_packet_id = r_route_handoff_data_id
+        append_movement(
+            node_id="node_0",
+            mode=R_ROUTE_EXPERIMENTAL_NEXT_0_MODE,
+            input_trace_ids=[r_graph_trace_id],
+            output_trace_ids=[r_route_handoff_trace_id],
+            input_data_ids=r_route_experimental_graph_data_ids,
+            output_data_ids=[r_route_handoff_data_id],
+        )
+        enter_loop(unified_state, "R")
+        r_route_result = run_r_loop_dry_run_skeleton(
+            trace_store=trace_store,
+            data_store=data_store,
+            turn_id=turn_id,
+            handoff_packet=r_route_handoff_frame,
+            input_ref=[r_route_handoff_trace_id],
+            frame_label="experimental",
+            generated_by=R_EXPERIMENTAL_ROUTE_GENERATOR,
+            graph_node_payloads={
+                node.node_id: asdict(node)
+                for node in r_graph_build.nodes
+            },
+            graph_edge_payloads=[asdict(edge) for edge in r_graph_build.edges],
+        )
+        exit_loop(unified_state, "R")
+        r_route_experimental_trace_event_ids = list(r_route_result.trace_event_ids)
+        r_route_experimental_output_data_ids = list(r_route_result.output_data_ids)
+        r_route_experimental_return_summary_id = r_route_result.return_summary.frame_id
+        r_route_experimental_candidate_surface_id = (
+            r_route_result.candidate_surface.frame_id
+        )
+        r_route_experimental_access_ledger_id = r_route_result.access_ledger.frame_id
+        append_movement(
+            node_id="R",
+            node_type="loop",
+            mode="R_route_experimental_skeleton",
+            input_trace_ids=[r_route_handoff_trace_id],
+            output_trace_ids=r_route_result.trace_event_ids,
+            input_data_ids=[r_route_handoff_data_id],
+            output_data_ids=r_route_result.output_data_ids,
+        )
+        close_decision = route_next(
+            user_input="보고",
+            memory_packet=packet_for_1,
+            schema_registry=schema_registry,
+        )
+        r_close_input_ref = _unique_strings(
+            [route_trace_id, *r_route_result.trace_event_ids]
+        )
+        r_close_source_data_ids = _unique_strings(
+            [
+                route_data_id,
+                r_route_handoff_data_id,
+                *r_route_result.output_data_ids,
+            ]
+        )
+        r_close_trace_id = record_routing(
+            trace_store=trace_store,
+            data_store=data_store,
+            turn_id=turn_id,
+            decision=close_decision,
+            input_ref=r_close_input_ref,
+            source_data_ids=r_close_source_data_ids,
+        )
+        r_route_experimental_close_route_id = f"route:{close_decision.route}"
+        route_data_ids.append(r_route_experimental_close_route_id)
+        set_current_route(unified_state, close_decision.route)
+        set_active_schema(unified_state, close_decision.required_schema)
+        append_movement(
+            node_id="node_1",
+            mode="routing_after_r_experimental_return",
+            input_trace_ids=r_close_input_ref,
+            output_trace_ids=[r_close_trace_id],
+            input_data_ids=r_close_source_data_ids,
+            output_data_ids=[r_route_experimental_close_route_id],
+        )
+        route2_trace_id = r_close_trace_id
+        route2_data_id = r_route_experimental_close_route_id
+        decision = close_decision
+
     # 4. route가 L이면 policy-guarded controller 아래에서 최대 2회차까지 다시 열 수 있다.
     if decision.route == "L":
         current_run_index = 1
@@ -412,6 +577,7 @@ def run_dry_turn(
                 zero_state=zero_state,
                 document_root=DEFAULT_DOCUMENT_ROOT,
                 l1_goal_adapter=l1_goal_adapter,
+                l_tool_scope_adapter=l_tool_scope_adapter,
                 l2_query_planner_adapter=l2_query_planner_adapter,
                 l3_result_adapter=l3_result_adapter,
                 max_tool_calls=max_tool_calls,
@@ -420,6 +586,7 @@ def run_dry_turn(
                 max_query_candidates=max_query_candidates,
                 max_read_doc_calls=max_read_doc_calls,
                 max_input_chars=max_input_chars,
+                max_document_context_chars=max_document_context_chars,
                 run_index=current_run_index,
                 same_turn_rerun_allowed=(
                     current_run_index > 1 and same_turn_l_reroute_enabled
@@ -465,13 +632,33 @@ def run_dry_turn(
             )
             node0_return_data_ids.append(node0_return_data_id)
             l_return_summary_data_ids.append(l_return_summary_data_id)
+            document_material_data_ids.append(
+                document_material_packet_frame_data_id(id_namespace=l_run_ids)
+            )
+            l_activity_trace_id, l_activity_ledger_data_id, _l_activity_ledger = (
+                record_l_loop_activity_ledger(
+                    trace_store=trace_store,
+                    data_store=data_store,
+                    turn_id=turn_id,
+                    l_result=l_result,
+                    return_summary_frame_id=l_return_summary_data_id,
+                    document_material_packet_frame_id=document_material_data_ids[-1],
+                    id_namespace=l_run_ids,
+                )
+            )
+            l_activity_ledger_data_ids.append(l_activity_ledger_data_id)
             append_movement(
                 node_id="node_0",
                 mode="loop_return_summary",
                 input_trace_ids=l_result.source_trace_ids,
-                output_trace_ids=[node0_return_trace_id],
+                output_trace_ids=[node0_return_trace_id, l_activity_trace_id],
                 input_data_ids=l_result.output_data_ids,
-                output_data_ids=[node0_return_data_id, l_return_summary_data_id],
+                output_data_ids=[
+                    node0_return_data_id,
+                    l_return_summary_data_id,
+                    document_material_data_ids[-1],
+                    l_activity_ledger_data_id,
+                ],
             )
 
             if node_1_router_adapter is not None:
@@ -597,7 +784,7 @@ def run_dry_turn(
                     output_data_ids=[route2_data_id],
                 )
             break
-    else:
+    elif route2_trace_id is None or route2_data_id is None:
         route2_trace_id = route_trace_id
         route2_data_id = route_data_id
 
@@ -689,7 +876,12 @@ def run_dry_turn(
             *l_loop_output_ids,
             *node0_return_data_ids,
             *l_return_summary_data_ids,
+            *document_material_data_ids,
+            *l_activity_ledger_data_ids,
             *reroute_controller_data_ids,
+            *r_route_experimental_graph_data_ids,
+            r_route_experimental_handoff_packet_id,
+            *r_route_experimental_output_data_ids,
             node0_final_data_id,
             outcome_id,
         ]
@@ -790,10 +982,34 @@ def run_dry_turn(
         )
         node2_review_data_id = "node_2:boundary_review"
     set_metainfo_boundary_id(unified_state, boundary_id)
+    answer_basis_trace_id, answer_basis_data_id, answer_basis_frame = (
+        run_node2_answer_basis_selection(
+            trace_store=trace_store,
+            data_store=data_store,
+            turn_id=turn_id,
+            user_question=user_input,
+            boundary_id=boundary_id,
+            boundary=boundary,
+            handoff_frame_id=handoff_data_id,
+            adapter=node_2_boundary_adapter,
+            input_ref=_unique_strings([boundary_trace_id, node2_review_trace_id, handoff_trace_id]),
+            source_data_ids=_unique_strings(
+                [
+                    node2_input_id,
+                    handoff_data_id,
+                    boundary_id,
+                    node2_review_data_id,
+                    selected_memory_context_data_id,
+                ]
+            ),
+            id_namespace=l_run_ids,
+        )
+    )
     assigned_model_by_node = _assigned_model_by_node(
         node_1_router_adapter=node_1_router_adapter,
         memory_relevance_selector_label=memory_relevance_selection_frame.generated_by,
         l1_goal_adapter=l1_goal_adapter,
+        l_tool_scope_adapter=l_tool_scope_adapter,
         l2_query_planner_adapter=l2_query_planner_adapter,
         l3_result_adapter=l3_result_adapter,
         node_2_boundary_adapter=node_2_boundary_adapter,
@@ -805,11 +1021,11 @@ def run_dry_turn(
         turn_id=turn_id,
         step_index=next_step_index,
         node_id="node_2",
-        mode="metainfo_boundary_and_node3_brief",
+        mode="metainfo_boundary_answer_basis_and_node3_brief",
         input_trace_ids=_unique_strings([handoff_trace_id, node2_input_trace.event_id]),
-        output_trace_ids=_unique_strings([boundary_trace_id, node2_review_trace_id]),
+        output_trace_ids=_unique_strings([boundary_trace_id, node2_review_trace_id, answer_basis_trace_id]),
         input_data_ids=_unique_strings([handoff_data_id, node2_input_id]),
-        output_data_ids=_unique_strings([boundary_id, node2_review_data_id]),
+        output_data_ids=_unique_strings([boundary_id, node2_review_data_id, answer_basis_data_id]),
         status="completed",
     )
     brief_trace_id, brief_data_id, brief_frame = record_node3_input_brief(
@@ -819,24 +1035,40 @@ def run_dry_turn(
         user_question=user_input,
         handoff_frame_id=handoff_data_id,
         boundary=boundary,
-        input_trace_ids=_unique_strings([handoff_trace_id, boundary_trace_id, node2_review_trace_id]),
-        source_data_ids=_unique_strings([node2_input_id, handoff_data_id, boundary_id, node2_review_data_id, selected_memory_context_data_id]),
+        input_trace_ids=_unique_strings(
+            [handoff_trace_id, boundary_trace_id, node2_review_trace_id, answer_basis_trace_id]
+        ),
+        source_data_ids=_unique_strings(
+            [
+                node2_input_id,
+                handoff_data_id,
+                boundary_id,
+                node2_review_data_id,
+                answer_basis_data_id,
+                selected_memory_context_data_id,
+            ]
+        ),
+        answer_basis_frame=answer_basis_frame,
         runtime_movements=[*movements, node2_brief_preview_movement],
         assigned_model_by_node=assigned_model_by_node,
         id_namespace=l_run_ids,
     )
     append_movement(
         node_id="node_2",
-        mode="metainfo_boundary_and_node3_brief",
+        mode="metainfo_boundary_answer_basis_and_node3_brief",
         input_trace_ids=_unique_strings([handoff_trace_id, node2_input_trace.event_id]),
-        output_trace_ids=_unique_strings([boundary_trace_id, node2_review_trace_id, brief_trace_id]),
+        output_trace_ids=_unique_strings(
+            [boundary_trace_id, node2_review_trace_id, answer_basis_trace_id, brief_trace_id]
+        ),
         input_data_ids=_unique_strings([handoff_data_id, node2_input_id]),
-        output_data_ids=_unique_strings([boundary_id, node2_review_data_id, brief_data_id]),
+        output_data_ids=_unique_strings(
+            [boundary_id, node2_review_data_id, answer_basis_data_id, brief_data_id]
+        ),
     )
 
     # 10. 3이 내부 ID를 제거한 node_3용 브리프를 보고 답변한다.
     report_source_trace_ids = [brief_trace_id]
-    report_source_data_ids = _unique_strings([brief_data_id, handoff_data_id, boundary_id, outcome_id, node2_input_id, node2_review_data_id, selected_memory_context_data_id])
+    report_source_data_ids = _unique_strings([brief_data_id, handoff_data_id, boundary_id, answer_basis_data_id, outcome_id, node2_input_id, node2_review_data_id, selected_memory_context_data_id])
     report_generation_source = "CODE/RENDERER"
     llm_reporter_status = "not_run"
     if node_3_reporter_adapter is not None:
@@ -900,7 +1132,7 @@ def run_dry_turn(
             rendered_markdown=report,
             adapter=node_4_gatekeeper_adapter,
             input_ref=[report_trace_id],
-            source_data_ids=[report_id, brief_data_id, boundary_id],
+            source_data_ids=[report_id, brief_data_id, boundary_id, answer_basis_data_id],
             id_namespace=l_run_ids,
         )
         node4_gate_data_id = (
@@ -936,10 +1168,52 @@ def run_dry_turn(
         final_response_trace_id=node4_gate_trace_id or report_trace_id,
     )
     add_capsule_to_zero_state(zero_state, capsule)
+    graph_memory_record = record_graph_memory_for_capsules(
+        trace_store=trace_store,
+        data_store=data_store,
+        turn_id=turn_id,
+        capsules=zero_state.previous_turn_capsules,
+        batch_id=turn_id,
+    )
 
     # prompt_registry는 지금 실제 실행에 쓰이지 않지만, 드라이런에 구성품이 있음을 확인한다.
     prompt_registry.get("node_0")
     task_counts = task_ledger_counts(data_store)
+    graph_snapshot = graph_memory_record.build.snapshot
+    graph_guide = graph_memory_record.build.guide_packet
+    (
+        r_loop_memory_handoff_trace_id,
+        r_loop_memory_handoff_data_id,
+        r_loop_memory_handoff_frame,
+    ) = record_r_loop_memory_handoff_packet(
+        trace_store=trace_store,
+        data_store=data_store,
+        turn_id=turn_id,
+        guide_packet=graph_guide,
+        input_ref=[graph_memory_record.trace_event_id],
+        source_data_ids=[graph_snapshot.snapshot_id, graph_guide.packet_id],
+        semantic_hint_status=graph_guide.recommended_traversal_hints_status,
+    )
+    r_loop_dry_run_result = None
+    if enable_r_route_dry_run:
+        r_loop_dry_run_result = run_r_loop_dry_run_skeleton(
+            trace_store=trace_store,
+            data_store=data_store,
+            turn_id=turn_id,
+            handoff_packet=r_loop_memory_handoff_frame,
+            input_ref=[r_loop_memory_handoff_trace_id],
+            force_budget_exhausted=r_route_dry_run_force_budget_exhausted,
+        )
+    (
+        turn_activity_graph_link_trace_id,
+        turn_activity_graph_link_frame_id,
+        turn_activity_graph_link_frame,
+    ) = record_turn_activity_graph_links(
+        trace_store=trace_store,
+        data_store=data_store,
+        turn_id=turn_id,
+        l_loop_activity_ledger_data_ids=l_activity_ledger_data_ids,
+    )
 
     result = {
         "turn_id": turn_id,
@@ -1000,6 +1274,177 @@ def run_dry_turn(
         "missing_selected_memory_context_count": (
             selected_memory_context_frame.missing_selected_memory_context_count
         ),
+        "graph_memory_snapshot_id": graph_snapshot.snapshot_id,
+        "graph_memory_node_count": len(graph_snapshot.graph_node_ids),
+        "graph_memory_edge_count": len(graph_snapshot.graph_edge_ids),
+        "graph_memory_node_kind_counts": graph_snapshot.node_kind_counts,
+        "graph_memory_data_kind_counts": graph_snapshot.data_kind_counts,
+        "graph_memory_raw_capsule_node_count": graph_snapshot.node_kind_counts.get(
+            "raw_capsule",
+            0,
+        ),
+        "graph_memory_time_bundle_count": graph_snapshot.node_kind_counts.get(
+            "time_bundle",
+            0,
+        ),
+        "graph_memory_record_trace_id": graph_memory_record.trace_event_id,
+        "graph_memory_created_data_ids": graph_memory_record.created_data_ids,
+        "graph_memory_existing_data_ids": graph_memory_record.existing_data_ids,
+        "rloop_graph_guide_packet_id": graph_guide.packet_id,
+        "rloop_graph_guide_target_consumer": graph_guide.target_consumer,
+        "rloop_graph_guide_entry_node_count": len(graph_guide.available_entry_nodes),
+        "rloop_graph_guide_available_entry_nodes": graph_guide.available_entry_nodes,
+        "rloop_graph_guide_summary_depth_range": graph_guide.summary_depth_range,
+        "rloop_graph_guide_source_leaf_count_range": graph_guide.source_leaf_count_range,
+        "rloop_graph_guide_risky_or_unreviewed_node_count": len(
+            graph_guide.risky_or_unreviewed_node_ids
+        ),
+        "rloop_graph_guide_generated_by": graph_guide.generated_by,
+        "rloop_graph_guide_info_class": graph_guide.info_class,
+        "rloop_graph_guide_semantic_judgement_status": (
+            graph_guide.semantic_judgement_status
+        ),
+        "rloop_graph_guide_hints_status": graph_guide.recommended_traversal_hints_status,
+        "r_loop_memory_handoff_trace_id": r_loop_memory_handoff_trace_id,
+        "r_loop_memory_handoff_packet_id": r_loop_memory_handoff_data_id,
+        "r_loop_memory_handoff_status": r_loop_memory_handoff_frame.packet_status,
+        "r_loop_memory_handoff_target": r_loop_memory_handoff_frame.target,
+        "r_loop_memory_handoff_mode": r_loop_memory_handoff_frame.mode,
+        "r_loop_memory_handoff_guide_packet_id": (
+            r_loop_memory_handoff_frame.r_loop_graph_guide_packet_id
+        ),
+        "r_loop_memory_handoff_entry_node_count": len(
+            r_loop_memory_handoff_frame.available_entry_node_ids
+        ),
+        "r_loop_memory_handoff_source_graph_node_count": len(
+            r_loop_memory_handoff_frame.source_graph_node_ids
+        ),
+        "r_loop_memory_handoff_summary_depth_range": (
+            r_loop_memory_handoff_frame.summary_depth_range
+        ),
+        "r_loop_memory_handoff_semantic_hint_status": (
+            r_loop_memory_handoff_frame.semantic_hint_status
+        ),
+        "r_loop_memory_handoff_generated_by": r_loop_memory_handoff_frame.generated_by,
+        "r_loop_memory_handoff_info_class": r_loop_memory_handoff_frame.info_class,
+        "r_loop_memory_handoff_semantic_judgement_status": (
+            r_loop_memory_handoff_frame.semantic_judgement_status
+        ),
+        "r_route_experimental_enabled": enable_r_route_experimental,
+        "r_route_experimental_status": r_route_experimental_status,
+        "r_route_experimental_policy_flag": (
+            R_ROUTE_EXPERIMENTAL_POLICY_FLAG if enable_r_route_experimental else None
+        ),
+        "r_route_experimental_handoff_packet_id": r_route_experimental_handoff_packet_id,
+        "r_route_experimental_return_summary_id": r_route_experimental_return_summary_id,
+        "r_route_experimental_candidate_surface_id": (
+            r_route_experimental_candidate_surface_id
+        ),
+        "r_route_experimental_access_ledger_id": r_route_experimental_access_ledger_id,
+        "r_route_experimental_close_route_id": r_route_experimental_close_route_id,
+        "r_route_experimental_output_data_ids": r_route_experimental_output_data_ids,
+        "r_route_experimental_trace_event_ids": r_route_experimental_trace_event_ids,
+        "r_route_experimental_graph_data_ids": r_route_experimental_graph_data_ids,
+        "r_route_dry_run_enabled": enable_r_route_dry_run,
+        "r_route_dry_run_status": (
+            r_loop_dry_run_result.return_summary.r_loop_task_status
+            if r_loop_dry_run_result is not None
+            else "not_run"
+        ),
+        "r_route_dry_run_continuation_status": (
+            r_loop_dry_run_result.continuation.continuation_status
+            if r_loop_dry_run_result is not None
+            else "not_run"
+        ),
+        "r_route_dry_run_next_target_node": (
+            r_loop_dry_run_result.continuation.next_target_node
+            if r_loop_dry_run_result is not None
+            else "not_run"
+        ),
+        "r_route_dry_run_output_data_ids": (
+            r_loop_dry_run_result.output_data_ids
+            if r_loop_dry_run_result is not None
+            else []
+        ),
+        "r_route_dry_run_trace_event_ids": (
+            r_loop_dry_run_result.trace_event_ids
+            if r_loop_dry_run_result is not None
+            else []
+        ),
+        "r_route_dry_run_traversal_step_count": (
+            len(r_loop_dry_run_result.r3_inspections)
+            if r_loop_dry_run_result is not None
+            else 0
+        ),
+        "r_route_dry_run_access_ledger_id": (
+            r_loop_dry_run_result.access_ledger.frame_id
+            if r_loop_dry_run_result is not None
+            else None
+        ),
+        "turn_activity_graph_link_trace_id": turn_activity_graph_link_trace_id,
+        "turn_activity_graph_link_frame_id": turn_activity_graph_link_frame_id,
+        "turn_activity_graph_link_node_count": len(
+            turn_activity_graph_link_frame.activity_ledger_graph_node_ids
+        ),
+        "turn_activity_graph_link_edge_count": len(
+            turn_activity_graph_link_frame.activity_ledger_graph_edge_ids
+        ),
+        "turn_activity_graph_link_l_ledger_count": len(
+            turn_activity_graph_link_frame.l_loop_activity_ledger_data_ids
+        ),
+        "turn_activity_graph_link_r_ledger_count": len(
+            turn_activity_graph_link_frame.r_graph_access_ledger_data_ids
+        ),
+        "r_route_dry_run_candidate_surface_id": (
+            r_loop_dry_run_result.candidate_surface.frame_id
+            if r_loop_dry_run_result is not None
+            else None
+        ),
+        "r_route_dry_run_candidate_surface_count": (
+            r_loop_dry_run_result.candidate_surface.candidate_count
+            if r_loop_dry_run_result is not None
+            else 0
+        ),
+        "r_route_dry_run_candidate_surface_next_count": (
+            len(r_loop_dry_run_result.candidate_surface.next_candidate_node_ids)
+            if r_loop_dry_run_result is not None
+            else 0
+        ),
+        "r_route_dry_run_candidate_surface_previous_count": (
+            len(r_loop_dry_run_result.candidate_surface.previous_candidate_node_ids)
+            if r_loop_dry_run_result is not None
+            else 0
+        ),
+        "r_route_dry_run_access_candidate_count": (
+            len(r_loop_dry_run_result.access_ledger.candidate_graph_node_ids)
+            if r_loop_dry_run_result is not None
+            else 0
+        ),
+        "r_route_dry_run_access_selected_count": (
+            len(r_loop_dry_run_result.access_ledger.selected_graph_node_ids)
+            if r_loop_dry_run_result is not None
+            else 0
+        ),
+        "r_route_dry_run_access_inspected_count": (
+            len(r_loop_dry_run_result.access_ledger.inspected_graph_node_ids)
+            if r_loop_dry_run_result is not None
+            else 0
+        ),
+        "r_route_dry_run_selected_entry_node_ids": (
+            r_loop_dry_run_result.return_summary.selected_entry_node_ids
+            if r_loop_dry_run_result is not None
+            else []
+        ),
+        "r_route_dry_run_inspected_graph_node_ids": (
+            r_loop_dry_run_result.return_summary.inspected_graph_node_ids
+            if r_loop_dry_run_result is not None
+            else []
+        ),
+        "r_route_dry_run_budget_status": (
+            r_loop_dry_run_result.return_summary.budget_status
+            if r_loop_dry_run_result is not None
+            else "not_run"
+        ),
         "llm_call_count": _count_records_by_type(data_store, "llm_call"),
         "tool_choice_count": _count_records_by_type(data_store, "tool_choice"),
         "tool_result_count": _count_records_with_type_prefix(data_store, "tool_result:"),
@@ -1016,6 +1461,7 @@ def run_dry_turn(
         "max_query_attempts": max_query_candidates
         if max_query_candidates is not None
         else max_query_attempts,
+        "max_document_context_chars": max_document_context_chars,
         "l_loop_run_count": len(l_results),
         "same_turn_l_reroute_enabled": same_turn_l_reroute_enabled,
         "max_l_runs_per_turn": max_l_runs_per_turn,
@@ -1050,6 +1496,8 @@ def run_dry_turn(
         "l_loop_final_continuation_status": last_l_result.final_continuation_status if last_l_result is not None else None,
         "l_loop_continuation_count": len(last_l_result.continuation_data_ids) if last_l_result is not None else 0,
         "l_loop_revision_query_count": len(last_l_result.revision_query_data_ids) if last_l_result is not None else 0,
+        "l_loop_activity_ledger_data_ids": l_activity_ledger_data_ids,
+        "l_loop_activity_ledger_count": len(l_activity_ledger_data_ids),
         "l2_query_source": _read_l2_query_source(data_store),
         "node1_llm_routing_count": _count_node1_llm_routes(data_store),
         "node1_llm_routing_failed_count": _count_node1_llm_failed_routes(data_store),
@@ -1072,6 +1520,72 @@ def run_dry_turn(
             "node_3:input_brief_frame",
             "brief_status",
             data_type="node_output:node3_input_brief_frame",
+        ),
+        "node2_answer_basis_mode": _read_payload_text(
+            data_store,
+            "node_2:answer_basis_frame",
+            "answer_basis_mode",
+            data_type="node_output:node2_answer_basis_frame",
+        ),
+        "node2_answer_basis_generated_by": _read_payload_text(
+            data_store,
+            "node_2:answer_basis_frame",
+            "generated_by",
+            data_type="node_output:node2_answer_basis_frame",
+        ),
+        "node2_answer_basis_reason_codes": _read_payload_string_list(
+            data_store,
+            "node_2:answer_basis_frame",
+            "basis_reason_codes",
+            data_type="node_output:node2_answer_basis_frame",
+        ),
+        "node2_answer_basis_semantic_judgement_status": _read_payload_text(
+            data_store,
+            "node_2:answer_basis_frame",
+            "semantic_judgement_status",
+            data_type="node_output:node2_answer_basis_frame",
+        ),
+        "node2_answer_basis_failure_type": _read_payload_text(
+            data_store,
+            "node_2:answer_basis_frame",
+            "answer_basis_failure_type",
+            data_type="node_output:node2_answer_basis_frame",
+        ),
+        "node2_answer_basis_llm_call_data_id": _read_payload_text(
+            data_store,
+            "node_2:answer_basis_frame",
+            "answer_basis_llm_call_data_id",
+            data_type="node_output:node2_answer_basis_frame",
+        ),
+        "node2_answer_basis_trace_event_id": _read_payload_text(
+            data_store,
+            "node_2:answer_basis_frame",
+            "answer_basis_trace_event_id",
+            data_type="node_output:node2_answer_basis_frame",
+        ),
+        "node2_answer_basis_validation_error": _read_payload_text(
+            data_store,
+            "node_2:answer_basis_frame",
+            "answer_basis_validation_error",
+            data_type="node_output:node2_answer_basis_frame",
+        ),
+        "node2_answer_basis_raw_text_present": _read_payload_bool(
+            data_store,
+            "node_2:answer_basis_frame",
+            "answer_basis_raw_text_present",
+            data_type="node_output:node2_answer_basis_frame",
+        ),
+        "node2_answer_basis_prompt_ref": _read_payload_text(
+            data_store,
+            "node_2:answer_basis_frame",
+            "answer_basis_prompt_ref",
+            data_type="node_output:node2_answer_basis_frame",
+        ),
+        "node2_answer_basis_payload_parse_status": _read_payload_text(
+            data_store,
+            "node_2:answer_basis_frame",
+            "answer_basis_payload_parse_status",
+            data_type="node_output:node2_answer_basis_frame",
         ),
         "node3_reporter_status": _read_payload_text(
             data_store,
@@ -1127,6 +1641,118 @@ def _unique_strings(values: list[str | None]) -> list[str]:
         seen.add(value)
         unique_values.append(value)
     return unique_values
+
+
+def _record_r_route_experimental_graph_sources(
+    *,
+    trace_store: TraceStore,
+    data_store: DataStore,
+    turn_id: str,
+    graph_build: GraphMemoryBuildResult,
+    input_ref: list[str],
+) -> tuple[str, list[str]]:
+    event = trace_store.create_event(
+        turn_id=turn_id,
+        actor="graph_memory",
+        event_type="r_route_experimental_graph_snapshot",
+        input_ref=input_ref,
+        output_ref=[
+            graph_build.snapshot.snapshot_id,
+            graph_build.guide_packet.packet_id,
+        ],
+        schema_status="passed",
+    )
+    recorded_data_ids: list[str] = []
+    skipped_shared_graph_ids = _r_route_experimental_shared_graph_ids()
+
+    for node in graph_build.nodes:
+        if node.node_id in skipped_shared_graph_ids:
+            continue
+        _record_payload_if_same_or_missing(
+            data_store=data_store,
+            data_id=node.node_id,
+            data_type=f"graph_memory:node:{node.node_kind}",
+            payload=asdict(node),
+            created_at=event.timestamp,
+            source_trace_id=event.event_id,
+            recorded_data_ids=recorded_data_ids,
+        )
+    for edge in graph_build.edges:
+        if edge.edge_id in skipped_shared_graph_ids:
+            continue
+        _record_payload_if_same_or_missing(
+            data_store=data_store,
+            data_id=edge.edge_id,
+            data_type=f"graph_memory:edge:{edge.edge_kind}",
+            payload=asdict(edge),
+            created_at=event.timestamp,
+            source_trace_id=event.event_id,
+            recorded_data_ids=recorded_data_ids,
+        )
+    for data_id, data_type, payload in [
+        (
+            graph_build.core_ego_time_axis.frame_id,
+            "graph_memory:core_ego_time_axis_frame",
+            asdict(graph_build.core_ego_time_axis),
+        ),
+        (
+            graph_build.snapshot.snapshot_id,
+            "graph_memory:snapshot",
+            asdict(graph_build.snapshot),
+        ),
+        (
+            graph_build.guide_packet.packet_id,
+            "graph_memory:rloop_guide_packet",
+            asdict(graph_build.guide_packet),
+        ),
+    ]:
+        _record_payload_if_same_or_missing(
+            data_store=data_store,
+            data_id=data_id,
+            data_type=data_type,
+            payload=payload,
+            created_at=event.timestamp,
+            source_trace_id=event.event_id,
+            recorded_data_ids=recorded_data_ids,
+        )
+
+    return event.event_id, _unique_strings(recorded_data_ids)
+
+
+def _r_route_experimental_shared_graph_ids() -> set[str]:
+    return {
+        CORE_EGO_ROOT_NODE_ID,
+        TIME_AXIS_NODE_ID,
+        f"graph:edge:contains:{CORE_EGO_ROOT_NODE_ID}:{TIME_AXIS_NODE_ID}",
+    }
+
+
+def _record_payload_if_same_or_missing(
+    *,
+    data_store: DataStore,
+    data_id: str,
+    data_type: str,
+    payload: dict[str, object],
+    created_at: str,
+    source_trace_id: str,
+    recorded_data_ids: list[str],
+) -> None:
+    existing = data_store.get_record(data_id)
+    if existing is not None:
+        if existing.data_type != data_type or existing.payload != payload:
+            raise ValueError(f"r experimental graph source collision: {data_id}")
+        recorded_data_ids.append(data_id)
+        return
+    data_store.create_record(
+        data_id=data_id,
+        data_type=data_type,
+        exists=True,
+        created_at=created_at,
+        source_trace_id=source_trace_id,
+        payload=payload,
+    )
+    recorded_data_ids.append(data_id)
+
 
 def _count_records_by_type(data_store: DataStore, data_type: str) -> int:
     return sum(1 for record in data_store.list_records() if record.data_type == data_type)
@@ -1219,6 +1845,40 @@ def _read_payload_int(
     return value if isinstance(value, int) else None
 
 
+def _read_payload_bool(
+    data_store: DataStore,
+    data_id: str,
+    field_name: str,
+    *,
+    data_type: str | None = None,
+) -> bool | None:
+    record = data_store.get_record(data_id)
+    if record is None and data_type is not None:
+        record = _latest_record_by_type(data_store, data_type)
+    if record is None or not isinstance(record.payload, dict):
+        return None
+    value = record.payload.get(field_name)
+    return value if isinstance(value, bool) else None
+
+
+def _read_payload_string_list(
+    data_store: DataStore,
+    data_id: str,
+    field_name: str,
+    *,
+    data_type: str | None = None,
+) -> list[str] | None:
+    record = data_store.get_record(data_id)
+    if record is None and data_type is not None:
+        record = _latest_record_by_type(data_store, data_type)
+    if record is None or not isinstance(record.payload, dict):
+        return None
+    value = record.payload.get(field_name)
+    if not isinstance(value, list):
+        return None
+    return [item for item in value if isinstance(item, str)]
+
+
 def _latest_record_by_type(data_store: DataStore, data_type: str):
     for record in reversed(data_store.list_records()):
         if record.data_type == data_type:
@@ -1236,11 +1896,13 @@ def _adapter_label(adapter: LLMAdapter | None, *, fallback: str) -> str:
 def _loop_adapter_label(
     *,
     l1_goal_adapter: LLMAdapter | None,
+    l_tool_scope_adapter: LLMAdapter | None,
     l2_query_planner_adapter: LLMAdapter | None,
     l3_result_adapter: LLMAdapter | None,
 ) -> str:
     labels = [
         _adapter_label(l1_goal_adapter, fallback="L1:CODE/RULE_STUB"),
+        _adapter_label(l_tool_scope_adapter, fallback="L_scope:CODE/FALLBACK"),
         _adapter_label(l2_query_planner_adapter, fallback="L2:CODE/FALLBACK"),
         _adapter_label(l3_result_adapter, fallback="L3:CODE/OPERATION_CHECK"),
     ]
@@ -1253,6 +1915,7 @@ def _assigned_model_by_node(
     node_1_router_adapter: LLMAdapter | None,
     memory_relevance_selector_label: str,
     l1_goal_adapter: LLMAdapter | None,
+    l_tool_scope_adapter: LLMAdapter | None,
     l2_query_planner_adapter: LLMAdapter | None,
     l3_result_adapter: LLMAdapter | None,
     node_2_boundary_adapter: LLMAdapter | None,
@@ -1265,6 +1928,7 @@ def _assigned_model_by_node(
         "memory_relevance_selector": memory_relevance_selector_label,
         "L": _loop_adapter_label(
             l1_goal_adapter=l1_goal_adapter,
+            l_tool_scope_adapter=l_tool_scope_adapter,
             l2_query_planner_adapter=l2_query_planner_adapter,
             l3_result_adapter=l3_result_adapter,
         ),

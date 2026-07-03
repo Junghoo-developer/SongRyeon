@@ -6,7 +6,35 @@ import sys
 from pathlib import Path
 
 from songryeon_core.runtime.dry_run import run_dry_turn
+from songryeon_core.runtime.fast_test import run_fast_tests
+from songryeon_core.runtime.graph_vessel_first_write import run_local_vessel_first_write
+from songryeon_core.runtime.graph_vessel_inspect import (
+    render_vessel_inspect_text,
+    run_local_vessel_inspect,
+)
+from songryeon_core.runtime.graph_vessel_readback import run_local_vessel_readback
 from songryeon_core.runtime.l_loop_smoke import run_qwen_l_loop_smoke
+from songryeon_core.runtime.night_changed_source_summary import (
+    DEFAULT_NIGHT_CHANGED_SOURCE_STORE_DIR,
+    run_night_changed_source_summary,
+)
+from songryeon_core.runtime.night_token_budget_layer_summary import (
+    DEFAULT_NIGHT_TOKEN_BUDGET_MAX_LAYER_DEPTH,
+    DEFAULT_NIGHT_TOKEN_BUDGET_MAX_STEPS,
+    DEFAULT_NIGHT_TOKEN_BUDGET_LAYER_MAX_BUNDLE_CHARS,
+    DEFAULT_NIGHT_TOKEN_BUDGET_TARGET_CONTEXT_CHARS,
+    run_night_token_budget_layer_summary,
+)
+from songryeon_core.runtime.r_loop_vessel_read_packet import (
+    render_r_loop_vessel_read_packet_text,
+    run_local_r_loop_vessel_read_packet,
+)
+from songryeon_core.runtime.r_loop_vessel_one_step import (
+    render_r_loop_vessel_one_step_text,
+    render_r_loop_vessel_traverse_text,
+    run_local_r_loop_vessel_one_step,
+    run_local_r_loop_vessel_traverse,
+)
 from songryeon_core.runtime.replay import replay_run
 from songryeon_core.runtime.smoke_test import run_smoke_tests
 from songryeon_core.runtime.terminal_view import render_pretty_turn
@@ -19,6 +47,7 @@ from songryeon_core.runtime.chat_session import (
     store_chat_turn_result,
 )
 from songryeon_core.runtime.defaults import (
+    DEFAULT_MAX_DOCUMENT_CONTEXT_CHARS,
     DEFAULT_MAX_INPUT_CHARS,
     DEFAULT_MAX_QUERY_ATTEMPTS,
     DEFAULT_MAX_READ_DOC_CALLS,
@@ -91,6 +120,200 @@ def main() -> None:
 
     # smoke-test는 "지금 기준선이 깨졌는가?"를 빠르게 확인하는 자동 점검이다.
     subparsers.add_parser("smoke-test")
+    fast_test_parser = subparsers.add_parser("fast-test")
+    fast_test_parser.add_argument("--profile", choices=["core", "graph"], default="graph")
+    fast_test_parser.add_argument("--skip-compileall", action="store_true")
+    fast_test_parser.add_argument("--dry-run", action="store_true")
+
+    vessel_first_write_parser = subparsers.add_parser("vessel-first-write")
+    vessel_first_write_parser.add_argument("--root", default=".")
+    vessel_first_write_parser.add_argument("--batch-id", default="manual_vessel_first_write")
+    vessel_first_write_parser.add_argument("--turn-id", default="turn_vessel_first_write_0001")
+    vessel_first_write_parser.add_argument("--uri", default=None)
+    vessel_first_write_parser.add_argument("--user", default=None)
+    vessel_first_write_parser.add_argument("--password", default=None)
+    vessel_first_write_parser.add_argument("--database", default=None)
+    vessel_first_write_parser.add_argument("--allow-no-auth", action="store_true")
+    vessel_first_write_parser.add_argument("--include-source-manifest", action="store_true")
+    vessel_first_write_parser.add_argument("--store-text-snapshots", action="store_true")
+
+    vessel_readback_parser = subparsers.add_parser("vessel-readback")
+    vessel_readback_parser.add_argument("--batch-id", default="manual_vessel_readback")
+    vessel_readback_parser.add_argument("--turn-id", default="turn_vessel_readback_0001")
+    vessel_readback_parser.add_argument("--uri", default=None)
+    vessel_readback_parser.add_argument("--user", default=None)
+    vessel_readback_parser.add_argument("--password", default=None)
+    vessel_readback_parser.add_argument("--database", default=None)
+    vessel_readback_parser.add_argument("--allow-no-auth", action="store_true")
+
+    vessel_inspect_parser = subparsers.add_parser("vessel-inspect")
+    vessel_inspect_parser.add_argument("--batch-id", default="manual_vessel_inspect")
+    vessel_inspect_parser.add_argument("--turn-id", default="turn_vessel_inspect_0001")
+    vessel_inspect_parser.add_argument("--uri", default=None)
+    vessel_inspect_parser.add_argument("--user", default=None)
+    vessel_inspect_parser.add_argument("--password", default=None)
+    vessel_inspect_parser.add_argument("--database", default=None)
+    vessel_inspect_parser.add_argument("--allow-no-auth", action="store_true")
+    vessel_inspect_parser.add_argument("--limit", type=int, default=50)
+    vessel_inspect_parser.add_argument("--format", choices=["json", "text"], default="json")
+
+    r_loop_vessel_read_packet_parser = subparsers.add_parser("vessel-r-read-packet")
+    r_loop_vessel_read_packet_parser.add_argument(
+        "--batch-id",
+        default="manual_r_loop_vessel_read_packet",
+    )
+    r_loop_vessel_read_packet_parser.add_argument(
+        "--turn-id",
+        default="turn_r_loop_vessel_read_packet_0001",
+    )
+    r_loop_vessel_read_packet_parser.add_argument("--uri", default=None)
+    r_loop_vessel_read_packet_parser.add_argument("--user", default=None)
+    r_loop_vessel_read_packet_parser.add_argument("--password", default=None)
+    r_loop_vessel_read_packet_parser.add_argument("--database", default=None)
+    r_loop_vessel_read_packet_parser.add_argument("--allow-no-auth", action="store_true")
+    r_loop_vessel_read_packet_parser.add_argument("--limit", type=int, default=50)
+    r_loop_vessel_read_packet_parser.add_argument(
+        "--format",
+        choices=["json", "text"],
+        default="json",
+    )
+
+    r_loop_vessel_one_step_parser = subparsers.add_parser("vessel-r-one-step")
+    r_loop_vessel_one_step_parser.add_argument("user_question")
+    r_loop_vessel_one_step_parser.add_argument(
+        "--batch-id",
+        default="manual_r_loop_vessel_one_step",
+    )
+    r_loop_vessel_one_step_parser.add_argument(
+        "--turn-id",
+        default="turn_r_loop_vessel_one_step_0001",
+    )
+    r_loop_vessel_one_step_parser.add_argument("--uri", default=None)
+    r_loop_vessel_one_step_parser.add_argument("--user", default=None)
+    r_loop_vessel_one_step_parser.add_argument("--password", default=None)
+    r_loop_vessel_one_step_parser.add_argument("--database", default=None)
+    r_loop_vessel_one_step_parser.add_argument("--allow-no-auth", action="store_true")
+    r_loop_vessel_one_step_parser.add_argument("--limit", type=int, default=50)
+    r_loop_vessel_one_step_parser.add_argument(
+        "--llm-mode",
+        choices=["off", "fake", "qwen"],
+        default="fake",
+    )
+    r_loop_vessel_one_step_parser.add_argument("--endpoint", default=None)
+    r_loop_vessel_one_step_parser.add_argument("--model-id", default=None)
+    r_loop_vessel_one_step_parser.add_argument("--timeout", type=int, default=None)
+    r_loop_vessel_one_step_parser.add_argument(
+        "--format",
+        choices=["json", "text"],
+        default="json",
+    )
+
+    r_loop_vessel_traverse_parser = subparsers.add_parser("vessel-r-traverse")
+    r_loop_vessel_traverse_parser.add_argument("user_question")
+    r_loop_vessel_traverse_parser.add_argument(
+        "--batch-id",
+        default="manual_r_loop_vessel_traverse",
+    )
+    r_loop_vessel_traverse_parser.add_argument(
+        "--turn-id",
+        default="turn_r_loop_vessel_traverse_0001",
+    )
+    r_loop_vessel_traverse_parser.add_argument("--uri", default=None)
+    r_loop_vessel_traverse_parser.add_argument("--user", default=None)
+    r_loop_vessel_traverse_parser.add_argument("--password", default=None)
+    r_loop_vessel_traverse_parser.add_argument("--database", default=None)
+    r_loop_vessel_traverse_parser.add_argument("--allow-no-auth", action="store_true")
+    r_loop_vessel_traverse_parser.add_argument("--limit", type=int, default=50)
+    r_loop_vessel_traverse_parser.add_argument(
+        "--llm-mode",
+        choices=["off", "fake", "qwen"],
+        default="fake",
+    )
+    r_loop_vessel_traverse_parser.add_argument("--endpoint", default=None)
+    r_loop_vessel_traverse_parser.add_argument("--model-id", default=None)
+    r_loop_vessel_traverse_parser.add_argument("--timeout", type=int, default=None)
+    r_loop_vessel_traverse_parser.add_argument(
+        "--format",
+        choices=["json", "text"],
+        default="json",
+    )
+
+    night_changed_sources_parser = subparsers.add_parser(
+        "night-summarize-changed-sources"
+    )
+    night_changed_sources_parser.add_argument("--root", default=".")
+    night_changed_sources_parser.add_argument(
+        "--store-dir",
+        default=DEFAULT_NIGHT_CHANGED_SOURCE_STORE_DIR,
+    )
+    night_changed_sources_parser.add_argument("--batch-id", default=None)
+    night_changed_sources_parser.add_argument("--turn-id", default=None)
+    night_changed_sources_parser.add_argument(
+        "--llm-mode",
+        choices=["off", "fake", "qwen"],
+        default="off",
+    )
+    night_changed_sources_parser.add_argument("--endpoint", default=None)
+    night_changed_sources_parser.add_argument("--model-id", default=None)
+    night_changed_sources_parser.add_argument("--timeout", type=int, default=None)
+    night_changed_sources_parser.add_argument("--one-at-a-time", action="store_true")
+    night_changed_sources_parser.add_argument("--write-vessel", action="store_true")
+    night_changed_sources_parser.add_argument("--uri", default=None)
+    night_changed_sources_parser.add_argument("--user", default=None)
+    night_changed_sources_parser.add_argument("--password", default=None)
+    night_changed_sources_parser.add_argument("--database", default=None)
+    night_changed_sources_parser.add_argument("--allow-no-auth", action="store_true")
+
+    night_token_layer_parser = subparsers.add_parser("night-summarize-token-layer")
+    night_token_layer_parser.add_argument(
+        "--store-dir",
+        default=DEFAULT_NIGHT_CHANGED_SOURCE_STORE_DIR,
+    )
+    night_token_layer_parser.add_argument("--batch-id", default=None)
+    night_token_layer_parser.add_argument("--turn-id", default=None)
+    night_token_layer_parser.add_argument(
+        "--max-bundle-chars",
+        type=int,
+        default=DEFAULT_NIGHT_TOKEN_BUDGET_LAYER_MAX_BUNDLE_CHARS,
+    )
+    night_token_layer_parser.add_argument(
+        "--llm-mode",
+        choices=["off", "fake", "qwen"],
+        default="off",
+    )
+    night_token_layer_parser.add_argument("--endpoint", default=None)
+    night_token_layer_parser.add_argument("--model-id", default=None)
+    night_token_layer_parser.add_argument("--timeout", type=int, default=None)
+    night_token_layer_parser.add_argument("--until-context-budget", action="store_true")
+    night_token_layer_parser.add_argument(
+        "--target-context-chars",
+        type=int,
+        default=DEFAULT_NIGHT_TOKEN_BUDGET_TARGET_CONTEXT_CHARS,
+    )
+    night_token_layer_parser.add_argument(
+        "--max-layer-depth",
+        type=int,
+        default=DEFAULT_NIGHT_TOKEN_BUDGET_MAX_LAYER_DEPTH,
+    )
+    night_token_layer_parser.add_argument(
+        "--max-steps",
+        type=int,
+        default=DEFAULT_NIGHT_TOKEN_BUDGET_MAX_STEPS,
+    )
+    night_token_layer_parser.add_argument("--max-runtime-minutes", type=float, default=None)
+    night_token_layer_parser.add_argument("--progress-jsonl", default=None)
+    night_token_layer_parser.add_argument(
+        "--vessel-write-mode",
+        choices=["none", "every-step", "at-end"],
+        default=None,
+    )
+    night_token_layer_parser.add_argument("--no-stop-on-failure", action="store_true")
+    night_token_layer_parser.add_argument("--write-vessel", action="store_true")
+    night_token_layer_parser.add_argument("--uri", default=None)
+    night_token_layer_parser.add_argument("--user", default=None)
+    night_token_layer_parser.add_argument("--password", default=None)
+    night_token_layer_parser.add_argument("--database", default=None)
+    night_token_layer_parser.add_argument("--allow-no-auth", action="store_true")
 
     args = parser.parse_args()
 
@@ -138,10 +361,12 @@ def main() -> None:
             max_query_candidates=args.max_query_candidates,
             max_read_doc_calls=args.max_read_doc_calls,
             max_input_chars=args.max_input_chars,
+            max_document_context_chars=args.max_document_context_chars,
             include_data_records=args.pretty,
             force_l_route=args.force_l,
             same_turn_l_reroute_enabled=args.same_turn_l_reroute,
             max_l_runs_per_turn=args.max_l_runs_per_turn,
+            enable_r_route_experimental=args.enable_r_route_experimental,
             live_trace=args.live_trace,
         )
         if args.pretty:
@@ -161,10 +386,12 @@ def main() -> None:
             max_query_candidates=args.max_query_candidates,
             max_read_doc_calls=args.max_read_doc_calls,
             max_input_chars=args.max_input_chars,
+            max_document_context_chars=args.max_document_context_chars,
             include_data_records=args.pretty,
             force_l_route=args.force_l,
             same_turn_l_reroute_enabled=args.same_turn_l_reroute,
             max_l_runs_per_turn=args.max_l_runs_per_turn,
+            enable_r_route_experimental=args.enable_r_route_experimental,
             live_trace=args.live_trace,
         )
         if args.pretty:
@@ -175,6 +402,179 @@ def main() -> None:
         _run_qwen_chat(args)
     elif args.command == "smoke-test":
         print(json.dumps(run_smoke_tests(), ensure_ascii=False, indent=2))
+    elif args.command == "fast-test":
+        result = run_fast_tests(
+            profile=args.profile,
+            skip_compileall=args.skip_compileall,
+            dry_run=args.dry_run,
+        )
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        if result["status"] == "FAST_TEST_FAILED":
+            raise SystemExit(1)
+    elif args.command == "vessel-first-write":
+        result = run_local_vessel_first_write(
+            root_path=args.root,
+            batch_id=args.batch_id,
+            turn_id=args.turn_id,
+            uri=args.uri,
+            user=args.user,
+            password=args.password,
+            database=args.database,
+            allow_no_auth=args.allow_no_auth,
+            include_source_manifest=args.include_source_manifest,
+            store_text_snapshots=args.store_text_snapshots,
+        )
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        if result["write_status"] == "write_failed":
+            raise SystemExit(1)
+    elif args.command == "vessel-readback":
+        result = run_local_vessel_readback(
+            batch_id=args.batch_id,
+            turn_id=args.turn_id,
+            uri=args.uri,
+            user=args.user,
+            password=args.password,
+            database=args.database,
+            allow_no_auth=args.allow_no_auth,
+        )
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        if result["readback_status"] in {"read_failed", "failed"}:
+            raise SystemExit(1)
+    elif args.command == "vessel-inspect":
+        result = run_local_vessel_inspect(
+            batch_id=args.batch_id,
+            turn_id=args.turn_id,
+            uri=args.uri,
+            user=args.user,
+            password=args.password,
+            database=args.database,
+            allow_no_auth=args.allow_no_auth,
+            limit=args.limit,
+        )
+        if args.format == "text":
+            print(render_vessel_inspect_text(result))
+        else:
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+        if result["inspect_status"] == "read_failed":
+            raise SystemExit(1)
+    elif args.command == "vessel-r-read-packet":
+        result = run_local_r_loop_vessel_read_packet(
+            batch_id=args.batch_id,
+            turn_id=args.turn_id,
+            uri=args.uri,
+            user=args.user,
+            password=args.password,
+            database=args.database,
+            allow_no_auth=args.allow_no_auth,
+            limit=args.limit,
+        )
+        if args.format == "text":
+            print(render_r_loop_vessel_read_packet_text(result))
+        else:
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+        if result["read_status"] == "read_failed":
+            raise SystemExit(1)
+    elif args.command == "vessel-r-one-step":
+        result = run_local_r_loop_vessel_one_step(
+            user_question=args.user_question,
+            batch_id=args.batch_id,
+            turn_id=args.turn_id,
+            uri=args.uri,
+            user=args.user,
+            password=args.password,
+            database=args.database,
+            allow_no_auth=args.allow_no_auth,
+            limit=args.limit,
+            llm_mode=args.llm_mode,
+            endpoint=args.endpoint,
+            model_id=args.model_id,
+            timeout_seconds=args.timeout,
+        )
+        if args.format == "text":
+            print(render_r_loop_vessel_one_step_text(result))
+        else:
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+        if result["one_step_status"] == "failed":
+            raise SystemExit(1)
+    elif args.command == "vessel-r-traverse":
+        result = run_local_r_loop_vessel_traverse(
+            user_question=args.user_question,
+            batch_id=args.batch_id,
+            turn_id=args.turn_id,
+            uri=args.uri,
+            user=args.user,
+            password=args.password,
+            database=args.database,
+            allow_no_auth=args.allow_no_auth,
+            limit=args.limit,
+            llm_mode=args.llm_mode,
+            endpoint=args.endpoint,
+            model_id=args.model_id,
+            timeout_seconds=args.timeout,
+        )
+        if args.format == "text":
+            print(render_r_loop_vessel_traverse_text(result))
+        else:
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+        if result["traverse_status"] == "failed":
+            raise SystemExit(1)
+    elif args.command == "night-summarize-changed-sources":
+        result = run_night_changed_source_summary(
+            root_path=args.root,
+            store_dir=args.store_dir,
+            batch_id=args.batch_id,
+            turn_id=args.turn_id,
+            llm_mode=args.llm_mode,
+            endpoint=args.endpoint,
+            model_id=args.model_id,
+            timeout_seconds=args.timeout,
+            one_at_a_time=args.one_at_a_time,
+            write_vessel=args.write_vessel,
+            uri=args.uri,
+            user=args.user,
+            password=args.password,
+            database=args.database,
+            allow_no_auth=args.allow_no_auth,
+        )
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        if (
+            result.get("write_result") is not None
+            and isinstance(result.get("write_result"), dict)
+            and result["write_result"].get("write_status") == "write_failed"
+        ):
+            raise SystemExit(1)
+    elif args.command == "night-summarize-token-layer":
+        result = run_night_token_budget_layer_summary(
+            store_dir=args.store_dir,
+            batch_id=args.batch_id,
+            turn_id=args.turn_id,
+            max_bundle_chars=args.max_bundle_chars,
+            llm_mode=args.llm_mode,
+            endpoint=args.endpoint,
+            model_id=args.model_id,
+            timeout_seconds=args.timeout,
+            until_context_budget=args.until_context_budget,
+            target_context_chars=args.target_context_chars,
+            max_layer_depth=args.max_layer_depth,
+            max_steps=args.max_steps,
+            max_runtime_minutes=args.max_runtime_minutes,
+            progress_jsonl=args.progress_jsonl,
+            vessel_write_mode=args.vessel_write_mode,
+            stop_on_failure=not args.no_stop_on_failure,
+            write_vessel=args.write_vessel,
+            uri=args.uri,
+            user=args.user,
+            password=args.password,
+            database=args.database,
+            allow_no_auth=args.allow_no_auth,
+        )
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        if (
+            result.get("write_result") is not None
+            and isinstance(result.get("write_result"), dict)
+            and result["write_result"].get("write_status") == "write_failed"
+        ):
+            raise SystemExit(1)
 
 
 def _add_turn_runtime_args(parser: argparse.ArgumentParser, *, include_qwen_args: bool) -> None:
@@ -189,9 +589,15 @@ def _add_turn_runtime_args(parser: argparse.ArgumentParser, *, include_qwen_args
     parser.add_argument("--max-query-candidates", type=int, default=None)
     parser.add_argument("--max-read-doc-calls", type=int, default=DEFAULT_MAX_READ_DOC_CALLS)
     parser.add_argument("--max-input-chars", type=int, default=DEFAULT_MAX_INPUT_CHARS)
+    parser.add_argument(
+        "--max-document-context-chars",
+        type=int,
+        default=DEFAULT_MAX_DOCUMENT_CONTEXT_CHARS,
+    )
     parser.add_argument("--force-l", action="store_true")
     parser.add_argument("--same-turn-l-reroute", action="store_true")
     parser.add_argument("--max-l-runs-per-turn", type=int, default=1)
+    parser.add_argument("--enable-r-route-experimental", action="store_true")
     parser.add_argument("--live-trace", action="store_true")
     if include_qwen_args:
         parser.add_argument("--endpoint", default=None)
@@ -241,10 +647,12 @@ def _run_qwen_chat(args: argparse.Namespace) -> None:
             max_query_candidates=args.max_query_candidates,
             max_read_doc_calls=args.max_read_doc_calls,
             max_input_chars=args.max_input_chars,
+            max_document_context_chars=args.max_document_context_chars,
             include_data_records=True,
             force_l_route=args.force_l,
             same_turn_l_reroute_enabled=args.same_turn_l_reroute,
             max_l_runs_per_turn=args.max_l_runs_per_turn,
+            enable_r_route_experimental=args.enable_r_route_experimental,
             recent_raw_conversation=session_memory.recent_raw_conversation,
             previous_turn_capsules=session_memory.previous_turn_capsules,
             live_trace=args.live_trace,
@@ -291,6 +699,7 @@ def _summary(result: dict[str, object]) -> dict[str, object]:
         "l_loop_budget_plan_count": result.get("l_loop_budget_plan_count"),
         "search_top_k": result.get("search_top_k"),
         "max_query_attempts": result.get("max_query_attempts"),
+        "max_document_context_chars": result.get("max_document_context_chars"),
         "l_loop_final_decision": result.get("l_loop_final_decision"),
         "l_loop_final_continuation_status": result.get("l_loop_final_continuation_status"),
         "l_loop_continuation_count": result.get("l_loop_continuation_count"),
@@ -309,6 +718,14 @@ def _summary(result: dict[str, object]) -> dict[str, object]:
         "node1_llm_routing_failed_count": result.get("node1_llm_routing_failed_count"),
         "node1_router_fallback_count": result.get("node1_router_fallback_count"),
         "node1_router_fallback_policy": result.get("node1_router_fallback_policy"),
+        "r_route_experimental_enabled": result.get("r_route_experimental_enabled"),
+        "r_route_experimental_status": result.get("r_route_experimental_status"),
+        "r_route_experimental_return_summary_id": result.get(
+            "r_route_experimental_return_summary_id"
+        ),
+        "r_route_experimental_close_route_id": result.get(
+            "r_route_experimental_close_route_id"
+        ),
         "recent_memory_relevance_selection_status": result.get(
             "recent_memory_relevance_selection_status"
         ),
@@ -337,6 +754,22 @@ def _summary(result: dict[str, object]) -> dict[str, object]:
         ),
         "node4_unsupported_recent_memory_claim_count": result.get(
             "node4_unsupported_recent_memory_claim_count"
+        ),
+        "node2_answer_basis_mode": result.get("node2_answer_basis_mode"),
+        "node2_answer_basis_generated_by": result.get("node2_answer_basis_generated_by"),
+        "node2_answer_basis_reason_codes": result.get("node2_answer_basis_reason_codes"),
+        "node2_answer_basis_semantic_judgement_status": result.get(
+            "node2_answer_basis_semantic_judgement_status"
+        ),
+        "node2_answer_basis_failure_type": result.get("node2_answer_basis_failure_type"),
+        "node2_answer_basis_llm_call_data_id": result.get(
+            "node2_answer_basis_llm_call_data_id"
+        ),
+        "node2_answer_basis_trace_event_id": result.get(
+            "node2_answer_basis_trace_event_id"
+        ),
+        "node2_answer_basis_payload_parse_status": result.get(
+            "node2_answer_basis_payload_parse_status"
         ),
         "export_dir": result.get("export_dir"),
     }

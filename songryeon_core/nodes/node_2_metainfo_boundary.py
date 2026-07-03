@@ -8,8 +8,11 @@ from songryeon_core.core.schemas import (
     DataRef,
     MetainfoBoundary,
     MixedInfoRef,
+    Node2AnswerBasisFrame,
     RelativeInfoRef,
     Node2BoundaryReviewFrame,
+    Node2EvidenceRole,
+    validate_node2_answer_basis_frame,
     validate_mixed_info_ref,
     validate_relative_info_ref,
     validate_node2_boundary_review_frame,
@@ -17,6 +20,10 @@ from songryeon_core.core.schemas import (
 from songryeon_core.core.trace_store import TraceStore
 from songryeon_core.llm.base import LLMAdapter
 from songryeon_core.llm.node_executor import LLMNodeExecutor
+from songryeon_core.loops.l_loop_namespace import LRunIds
+
+
+NODE2_ANSWER_BASIS_FRAME_DATA_ID = "node_2:answer_basis_frame"
 
 
 def build_metainfo_boundary(
@@ -294,6 +301,392 @@ def run_node2_boundary_review(
         payload=asdict(frame),
     )
     return event.event_id
+
+
+def run_node2_answer_basis_selection(
+    *,
+    trace_store: TraceStore,
+    data_store: DataStore,
+    turn_id: str,
+    user_question: str,
+    boundary_id: str,
+    boundary: MetainfoBoundary,
+    handoff_frame_id: str,
+    adapter: LLMAdapter | None,
+    input_ref: list[str],
+    source_data_ids: list[str],
+    id_namespace: LRunIds | None = None,
+) -> tuple[str, str, Node2AnswerBasisFrame]:
+    """node_2 LLM이 node_3 답변 근거 모드를 고르고 실패 시 안전 fallback을 기록한다."""
+
+    frame_id = (
+        id_namespace.scoped_data_id(NODE2_ANSWER_BASIS_FRAME_DATA_ID)
+        if id_namespace is not None
+        else NODE2_ANSWER_BASIS_FRAME_DATA_ID
+    )
+    base_source_data_ids = _unique_strings(
+        [*source_data_ids, boundary_id, handoff_frame_id]
+    )
+    available_evidence_sources = _answer_basis_available_evidence_sources(
+        boundary=boundary,
+        base_source_data_ids=base_source_data_ids,
+    )
+    allowed_answer_basis_source_data_ids = _unique_strings(
+        [
+            str(source["source_data_id"])
+            for source in available_evidence_sources
+            if isinstance(source.get("source_data_id"), str)
+        ]
+    )
+    prompt_ref = "songryeon_core/prompts/node_2_answer_basis_selector_v0.md"
+    if adapter is None:
+        frame = _fallback_answer_basis_frame(
+            frame_id=frame_id,
+            turn_id=turn_id,
+            source_trace_ids=input_ref,
+            source_data_ids=allowed_answer_basis_source_data_ids,
+            failure_type="adapter_missing",
+            llm_call_data_id=None,
+            trace_event_id=None,
+            validation_error="adapter_missing",
+            raw_text_present=False,
+            prompt_ref=prompt_ref,
+            payload_parse_status="not_checked",
+        )
+        return _record_answer_basis_frame(
+            trace_store=trace_store,
+            data_store=data_store,
+            turn_id=turn_id,
+            frame=frame,
+            schema_status="failed",
+        )
+
+    prompt = Path(prompt_ref).read_text(encoding="utf-8")
+    llm_result = LLMNodeExecutor(adapter).run(
+        node_id="node_2",
+        prompt=prompt,
+        input_payload={
+            "user_question": user_question,
+            "boundary_id": boundary_id,
+            "handoff_frame_id": handoff_frame_id,
+            "absolute_info_count": len(boundary.absolute_info),
+            "relative_info_count": len(boundary.relative_info),
+            "mixed_info_count": len(boundary.mixed_info),
+            "absolute_info_samples": [
+                asdict(data_ref) for data_ref in boundary.absolute_info[:16]
+            ],
+            "relative_info_samples": [
+                asdict(info_ref) for info_ref in boundary.relative_info[:12]
+            ],
+            "mixed_info_samples": [
+                asdict(info_ref) for info_ref in boundary.mixed_info[:12]
+            ],
+            "source_data_ids": allowed_answer_basis_source_data_ids,
+            "available_evidence_sources": available_evidence_sources,
+            "answer_basis_modes": [
+                "absolute_first",
+                "relative_allowed",
+                "mixed_or_uncertain",
+            ],
+            "basis_reason_codes": [
+                "code_verified_fact_required",
+                "user_asked_for_interpretation",
+                "multi_source_bundle",
+                "source_mapping_unclear",
+                "insufficient_grounding",
+                "partial_evidence_only",
+                "recent_conversation_basis_present",
+                "document_basis_present",
+                "runtime_state_basis_present",
+                "llm_mode_selection_failed",
+            ],
+            "evidence_role_values": [
+                "primary_answer_basis",
+                "supporting_context",
+                "available_but_not_used",
+                "candidate_not_read",
+                "excluded_by_budget",
+                "failed_or_empty",
+                "not_supplied",
+            ],
+        },
+        trace_store=trace_store,
+        data_store=data_store,
+        turn_id=turn_id,
+        prompt_ref=prompt_ref,
+        input_ref=input_ref,
+        source_data_ids=base_source_data_ids,
+        payload_validator=lambda payload: _validate_answer_basis_payload(
+            payload,
+            allowed_source_data_ids=allowed_answer_basis_source_data_ids,
+        ),
+    )
+    frame_source_trace_ids = list(input_ref)
+    if llm_result.trace_event_id:
+        frame_source_trace_ids.append(llm_result.trace_event_id)
+    frame_source_data_ids = _unique_strings(
+        [*allowed_answer_basis_source_data_ids, llm_result.call_data_id]
+    )
+    if llm_result.failure_type == "none" and llm_result.validation.payload is not None:
+        payload = llm_result.validation.payload
+        frame = Node2AnswerBasisFrame(
+            frame_id=frame_id,
+            turn_id=turn_id,
+            answer_basis_mode=str(payload.get("answer_basis_mode") or "").strip(),
+            basis_reason_codes=_string_list(payload.get("basis_reason_codes")),
+            mode_selection_reason=str(payload.get("mode_selection_reason") or "").strip(),
+            mode_selection_reason_info_class=str(
+                payload.get("mode_selection_reason_info_class") or "mixed"
+            ).strip(),
+            evidence_roles=_evidence_roles_from_payload(payload.get("evidence_roles")),
+            generated_by=f"LLM:{llm_result.model_id}",
+            info_class=str(payload.get("mode_selection_reason_info_class") or "mixed").strip(),
+            semantic_judgement_status="ran",
+            answer_basis_failure_type="none",
+            answer_basis_llm_call_data_id=llm_result.call_data_id,
+            answer_basis_trace_event_id=llm_result.trace_event_id,
+            answer_basis_validation_error="",
+            answer_basis_raw_text_present=bool(llm_result.raw_text),
+            answer_basis_prompt_ref=prompt_ref,
+            answer_basis_payload_parse_status=_answer_basis_payload_parse_status(llm_result.failure_type),
+            source_trace_ids=_unique_strings(frame_source_trace_ids),
+            source_data_ids=frame_source_data_ids,
+        )
+        validate_node2_answer_basis_frame(frame)
+        return _record_answer_basis_frame(
+            trace_store=trace_store,
+            data_store=data_store,
+            turn_id=turn_id,
+            frame=frame,
+            schema_status="passed",
+        )
+
+    frame = _fallback_answer_basis_frame(
+        frame_id=frame_id,
+        turn_id=turn_id,
+        source_trace_ids=frame_source_trace_ids,
+        source_data_ids=frame_source_data_ids,
+        failure_type=llm_result.failure_type,
+        llm_call_data_id=llm_result.call_data_id,
+        trace_event_id=llm_result.trace_event_id,
+        validation_error=_short_diagnostic_text(llm_result.validation.error or ""),
+        raw_text_present=bool(llm_result.raw_text),
+        prompt_ref=prompt_ref,
+        payload_parse_status=_answer_basis_payload_parse_status(llm_result.failure_type),
+    )
+    return _record_answer_basis_frame(
+        trace_store=trace_store,
+        data_store=data_store,
+        turn_id=turn_id,
+        frame=frame,
+        schema_status="failed",
+    )
+
+
+def _answer_basis_available_evidence_sources(
+    *,
+    boundary: MetainfoBoundary,
+    base_source_data_ids: list[str],
+) -> list[dict[str, str]]:
+    """answer-basis LLM이 evidence role로 고를 수 있는 source ID 표를 만든다."""
+
+    candidate_ids = _unique_strings(
+        [
+            *base_source_data_ids,
+            *(ref.data_id for ref in boundary.absolute_info[:16]),
+            *(ref.source_data_id for ref in boundary.relative_info[:12]),
+            *(ref.source_data_id for ref in boundary.mixed_info[:12]),
+        ]
+    )
+    return [
+        {
+            "source_data_id": source_data_id,
+            "source_label": _answer_basis_source_label(source_data_id),
+            "source_kind": _answer_basis_source_kind(source_data_id),
+        }
+        for source_data_id in candidate_ids
+    ]
+
+
+def _answer_basis_source_label(source_data_id: str) -> str:
+    if "selected_recent_memory_context" in source_data_id:
+        return "선택된 최근 기억"
+    if "memory_relevance" in source_data_id:
+        return "최근 기억 선택 판단"
+    if "l_loop_return_summary" in source_data_id or "L:return_summary_frame" in source_data_id:
+        return "L loop 반환 요약"
+    if "read_doc" in source_data_id or "read_artifact" in source_data_id:
+        return "읽은 문서"
+    if "document_material_packet" in source_data_id:
+        return "0 문서 장부"
+    if "document_context_pack" in source_data_id:
+        return "문서 context pack"
+    if "L3" in source_data_id or "achievement" in source_data_id or "preserved" in source_data_id:
+        return "L3 검색 성패 판단"
+    if "route" in source_data_id:
+        return "라우팅 결과"
+    if "boundary" in source_data_id:
+        return "메타정보 경계"
+    if "handoff" in source_data_id:
+        return "node_2 handoff"
+    if "node2_input" in source_data_id:
+        return "node_2 입력 프레임"
+    return "공급된 근거 자료"
+
+
+def _answer_basis_source_kind(source_data_id: str) -> str:
+    if "selected_recent_memory_context" in source_data_id:
+        return "selected_recent_memory_context"
+    if "memory_relevance" in source_data_id:
+        return "memory_relevance_selection"
+    if "l_loop_return_summary" in source_data_id or "L:return_summary_frame" in source_data_id:
+        return "l_loop_return_summary"
+    if "read_doc" in source_data_id or "read_artifact" in source_data_id:
+        return "read_document"
+    if "document_material_packet" in source_data_id:
+        return "document_material_packet"
+    if "document_context_pack" in source_data_id:
+        return "document_context_pack"
+    if "L3" in source_data_id or "achievement" in source_data_id or "preserved" in source_data_id:
+        return "l3_result"
+    if "route" in source_data_id:
+        return "route"
+    if "boundary" in source_data_id:
+        return "metainfo_boundary"
+    if "handoff" in source_data_id:
+        return "node2_handoff"
+    if "node2_input" in source_data_id:
+        return "node2_input"
+    return "supplied_source"
+
+
+def _fallback_answer_basis_frame(
+    *,
+    frame_id: str,
+    turn_id: str,
+    source_trace_ids: list[str],
+    source_data_ids: list[str],
+    failure_type: str,
+    llm_call_data_id: str | None,
+    trace_event_id: str | None,
+    validation_error: str,
+    raw_text_present: bool,
+    prompt_ref: str,
+    payload_parse_status: str,
+) -> Node2AnswerBasisFrame:
+    frame = Node2AnswerBasisFrame(
+        frame_id=frame_id,
+        turn_id=turn_id,
+        answer_basis_mode="mixed_or_uncertain",
+        basis_reason_codes=["llm_mode_selection_failed"],
+        mode_selection_reason="CODE_STATUS:node2_answer_basis_mode_selection_failed",
+        mode_selection_reason_info_class="absolute_status",
+        evidence_roles=[],
+        generated_by="CODE:FALLBACK",
+        info_class="absolute_status",
+        semantic_judgement_status="failed",
+        answer_basis_failure_type=failure_type,
+        answer_basis_llm_call_data_id=llm_call_data_id,
+        answer_basis_trace_event_id=trace_event_id,
+        answer_basis_validation_error=validation_error,
+        answer_basis_raw_text_present=raw_text_present,
+        answer_basis_prompt_ref=prompt_ref,
+        answer_basis_payload_parse_status=payload_parse_status,
+        source_trace_ids=_unique_strings(source_trace_ids),
+        source_data_ids=_unique_strings(source_data_ids),
+    )
+    validate_node2_answer_basis_frame(frame)
+    return frame
+
+
+def _answer_basis_payload_parse_status(failure_type: str) -> str:
+    if failure_type in {"none", "schema_failed"}:
+        return "passed"
+    if failure_type == "parse_failed":
+        return "failed"
+    return "not_checked"
+
+
+def _short_diagnostic_text(text: str, *, limit: int = 240) -> str:
+    compact = " ".join(text.split())
+    if len(compact) <= limit:
+        return compact
+    return f"{compact[: limit - 3]}..."
+
+
+def _record_answer_basis_frame(
+    *,
+    trace_store: TraceStore,
+    data_store: DataStore,
+    turn_id: str,
+    frame: Node2AnswerBasisFrame,
+    schema_status: str,
+) -> tuple[str, str, Node2AnswerBasisFrame]:
+    event = trace_store.create_event(
+        turn_id=turn_id,
+        actor="node_2",
+        event_type="node_output",
+        input_ref=frame.source_trace_ids,
+        output_ref=[frame.frame_id],
+        schema_status=schema_status,
+    )
+    data_store.create_record(
+        data_id=frame.frame_id,
+        data_type="node_output:node2_answer_basis_frame",
+        exists=True,
+        created_at=event.timestamp,
+        source_trace_id=event.event_id,
+        payload=asdict(frame),
+    )
+    return event.event_id, frame.frame_id, frame
+
+
+def _validate_answer_basis_payload(
+    payload: dict[str, object],
+    *,
+    allowed_source_data_ids: list[str],
+) -> None:
+    frame = Node2AnswerBasisFrame(
+        frame_id="validation_answer_basis",
+        turn_id="validation_turn",
+        answer_basis_mode=str(payload.get("answer_basis_mode") or "").strip(),
+        basis_reason_codes=_string_list(payload.get("basis_reason_codes")),
+        mode_selection_reason=str(payload.get("mode_selection_reason") or "").strip(),
+        mode_selection_reason_info_class=str(
+            payload.get("mode_selection_reason_info_class") or "mixed"
+        ).strip(),
+        evidence_roles=_evidence_roles_from_payload(payload.get("evidence_roles")),
+        generated_by="LLM:validation-model",
+        info_class=str(payload.get("mode_selection_reason_info_class") or "mixed").strip(),
+        semantic_judgement_status="ran",
+        source_trace_ids=["validation_trace"],
+        source_data_ids=_unique_strings(["validation_data", *allowed_source_data_ids]),
+    )
+    validate_node2_answer_basis_frame(frame)
+
+
+def _evidence_roles_from_payload(value: object) -> list[Node2EvidenceRole]:
+    if not isinstance(value, list):
+        return []
+    roles: list[Node2EvidenceRole] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        source_data_id = str(item.get("source_data_id") or "").strip()
+        evidence_role = str(item.get("evidence_role") or "").strip()
+        if not source_data_id or not evidence_role:
+            continue
+        roles.append(
+            Node2EvidenceRole(
+                source_data_id=source_data_id,
+                evidence_role=evidence_role,
+                role_reason=str(item.get("role_reason") or "").strip(),
+                role_reason_info_class=str(
+                    item.get("role_reason_info_class") or "mixed"
+                ).strip(),
+            )
+        )
+    return roles
 
 
 def _data_record_metadata_refs(

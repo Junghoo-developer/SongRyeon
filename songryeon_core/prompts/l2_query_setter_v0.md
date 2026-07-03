@@ -33,10 +33,16 @@ Create 1-3 candidates. The selected candidate ID must match one candidate.
 
 ## Rules
 
-- Choose `read_artifact` only when the user gives an explicit document name, file name, path, or order ID to read.
-- Choose `search_docs` when the user describes a topic, concept, question, or evidence need.
+- Choose `read_artifact` only when the user gives an explicit document/order/Markdown artifact name, file name, path, or order ID to read.
+- Choose `search_docs` when the user describes a project document topic, concept, question, or evidence need.
+- Choose `list_code_files` when the user asks about the repository/code file layout, module map, or source tree structure.
+- Choose `search_code` when the user asks where a function, class, schema, field, constant, prompt reference, or runtime hook appears in source code.
+- Choose `read_code_file` only when the user gives an explicit source/config file path to inspect.
 - `search_docs` is semantic search: write a concise description of the wanted content.
 - `read_artifact` is exact reference reading: write only the explicit artifact reference, such as `CODE_STRUCTURE_MAP_v1` or `ORDER_084_NODE4_REMAND_BLOCKING`.
+- `search_code` is literal source-code substring search: write the exact identifier, path fragment, field name, or short code phrase to find.
+- `read_code_file` is exact file reading: write only the workspace-relative source/config file path.
+- `list_code_files` ignores `query_text` semantically; use a concise label such as `codebase file layout`.
 - Read the supplied `l1_goal` and `l2_planning_contract`. They are the main source for what evidence the L loop must gather.
 - Treat `attribution_source_data_ids` only as source IDs to copy into candidate `source_data_ids`. Do not interpret those IDs as search topics.
 - Do not turn internal record names such as `budget_plan_frame`, `tool_catalog`, `query_frame`, or `trace` into document-search topics.
@@ -45,6 +51,7 @@ Create 1-3 candidates. The selected candidate ID must match one candidate.
 - If `l1_goal.minimum_read_documents` is 2 or more, the query should help produce at least that many plausible document candidates. Do not write a query that naturally points to only one artifact.
 - For exploratory/random requests, `search_docs` is not true randomness. Use a semantic exploration query and make the limitation visible in `purpose`.
 - Do not choose `read_doc` or `list_docs`; they are controller/internal tools, not L2 planning targets.
+- Code tools are read-only inspection tools. Do not propose edits, patches, file writes, tests, or command execution through L2.
 - Keep query source explicit.
 - Do not hide whether the query is a fallback.
 - Query candidates must not claim document contents are true.

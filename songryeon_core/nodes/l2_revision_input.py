@@ -145,6 +145,7 @@ def record_l2_revision_input_frame(
         previous_query_text=_text(l2_payload, "query_text", fallback="unknown_query"),
         previous_tool_name=_previous_tool_name(data_store=data_store, l2_payload=l2_payload),
         read_document_names=read_doc_ids,
+        unread_candidate_doc_ids=unread_candidate_doc_ids,
         unread_candidate_summaries=unread_candidate_summaries,
         l3_goal_status=_text(l3_payload, "achievement_status", fallback="not_run"),
         l3_goal_match_status=_text(l3_payload, "goal_match_status", fallback="not_run"),

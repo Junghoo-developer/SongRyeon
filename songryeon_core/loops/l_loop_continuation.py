@@ -164,9 +164,25 @@ def _decide_continuation(
             "loop_return_summary",
         )
 
-    has_query_budget = remaining_query_attempts > 0
     has_read_budget_for_unread_candidates = remaining_read_doc_calls > 0 and bool(unread_candidate_doc_ids)
-    if not has_query_budget and not has_read_budget_for_unread_candidates:
+
+    # ORDER_122 이후 revision L2는 새 search_docs query 없이도 기존 unread candidate를
+    # read_doc으로 고를 수 있다. 따라서 query budget이 0이어도 읽을 후보와 read budget이
+    # 있으면 continuation을 닫지 않는다.
+    if remaining_query_attempts <= 0:
+        if has_read_budget_for_unread_candidates:
+            return (
+                "continue",
+                "CODE_STATUS:l3_not_achieved_read_unread_candidate_after_query_budget",
+                "L2",
+            )
+        return (
+            "stop_budget_exhausted",
+            "CODE_STATUS:continuation_query_budget_exhausted",
+            "loop_return_summary",
+        )
+
+    if not has_read_budget_for_unread_candidates and remaining_tool_calls <= 0:
         return (
             "stop_no_actionable_gap",
             "CODE_STATUS:no_unread_candidate_or_revision_plan",

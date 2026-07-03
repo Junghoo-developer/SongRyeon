@@ -15,6 +15,7 @@ from songryeon_core.core.schemas import (
 )
 from songryeon_core.core.trace_store import TraceStore
 from songryeon_core.loops.l_loop_namespace import LRunIds
+from songryeon_core.tools.code_tools import list_code_files, read_code_file, search_code
 from songryeon_core.tools.document_tools import list_docs, read_artifact, read_doc, search_docs
 
 
@@ -133,10 +134,15 @@ class ToolRunner:
         )
 
 
-def build_document_tool_registry(document_root: str | Path) -> ToolRegistry:
+def build_document_tool_registry(
+    document_root: str | Path,
+    *,
+    code_root: str | Path | None = None,
+) -> ToolRegistry:
     """Administrative_Reform_1 같은 문서 루트에 묶인 읽기 전용 도구 레지스트리."""
 
     root = Path(document_root)
+    codebase_root = Path.cwd() if code_root is None else Path(code_root)
     return ToolRegistry(
         [
             ToolSpec(
@@ -170,6 +176,38 @@ def build_document_tool_registry(document_root: str | Path) -> ToolRegistry:
                 output_data_type="tool_result:search_docs",
                 function=lambda query, top_k=5: search_docs(root=root, query=query, top_k=top_k),
                 input_fields=["query", "top_k"],
+            ),
+            ToolSpec(
+                name="list_code_files",
+                description="Workspace의 코드/설정 파일 목록을 읽기 전용으로 가져온다.",
+                read_only=True,
+                output_data_type="tool_result:list_code_files",
+                function=lambda max_files=500: list_code_files(root=codebase_root, max_files=max_files),
+                input_fields=["max_files"],
+            ),
+            ToolSpec(
+                name="search_code",
+                description="Workspace 코드/설정 파일에서 문자열을 읽기 전용으로 검색한다.",
+                read_only=True,
+                output_data_type="tool_result:search_code",
+                function=lambda query, max_results=50: search_code(
+                    root=codebase_root,
+                    query=query,
+                    max_results=max_results,
+                ),
+                input_fields=["query", "max_results"],
+            ),
+            ToolSpec(
+                name="read_code_file",
+                description="Workspace 안의 코드/설정 파일 하나를 읽기 전용으로 가져온다.",
+                read_only=True,
+                output_data_type="tool_result:read_code_file",
+                function=lambda file_path, max_chars=12000: read_code_file(
+                    root=codebase_root,
+                    file_path=file_path,
+                    max_chars=max_chars,
+                ),
+                input_fields=["file_path", "max_chars"],
             ),
         ]
     )

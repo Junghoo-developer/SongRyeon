@@ -2,7 +2,7 @@
 
 발주서는 개발 지도에서 내려온 실무 계획서다.
 
-현재 정식 발주서는 `ORDER_001`부터 `ORDER_117`까지 있다.
+현재 정식 발주서는 `ORDER_001`부터 `ORDER_192`까지 있다.
 
 `ORDER_066`부터 `ORDER_075`까지는 메타정보 관리법을 실제 런타임과 LLM 노드 배선에 적용하기 위한 복구 로드맵이다.
 
@@ -73,6 +73,88 @@
 `ORDER_116`은 5000줄 이상으로 커진 `smoke_test.py`를 도메인별 smoke case와 pytest 파일로 분해하는 발주서다.
 
 `ORDER_117`은 compileall / pytest / smoke-test를 개발 루틴과 CI에 고정하는 발주서다.
+
+`ORDER_118`은 node_2가 node_3에게 `absolute_first`, `relative_allowed`, `mixed_or_uncertain` 3종 답변 근거 모드를 선택 이유와 함께 전달하도록 하는 발주서다.
+
+`ORDER_119`는 `structure_failed` fallback이 검색하지 않은 문서를 찾은 척하지 않게 하고, node_2 answer-basis selector 실패 원인을 runtime에 드러내는 정직성/진단 발주서다.
+
+`ORDER_120`은 `ToolUseBudgetFrame.query_count`가 `max_query_attempts`를 초과해 `structure_failed`가 발생하는 예산 count 불일치 원인을 찾고 진단 정보를 남기는 발주서다.
+
+`ORDER_121`은 node_2 answer-basis 근거 ID 허용 목록을 정렬하고, L3 실패/예산소진 신호가 node_3 답변 태도에 드러나게 하는 발주서다.
+
+`ORDER_122`는 L revision 흐름에서 unread search candidate를 `read_doc`으로 읽을 수 있게 하여, 검색 후보를 찾고도 원문 읽기를 적게 하는 병목을 줄이는 발주서다.
+
+`ORDER_123`은 실제 `read_doc` 도구 원문 읽기 수와 node_3 공급 문서 context 수를 구조적으로 분리해, 최종 답변이 두 count를 섞지 않게 하는 발주서다.
+
+`ORDER_124`는 L 이후 node_0이 검색 후보 / 실제 read_doc / node_3 공급 context / unread 후보를 문서별 절대정보 장부로 정리해 node_2와 node_3에 공급하는 발주서다.
+
+`ORDER_125`는 L3가 실제 읽은 문서별 요약 frame을 만들고, 담백 문서 요약(relative)과 상황 맞춤 요약(mixed)을 구분해 node_3에 전달하는 발주서다.
+
+`ORDER_126`은 terminal runtime view가 여러 `read_doc` / `read_artifact` document extract tool result를 최신 1개로 접지 않고 모두 표시하게 하는 발주서다.
+
+`ORDER_127`은 L revision에서 추가로 실행된 document extract record가 node_0 material packet과 node_3 actual read count에 누락되지 않게 병합하는 발주서다.
+
+`ORDER_128`은 node_3 actual read document count가 같은 파일명 문서를 하나로 합쳐 절대 count를 틀리지 않도록 `doc_id` identity 기준으로 정렬하는 발주서다.
+
+`ORDER_129`는 L3 문서별 요약을 열기 전에 node_0 material packet과 node_3 input brief의 search candidate count가 서로 다른 범위/identity 기준으로 세어지는지 감사하는 발주서다.
+
+`ORDER_130`은 node_3가 실제 read_doc, node_3 context 공급, search candidate, excluded/unread candidate 역할을 섞어 말하지 않게 하고 node_4가 명시 역할 claim 충돌을 막는 발주서다.
+
+`ORDER_131`은 `search_candidate_count`를 최종 검색 후보와 L3 preserved frame 누적 검색 후보로 분리해, 같은 숫자 이름이 서로 다른 범위를 가리키지 않게 하는 발주서다.
+
+`ORDER_132`는 node_2의 `answer_basis_mode`를 바탕으로 node_3가 원문 문서 context와 L3 문서별 요약을 어떤 태도로 사용할지 명시적인 material delivery policy로 전달하는 발주서다.
+
+`ORDER_133`은 송련이 내부 문서뿐 아니라 실제 source/config 파일 구조도 읽기 전용으로 검사할 수 있게 하는 codebase inspection MVP 발주서다.
+
+`ORDER_134`는 L2가 도구를 바로 고르기 전에 L루프가 먼저 tool scope와 도구군별 예산 분배를 명시 frame으로 확정하게 하는 발주서다.
+
+`ORDER_135`는 `read_code_file` 성공을 `read_doc`과 분리해 L3, return summary, node_3 grounding에서 source-code evidence로 인정하게 하는 발주서다.
+
+`ORDER_136`은 새 기능 확장 전에 현재 capability baseline과 live qwen 테스트 묶음을 문서화해, 다음 MVP가 기존 가능 범위를 잃지 않게 하는 발주서다.
+
+`ORDER_137`은 `read_code_file`로 읽은 source-code 원문에서 code가 문법적 outline을 만들고, node_3가 공개 함수/상수 coverage를 빠뜨리지 않게 하는 발주서다.
+
+`ORDER_138`은 ORDER_133 이후 빠르게 들어온 code inspection 계열과 심야정부 MVP를 새 기능 추가 없이 통합 기준선으로 묶고, dirty worktree/문서-현실 불일치를 정리하는 발주서다.
+
+`ORDER_139`는 `TurnStateCapsule`을 graph memory raw node로 옮기고 CoreEgo time axis와 RLoopGraphGuidePacket을 code-generated absolute 정보로 만드는 발주서다.
+
+`ORDER_140`은 R route를 열기 전에 R1/R2/R3/budget/continuation/return summary frame과 state-machine helper만 감사하는 발주서다.
+
+`ORDER_141`은 code-generated RLoopGraphGuidePacket 위에 CoreEgo guide worker LLM traversal hint를 별도 mixed frame으로 기록하는 발주서다.
+
+`ORDER_142`는 외부 그래프 DB 연결 전에 `songryeon-neo4j-vessel` 이름과 graph memory store adapter boundary를 예약하는 발주서다.
+
+`ORDER_143`은 node_0이 R_LOOP에게 graph guide 좌표를 넘기는 `RLoopMemoryHandoffPacketFrame`을 만들고 runtime에 status/count만 표시하게 하는 발주서다.
+
+`ORDER_144`는 qwen/live route=R을 열지 않고 dry-run opt-in fixture에서만 R1/R2/R3/continuation/return summary frame 골격을 실행해 보는 발주서다.
+
+`ORDER_145`는 live route=R을 열기 전에 현재 R skeleton이 dry-run opt-in 상태로 닫혀 있음을 문서와 테스트 기준선으로 감사하는 발주서다.
+
+`ORDER_146`은 기본 route set은 L/2로 유지하되, 명시 실험 플래그가 있을 때만 node_1 LLM이 `route=R`을 고르고 `R:experimental:*` skeleton을 실행할 수 있게 하는 발주서다.
+
+`ORDER_147`부터 `ORDER_161`까지는 R 결과 전달, graph traversal, activity ledger, graph source ingest, export packet, Vessel write plan boundary, local Neo4j first write, Vessel display vocabulary를 순서대로 잠그는 그래프 메모리/심야정부 전초 작업이다.
+
+`ORDER_162`부터 `ORDER_165`까지는 Vessel readback/inspect와 동적 원본 변경 시 source version lineage, observation ledger, summary invalidation ledger를 남기는 외부 그래프 DB 안전장치 작업이다.
+
+`ORDER_166`은 원본 `TimeBundle` graph node를 오염시키지 않고, LLM이 만든 심야정부 요약을 별도 `SummaryGraphNode`와 `SUMMARY_OF` edge로 붙이는 첫 summary node MVP 발주서다.
+
+`ORDER_167`은 ORDER_166의 심야정부 TimeBundle 요약 worker 이름을 `night_summarize_time_bundle` 계열로 정리하고, 기존 이름은 호환 alias로 남기는 명명 정리 발주서다.
+
+`ORDER_168`은 새로 관측됐거나 내용이 바뀐 코드/문서 `raw_source` leaf를 원문 text snapshot과 1:1로 연결해 LLM 요약 `SummaryGraphNode`를 붙이는 발주서다.
+
+`ORDER_169`는 ORDER_168의 source leaf 요약 엔진을 터미널에서 한 번에 실행하는 `night-summarize-changed-sources` CLI로 묶는 발주서다.
+
+`ORDER_170`은 `night-summarize-changed-sources --one-at-a-time` 모드로 변경 source leaf 요약 대상을 queue로 고정하고 한 실행에 하나씩만 요약해 재개 가능하게 만드는 발주서다.
+
+`ORDER_171`은 source leaf summary node들을 날짜가 아니라 예산 단위로 묶어, 한 실행에 하나의 token-budget summary bundle을 만들고 상위 mixed summary node를 붙이는 발주서다.
+
+`ORDER_172`는 token-budget summary layer를 사람이 반복 실행하지 않아도 되게, target context budget 이하가 될 때까지 `max_steps`와 `max_layer_depth` 안에서 자동으로 계층 요약을 진행하는 발주서다.
+
+`ORDER_173`은 ORDER_172 자동 reducer를 긴 실행으로 쓸 수 있게 progress JSONL, runtime limit, failure stop, Vessel write mode를 더한 checkpointed long runner 발주서다.
+
+`ORDER_174`는 Neo4j Vessel inspect가 summary/layer 노드를 read-only로 보여주게 하는 발주서다. 기본 CoreEgo 시간축 경로뿐 아니라 summary 수, depth, data_kind, sample preview를 확인한다.
+
+`ORDER_175`부터 `ORDER_192`까지는 Vessel-backed R read packet, R1/R2/R3 one-step traversal, 계층 surface, multi-step traversal, summary-before-raw 정책, raw original cap, R traverse live audit, token summary 하위 summary expansion, R2 branch role surface 안정화, R1 user question anchor copy로 이어지는 R루프 실전성 검증 작업이다.
 
 ## 임시 발주서
 
@@ -172,3 +254,78 @@
 - [ORDER 115: Schema Module Split With Compatibility Layer v0](ORDER_115_SCHEMA_MODULE_SPLIT_COMPAT_LAYER_V0.md)
 - [ORDER 116: Smoke Test Decomposition To Pytest v0](ORDER_116_SMOKE_TEST_DECOMPOSITION_TO_PYTEST_V0.md)
 - [ORDER 117: CI And Development Routine Lock v0](ORDER_117_CI_AND_DEVELOPMENT_ROUTINE_LOCK_V0.md)
+- [ORDER 118: Node2 Answer Basis Mode Frame v0](ORDER_118_NODE2_ANSWER_BASIS_MODE_FRAME_V0.md)
+- [ORDER 119: Structure Failed Honesty And Answer Basis Failure Diagnostics v0](ORDER_119_STRUCTURE_FAILED_HONESTY_AND_ANSWER_BASIS_FAILURE_DIAGNOSTICS_V0.md)
+- [ORDER 120: Tool Use Budget Query Count Consistency Diagnostic v0](ORDER_120_TOOL_USE_BUDGET_QUERY_COUNT_CONSISTENCY_DIAGNOSTIC_V0.md)
+- [ORDER 121: Node2 Evidence Source Alignment And L3 Failure Attitude v0](ORDER_121_NODE2_EVIDENCE_SOURCE_ALIGNMENT_AND_L3_FAILURE_ATTITUDE_V0.md)
+- [ORDER 122: L Revision Unread Candidate Read Path v0](ORDER_122_L_REVISION_UNREAD_CANDIDATE_READ_PATH_V0.md)
+- [ORDER 123: Actual Read Doc Vs Context Pack Count Boundary v0](ORDER_123_ACTUAL_READ_DOC_VS_CONTEXT_PACK_COUNT_BOUNDARY_V0.md)
+- [ORDER 124: Node0 Post-L Document Material Packet v0](ORDER_124_NODE0_POST_L_DOCUMENT_MATERIAL_PACKET_V0.md)
+- [ORDER 125: L3 Per-Document Summary Frame v0](ORDER_125_L3_PER_DOCUMENT_SUMMARY_FRAME_DESIGN_V0.md)
+- [ORDER 126: Runtime All Document Extract Display v0](ORDER_126_RUNTIME_ALL_DOCUMENT_EXTRACT_DISPLAY_V0.md)
+- [ORDER 127: Revision Document Extract Count Alignment v0](ORDER_127_REVISION_DOCUMENT_EXTRACT_COUNT_ALIGNMENT_V0.md)
+- [ORDER 128: Node3 Actual Read Doc Identity Key v0](ORDER_128_NODE3_ACTUAL_READ_DOC_IDENTITY_KEY_V0.md)
+- [ORDER 129: Search Candidate Count Basis Audit v0](ORDER_129_SEARCH_CANDIDATE_COUNT_BASIS_AUDIT_V0.md)
+- [ORDER 130: Document Evidence Role Claim Guard v0](ORDER_130_DOCUMENT_EVIDENCE_ROLE_CLAIM_GUARD_V0.md)
+- [ORDER 131: Search Candidate Scope Split v0](ORDER_131_SEARCH_CANDIDATE_SCOPE_SPLIT_V0.md)
+- [ORDER 132: Node2 Answer Basis Material Delivery Policy v0](ORDER_132_NODE2_ANSWER_BASIS_MATERIAL_DELIVERY_POLICY_V0.md)
+- [ORDER 133: Codebase Readonly Inspection MVP v0](ORDER_133_CODEBASE_READONLY_INSPECTION_MVP_V0.md)
+- [ORDER 134: L Tool Scope And Budget Partition v0](ORDER_134_L_TOOL_SCOPE_AND_BUDGET_PARTITION_V0.md)
+- [ORDER 135: Code Evidence Accounting And L3 Success Boundary v0](ORDER_135_CODE_EVIDENCE_ACCOUNTING_AND_L3_SUCCESS_BOUNDARY_V0.md)
+- [ORDER 136: Current Capability Baseline And Live Test Pack v0](ORDER_136_CURRENT_CAPABILITY_BASELINE_AND_LIVE_TEST_PACK_V0.md)
+- [ORDER 137: Source Code Context Summary Coverage Guard v0](ORDER_137_SOURCE_CODE_CONTEXT_SUMMARY_COVERAGE_GUARD_V0.md)
+- [ORDER 138: Integration Baseline And Dirty Worktree Reconciliation v0](ORDER_138_INTEGRATION_BASELINE_AND_DIRTY_WORKTREE_RECONCILIATION_V0.md)
+- [ORDER 139: Graph Memory Foundation And RLoop Guide Packet v0](ORDER_139_GRAPH_MEMORY_FOUNDATION_AND_RLOOP_GUIDE_PACKET_V0.md)
+- [ORDER 140: R Loop Frame-Only State Machine Audit v0](ORDER_140_R_LOOP_FRAME_ONLY_STATE_MACHINE_AUDIT_V0_CANDIDATE.md)
+- [ORDER 141: CoreEgo Guide Worker LLM Hints v0](ORDER_141_CORE_EGO_GUIDE_WORKER_LLM_HINTS_V0_CANDIDATE.md)
+- [ORDER 142: External Graph DB Adapter Boundary v0](ORDER_142_EXTERNAL_GRAPH_DB_ADAPTER_BOUNDARY_V0_CANDIDATE.md)
+- [ORDER 143: R Loop Node0 Memory Packet Handoff v0](ORDER_143_R_LOOP_NODE0_MEMORY_PACKET_HANDOFF_V0_CANDIDATE.md)
+- [ORDER 144: R Route Dry-Run Only v0](ORDER_144_R_ROUTE_DRY_RUN_ONLY_V0_CANDIDATE.md)
+- [ORDER 145: R Loop Pre-Live Route Audit Baseline v0](ORDER_145_R_LOOP_PRE_LIVE_ROUTE_AUDIT_BASELINE_V0.md)
+- [ORDER 146: R Route Experimental Gate And Allowed Route Set v0](ORDER_146_R_ROUTE_EXPERIMENTAL_GATE_AND_ALLOWED_ROUTE_SET_V0.md)
+- [ORDER 147: R Result To Node3 Brief v0](ORDER_147_R_RESULT_TO_NODE3_BRIEF_V0.md)
+- [ORDER 148: Graph NEXT And Turn Access Ledger v0](ORDER_148_GRAPH_NEXT_AND_TURN_ACCESS_LEDGER_V0.md)
+- [ORDER 149: R Graph Traversal Candidate Surface v0](ORDER_149_R_GRAPH_TRAVERSAL_CANDIDATE_SURFACE_V0.md)
+- [ORDER 150: R Loop Multi-Step Traversal Dry-Run v0](ORDER_150_R_LOOP_MULTI_STEP_TRAVERSAL_DRY_RUN_V0.md)
+- [ORDER 151: L Loop Activity Ledger For Graph Backup v0](ORDER_151_L_LOOP_ACTIVITY_LEDGER_FOR_GRAPH_BACKUP_V0.md)
+- [ORDER 152: Raw Capsule To Activity Ledger Graph Link v0](ORDER_152_RAW_CAPSULE_TO_ACTIVITY_LEDGER_GRAPH_LINK_V0.md)
+- [ORDER 153: Graph Memory Export Integrity Audit And R Experimental Source Recording v0](ORDER_153_GRAPH_MEMORY_EXPORT_INTEGRITY_AUDIT_AND_R_EXPERIMENTAL_SOURCE_RECORDING_V0.md)
+- [ORDER 154: Fast Test Gate v0](ORDER_154_FAST_TEST_GATE_V0.md)
+- [ORDER 155: Graph Source Kind Separated Ingest Foundation v0](ORDER_155_GRAPH_SOURCE_KIND_SEPARATED_INGEST_FOUNDATION_V0.md)
+- [ORDER 156: Graph Source Observation Time And CoreEgo Link v0](ORDER_156_GRAPH_SOURCE_OBSERVATION_TIME_AND_CORE_EGO_LINK_V0.md)
+- [ORDER 157: SongRyeon Core Source Ingest Manifest v0](ORDER_157_SONGRYEON_CORE_SOURCE_INGEST_MANIFEST_V0.md)
+- [ORDER 158: Graph Memory Export Packet v0](ORDER_158_GRAPH_MEMORY_EXPORT_PACKET_V0.md)
+- [ORDER 159: Vessel Adapter Write Plan Boundary v0](ORDER_159_VESSEL_ADAPTER_WRITE_PLAN_BOUNDARY_V0.md)
+- [ORDER 160: Local Vessel Neo4j First Write v0](ORDER_160_LOCAL_VESSEL_NEO4J_FIRST_WRITE_V0.md)
+- [ORDER 161: Vessel Display Vocabulary v0](ORDER_161_VESSEL_DISPLAY_VOCABULARY_V0.md)
+- [ORDER 162: Vessel Readback Verification v0](ORDER_162_VESSEL_READBACK_VERIFICATION_V0.md)
+- [ORDER 163: Vessel Inspect Manual Walk v0](ORDER_163_VESSEL_INSPECT_MANUAL_WALK_V0.md)
+- [ORDER 164: Dynamic Source Version Lineage And Summary Invalidation Ledger v0](ORDER_164_DYNAMIC_SOURCE_VERSION_LINEAGE_AND_SUMMARY_INVALIDATION_LEDGER_V0.md)
+- [ORDER 165: Same-Content Reobserve Observation Ledger v0](ORDER_165_SAME_CONTENT_REOBSERVE_OBSERVATION_LEDGER_V0.md)
+- [ORDER 166: Night TimeBundle Summary Node v0](ORDER_166_NIGHT_TIME_BUNDLE_SUMMARY_NODE_V0.md)
+- [ORDER 167: Night Summary Naming Clarity v0](ORDER_167_NIGHT_SUMMARY_NAMING_CLARITY_V0.md)
+- [ORDER 168: Night Summarize Changed Source Leaves v0](ORDER_168_NIGHT_SUMMARIZE_CHANGED_SOURCE_LEAVES_V0.md)
+- [ORDER 169: Night Changed Source Summary CLI v0](ORDER_169_NIGHT_CHANGED_SOURCE_SUMMARY_CLI_V0.md)
+- [ORDER 170: Night Changed Source One-At-A-Time Runner v0](ORDER_170_NIGHT_CHANGED_SOURCE_ONE_AT_A_TIME_RUNNER_V0.md)
+- [ORDER 171: Night Token Budget Layer Summary v0](ORDER_171_NIGHT_TOKEN_BUDGET_LAYER_SUMMARY_V0.md)
+- [ORDER 172: Night Token Layer Auto Reduce Until Context Budget v0](ORDER_172_NIGHT_TOKEN_LAYER_AUTO_REDUCE_UNTIL_CONTEXT_BUDGET_V0.md)
+- [ORDER 173: Night Checkpointed Long Runner v0](ORDER_173_NIGHT_CHECKPOINTED_LONG_RUNNER_V0.md)
+- [ORDER 174: Vessel Inspect Summary Layer View v0](ORDER_174_VESSEL_INSPECT_SUMMARY_LAYER_VIEW_V0.md)
+- [ORDER 175: Vessel-Backed R Graph Read Packet v0](ORDER_175_VESSEL_BACKED_R_GRAPH_READ_PACKET_V0.md)
+- [ORDER 176: Vessel R One-Step Traversal v0](ORDER_176_VESSEL_R_ONE_STEP_TRAVERSAL_V0.md)
+- [ORDER 177: R1 Candidate Text Blindness v0](ORDER_177_R1_CANDIDATE_TEXT_BLINDNESS_V0.md)
+- [ORDER 178: R Vessel Candidate Layer Surface v0](ORDER_178_R_VESSEL_CANDIDATE_LAYER_SURFACE_V0.md)
+- [ORDER 179: R2 Vessel Selection ID Disambiguation v0](ORDER_179_R2_VESSEL_SELECTION_ID_DISAMBIGUATION_V0.md)
+- [ORDER 180: R2 Prompt Example ID Removal v0](ORDER_180_R2_PROMPT_EXAMPLE_ID_REMOVAL_V0.md)
+- [ORDER 181: R2 Official Selection Ref Map v0](ORDER_181_R2_OFFICIAL_SELECTION_REF_MAP_V0.md)
+- [ORDER 182: R CoreEgo Start Selection Surface v0](ORDER_182_R_CORE_EGO_START_SELECTION_SURFACE_V0.md)
+- [ORDER 183: R Vessel Hierarchical Child Candidate Surface v0](ORDER_183_R_VESSEL_HIERARCHICAL_CHILD_CANDIDATE_SURFACE_V0.md)
+- [ORDER 184: R Vessel Multi-Step Traversal MVP v0](ORDER_184_R_VESSEL_MULTI_STEP_TRAVERSAL_MVP_V0.md)
+- [ORDER 185: R Terminal Material Budget And Early Stop Guard v0](ORDER_185_R_TERMINAL_MATERIAL_BUDGET_AND_EARLY_STOP_GUARD_V0.md)
+- [ORDER 186: R Vessel Exact Child Record Expansion v0](ORDER_186_R_VESSEL_EXACT_CHILD_RECORD_EXPANSION_V0.md)
+- [ORDER 187: R Vessel Summary Layer Before Raw v0](ORDER_187_R_VESSEL_SUMMARY_LAYER_BEFORE_RAW_V0.md)
+- [ORDER 188: R Vessel Raw Original Read Cap v0](ORDER_188_R_VESSEL_RAW_ORIGINAL_READ_CAP_V0.md)
+- [ORDER 189: R Traverse Live Audit v0](ORDER_189_R_TRAVERSE_LIVE_AUDIT_V0.md)
+- [ORDER 190: R Vessel Token Summary Deeper Child Expansion v0](ORDER_190_R_VESSEL_TOKEN_SUMMARY_DEEPER_CHILD_EXPANSION_V0.md)
+- [ORDER 191: R2 Source Ingest Branch Selection Stability v0](ORDER_191_R2_SOURCE_INGEST_BRANCH_SELECTION_STABILITY_V0.md)
+- [ORDER 192: R1 User Question Anchor Copy v0](ORDER_192_R1_USER_QUESTION_ANCHOR_COPY_V0.md)

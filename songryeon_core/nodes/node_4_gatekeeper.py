@@ -19,6 +19,9 @@ from songryeon_core.nodes.node_2_handoff import node3_brief_llm_payload
 
 NODE4_GATEKEEPER_FRAME_DATA_ID = "node_4:gatekeeper_frame"
 RECENT_MEMORY_INTERNAL_ID_LEAK = "CODE_STATUS:recent_memory_internal_id_leak"
+DOCUMENT_EVIDENCE_ROLE_CLAIM_MISMATCH = (
+    "CODE_STATUS:document_evidence_role_claim_mismatch"
+)
 
 
 def run_node4_gatekeeper(
@@ -67,6 +70,8 @@ def run_node4_gatekeeper(
                 "문서 추출이 있는데 없다고 말하는 모순이 있는지 확인한다.",
                 "내부 추적용 식별자나 장부용 필드명이 노출됐는지 확인한다.",
                 "최근 기억 발화가 selected_recent_memory_contexts 범위를 벗어나는지 확인한다.",
+                "answer_basis_mode에 맞는 말하기 자세를 유지했는지 확인한다.",
+                "L loop 실패/예산소진 신호를 검색 성공처럼 말하는지 확인한다.",
             ],
         },
         trace_store=trace_store,
@@ -142,6 +147,27 @@ def run_node4_gatekeeper(
     elif recent_memory_guard["status"] == "pass":
         checked_claims = _unique_strings([*checked_claims, "recent_memory_internal_id_guard"])
 
+    document_role_guard = _document_evidence_role_code_guard(
+        rendered_markdown=rendered_markdown,
+        brief_frame=brief_frame,
+    )
+    if document_role_guard["status"] == "needs_revision":
+        if gate_status == "pass":
+            gate_status = "needs_revision"
+        if "CODE:DOCUMENT_EVIDENCE_ROLE_GUARD" not in gate_generation_source:
+            gate_generation_source = f"{gate_generation_source}+CODE:DOCUMENT_EVIDENCE_ROLE_GUARD"
+        for reason_code in document_role_guard["reason_codes"]:
+            reason = _append_reason(reason, reason_code)
+        checked_claims = _unique_strings([*checked_claims, "document_evidence_role_guard"])
+        contradictions = _unique_strings(
+            [*contradictions, *document_role_guard["contradictions"]]
+        )
+        revision_targets = _unique_strings(
+            [*revision_targets, *document_role_guard["revision_targets"]]
+        )
+    elif document_role_guard["status"] == "pass":
+        checked_claims = _unique_strings([*checked_claims, "document_evidence_role_guard"])
+
     frame_source_trace_ids = list(input_ref)
     if llm_result.trace_event_id:
         frame_source_trace_ids.append(llm_result.trace_event_id)
@@ -205,8 +231,10 @@ def _grounding_count_violations(
     # 장기적으로는 node_3가 ReportGroundingFrame 같은 구조화 출력을 함께 만들고,
     # node_4는 렌더링된 문장 대신 그 frame을 검사하는 쪽이 더 건강하다.
     expected_counts = {
-        "읽은 문서": len(brief_frame.read_documents),
-        "검색 후보 문서": brief_frame.search_candidate_count,
+        "실제 read_doc 도구 원문 읽기": brief_frame.actual_tool_read_doc_count,
+        "node_3 공급 문서 context": brief_frame.supplied_document_context_count,
+        "검색 후보 문서(최종)": brief_frame.final_search_candidate_count,
+        "검색 후보 문서(누적)": brief_frame.accumulated_search_candidate_count,
         "현재 턴 실행 순서 자료": len(brief_frame.runtime_tasks),
     }
     if not rendered_markdown.startswith("근거 기준:"):
@@ -256,6 +284,131 @@ def _recent_memory_code_guard(
         "internal_id_leak_count": internal_id_leak_count,
         "revision_targets": _unique_strings(revision_targets),
     }
+
+
+def _document_evidence_role_code_guard(
+    *,
+    rendered_markdown: str,
+    brief_frame: Node3InputBriefFrame,
+) -> dict[str, object]:
+    """문서 장부의 명시 role과 보고문 속 명시 role 주장이 충돌하는지 검사한다."""
+
+    contradictions: list[str] = []
+    revision_targets: list[str] = []
+    for item in brief_frame.document_material_items:
+        if not item.was_actual_tool_read_doc and _claims_explicit_read_doc_role(
+            rendered_markdown=rendered_markdown,
+            document_name=item.document_name,
+        ):
+            contradictions.append(
+                "read_doc_claim_without_actual_tool_read_doc:"
+                f"{_safe_report_token(item.document_name)}"
+            )
+            revision_targets.append(
+                "read_doc으로 읽은 문서와 node_3 context로 공급된 문서를 분리해 말한다."
+            )
+        if not item.was_supplied_document_context and _claims_explicit_supplied_context_role(
+            rendered_markdown=rendered_markdown,
+            document_name=item.document_name,
+        ):
+            contradictions.append(
+                "supplied_context_claim_without_supplied_context:"
+                f"{_safe_report_token(item.document_name)}"
+            )
+            revision_targets.append(
+                "node_3 context로 공급된 문서와 후보/제외 문서를 분리해 말한다."
+            )
+
+    unique_contradictions = _unique_strings(contradictions)
+    reason_codes = (
+        [DOCUMENT_EVIDENCE_ROLE_CLAIM_MISMATCH] if unique_contradictions else []
+    )
+    return {
+        "status": "needs_revision" if unique_contradictions else "pass",
+        "reason_codes": reason_codes,
+        "contradictions": unique_contradictions,
+        "revision_targets": _unique_strings(revision_targets),
+    }
+
+
+def _claims_explicit_read_doc_role(
+    *,
+    rendered_markdown: str,
+    document_name: str,
+) -> bool:
+    for line in _lines_mentioning_document(rendered_markdown, document_name):
+        if _has_negated_role_claim(line):
+            continue
+        if re.search(
+            r"(?:`?read_doc`?|actual_tool_read_doc)\s*(?:으로|로)?\s*"
+            r"(?:읽혔|읽힌|읽었|읽어|실행|수행)",
+            line,
+            flags=re.IGNORECASE,
+        ):
+            return True
+        if "actual_tool_read_doc" in line:
+            return True
+    return False
+
+
+def _claims_explicit_supplied_context_role(
+    *,
+    rendered_markdown: str,
+    document_name: str,
+) -> bool:
+    for line in _lines_mentioning_document(rendered_markdown, document_name):
+        if _has_negated_role_claim(line):
+            continue
+        if re.search(
+            r"(?:node_3\s*)?(?:공급\s*)?(?:문서\s*)?context(?:로|로서|로는)?\s*"
+            r"(?:공급|포함|전달)",
+            line,
+            flags=re.IGNORECASE,
+        ):
+            return True
+        if "supplied_document_context" in line:
+            return True
+    return False
+
+
+def _lines_mentioning_document(rendered_markdown: str, document_name: str) -> list[str]:
+    if not document_name:
+        return []
+    tokens = _document_name_tokens(document_name)
+    return [
+        line
+        for line in rendered_markdown.splitlines()
+        if any(token and token in line for token in tokens)
+    ]
+
+
+def _document_name_tokens(document_name: str) -> list[str]:
+    tokens = [document_name.strip()]
+    basename = document_name.replace("\\", "/").rsplit("/", 1)[-1].strip()
+    if basename and basename not in tokens:
+        tokens.append(basename)
+    return tokens
+
+
+def _has_negated_role_claim(line: str) -> bool:
+    lowered = line.lower()
+    negation_tokens = [
+        "아니다",
+        "아니며",
+        "않",
+        "못",
+        "읽히지",
+        "읽지",
+        "not ",
+        "not_",
+        "never",
+        "without",
+    ]
+    return any(token in lowered for token in negation_tokens)
+
+
+def _safe_report_token(value: str) -> str:
+    return value.replace(" ", "_")[:120]
 
 
 def _internal_id_leak_count(rendered_markdown: str) -> int:

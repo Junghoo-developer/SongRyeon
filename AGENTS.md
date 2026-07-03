@@ -74,6 +74,7 @@ LLM이 판단한 것은 `generated_by`, `info_class`, `semantic_judgement_status
 - 기존 사용자 변경을 되돌리지 않는다.
 - 무관한 파일을 정리한다는 이유로 삭제하지 않는다.
 - 대량 이동, 삭제, DB 변형, 라우팅/프롬프트/answer_mode 대변경은 먼저 문서화하거나 결재를 받는다.
+- 새 발주서를 제안하거나 확정하면 반드시 `Administrative_Reform_1/04_Orders/`에 발주서 문서로 남기고, `04_Orders/README.md`와 필요한 실행 기록을 갱신해 송련과 외부 에이전트가 추적 가능하게 한다.
 - 테스트 결과와 실패 원인을 실행 기록에 남긴다.
 - `git add .` 같은 무차별 staging은 쓰지 않는다.
 
