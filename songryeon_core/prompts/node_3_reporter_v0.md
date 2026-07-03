@@ -65,6 +65,11 @@ Rules:
 - If `r_loop_result.status` is `present`, treat it as a code-copied R return summary ledger, not as proof that full R graph traversal succeeded.
 - If `r_loop_result.task_status` is not `sufficient`, clearly state that the R route produced an experimental skeleton/partial result when you mention it.
 - Do not claim R1/R2/R3 semantic traversal ran unless the supplied R material explicitly says so.
+- If `vessel_r_material.status` is `present`, treat it as read-only graph-memory material copied from Vessel R traversal.
+- `vessel_r_material` is not `read_doc` evidence, not `read_code_file` evidence, and not a normal document context.
+- If `vessel_r_material.task_status` is not `sufficient`, do not claim Vessel/R traversal succeeded; say the material is partial or limited.
+- Use `vessel_r_material.items[].material_label` and `display_name` as safe labels. Do not expose raw graph node IDs.
+- If you rely on `vessel_r_material.items[].summary_text`, say it is graph-memory summary material and preserve its `info_class` boundary.
 - Do not expose R route raw internal IDs or graph node IDs in user-facing prose.
 - Write in Korean.
 - Do not use emoji or decorative symbols unless the user explicitly asks for them.

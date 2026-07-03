@@ -159,6 +159,7 @@ def build_node3_grounding_block(brief_frame: Node3InputBriefFrame) -> str:
             f"- 현재 턴 실행 순서 자료: {len(brief_frame.runtime_tasks)}개",
             *_l_loop_grounding_lines(brief_frame),
             *_r_loop_grounding_lines(brief_frame),
+            *_vessel_r_grounding_lines(brief_frame),
             f"- 답변 근거 자세: {_answer_basis_mode_label(brief_frame.answer_basis_mode)}",
             f"- 재료 전달 정책: {_material_delivery_mode_label(brief_frame.material_delivery_mode)}",
             f"- 답변 한계: {_grounding_limit_text(brief_frame)}",
@@ -281,6 +282,11 @@ def _grounding_limit_text(brief_frame: Node3InputBriefFrame) -> str:
         and brief_frame.r_loop_result_material.attitude_hint != "r_loop_sufficient"
     ):
         return "R route 실험 결과는 skeleton/부분 장부이므로 graph memory 탐색 성공으로 단정하지 않는다."
+    if (
+        brief_frame.vessel_r_material is not None
+        and brief_frame.vessel_r_material.r_loop_task_status != "sufficient"
+    ):
+        return "Vessel R material이 있어도 R 탐색 상태가 충분하지 않으므로 graph memory 탐색 성공으로 단정하지 않는다."
     if brief_frame.insufficiency_reasons:
         return "자료 부족 신호가 있어 제공된 문서/허용 주장/현재 턴 실행 순서 자료 범위 안에서만 답한다."
     if brief_frame.answer_basis_mode == "absolute_first":
@@ -311,6 +317,19 @@ def _r_loop_grounding_lines(brief_frame: Node3InputBriefFrame) -> list[str]:
             "- R 탐색 실험 상태: "
             f"{material.r_loop_task_status} / {material.continuation_status} "
             f"/ budget={material.budget_status} / hint={material.attitude_hint}"
+        )
+    ]
+
+
+def _vessel_r_grounding_lines(brief_frame: Node3InputBriefFrame) -> list[str]:
+    material = brief_frame.vessel_r_material
+    if material is None:
+        return []
+    return [
+        (
+            "- Vessel R graph material: "
+            f"{brief_frame.vessel_r_material_count}개 / status={material.material_status} "
+            f"/ task={material.r_loop_task_status}"
         )
     ]
 

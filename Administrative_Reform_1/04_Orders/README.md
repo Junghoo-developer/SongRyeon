@@ -156,7 +156,7 @@
 
 `ORDER_175`부터 `ORDER_192`까지는 Vessel-backed R read packet, R1/R2/R3 one-step traversal, 계층 surface, multi-step traversal, summary-before-raw 정책, raw original cap, R traverse live audit, token summary 하위 summary expansion, R2 branch role surface 안정화, R1 user question anchor copy로 이어지는 R루프 실전성 검증 작업이다.
 
-`ORDER_193`은 R traversal 결과를 node_3가 사용할 수 있는 read-only Vessel material로 전달하되, 아직 정상 live answer route가 완전히 R-powered인 척하지 않게 하는 다음 MVP 발주서다.
+`ORDER_193`은 R traversal 결과를 node_3가 사용할 수 있는 read-only Vessel material로 전달하되, 아직 정상 live answer route가 완전히 R-powered인 척하지 않게 하는 MVP로 구현되었다.
 
 ## 임시 발주서
 

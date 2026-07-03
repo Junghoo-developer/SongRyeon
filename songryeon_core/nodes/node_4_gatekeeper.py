@@ -22,6 +22,9 @@ RECENT_MEMORY_INTERNAL_ID_LEAK = "CODE_STATUS:recent_memory_internal_id_leak"
 DOCUMENT_EVIDENCE_ROLE_CLAIM_MISMATCH = (
     "CODE_STATUS:document_evidence_role_claim_mismatch"
 )
+VESSEL_R_MATERIAL_CLAIM_MISMATCH = (
+    "CODE_STATUS:vessel_r_material_claim_mismatch"
+)
 
 
 def run_node4_gatekeeper(
@@ -72,6 +75,7 @@ def run_node4_gatekeeper(
                 "최근 기억 발화가 selected_recent_memory_contexts 범위를 벗어나는지 확인한다.",
                 "answer_basis_mode에 맞는 말하기 자세를 유지했는지 확인한다.",
                 "L loop 실패/예산소진 신호를 검색 성공처럼 말하는지 확인한다.",
+                "Vessel R material 상태를 R traversal 성공처럼 과장하는지 확인한다.",
             ],
         },
         trace_store=trace_store,
@@ -167,6 +171,27 @@ def run_node4_gatekeeper(
         )
     elif document_role_guard["status"] == "pass":
         checked_claims = _unique_strings([*checked_claims, "document_evidence_role_guard"])
+
+    vessel_r_guard = _vessel_r_material_code_guard(
+        rendered_markdown=rendered_markdown,
+        brief_frame=brief_frame,
+    )
+    if vessel_r_guard["status"] == "needs_revision":
+        if gate_status == "pass":
+            gate_status = "needs_revision"
+        if "CODE:VESSEL_R_MATERIAL_GUARD" not in gate_generation_source:
+            gate_generation_source = f"{gate_generation_source}+CODE:VESSEL_R_MATERIAL_GUARD"
+        for reason_code in vessel_r_guard["reason_codes"]:
+            reason = _append_reason(reason, reason_code)
+        checked_claims = _unique_strings([*checked_claims, "vessel_r_material_guard"])
+        contradictions = _unique_strings(
+            [*contradictions, *vessel_r_guard["contradictions"]]
+        )
+        revision_targets = _unique_strings(
+            [*revision_targets, *vessel_r_guard["revision_targets"]]
+        )
+    elif vessel_r_guard["status"] == "pass":
+        checked_claims = _unique_strings([*checked_claims, "vessel_r_material_guard"])
 
     frame_source_trace_ids = list(input_ref)
     if llm_result.trace_event_id:
@@ -329,6 +354,73 @@ def _document_evidence_role_code_guard(
         "contradictions": unique_contradictions,
         "revision_targets": _unique_strings(revision_targets),
     }
+
+
+def _vessel_r_material_code_guard(
+    *,
+    rendered_markdown: str,
+    brief_frame: Node3InputBriefFrame,
+) -> dict[str, object]:
+    """Vessel R material의 상태와 보고문 속 명시 성공/역할 주장이 충돌하는지 검사한다."""
+
+    contradictions: list[str] = []
+    revision_targets: list[str] = []
+    material = brief_frame.vessel_r_material
+    material_status = brief_frame.vessel_r_material_status
+    task_status = material.r_loop_task_status if material is not None else "not_run"
+
+    if _claims_vessel_r_success(rendered_markdown) and (
+        material_status != "present" or task_status != "sufficient"
+    ):
+        contradictions.append(
+            "vessel_r_success_claim_without_sufficient_material:"
+            f"status_{material_status}_task_{task_status}"
+        )
+        revision_targets.append(
+            "Vessel/R 탐색 상태가 sufficient가 아니면 성공으로 단정하지 않는다."
+        )
+
+    if _claims_vessel_r_as_document_evidence(rendered_markdown):
+        contradictions.append("vessel_r_material_claimed_as_document_evidence")
+        revision_targets.append(
+            "Vessel R graph material과 read_doc/read_code_file/document context 근거를 분리해 말한다."
+        )
+
+    graph_id_leak_count = len(re.findall(r"graph:[A-Za-z0-9_:\-]+", rendered_markdown))
+    if graph_id_leak_count:
+        contradictions.append(f"vessel_r_graph_node_id_leak_count:{graph_id_leak_count}")
+        revision_targets.append("최종 답변에서 raw graph node ID를 제거한다.")
+
+    unique_contradictions = _unique_strings(contradictions)
+    reason_codes = [VESSEL_R_MATERIAL_CLAIM_MISMATCH] if unique_contradictions else []
+    return {
+        "status": "needs_revision" if unique_contradictions else "pass",
+        "reason_codes": reason_codes,
+        "contradictions": unique_contradictions,
+        "revision_targets": _unique_strings(revision_targets),
+    }
+
+
+def _claims_vessel_r_success(rendered_markdown: str) -> bool:
+    patterns = [
+        r"Vessel\s*/?\s*R\s*(?:traversal|탐색).{0,24}(?:succeeded|success|성공|충분)",
+        r"R\s*(?:traversal|탐색).{0,24}(?:succeeded|success|성공|충분)",
+        r"graph\s*memory\s*(?:traversal|탐색).{0,24}(?:succeeded|success|성공|충분)",
+        r"그래프\s*기억\s*탐색.{0,24}(?:성공|충분)",
+    ]
+    return any(re.search(pattern, rendered_markdown, flags=re.IGNORECASE) for pattern in patterns)
+
+
+def _claims_vessel_r_as_document_evidence(rendered_markdown: str) -> bool:
+    for line in rendered_markdown.splitlines():
+        lowered = line.lower()
+        if not ("vessel" in lowered or "r " in lowered or "r루프" in line or "r 탐색" in line):
+            continue
+        if "read_doc" in lowered or "read_code_file" in lowered:
+            return True
+        if re.search(r"(문서\s*context|문서\s*근거|읽은\s*문서)", line):
+            return True
+    return False
 
 
 def _claims_explicit_read_doc_role(
