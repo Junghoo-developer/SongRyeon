@@ -2,7 +2,7 @@
 
 발주서는 개발 지도에서 내려온 실무 계획서다.
 
-현재 정식 발주서는 `ORDER_001`부터 `ORDER_193`까지 있다.
+현재 정식 발주서는 `ORDER_001`부터 `ORDER_199`까지 있다.
 
 `ORDER_066`부터 `ORDER_075`까지는 메타정보 관리법을 실제 런타임과 LLM 노드 배선에 적용하기 위한 복구 로드맵이다.
 
@@ -157,6 +157,8 @@
 `ORDER_175`부터 `ORDER_192`까지는 Vessel-backed R read packet, R1/R2/R3 one-step traversal, 계층 surface, multi-step traversal, summary-before-raw 정책, raw original cap, R traverse live audit, token summary 하위 summary expansion, R2 branch role surface 안정화, R1 user question anchor copy로 이어지는 R루프 실전성 검증 작업이다.
 
 `ORDER_193`은 R traversal 결과를 node_3가 사용할 수 있는 read-only Vessel material로 전달하되, 아직 정상 live answer route가 완전히 R-powered인 척하지 않게 하는 MVP로 구현되었다.
+
+`ORDER_194`부터 `ORDER_199`까지는 Vessel R루프를 L루프처럼 0 기억공급관이 시작/중간/끝에서 관리하고, R 활동을 턴 캡슐/RawCapsule과 연결한 뒤, 마지막에 별도 answer demo route로만 확인하는 후속 구현 로드맵이다.
 
 ## 임시 발주서
 
@@ -332,3 +334,9 @@
 - [ORDER 191: R2 Source Ingest Branch Selection Stability v0](ORDER_191_R2_SOURCE_INGEST_BRANCH_SELECTION_STABILITY_V0.md)
 - [ORDER 192: R1 User Question Anchor Copy v0](ORDER_192_R1_USER_QUESTION_ANCHOR_COPY_V0.md)
 - [ORDER 193: R Result To Node3 Vessel Material v0](ORDER_193_R_RESULT_TO_NODE3_VESSEL_MATERIAL_V0.md)
+- [ORDER 194: R Vessel Node0 Start Handoff Packet v0](ORDER_194_R_VESSEL_NODE0_START_HANDOFF_PACKET_V0.md)
+- [ORDER 195: R Vessel Activity Ledger v0](ORDER_195_R_VESSEL_ACTIVITY_LEDGER_V0.md)
+- [ORDER 196: R Vessel Activity Ledger Raw Capsule Link v0](ORDER_196_R_VESSEL_ACTIVITY_LEDGER_RAW_CAPSULE_LINK_V0.md)
+- [ORDER 197: R Vessel Node0 Continuation Checkpoint Packet v0](ORDER_197_R_VESSEL_NODE0_CONTINUATION_CHECKPOINT_PACKET_V0.md)
+- [ORDER 198: R Vessel Node0 Return Packet v0](ORDER_198_R_VESSEL_NODE0_RETURN_PACKET_V0.md)
+- [ORDER 199: R Vessel Answer Demo Route v0](ORDER_199_R_VESSEL_ANSWER_DEMO_ROUTE_V0.md)
