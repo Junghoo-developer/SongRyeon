@@ -2,6 +2,8 @@
 
 [![smoke-test](https://github.com/Junghoo-developer/SongRyeon/actions/workflows/smoke-test.yml/badge.svg)](https://github.com/Junghoo-developer/SongRyeon/actions/workflows/smoke-test.yml)
 
+[English README](README.md) | [데모 명령어](DEMO.md) | [릴리즈 노트](RELEASE_NOTES.md)
+
 **키워드:** LLM 에이전트, 출처 추적, 런타임 정직성, traceability, 로컬 우선 AI, smoke-tested agent architecture.
 
 송련 코어는 LLM 에이전트가 **코드가 확인한 사실**과 **모델이 해석한 말**을 섞어 말하지 않게 만드는 작은 런타임 실험입니다.
@@ -88,6 +90,29 @@ LLM 판단은 LLM 판단으로 둔다.
 - 최근 턴 capsule과 raw conversation alignment packet.
 - 상대정보/혼합정보 분리 및 smoke-test.
 - pretty runtime 출력에서 생성자, 정보 등급, source ID, 의미 판단 상태 표시.
+- 실제 source code를 읽기 전용으로 검사하는 codebase inspection 도구.
+- 그래프 기억 기반 구조: CoreEgo -> Time Axis -> Time Bundle -> raw/source/summary node.
+- 로컬 Neo4j Vessel adapter: write, readback, inspect 명령.
+- 바뀐 코드/문서 leaf와 token-budget summary layer를 만드는 심야 요약 파이프라인.
+- R1/R2/R3 frame으로 Vessel graph memory를 탐색하는 실험적 R traversal.
+
+## 현재 데모 경로
+
+새 그래프 기억 경로만 빠르게 보고 싶다면 아래부터 시작하면 됩니다.
+
+```powershell
+python main.py vessel-readback --database neo4j
+python main.py vessel-inspect --database neo4j --format text
+python main.py vessel-r-traverse "Trace how SongRyeon Core source summaries connect to token-bundle summaries." --database neo4j --llm-mode fake --format text
+```
+
+Qwen/Ollama live traversal:
+
+```powershell
+python main.py vessel-r-traverse "송련 Core의 그래프 기억 구조에서 소스 요약과 토큰 묶음 요약이 어떻게 이어지는지 계층적으로 탐색해줘." --database neo4j --llm-mode qwen --timeout 180 --format text
+```
+
+Neo4j 환경변수와 더 자세한 실행 예시는 [DEMO.md](DEMO.md)에 있습니다.
 
 ## 추천 GitHub Topics
 
@@ -158,16 +183,19 @@ python main.py qwen-turn "송련의 문서 메모리 인덱스가 무엇인지 �
 
 ## 현재 기준선
 
-2026-06-27 기준:
+2026-07-03 기준:
 
 - `python -m compileall songryeon_core main.py` 통과.
-- `python -m pytest` 통과.
+- `python -m pytest` 통과: 279 tests.
 - `python main.py smoke-test` 통과.
+- `python main.py fast-test --profile graph` 통과.
+- GitHub Actions `smoke-test`가 `main`에서 통과.
 - pytest는 import, schema split compatibility, 도메인별 smoke case를 검사함.
 - 하나의 source field에 직접 대응하는 claim은 relative info로 테스트됨.
 - source bundle 기반 planner claim은 mixed info로 유지됨.
 - node_3 report grounding count는 code가 공급함.
 - node_4는 위험하거나 count가 맞지 않는 report를 차단할 수 있음.
+- Vessel readback/inspect와 실험적 R traversal은 CLI 명령으로 실행 가능함.
 
 테스트 계층:
 

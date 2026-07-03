@@ -2,7 +2,7 @@
 
 [![smoke-test](https://github.com/Junghoo-developer/SongRyeon/actions/workflows/smoke-test.yml/badge.svg)](https://github.com/Junghoo-developer/SongRyeon/actions/workflows/smoke-test.yml)
 
-[한국어 README](README.ko.md)
+[한국어 README](README.ko.md) | [Demo Commands](DEMO.md) | [Release Notes](RELEASE_NOTES.md)
 
 **Keywords:** LLM agents, provenance, runtime honesty, traceability, local-first AI, smoke-tested agent architecture.
 
@@ -85,6 +85,29 @@ SongRyeon Core is my small, local-first attempt to make those questions visible 
 - Recent turn capsule and raw-conversation alignment packets.
 - Relative/mixed semantic information split with smoke coverage.
 - Pretty runtime output that exposes generator, info class, source IDs, and judgment status.
+- Read-only source-code inspection tools for codebase questions.
+- Graph memory foundation: CoreEgo -> Time Axis -> Time Bundle -> raw/source/summary nodes.
+- Local Neo4j "Vessel" adapter with write, readback, and inspect commands.
+- Night summary pipeline for changed source leaves and token-budget summary layers.
+- Experimental Vessel-backed R traversal that can walk graph memory through R1/R2/R3 frames.
+
+## Current Demo Path
+
+If you only want to see the newest graph-memory path, start here:
+
+```powershell
+python main.py vessel-readback --database neo4j
+python main.py vessel-inspect --database neo4j --format text
+python main.py vessel-r-traverse "Trace how SongRyeon Core source summaries connect to token-bundle summaries." --database neo4j --llm-mode fake --format text
+```
+
+For Qwen/Ollama live traversal:
+
+```powershell
+python main.py vessel-r-traverse "송련 Core의 그래프 기억 구조에서 소스 요약과 토큰 묶음 요약이 어떻게 이어지는지 계층적으로 탐색해줘." --database neo4j --llm-mode qwen --timeout 180 --format text
+```
+
+See [DEMO.md](DEMO.md) for the fuller local setup, including Neo4j environment variables.
 
 ## Suggested GitHub Topics
 
@@ -154,16 +177,19 @@ You can also point `QWEN_LOCAL_ENDPOINT` at an OpenAI-compatible local HTTP endp
 
 ## Current Baseline
 
-As of 2026-06-27:
+As of 2026-07-03:
 
 - `python -m compileall songryeon_core main.py` passes.
-- `python -m pytest` passes.
+- `python -m pytest` passes: 279 tests.
 - `python main.py smoke-test` passes.
+- `python main.py fast-test --profile graph` passes.
+- GitHub Actions `smoke-test` passes on `main`.
 - Pytest has import, schema split compatibility, and domain smoke-case coverage.
 - Relative direct-field claims are tested.
 - Source-bundle planner claims remain mixed information.
 - Node 3 report grounding counts are code-supplied.
 - Node 4 can block unsafe or mismatched reports.
+- Vessel readback/inspect and experimental R traversal are available through CLI commands.
 
 Test layers:
 

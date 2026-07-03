@@ -2,7 +2,7 @@
 
 발주서는 개발 지도에서 내려온 실무 계획서다.
 
-현재 정식 발주서는 `ORDER_001`부터 `ORDER_192`까지 있다.
+현재 정식 발주서는 `ORDER_001`부터 `ORDER_193`까지 있다.
 
 `ORDER_066`부터 `ORDER_075`까지는 메타정보 관리법을 실제 런타임과 LLM 노드 배선에 적용하기 위한 복구 로드맵이다.
 
@@ -155,6 +155,8 @@
 `ORDER_174`는 Neo4j Vessel inspect가 summary/layer 노드를 read-only로 보여주게 하는 발주서다. 기본 CoreEgo 시간축 경로뿐 아니라 summary 수, depth, data_kind, sample preview를 확인한다.
 
 `ORDER_175`부터 `ORDER_192`까지는 Vessel-backed R read packet, R1/R2/R3 one-step traversal, 계층 surface, multi-step traversal, summary-before-raw 정책, raw original cap, R traverse live audit, token summary 하위 summary expansion, R2 branch role surface 안정화, R1 user question anchor copy로 이어지는 R루프 실전성 검증 작업이다.
+
+`ORDER_193`은 R traversal 결과를 node_3가 사용할 수 있는 read-only Vessel material로 전달하되, 아직 정상 live answer route가 완전히 R-powered인 척하지 않게 하는 다음 MVP 발주서다.
 
 ## 임시 발주서
 
@@ -329,3 +331,4 @@
 - [ORDER 190: R Vessel Token Summary Deeper Child Expansion v0](ORDER_190_R_VESSEL_TOKEN_SUMMARY_DEEPER_CHILD_EXPANSION_V0.md)
 - [ORDER 191: R2 Source Ingest Branch Selection Stability v0](ORDER_191_R2_SOURCE_INGEST_BRANCH_SELECTION_STABILITY_V0.md)
 - [ORDER 192: R1 User Question Anchor Copy v0](ORDER_192_R1_USER_QUESTION_ANCHOR_COPY_V0.md)
+- [ORDER 193: R Result To Node3 Vessel Material v0](ORDER_193_R_RESULT_TO_NODE3_VESSEL_MATERIAL_V0.md)
