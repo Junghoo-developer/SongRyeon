@@ -476,6 +476,9 @@ class SongRyeonAllNodesFakeLLMAdapter:
         if not isinstance(extracts, list):
             extracts = request.input_payload.get("document_extracts")
         selected_contexts = request.input_payload.get("selected_recent_memory_contexts")
+        vessel_r_material = request.input_payload.get("vessel_r_material")
+        if not isinstance(vessel_r_material, dict):
+            vessel_r_material = {}
         l_loop_result = request.input_payload.get("l_loop_result")
         if not isinstance(l_loop_result, dict):
             l_loop_result = {}
@@ -501,6 +504,29 @@ class SongRyeonAllNodesFakeLLMAdapter:
             else:
                 body_markdown = (
                     "선택된 최근 기억은 들어왔지만, 그 복사본 안에서 테스트 암호를 확정할 수는 없어."
+                )
+        elif vessel_r_material.get("status") in {"present", "failed"}:
+            task_status = str(vessel_r_material.get("task_status") or "not_run")
+            items = vessel_r_material.get("items")
+            if not isinstance(items, list):
+                items = []
+            first_item = items[0] if items and isinstance(items[0], dict) else {}
+            summary_text = str(first_item.get("summary_text") or "").strip()
+            display_name = str(first_item.get("display_name") or "그래프 기억 재료").strip()
+            if vessel_r_material.get("status") == "present" and summary_text:
+                body_markdown = (
+                    "이번 답변은 Vessel R이 찾은 graph-memory 재료를 사용했어. "
+                    "이 재료는 문서 읽기 도구 근거가 아니라, Vessel 그래프에서 복사된 요약 재료야.\n\n"
+                    f"확인한 재료: {display_name}\n\n"
+                    f"요약 내용: {summary_text}\n\n"
+                    f"R 탐색 상태 표기: {task_status}. "
+                    "다만 이것이 기본 채팅 route=R이 켜졌다는 뜻은 아니야."
+                )
+            else:
+                body_markdown = (
+                    "Vessel R graph-memory 재료가 답변 요건을 채운 상태로 들어오지 않았어. "
+                    "그래서 이번 데모에서는 그래프 기억 탐색 결과를 완료 상태로 단정하지 않고, "
+                    f"상태만 제한적으로 보고할게. R 탐색 상태 표기: {task_status}."
                 )
         elif isinstance(extracts, list) and extracts:
             first = extracts[0] if isinstance(extracts[0], dict) else {}

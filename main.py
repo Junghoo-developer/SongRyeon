@@ -35,6 +35,10 @@ from songryeon_core.runtime.r_loop_vessel_one_step import (
     run_local_r_loop_vessel_one_step,
     run_local_r_loop_vessel_traverse,
 )
+from songryeon_core.runtime.r_loop_vessel_answer_demo import (
+    render_r_loop_vessel_answer_demo_text,
+    run_local_r_loop_vessel_answer_demo,
+)
 from songryeon_core.runtime.replay import replay_run
 from songryeon_core.runtime.smoke_test import run_smoke_tests
 from songryeon_core.runtime.terminal_view import render_pretty_turn
@@ -233,6 +237,43 @@ def main() -> None:
     r_loop_vessel_traverse_parser.add_argument("--model-id", default=None)
     r_loop_vessel_traverse_parser.add_argument("--timeout", type=int, default=None)
     r_loop_vessel_traverse_parser.add_argument(
+        "--format",
+        choices=["json", "text"],
+        default="json",
+    )
+
+    r_loop_vessel_answer_demo_parser = subparsers.add_parser("vessel-r-answer-demo")
+    r_loop_vessel_answer_demo_parser.add_argument("user_question")
+    r_loop_vessel_answer_demo_parser.add_argument(
+        "--batch-id",
+        default="manual_r_loop_vessel_answer_demo",
+    )
+    r_loop_vessel_answer_demo_parser.add_argument(
+        "--turn-id",
+        default="turn_r_loop_vessel_answer_demo_0001",
+    )
+    r_loop_vessel_answer_demo_parser.add_argument("--uri", default=None)
+    r_loop_vessel_answer_demo_parser.add_argument("--user", default=None)
+    r_loop_vessel_answer_demo_parser.add_argument("--password", default=None)
+    r_loop_vessel_answer_demo_parser.add_argument("--database", default=None)
+    r_loop_vessel_answer_demo_parser.add_argument("--allow-no-auth", action="store_true")
+    r_loop_vessel_answer_demo_parser.add_argument("--limit", type=int, default=50)
+    r_loop_vessel_answer_demo_parser.add_argument("--max-node-reads", type=int, default=6)
+    r_loop_vessel_answer_demo_parser.add_argument(
+        "--max-raw-original-material-reads",
+        type=int,
+        default=5,
+    )
+    r_loop_vessel_answer_demo_parser.add_argument(
+        "--llm-mode",
+        choices=["fake", "qwen"],
+        default="fake",
+    )
+    r_loop_vessel_answer_demo_parser.add_argument("--endpoint", default=None)
+    r_loop_vessel_answer_demo_parser.add_argument("--model-id", default=None)
+    r_loop_vessel_answer_demo_parser.add_argument("--timeout", type=int, default=None)
+    r_loop_vessel_answer_demo_parser.add_argument("--write-trace-cache", action="store_true")
+    r_loop_vessel_answer_demo_parser.add_argument(
         "--format",
         choices=["json", "text"],
         default="json",
@@ -517,6 +558,31 @@ def main() -> None:
         else:
             print(json.dumps(result, ensure_ascii=False, indent=2))
         if result["traverse_status"] == "failed":
+            raise SystemExit(1)
+    elif args.command == "vessel-r-answer-demo":
+        result = run_local_r_loop_vessel_answer_demo(
+            user_question=args.user_question,
+            batch_id=args.batch_id,
+            turn_id=args.turn_id,
+            uri=args.uri,
+            user=args.user,
+            password=args.password,
+            database=args.database,
+            allow_no_auth=args.allow_no_auth,
+            limit=args.limit,
+            max_node_reads=args.max_node_reads,
+            max_raw_original_material_reads=args.max_raw_original_material_reads,
+            llm_mode=args.llm_mode,
+            endpoint=args.endpoint,
+            model_id=args.model_id,
+            timeout_seconds=args.timeout,
+            write_trace_cache=args.write_trace_cache,
+        )
+        if args.format == "text":
+            print(render_r_loop_vessel_answer_demo_text(result))
+        else:
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+        if result["demo_status"] == "blocked":
             raise SystemExit(1)
     elif args.command == "night-summarize-changed-sources":
         result = run_night_changed_source_summary(

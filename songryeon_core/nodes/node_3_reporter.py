@@ -286,7 +286,7 @@ def _grounding_limit_text(brief_frame: Node3InputBriefFrame) -> str:
         brief_frame.vessel_r_material is not None
         and brief_frame.vessel_r_material.r_loop_task_status != "sufficient"
     ):
-        return "Vessel R material이 있어도 R 탐색 상태가 충분하지 않으므로 graph memory 탐색 성공으로 단정하지 않는다."
+        return "Vessel R material이 있어도 R 탐색 상태가 요구 수준에 도달했다고 단정하지 않는다."
     if brief_frame.insufficiency_reasons:
         return "자료 부족 신호가 있어 제공된 문서/허용 주장/현재 턴 실행 순서 자료 범위 안에서만 답한다."
     if brief_frame.answer_basis_mode == "absolute_first":
