@@ -392,3 +392,24 @@ summary depth를 계산한다.
 CoreEgo 직속 연결은 처음에는 시간축만 쓴다.
 의미축은 R1 부담이 실제로 관측된 뒤 연다.
 ```
+
+## 13. 2026-07-02 본점 정밀 탐사 이후 추가 재료
+
+본점의 Sleep Stack, Midnight Government, CoreEgo, local council, D10 trace 계열 문서를 다시 읽은 뒤, Core의 8월 심야정부 재료는 별도 철학 문서로 분리했다.
+
+연결 문서:
+
+```text
+Administrative_Reform_1/00_Philosophy/Night_Government_August_Materials_From_Main_Project_2026_07_02.md
+```
+
+핵심 보강:
+
+```text
+심야정부는 낮의 명령권이 아니다.
+심야정부는 source/version/summary/validity/R-guide를 정리한다.
+작업 장부 없이 대량 LLM 요약을 돌리지 않는다.
+pending 작업이 새 버전으로 대체되면 요약하지 않고 superseded로 닫는다.
+완료된 옛 요약은 삭제하지 않고 invalidated로 남긴다.
+시간축은 기본 골격이고, 의미축은 R-loop 수요가 생긴 뒤 연다.
+```

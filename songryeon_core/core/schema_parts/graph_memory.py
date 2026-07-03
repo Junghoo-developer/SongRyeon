@@ -32,6 +32,10 @@ SOURCE_OBSERVATION_LEDGER_FRAME_SCHEMA_NAME = "SourceObservationLedgerFrame"
 SOURCE_OBSERVATION_LEDGER_FRAME_SCHEMA_VERSION = "0.1"
 SUMMARY_INVALIDATION_LEDGER_FRAME_SCHEMA_NAME = "SummaryInvalidationLedgerFrame"
 SUMMARY_INVALIDATION_LEDGER_FRAME_SCHEMA_VERSION = "0.1"
+NIGHT_TIME_BUNDLE_SUMMARY_FRAME_SCHEMA_NAME = "NightTimeBundleSummaryFrame"
+NIGHT_TIME_BUNDLE_SUMMARY_FRAME_SCHEMA_VERSION = "0.1"
+NIGHT_SOURCE_LEAF_SUMMARY_FRAME_SCHEMA_NAME = "NightSourceLeafSummaryFrame"
+NIGHT_SOURCE_LEAF_SUMMARY_FRAME_SCHEMA_VERSION = "0.1"
 
 GRAPH_MEMORY_NODE_KINDS = {
     "raw_capsule",
@@ -44,6 +48,7 @@ GRAPH_MEMORY_NODE_KINDS = {
     "raw_source",
     "source_ingest_time_bundle",
     "source_kind_bundle",
+    "token_budget_summary_bundle",
 }
 GRAPH_MEMORY_EDGE_KINDS = {
     "CONTAINS",
@@ -96,6 +101,49 @@ SUMMARY_INVALIDATION_LEDGER_STATUSES = {
     "no_invalidations",
     "invalidations_recorded",
 }
+NIGHT_TIME_BUNDLE_SUMMARY_STATUSES = {"ran", "failed"}
+NIGHT_TIME_BUNDLE_SUMMARY_FAILURE_TYPES = {
+    "none",
+    "adapter_missing",
+    "adapter_failed",
+    "parse_failed",
+    "schema_failed",
+}
+NIGHT_TIME_BUNDLE_SUMMARY_PARSE_STATUSES = {"passed", "failed", "not_checked"}
+NIGHT_TIME_BUNDLE_SUMMARY_VALIDITY_STATUSES = {
+    "active",
+    "invalidated_by_source_change",
+}
+NIGHT_TIME_BUNDLE_SUMMARY_REVIEW_STATUSES = {
+    "not_reviewed",
+    "approved",
+    "rejected",
+}
+NIGHT_SOURCE_LEAF_SUMMARY_STATUSES = {
+    "ran",
+    "failed",
+    "skipped_no_text_snapshot",
+    "skipped_empty_text",
+}
+NIGHT_SOURCE_LEAF_SUMMARY_FAILURE_TYPES = {
+    "none",
+    "adapter_missing",
+    "adapter_failed",
+    "parse_failed",
+    "schema_failed",
+    "no_text_snapshot",
+    "empty_text",
+}
+NIGHT_SOURCE_LEAF_SUMMARY_PARSE_STATUSES = {"passed", "failed", "not_checked"}
+NIGHT_SOURCE_LEAF_SUMMARY_VALIDITY_STATUSES = {
+    "active",
+    "invalidated_by_source_change",
+}
+NIGHT_SOURCE_LEAF_SUMMARY_REVIEW_STATUSES = {
+    "not_reviewed",
+    "approved",
+    "rejected",
+}
 
 
 @dataclass
@@ -133,6 +181,85 @@ class GraphMemoryNodeFrame:
     semantic_judgement_status: str = "not_run"
     schema_name: str = GRAPH_MEMORY_NODE_FRAME_SCHEMA_NAME
     schema_version: str = GRAPH_MEMORY_NODE_FRAME_SCHEMA_VERSION
+
+
+@dataclass
+class NightTimeBundleSummaryFrame:
+    """An LLM-generated summary graph node attached to one TimeBundle target."""
+
+    frame_id: str
+    summary_graph_node_id: str
+    target_graph_node_id: str
+    target_node_kind: str
+    summary_text: str = ""
+    summary_status: str = "ran"
+    failure_type: str = "none"
+    payload_parse_status: str = "passed"
+    node_kind: str = "summary"
+    data_kind: str = "time_bundle_summary"
+    summary_depth: int = 1
+    source_depth_min: int = 0
+    source_depth_max: int = 0
+    source_leaf_count: int = 0
+    source_summary_count: int = 0
+    source_bundle_kind: str = "time_bundle"
+    validity_status: str = "active"
+    review_status: str = "not_reviewed"
+    llm_call_data_id: str | None = None
+    llm_trace_event_id: str | None = None
+    prompt_ref: str = "songryeon_core/prompts/night_summarize_time_bundle_v0.md"
+    source_mode: str = "source_bundle"
+    claim_alignment: str = "multi_source_bundle"
+    source_graph_node_ids: list[str] = field(default_factory=list)
+    source_trace_ids: list[str] = field(default_factory=list)
+    source_data_ids: list[str] = field(default_factory=list)
+    generated_by: str = "LLM:unknown:night_summarize_time_bundle"
+    info_class: str = "mixed"
+    semantic_judgement_status: str = "ran"
+    schema_name: str = NIGHT_TIME_BUNDLE_SUMMARY_FRAME_SCHEMA_NAME
+    schema_version: str = NIGHT_TIME_BUNDLE_SUMMARY_FRAME_SCHEMA_VERSION
+
+
+@dataclass
+class NightSourceLeafSummaryFrame:
+    """An LLM-generated summary attached to exactly one raw_source leaf."""
+
+    frame_id: str
+    summary_graph_node_id: str
+    target_graph_node_id: str
+    target_node_kind: str
+    source_kind: str
+    source_path: str
+    source_file_data_id: str
+    content_sha1: str
+    text_snapshot_data_id: str | None = None
+    summary_text: str = ""
+    summary_status: str = "ran"
+    failure_type: str = "none"
+    payload_parse_status: str = "passed"
+    node_kind: str = "summary"
+    data_kind: str = "source_leaf_summary"
+    summary_depth: int = 1
+    source_depth_min: int = 0
+    source_depth_max: int = 0
+    source_leaf_count: int = 1
+    source_summary_count: int = 0
+    source_bundle_kind: str = "raw_source"
+    validity_status: str = "active"
+    review_status: str = "not_reviewed"
+    llm_call_data_id: str | None = None
+    llm_trace_event_id: str | None = None
+    prompt_ref: str = "songryeon_core/prompts/night_summarize_source_leaf_v0.md"
+    source_mode: str = "single_source"
+    claim_alignment: str = "single_absolute_record"
+    source_graph_node_ids: list[str] = field(default_factory=list)
+    source_trace_ids: list[str] = field(default_factory=list)
+    source_data_ids: list[str] = field(default_factory=list)
+    generated_by: str = "LLM:unknown:night_summarize_source_leaf"
+    info_class: str = "relative"
+    semantic_judgement_status: str = "ran"
+    schema_name: str = NIGHT_SOURCE_LEAF_SUMMARY_FRAME_SCHEMA_NAME
+    schema_version: str = NIGHT_SOURCE_LEAF_SUMMARY_FRAME_SCHEMA_VERSION
 
 
 @dataclass
@@ -393,6 +520,358 @@ class SummaryInvalidationLedgerFrame:
     semantic_judgement_status: str = "not_run"
     schema_name: str = SUMMARY_INVALIDATION_LEDGER_FRAME_SCHEMA_NAME
     schema_version: str = SUMMARY_INVALIDATION_LEDGER_FRAME_SCHEMA_VERSION
+
+
+def validate_night_time_bundle_summary_frame(frame: NightTimeBundleSummaryFrame) -> None:
+    _require_text_fields(
+        "NightTimeBundleSummaryFrame",
+        {
+            "frame_id": frame.frame_id,
+            "summary_graph_node_id": frame.summary_graph_node_id,
+            "target_graph_node_id": frame.target_graph_node_id,
+            "target_node_kind": frame.target_node_kind,
+            "summary_status": frame.summary_status,
+            "failure_type": frame.failure_type,
+            "payload_parse_status": frame.payload_parse_status,
+            "node_kind": frame.node_kind,
+            "data_kind": frame.data_kind,
+            "source_bundle_kind": frame.source_bundle_kind,
+            "validity_status": frame.validity_status,
+            "review_status": frame.review_status,
+            "prompt_ref": frame.prompt_ref,
+            "source_mode": frame.source_mode,
+            "claim_alignment": frame.claim_alignment,
+            "generated_by": frame.generated_by,
+            "info_class": frame.info_class,
+            "semantic_judgement_status": frame.semantic_judgement_status,
+            "schema_name": frame.schema_name,
+            "schema_version": frame.schema_version,
+        },
+    )
+    if frame.schema_name != NIGHT_TIME_BUNDLE_SUMMARY_FRAME_SCHEMA_NAME:
+        raise ValueError(
+            f"unknown NightTimeBundleSummaryFrame.schema_name: {frame.schema_name}"
+        )
+    if frame.schema_version != NIGHT_TIME_BUNDLE_SUMMARY_FRAME_SCHEMA_VERSION:
+        raise ValueError(
+            f"unknown NightTimeBundleSummaryFrame.schema_version: {frame.schema_version}"
+        )
+    if frame.node_kind != "summary":
+        raise ValueError("NightTimeBundleSummaryFrame.node_kind must be summary")
+    if frame.target_node_kind != "time_bundle":
+        raise ValueError("NightTimeBundleSummaryFrame target_node_kind must be time_bundle")
+    if not frame.summary_graph_node_id.startswith("graph:summary:"):
+        raise ValueError(
+            "NightTimeBundleSummaryFrame.summary_graph_node_id must be a graph summary id"
+        )
+    if not frame.generated_by.startswith("LLM:"):
+        raise ValueError("NightTimeBundleSummaryFrame.generated_by must be LLM")
+    if frame.summary_status not in NIGHT_TIME_BUNDLE_SUMMARY_STATUSES:
+        raise ValueError(
+            f"unknown NightTimeBundleSummaryFrame.summary_status: {frame.summary_status}"
+        )
+    if frame.failure_type not in NIGHT_TIME_BUNDLE_SUMMARY_FAILURE_TYPES:
+        raise ValueError(
+            f"unknown NightTimeBundleSummaryFrame.failure_type: {frame.failure_type}"
+        )
+    if frame.payload_parse_status not in NIGHT_TIME_BUNDLE_SUMMARY_PARSE_STATUSES:
+        raise ValueError(
+            "NightTimeBundleSummaryFrame.payload_parse_status is invalid"
+        )
+    if frame.validity_status not in NIGHT_TIME_BUNDLE_SUMMARY_VALIDITY_STATUSES:
+        raise ValueError("NightTimeBundleSummaryFrame.validity_status is invalid")
+    if frame.review_status not in NIGHT_TIME_BUNDLE_SUMMARY_REVIEW_STATUSES:
+        raise ValueError("NightTimeBundleSummaryFrame.review_status is invalid")
+    if frame.info_class not in {"relative", "mixed"}:
+        raise ValueError("NightTimeBundleSummaryFrame.info_class must be relative or mixed")
+    if frame.semantic_judgement_status not in {"ran", "failed"}:
+        raise ValueError(
+            "NightTimeBundleSummaryFrame.semantic_judgement_status must be ran or failed"
+        )
+
+    _validate_non_negative_ints(
+        "NightTimeBundleSummaryFrame",
+        {
+            "summary_depth": frame.summary_depth,
+            "source_depth_min": frame.source_depth_min,
+            "source_depth_max": frame.source_depth_max,
+            "source_leaf_count": frame.source_leaf_count,
+            "source_summary_count": frame.source_summary_count,
+        },
+    )
+    if frame.summary_depth < 1:
+        raise ValueError("NightTimeBundleSummaryFrame.summary_depth must be >= 1")
+    if frame.source_depth_min > frame.source_depth_max:
+        raise ValueError("NightTimeBundleSummaryFrame source depth range is inverted")
+
+    for field_name, values in {
+        "source_graph_node_ids": frame.source_graph_node_ids,
+        "source_trace_ids": frame.source_trace_ids,
+        "source_data_ids": frame.source_data_ids,
+    }.items():
+        _validate_string_list(f"NightTimeBundleSummaryFrame.{field_name}", values)
+        _validate_no_duplicates(f"NightTimeBundleSummaryFrame.{field_name}", values)
+
+    if frame.target_graph_node_id not in frame.source_data_ids:
+        raise ValueError(
+            "NightTimeBundleSummaryFrame.source_data_ids must include target_graph_node_id"
+        )
+    for source_graph_node_id in frame.source_graph_node_ids:
+        if source_graph_node_id not in frame.source_data_ids:
+            raise ValueError(
+                "NightTimeBundleSummaryFrame.source_data_ids must include source graph nodes"
+            )
+
+    expected_info_class = (
+        "relative"
+        if frame.source_leaf_count == 1
+        and frame.source_summary_count == 0
+        and len(frame.source_graph_node_ids) == 1
+        else "mixed"
+    )
+    if frame.info_class != expected_info_class:
+        raise ValueError(
+            "NightTimeBundleSummaryFrame.info_class must follow source cardinality"
+        )
+    expected_source_mode = (
+        "single_source" if expected_info_class == "relative" else "source_bundle"
+    )
+    expected_claim_alignment = (
+        "single_absolute_record"
+        if expected_info_class == "relative"
+        else "multi_source_bundle"
+    )
+    if frame.source_mode != expected_source_mode:
+        raise ValueError(
+            "NightTimeBundleSummaryFrame.source_mode must follow source cardinality"
+        )
+    if frame.claim_alignment != expected_claim_alignment:
+        raise ValueError(
+            "NightTimeBundleSummaryFrame.claim_alignment must follow source cardinality"
+        )
+
+    if frame.summary_status == "ran":
+        if not frame.summary_text.strip():
+            raise ValueError("ran NightTimeBundleSummaryFrame must include summary_text")
+        if frame.failure_type != "none":
+            raise ValueError("ran NightTimeBundleSummaryFrame failure_type must be none")
+        if frame.payload_parse_status != "passed":
+            raise ValueError(
+                "ran NightTimeBundleSummaryFrame payload_parse_status must be passed"
+            )
+        if frame.semantic_judgement_status != "ran":
+            raise ValueError(
+                "ran NightTimeBundleSummaryFrame semantic_judgement_status must be ran"
+            )
+        if frame.llm_call_data_id is None or frame.llm_call_data_id not in frame.source_data_ids:
+            raise ValueError(
+                "ran NightTimeBundleSummaryFrame.source_data_ids must include llm_call_data_id"
+            )
+    else:
+        if frame.summary_text.strip():
+            raise ValueError("failed NightTimeBundleSummaryFrame must not include summary_text")
+        if frame.failure_type == "none":
+            raise ValueError("failed NightTimeBundleSummaryFrame failure_type must not be none")
+        if frame.semantic_judgement_status != "failed":
+            raise ValueError(
+                "failed NightTimeBundleSummaryFrame semantic_judgement_status must be failed"
+            )
+
+
+def validate_night_source_leaf_summary_frame(frame: NightSourceLeafSummaryFrame) -> None:
+    _require_text_fields(
+        "NightSourceLeafSummaryFrame",
+        {
+            "frame_id": frame.frame_id,
+            "summary_graph_node_id": frame.summary_graph_node_id,
+            "target_graph_node_id": frame.target_graph_node_id,
+            "target_node_kind": frame.target_node_kind,
+            "source_kind": frame.source_kind,
+            "source_path": frame.source_path,
+            "source_file_data_id": frame.source_file_data_id,
+            "content_sha1": frame.content_sha1,
+            "summary_status": frame.summary_status,
+            "failure_type": frame.failure_type,
+            "payload_parse_status": frame.payload_parse_status,
+            "node_kind": frame.node_kind,
+            "data_kind": frame.data_kind,
+            "source_bundle_kind": frame.source_bundle_kind,
+            "validity_status": frame.validity_status,
+            "review_status": frame.review_status,
+            "prompt_ref": frame.prompt_ref,
+            "source_mode": frame.source_mode,
+            "claim_alignment": frame.claim_alignment,
+            "generated_by": frame.generated_by,
+            "info_class": frame.info_class,
+            "semantic_judgement_status": frame.semantic_judgement_status,
+            "schema_name": frame.schema_name,
+            "schema_version": frame.schema_version,
+        },
+    )
+    if frame.schema_name != NIGHT_SOURCE_LEAF_SUMMARY_FRAME_SCHEMA_NAME:
+        raise ValueError(
+            f"unknown NightSourceLeafSummaryFrame.schema_name: {frame.schema_name}"
+        )
+    if frame.schema_version != NIGHT_SOURCE_LEAF_SUMMARY_FRAME_SCHEMA_VERSION:
+        raise ValueError(
+            f"unknown NightSourceLeafSummaryFrame.schema_version: {frame.schema_version}"
+        )
+    if frame.node_kind != "summary":
+        raise ValueError("NightSourceLeafSummaryFrame.node_kind must be summary")
+    if frame.data_kind != "source_leaf_summary":
+        raise ValueError(
+            "NightSourceLeafSummaryFrame.data_kind must be source_leaf_summary"
+        )
+    if frame.target_node_kind != "raw_source":
+        raise ValueError(
+            "NightSourceLeafSummaryFrame target_node_kind must be raw_source"
+        )
+    if not frame.summary_graph_node_id.startswith("graph:summary:source_leaf:"):
+        raise ValueError(
+            "NightSourceLeafSummaryFrame.summary_graph_node_id must be a source leaf summary id"
+        )
+    if frame.summary_status not in NIGHT_SOURCE_LEAF_SUMMARY_STATUSES:
+        raise ValueError(
+            f"unknown NightSourceLeafSummaryFrame.summary_status: {frame.summary_status}"
+        )
+    if frame.failure_type not in NIGHT_SOURCE_LEAF_SUMMARY_FAILURE_TYPES:
+        raise ValueError(
+            f"unknown NightSourceLeafSummaryFrame.failure_type: {frame.failure_type}"
+        )
+    if frame.payload_parse_status not in NIGHT_SOURCE_LEAF_SUMMARY_PARSE_STATUSES:
+        raise ValueError(
+            "NightSourceLeafSummaryFrame.payload_parse_status is invalid"
+        )
+    if frame.validity_status not in NIGHT_SOURCE_LEAF_SUMMARY_VALIDITY_STATUSES:
+        raise ValueError("NightSourceLeafSummaryFrame.validity_status is invalid")
+    if frame.review_status not in NIGHT_SOURCE_LEAF_SUMMARY_REVIEW_STATUSES:
+        raise ValueError("NightSourceLeafSummaryFrame.review_status is invalid")
+
+    _validate_non_negative_ints(
+        "NightSourceLeafSummaryFrame",
+        {
+            "summary_depth": frame.summary_depth,
+            "source_depth_min": frame.source_depth_min,
+            "source_depth_max": frame.source_depth_max,
+            "source_leaf_count": frame.source_leaf_count,
+            "source_summary_count": frame.source_summary_count,
+        },
+    )
+    if frame.summary_depth != 1:
+        raise ValueError("NightSourceLeafSummaryFrame.summary_depth must be 1")
+    if frame.source_depth_min != 0 or frame.source_depth_max != 0:
+        raise ValueError("NightSourceLeafSummaryFrame source depth must be 0")
+    if frame.source_leaf_count != 1:
+        raise ValueError("NightSourceLeafSummaryFrame.source_leaf_count must be 1")
+    if frame.source_summary_count != 0:
+        raise ValueError("NightSourceLeafSummaryFrame.source_summary_count must be 0")
+    if frame.source_bundle_kind != "raw_source":
+        raise ValueError(
+            "NightSourceLeafSummaryFrame.source_bundle_kind must be raw_source"
+        )
+    if frame.source_mode != "single_source":
+        raise ValueError("NightSourceLeafSummaryFrame.source_mode must be single_source")
+    if frame.claim_alignment != "single_absolute_record":
+        raise ValueError(
+            "NightSourceLeafSummaryFrame.claim_alignment must be single_absolute_record"
+        )
+
+    for field_name, values in {
+        "source_graph_node_ids": frame.source_graph_node_ids,
+        "source_trace_ids": frame.source_trace_ids,
+        "source_data_ids": frame.source_data_ids,
+    }.items():
+        _validate_string_list(f"NightSourceLeafSummaryFrame.{field_name}", values)
+        _validate_no_duplicates(f"NightSourceLeafSummaryFrame.{field_name}", values)
+
+    if frame.source_graph_node_ids != [frame.target_graph_node_id]:
+        raise ValueError(
+            "NightSourceLeafSummaryFrame.source_graph_node_ids must contain only the target raw source"
+        )
+    for required_id in (frame.target_graph_node_id, frame.source_file_data_id):
+        if required_id not in frame.source_data_ids:
+            raise ValueError(
+                "NightSourceLeafSummaryFrame.source_data_ids must include target and source file data"
+            )
+    if frame.text_snapshot_data_id is not None and frame.text_snapshot_data_id not in (
+        frame.source_data_ids
+    ):
+        raise ValueError(
+            "NightSourceLeafSummaryFrame.source_data_ids must include text_snapshot_data_id"
+        )
+
+    if frame.summary_status == "ran":
+        if not frame.generated_by.startswith("LLM:"):
+            raise ValueError("ran NightSourceLeafSummaryFrame.generated_by must be LLM")
+        if frame.info_class != "relative":
+            raise ValueError("ran NightSourceLeafSummaryFrame.info_class must be relative")
+        if frame.semantic_judgement_status != "ran":
+            raise ValueError(
+                "ran NightSourceLeafSummaryFrame.semantic_judgement_status must be ran"
+            )
+        if not frame.summary_text.strip():
+            raise ValueError("ran NightSourceLeafSummaryFrame must include summary_text")
+        if frame.failure_type != "none":
+            raise ValueError("ran NightSourceLeafSummaryFrame.failure_type must be none")
+        if frame.payload_parse_status != "passed":
+            raise ValueError(
+                "ran NightSourceLeafSummaryFrame.payload_parse_status must be passed"
+            )
+        if frame.text_snapshot_data_id is None:
+            raise ValueError(
+                "ran NightSourceLeafSummaryFrame must include text_snapshot_data_id"
+            )
+        if frame.llm_call_data_id is None or frame.llm_call_data_id not in (
+            frame.source_data_ids
+        ):
+            raise ValueError(
+                "ran NightSourceLeafSummaryFrame.source_data_ids must include llm_call_data_id"
+            )
+        return
+
+    if frame.summary_text.strip():
+        raise ValueError("non-ran NightSourceLeafSummaryFrame must not include summary_text")
+
+    if frame.summary_status == "failed":
+        if not frame.generated_by.startswith("LLM:"):
+            raise ValueError("failed NightSourceLeafSummaryFrame.generated_by must be LLM")
+        if frame.info_class != "relative":
+            raise ValueError(
+                "failed NightSourceLeafSummaryFrame.info_class must be relative"
+            )
+        if frame.semantic_judgement_status != "failed":
+            raise ValueError(
+                "failed NightSourceLeafSummaryFrame.semantic_judgement_status must be failed"
+            )
+        if frame.failure_type in {"none", "no_text_snapshot", "empty_text"}:
+            raise ValueError(
+                "failed NightSourceLeafSummaryFrame.failure_type must be an LLM failure"
+            )
+        return
+
+    if not frame.generated_by.startswith("CODE:"):
+        raise ValueError("skipped NightSourceLeafSummaryFrame.generated_by must be CODE")
+    if frame.info_class != "absolute":
+        raise ValueError("skipped NightSourceLeafSummaryFrame.info_class must be absolute")
+    if frame.semantic_judgement_status != "not_run":
+        raise ValueError(
+            "skipped NightSourceLeafSummaryFrame.semantic_judgement_status must be not_run"
+        )
+    if frame.llm_call_data_id is not None or frame.llm_trace_event_id is not None:
+        raise ValueError("skipped NightSourceLeafSummaryFrame must not include llm ids")
+    if frame.payload_parse_status != "not_checked":
+        raise ValueError(
+            "skipped NightSourceLeafSummaryFrame.payload_parse_status must be not_checked"
+        )
+    expected_failure_type = (
+        "no_text_snapshot"
+        if frame.summary_status == "skipped_no_text_snapshot"
+        else "empty_text"
+    )
+    if frame.failure_type != expected_failure_type:
+        raise ValueError(
+            "skipped NightSourceLeafSummaryFrame.failure_type must match skip status"
+        )
 
 
 def validate_graph_memory_node_frame(frame: GraphMemoryNodeFrame) -> None:
@@ -1536,11 +2015,27 @@ __all__ = [
     "SUMMARY_INVALIDATION_LEDGER_FRAME_SCHEMA_NAME",
     "SUMMARY_INVALIDATION_LEDGER_FRAME_SCHEMA_VERSION",
     "SUMMARY_INVALIDATION_LEDGER_STATUSES",
+    "NIGHT_TIME_BUNDLE_SUMMARY_FRAME_SCHEMA_NAME",
+    "NIGHT_TIME_BUNDLE_SUMMARY_FRAME_SCHEMA_VERSION",
+    "NIGHT_TIME_BUNDLE_SUMMARY_STATUSES",
+    "NIGHT_TIME_BUNDLE_SUMMARY_FAILURE_TYPES",
+    "NIGHT_TIME_BUNDLE_SUMMARY_PARSE_STATUSES",
+    "NIGHT_TIME_BUNDLE_SUMMARY_VALIDITY_STATUSES",
+    "NIGHT_TIME_BUNDLE_SUMMARY_REVIEW_STATUSES",
+    "NIGHT_SOURCE_LEAF_SUMMARY_FAILURE_TYPES",
+    "NIGHT_SOURCE_LEAF_SUMMARY_FRAME_SCHEMA_NAME",
+    "NIGHT_SOURCE_LEAF_SUMMARY_FRAME_SCHEMA_VERSION",
+    "NIGHT_SOURCE_LEAF_SUMMARY_PARSE_STATUSES",
+    "NIGHT_SOURCE_LEAF_SUMMARY_REVIEW_STATUSES",
+    "NIGHT_SOURCE_LEAF_SUMMARY_STATUSES",
+    "NIGHT_SOURCE_LEAF_SUMMARY_VALIDITY_STATUSES",
     "CoreEgoGuideWorkerHintFrame",
     "CoreEgoTimeAxisFrame",
     "GraphMemoryEdgeFrame",
     "GraphMemoryNodeFrame",
     "GraphMemorySnapshotFrame",
+    "NightSourceLeafSummaryFrame",
+    "NightTimeBundleSummaryFrame",
     "RLoopMemoryHandoffPacketFrame",
     "RLoopGraphGuidePacketFrame",
     "SourceObservationLedgerFrame",
@@ -1553,6 +2048,8 @@ __all__ = [
     "validate_graph_memory_edge_frame",
     "validate_graph_memory_node_frame",
     "validate_graph_memory_snapshot_frame",
+    "validate_night_source_leaf_summary_frame",
+    "validate_night_time_bundle_summary_frame",
     "validate_r_loop_memory_handoff_packet_frame",
     "validate_rloop_graph_guide_packet_frame",
     "validate_source_observation_ledger_frame",

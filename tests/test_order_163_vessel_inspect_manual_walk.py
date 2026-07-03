@@ -235,15 +235,18 @@ class FakeInspectDriverFactory:
         *,
         counts: dict[str, int] | None = None,
         path_rows: list[dict[str, object]] | None = None,
+        summary_rows: list[dict[str, object]] | None = None,
     ) -> None:
         self.counts = {
             "core_count": 1,
             "time_axis_count": 1,
             "time_bundle_count": 1,
             "raw_capsule_count": 1,
+            "summary_count": 0,
         }
         self.counts.update(counts or {})
         self.path_rows = _default_path_rows() if path_rows is None else list(path_rows)
+        self.summary_rows = [] if summary_rows is None else list(summary_rows)
         self.calls: list[dict[str, object]] = []
         self.last_driver: FakeInspectDriver | None = None
 
@@ -252,6 +255,7 @@ class FakeInspectDriverFactory:
         self.last_driver = FakeInspectDriver(
             counts=self.counts,
             path_rows=self.path_rows,
+            summary_rows=self.summary_rows,
         )
         return self.last_driver
 
@@ -276,9 +280,11 @@ class FakeInspectDriver:
         *,
         counts: dict[str, int],
         path_rows: list[dict[str, object]],
+        summary_rows: list[dict[str, object]],
     ) -> None:
         self.counts = dict(counts)
         self.path_rows = list(path_rows)
+        self.summary_rows = list(summary_rows)
         self.queries: list[tuple[str, dict[str, object]]] = []
         self.closed = False
 
@@ -332,6 +338,8 @@ class FakeInspectTransaction:
         compact = " ".join(query.split())
         if "RETURN core.data_id AS core_data_id" in compact:
             return FakePathResult(self.driver.path_rows)
+        if "MATCH (summary:SummaryGraphNode" in compact:
+            return FakePathResult(self.driver.summary_rows)
         if "MATCH (n:CoreEgo" in compact:
             return FakeCountResult(self.driver.counts["core_count"])
         if "MATCH (n:TimeAxis" in compact:
@@ -340,6 +348,8 @@ class FakeInspectTransaction:
             return FakeCountResult(self.driver.counts["time_bundle_count"])
         if "MATCH (n:RawCapsule" in compact:
             return FakeCountResult(self.driver.counts["raw_capsule_count"])
+        if "MATCH (n:SummaryGraphNode" in compact:
+            return FakeCountResult(self.driver.counts["summary_count"])
         return FakeCountResult(0)
 
 

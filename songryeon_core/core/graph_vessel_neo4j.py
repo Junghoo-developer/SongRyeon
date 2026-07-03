@@ -584,6 +584,7 @@ def _graph_node_labels(record: DataRecord) -> list[str]:
         "time_axis": "TimeAxis",
         "time_bundle": "TimeBundle",
         "raw_capsule": "RawCapsule",
+        "summary": "SummaryGraphNode",
         "raw_source": "RawSource",
         "source_kind_bundle": "SourceKindBundle",
         "source_ingest_time_bundle": "SourceIngestBundle",
@@ -631,6 +632,8 @@ def _display_name(record: DataRecord) -> str:
         return "Time Bundle"
     if node_kind == "raw_capsule":
         return f"Raw Capsule: {_payload_str(payload, 'source_turn_id') or record.data_id}"
+    if node_kind == "summary":
+        return f"Summary: {_payload_str(payload, 'target_graph_node_id') or record.data_id}"
     if node_kind == "raw_source":
         return f"Raw Source: {_payload_str(payload, 'data_kind') or record.data_id}"
     if record.data_type == "graph_memory:snapshot":

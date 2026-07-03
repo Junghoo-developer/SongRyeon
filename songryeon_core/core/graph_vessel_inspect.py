@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from typing import Any, Callable
@@ -45,6 +46,25 @@ class GraphVesselNeo4jInspectPathItem:
 
 
 @dataclass(frozen=True)
+class GraphVesselNeo4jInspectSummarySampleItem:
+    summary_data_id: str
+    summary_display_name: str
+    data_kind: str | None
+    summary_depth: int | None
+    summary_status: str | None
+    validity_status: str | None
+    review_status: str | None
+    target_graph_node_id: str | None
+    target_display_name: str | None
+    target_node_kind: str | None
+    source_leaf_count: int | None
+    source_summary_count: int | None
+    info_class: str | None
+    generated_by: str | None
+    summary_text_preview: str
+
+
+@dataclass(frozen=True)
 class GraphVesselNeo4jInspectResultFrame:
     result_id: str
     created_at: str
@@ -60,6 +80,13 @@ class GraphVesselNeo4jInspectResultFrame:
     time_axis_count: int | None
     time_bundle_count: int | None
     raw_capsule_count: int | None
+    summary_count: int | None
+    active_summary_count: int | None
+    invalidated_summary_count: int | None
+    summary_count_by_data_kind: dict[str, int]
+    summary_count_by_depth: dict[str, int]
+    summary_sample_items: list[dict[str, object]]
+    summary_lines: list[str]
     path_items: list[dict[str, object]]
     tree_lines: list[str]
     source_data_ids: list[str]
@@ -130,7 +157,13 @@ def inspect_graph_vessel_from_neo4j(
         driver = driver_factory(config.uri, auth=auth)
         try:
             with driver.session(database=config.database) as session:
-                counts, path_items = session.execute_read(
+                (
+                    counts,
+                    path_items,
+                    summary_items,
+                    summary_count_by_data_kind,
+                    summary_count_by_depth,
+                ) = session.execute_read(
                     _execute_inspect,
                     SONGRYEON_GRAPH_NAMESPACE,
                     safe_limit,
@@ -156,6 +189,9 @@ def inspect_graph_vessel_from_neo4j(
         failure_reason=None if path_items else "No CoreEgo -> TimeAxis path was found.",
         counts=counts,
         path_items=path_items,
+        summary_items=summary_items,
+        summary_count_by_data_kind=summary_count_by_data_kind,
+        summary_count_by_depth=summary_count_by_depth,
     )
 
 
@@ -221,6 +257,9 @@ class _InspectCounts:
     time_axis_count: int | None
     time_bundle_count: int | None
     raw_capsule_count: int | None
+    summary_count: int | None
+    active_summary_count: int | None
+    invalidated_summary_count: int | None
 
 
 def _make_result(
@@ -231,8 +270,13 @@ def _make_result(
     failure_reason: str | None,
     counts: _InspectCounts,
     path_items: list[GraphVesselNeo4jInspectPathItem],
+    summary_items: list[GraphVesselNeo4jInspectSummarySampleItem] | None = None,
+    summary_count_by_data_kind: dict[str, int] | None = None,
+    summary_count_by_depth: dict[str, int] | None = None,
 ) -> GraphVesselNeo4jInspectResultFrame:
     path_item_payloads = [asdict(item) for item in path_items]
+    summary_items = summary_items or []
+    summary_item_payloads = [asdict(item) for item in summary_items]
     source_data_ids = _unique_strings(
         [
             value
@@ -244,6 +288,8 @@ def _make_result(
                 item.raw_capsule_data_id,
             )
         ]
+        + [item.summary_data_id for item in summary_items]
+        + [item.target_graph_node_id for item in summary_items]
     )
     source_trace_ids = _unique_strings(
         [item.raw_capsule_source_trace_id for item in path_items]
@@ -263,6 +309,13 @@ def _make_result(
         time_axis_count=counts.time_axis_count,
         time_bundle_count=counts.time_bundle_count,
         raw_capsule_count=counts.raw_capsule_count,
+        summary_count=counts.summary_count,
+        active_summary_count=counts.active_summary_count,
+        invalidated_summary_count=counts.invalidated_summary_count,
+        summary_count_by_data_kind=summary_count_by_data_kind or {},
+        summary_count_by_depth=summary_count_by_depth or {},
+        summary_sample_items=summary_item_payloads,
+        summary_lines=_build_summary_lines(summary_items),
         path_items=path_item_payloads,
         tree_lines=_build_tree_lines(path_items),
         source_data_ids=source_data_ids,
@@ -276,12 +329,47 @@ def _execute_inspect(
     tx: object,
     graph_namespace: str,
     limit: int,
-) -> tuple[_InspectCounts, list[GraphVesselNeo4jInspectPathItem]]:
+) -> tuple[
+    _InspectCounts,
+    list[GraphVesselNeo4jInspectPathItem],
+    list[GraphVesselNeo4jInspectSummarySampleItem],
+    dict[str, int],
+    dict[str, int],
+]:
     counts = _InspectCounts(
         core_count=_count_label(tx, graph_namespace, "CoreEgo"),
         time_axis_count=_count_label(tx, graph_namespace, "TimeAxis"),
         time_bundle_count=_count_label(tx, graph_namespace, "TimeBundle"),
         raw_capsule_count=_count_label(tx, graph_namespace, "RawCapsule"),
+        summary_count=_count_label(tx, graph_namespace, "SummaryGraphNode"),
+        active_summary_count=None,
+        invalidated_summary_count=None,
+    )
+    summary_records = _read_summary_records(tx, graph_namespace)
+    summary_items = [
+        _summary_item_from_record(record)
+        for record in summary_records[:limit]
+    ]
+    summary_count_by_data_kind = _count_summary_items_by_data_kind(summary_records)
+    summary_count_by_depth = _count_summary_items_by_depth(summary_records)
+    active_summary_count = sum(
+        1
+        for record in summary_records
+        if _summary_payload(record).get("validity_status") == "active"
+    )
+    invalidated_summary_count = sum(
+        1
+        for record in summary_records
+        if _text(_summary_payload(record).get("validity_status")).startswith("invalidated")
+    )
+    counts = _InspectCounts(
+        core_count=counts.core_count,
+        time_axis_count=counts.time_axis_count,
+        time_bundle_count=counts.time_bundle_count,
+        raw_capsule_count=counts.raw_capsule_count,
+        summary_count=counts.summary_count,
+        active_summary_count=active_summary_count,
+        invalidated_summary_count=invalidated_summary_count,
     )
     result = tx.run(
         """
@@ -312,7 +400,13 @@ def _execute_inspect(
         graph_namespace=graph_namespace,
         limit=limit,
     )
-    return counts, [_path_item_from_record(record) for record in _records(result)]
+    return (
+        counts,
+        [_path_item_from_record(record) for record in _records(result)],
+        summary_items,
+        summary_count_by_data_kind,
+        summary_count_by_depth,
+    )
 
 
 def _path_item_from_record(record: object) -> GraphVesselNeo4jInspectPathItem:
@@ -366,6 +460,109 @@ def _build_tree_lines(path_items: list[GraphVesselNeo4jInspectPathItem]) -> list
     return lines
 
 
+def _read_summary_records(tx: object, graph_namespace: str) -> list[object]:
+    result = tx.run(
+        """
+        MATCH (summary:SummaryGraphNode {graph_namespace: $graph_namespace})
+        OPTIONAL MATCH (summary)-[:SUMMARY_OF {graph_namespace: $graph_namespace}]->
+          (target:VesselRecord {graph_namespace: $graph_namespace})
+        RETURN
+          summary.data_id AS summary_data_id,
+          coalesce(summary.display_name, summary.data_id) AS summary_display_name,
+          summary.data_kind AS summary_data_kind,
+          summary.info_class AS summary_info_class,
+          summary.generated_by AS summary_generated_by,
+          summary.payload_json AS summary_payload_json,
+          target.data_id AS target_graph_node_id,
+          coalesce(target.display_name, target.data_id) AS target_display_name,
+          target.node_kind AS target_node_kind
+        ORDER BY summary.data_kind, summary.data_id
+        LIMIT 10000
+        """,
+        graph_namespace=graph_namespace,
+    )
+    return _records(result)
+
+
+def _summary_item_from_record(record: object) -> GraphVesselNeo4jInspectSummarySampleItem:
+    payload = _summary_payload(record)
+    summary_text = _text(payload.get("summary_text"))
+    target_graph_node_id = (
+        _optional_record_str(record, "target_graph_node_id")
+        or _text(payload.get("target_graph_node_id"))
+        or None
+    )
+    return GraphVesselNeo4jInspectSummarySampleItem(
+        summary_data_id=_require_record_str(record, "summary_data_id"),
+        summary_display_name=_require_record_str(record, "summary_display_name"),
+        data_kind=_optional_record_str(record, "summary_data_kind")
+        or _text(payload.get("data_kind"))
+        or None,
+        summary_depth=_optional_int(payload.get("summary_depth")),
+        summary_status=_text(payload.get("summary_status")) or None,
+        validity_status=_text(payload.get("validity_status")) or None,
+        review_status=_text(payload.get("review_status")) or None,
+        target_graph_node_id=target_graph_node_id,
+        target_display_name=_optional_record_str(record, "target_display_name"),
+        target_node_kind=_optional_record_str(record, "target_node_kind")
+        or _text(payload.get("target_node_kind"))
+        or None,
+        source_leaf_count=_optional_int(payload.get("source_leaf_count")),
+        source_summary_count=_optional_int(payload.get("source_summary_count")),
+        info_class=_optional_record_str(record, "summary_info_class")
+        or _text(payload.get("info_class"))
+        or None,
+        generated_by=_optional_record_str(record, "summary_generated_by")
+        or _text(payload.get("generated_by"))
+        or None,
+        summary_text_preview=_preview(summary_text),
+    )
+
+
+def _count_summary_items_by_data_kind(records: list[object]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for record in records:
+        payload = _summary_payload(record)
+        data_kind = (
+            _optional_record_str(record, "summary_data_kind")
+            or _text(payload.get("data_kind"))
+            or "unknown"
+        )
+        counts[data_kind] = counts.get(data_kind, 0) + 1
+    return dict(sorted(counts.items()))
+
+
+def _count_summary_items_by_depth(records: list[object]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for record in records:
+        depth = _optional_int(_summary_payload(record).get("summary_depth"))
+        key = str(depth) if depth is not None else "unknown"
+        counts[key] = counts.get(key, 0) + 1
+    return dict(sorted(counts.items(), key=lambda item: item[0]))
+
+
+def _build_summary_lines(
+    summary_items: list[GraphVesselNeo4jInspectSummarySampleItem],
+) -> list[str]:
+    if not summary_items:
+        return []
+    lines = ["Summary samples"]
+    for item in summary_items:
+        lines.append(
+            "  "
+            f"{item.data_kind or 'unknown'}"
+            f"(depth={item.summary_depth if item.summary_depth is not None else 'unknown'}, "
+            f"info={item.info_class or 'unknown'}) "
+            f"[{item.summary_data_id}]"
+        )
+        if item.target_graph_node_id:
+            target_name = item.target_display_name or item.target_graph_node_id
+            lines.append(f"    SUMMARY_OF -> {target_name} [{item.target_graph_node_id}]")
+        if item.summary_text_preview:
+            lines.append(f"    preview: {item.summary_text_preview}")
+    return lines
+
+
 def _count_label(tx: object, graph_namespace: str, label: str) -> int:
     _validate_cypher_token(label)
     result = tx.run(
@@ -398,6 +595,9 @@ def _empty_counts() -> _InspectCounts:
         time_axis_count=None,
         time_bundle_count=None,
         raw_capsule_count=None,
+        summary_count=None,
+        active_summary_count=None,
+        invalidated_summary_count=None,
     )
 
 
@@ -480,6 +680,41 @@ def _record_value(record: object, field_name: str) -> object:
     return None
 
 
+def _summary_payload(record: object) -> dict[str, object]:
+    payload_json = _optional_record_str(record, "summary_payload_json")
+    if not payload_json:
+        return {}
+    try:
+        payload = json.loads(payload_json)
+    except json.JSONDecodeError:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _optional_int(value: object) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except ValueError:
+            return None
+    return None
+
+
+def _text(value: object) -> str:
+    return value if isinstance(value, str) else ""
+
+
+def _preview(text: str, *, max_chars: int = 180) -> str:
+    compact = " ".join(text.split())
+    if len(compact) <= max_chars:
+        return compact
+    return compact[: max_chars - 3].rstrip() + "..."
+
+
 def _single_count(result: object) -> int:
     single = getattr(result, "single", None)
     if callable(single):
@@ -528,6 +763,7 @@ __all__ = [
     "GRAPH_VESSEL_NEO4J_INSPECT_STATUSES",
     "GraphVesselNeo4jInspectPathItem",
     "GraphVesselNeo4jInspectResultFrame",
+    "GraphVesselNeo4jInspectSummarySampleItem",
     "RecordedGraphVesselNeo4jInspectResult",
     "graph_vessel_neo4j_inspect_result_id",
     "inspect_graph_vessel_from_neo4j",

@@ -70,6 +70,13 @@ def run_local_vessel_inspect(
         "time_axis_count": inspect.result.time_axis_count,
         "time_bundle_count": inspect.result.time_bundle_count,
         "raw_capsule_count": inspect.result.raw_capsule_count,
+        "summary_count": inspect.result.summary_count,
+        "active_summary_count": inspect.result.active_summary_count,
+        "invalidated_summary_count": inspect.result.invalidated_summary_count,
+        "summary_count_by_data_kind": inspect.result.summary_count_by_data_kind,
+        "summary_count_by_depth": inspect.result.summary_count_by_depth,
+        "summary_sample_items": inspect.result.summary_sample_items,
+        "summary_lines": inspect.result.summary_lines,
         "tree_lines": inspect.result.tree_lines,
         "tree_text": tree_text,
         "path_items": inspect.result.path_items,
@@ -89,10 +96,23 @@ def render_vessel_inspect_text(result: dict[str, object]) -> str:
         lines.append(f"failure_reason: {failure_reason}")
     lines.append(f"graph_namespace: {result.get('graph_namespace')}")
     lines.append(f"inspected_path_count: {result.get('inspected_path_count')}")
+    summary_count = result.get("summary_count")
+    if summary_count is not None:
+        lines.append(f"summary_count: {summary_count}")
+        lines.append(f"active_summary_count: {result.get('active_summary_count')}")
+        lines.append(
+            f"invalidated_summary_count: {result.get('invalidated_summary_count')}"
+        )
+        lines.append(f"summary_count_by_data_kind: {result.get('summary_count_by_data_kind')}")
+        lines.append(f"summary_count_by_depth: {result.get('summary_count_by_depth')}")
     tree_text = result.get("tree_text")
     if isinstance(tree_text, str) and tree_text:
         lines.append("")
         lines.append(tree_text)
+    summary_lines = result.get("summary_lines")
+    if isinstance(summary_lines, list) and summary_lines:
+        lines.append("")
+        lines.extend(str(line) for line in summary_lines)
     return "\n".join(lines)
 
 

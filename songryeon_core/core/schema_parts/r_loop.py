@@ -70,6 +70,7 @@ class R1GraphGoalFrame:
     max_context_tokens: int
     stop_condition: str
     source_graph_guide_packet_id: str
+    user_question_anchor_id: str = ""
     source_data_ids: list[str] = field(default_factory=list)
     source_trace_ids: list[str] = field(default_factory=list)
     generated_by: str = R_LOOP_SCHEMA_ONLY_GENERATOR

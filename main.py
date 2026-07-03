@@ -14,6 +14,27 @@ from songryeon_core.runtime.graph_vessel_inspect import (
 )
 from songryeon_core.runtime.graph_vessel_readback import run_local_vessel_readback
 from songryeon_core.runtime.l_loop_smoke import run_qwen_l_loop_smoke
+from songryeon_core.runtime.night_changed_source_summary import (
+    DEFAULT_NIGHT_CHANGED_SOURCE_STORE_DIR,
+    run_night_changed_source_summary,
+)
+from songryeon_core.runtime.night_token_budget_layer_summary import (
+    DEFAULT_NIGHT_TOKEN_BUDGET_MAX_LAYER_DEPTH,
+    DEFAULT_NIGHT_TOKEN_BUDGET_MAX_STEPS,
+    DEFAULT_NIGHT_TOKEN_BUDGET_LAYER_MAX_BUNDLE_CHARS,
+    DEFAULT_NIGHT_TOKEN_BUDGET_TARGET_CONTEXT_CHARS,
+    run_night_token_budget_layer_summary,
+)
+from songryeon_core.runtime.r_loop_vessel_read_packet import (
+    render_r_loop_vessel_read_packet_text,
+    run_local_r_loop_vessel_read_packet,
+)
+from songryeon_core.runtime.r_loop_vessel_one_step import (
+    render_r_loop_vessel_one_step_text,
+    render_r_loop_vessel_traverse_text,
+    run_local_r_loop_vessel_one_step,
+    run_local_r_loop_vessel_traverse,
+)
 from songryeon_core.runtime.replay import replay_run
 from songryeon_core.runtime.smoke_test import run_smoke_tests
 from songryeon_core.runtime.terminal_view import render_pretty_turn
@@ -135,6 +156,164 @@ def main() -> None:
     vessel_inspect_parser.add_argument("--allow-no-auth", action="store_true")
     vessel_inspect_parser.add_argument("--limit", type=int, default=50)
     vessel_inspect_parser.add_argument("--format", choices=["json", "text"], default="json")
+
+    r_loop_vessel_read_packet_parser = subparsers.add_parser("vessel-r-read-packet")
+    r_loop_vessel_read_packet_parser.add_argument(
+        "--batch-id",
+        default="manual_r_loop_vessel_read_packet",
+    )
+    r_loop_vessel_read_packet_parser.add_argument(
+        "--turn-id",
+        default="turn_r_loop_vessel_read_packet_0001",
+    )
+    r_loop_vessel_read_packet_parser.add_argument("--uri", default=None)
+    r_loop_vessel_read_packet_parser.add_argument("--user", default=None)
+    r_loop_vessel_read_packet_parser.add_argument("--password", default=None)
+    r_loop_vessel_read_packet_parser.add_argument("--database", default=None)
+    r_loop_vessel_read_packet_parser.add_argument("--allow-no-auth", action="store_true")
+    r_loop_vessel_read_packet_parser.add_argument("--limit", type=int, default=50)
+    r_loop_vessel_read_packet_parser.add_argument(
+        "--format",
+        choices=["json", "text"],
+        default="json",
+    )
+
+    r_loop_vessel_one_step_parser = subparsers.add_parser("vessel-r-one-step")
+    r_loop_vessel_one_step_parser.add_argument("user_question")
+    r_loop_vessel_one_step_parser.add_argument(
+        "--batch-id",
+        default="manual_r_loop_vessel_one_step",
+    )
+    r_loop_vessel_one_step_parser.add_argument(
+        "--turn-id",
+        default="turn_r_loop_vessel_one_step_0001",
+    )
+    r_loop_vessel_one_step_parser.add_argument("--uri", default=None)
+    r_loop_vessel_one_step_parser.add_argument("--user", default=None)
+    r_loop_vessel_one_step_parser.add_argument("--password", default=None)
+    r_loop_vessel_one_step_parser.add_argument("--database", default=None)
+    r_loop_vessel_one_step_parser.add_argument("--allow-no-auth", action="store_true")
+    r_loop_vessel_one_step_parser.add_argument("--limit", type=int, default=50)
+    r_loop_vessel_one_step_parser.add_argument(
+        "--llm-mode",
+        choices=["off", "fake", "qwen"],
+        default="fake",
+    )
+    r_loop_vessel_one_step_parser.add_argument("--endpoint", default=None)
+    r_loop_vessel_one_step_parser.add_argument("--model-id", default=None)
+    r_loop_vessel_one_step_parser.add_argument("--timeout", type=int, default=None)
+    r_loop_vessel_one_step_parser.add_argument(
+        "--format",
+        choices=["json", "text"],
+        default="json",
+    )
+
+    r_loop_vessel_traverse_parser = subparsers.add_parser("vessel-r-traverse")
+    r_loop_vessel_traverse_parser.add_argument("user_question")
+    r_loop_vessel_traverse_parser.add_argument(
+        "--batch-id",
+        default="manual_r_loop_vessel_traverse",
+    )
+    r_loop_vessel_traverse_parser.add_argument(
+        "--turn-id",
+        default="turn_r_loop_vessel_traverse_0001",
+    )
+    r_loop_vessel_traverse_parser.add_argument("--uri", default=None)
+    r_loop_vessel_traverse_parser.add_argument("--user", default=None)
+    r_loop_vessel_traverse_parser.add_argument("--password", default=None)
+    r_loop_vessel_traverse_parser.add_argument("--database", default=None)
+    r_loop_vessel_traverse_parser.add_argument("--allow-no-auth", action="store_true")
+    r_loop_vessel_traverse_parser.add_argument("--limit", type=int, default=50)
+    r_loop_vessel_traverse_parser.add_argument(
+        "--llm-mode",
+        choices=["off", "fake", "qwen"],
+        default="fake",
+    )
+    r_loop_vessel_traverse_parser.add_argument("--endpoint", default=None)
+    r_loop_vessel_traverse_parser.add_argument("--model-id", default=None)
+    r_loop_vessel_traverse_parser.add_argument("--timeout", type=int, default=None)
+    r_loop_vessel_traverse_parser.add_argument(
+        "--format",
+        choices=["json", "text"],
+        default="json",
+    )
+
+    night_changed_sources_parser = subparsers.add_parser(
+        "night-summarize-changed-sources"
+    )
+    night_changed_sources_parser.add_argument("--root", default=".")
+    night_changed_sources_parser.add_argument(
+        "--store-dir",
+        default=DEFAULT_NIGHT_CHANGED_SOURCE_STORE_DIR,
+    )
+    night_changed_sources_parser.add_argument("--batch-id", default=None)
+    night_changed_sources_parser.add_argument("--turn-id", default=None)
+    night_changed_sources_parser.add_argument(
+        "--llm-mode",
+        choices=["off", "fake", "qwen"],
+        default="off",
+    )
+    night_changed_sources_parser.add_argument("--endpoint", default=None)
+    night_changed_sources_parser.add_argument("--model-id", default=None)
+    night_changed_sources_parser.add_argument("--timeout", type=int, default=None)
+    night_changed_sources_parser.add_argument("--one-at-a-time", action="store_true")
+    night_changed_sources_parser.add_argument("--write-vessel", action="store_true")
+    night_changed_sources_parser.add_argument("--uri", default=None)
+    night_changed_sources_parser.add_argument("--user", default=None)
+    night_changed_sources_parser.add_argument("--password", default=None)
+    night_changed_sources_parser.add_argument("--database", default=None)
+    night_changed_sources_parser.add_argument("--allow-no-auth", action="store_true")
+
+    night_token_layer_parser = subparsers.add_parser("night-summarize-token-layer")
+    night_token_layer_parser.add_argument(
+        "--store-dir",
+        default=DEFAULT_NIGHT_CHANGED_SOURCE_STORE_DIR,
+    )
+    night_token_layer_parser.add_argument("--batch-id", default=None)
+    night_token_layer_parser.add_argument("--turn-id", default=None)
+    night_token_layer_parser.add_argument(
+        "--max-bundle-chars",
+        type=int,
+        default=DEFAULT_NIGHT_TOKEN_BUDGET_LAYER_MAX_BUNDLE_CHARS,
+    )
+    night_token_layer_parser.add_argument(
+        "--llm-mode",
+        choices=["off", "fake", "qwen"],
+        default="off",
+    )
+    night_token_layer_parser.add_argument("--endpoint", default=None)
+    night_token_layer_parser.add_argument("--model-id", default=None)
+    night_token_layer_parser.add_argument("--timeout", type=int, default=None)
+    night_token_layer_parser.add_argument("--until-context-budget", action="store_true")
+    night_token_layer_parser.add_argument(
+        "--target-context-chars",
+        type=int,
+        default=DEFAULT_NIGHT_TOKEN_BUDGET_TARGET_CONTEXT_CHARS,
+    )
+    night_token_layer_parser.add_argument(
+        "--max-layer-depth",
+        type=int,
+        default=DEFAULT_NIGHT_TOKEN_BUDGET_MAX_LAYER_DEPTH,
+    )
+    night_token_layer_parser.add_argument(
+        "--max-steps",
+        type=int,
+        default=DEFAULT_NIGHT_TOKEN_BUDGET_MAX_STEPS,
+    )
+    night_token_layer_parser.add_argument("--max-runtime-minutes", type=float, default=None)
+    night_token_layer_parser.add_argument("--progress-jsonl", default=None)
+    night_token_layer_parser.add_argument(
+        "--vessel-write-mode",
+        choices=["none", "every-step", "at-end"],
+        default=None,
+    )
+    night_token_layer_parser.add_argument("--no-stop-on-failure", action="store_true")
+    night_token_layer_parser.add_argument("--write-vessel", action="store_true")
+    night_token_layer_parser.add_argument("--uri", default=None)
+    night_token_layer_parser.add_argument("--user", default=None)
+    night_token_layer_parser.add_argument("--password", default=None)
+    night_token_layer_parser.add_argument("--database", default=None)
+    night_token_layer_parser.add_argument("--allow-no-auth", action="store_true")
 
     args = parser.parse_args()
 
@@ -277,6 +456,124 @@ def main() -> None:
         else:
             print(json.dumps(result, ensure_ascii=False, indent=2))
         if result["inspect_status"] == "read_failed":
+            raise SystemExit(1)
+    elif args.command == "vessel-r-read-packet":
+        result = run_local_r_loop_vessel_read_packet(
+            batch_id=args.batch_id,
+            turn_id=args.turn_id,
+            uri=args.uri,
+            user=args.user,
+            password=args.password,
+            database=args.database,
+            allow_no_auth=args.allow_no_auth,
+            limit=args.limit,
+        )
+        if args.format == "text":
+            print(render_r_loop_vessel_read_packet_text(result))
+        else:
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+        if result["read_status"] == "read_failed":
+            raise SystemExit(1)
+    elif args.command == "vessel-r-one-step":
+        result = run_local_r_loop_vessel_one_step(
+            user_question=args.user_question,
+            batch_id=args.batch_id,
+            turn_id=args.turn_id,
+            uri=args.uri,
+            user=args.user,
+            password=args.password,
+            database=args.database,
+            allow_no_auth=args.allow_no_auth,
+            limit=args.limit,
+            llm_mode=args.llm_mode,
+            endpoint=args.endpoint,
+            model_id=args.model_id,
+            timeout_seconds=args.timeout,
+        )
+        if args.format == "text":
+            print(render_r_loop_vessel_one_step_text(result))
+        else:
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+        if result["one_step_status"] == "failed":
+            raise SystemExit(1)
+    elif args.command == "vessel-r-traverse":
+        result = run_local_r_loop_vessel_traverse(
+            user_question=args.user_question,
+            batch_id=args.batch_id,
+            turn_id=args.turn_id,
+            uri=args.uri,
+            user=args.user,
+            password=args.password,
+            database=args.database,
+            allow_no_auth=args.allow_no_auth,
+            limit=args.limit,
+            llm_mode=args.llm_mode,
+            endpoint=args.endpoint,
+            model_id=args.model_id,
+            timeout_seconds=args.timeout,
+        )
+        if args.format == "text":
+            print(render_r_loop_vessel_traverse_text(result))
+        else:
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+        if result["traverse_status"] == "failed":
+            raise SystemExit(1)
+    elif args.command == "night-summarize-changed-sources":
+        result = run_night_changed_source_summary(
+            root_path=args.root,
+            store_dir=args.store_dir,
+            batch_id=args.batch_id,
+            turn_id=args.turn_id,
+            llm_mode=args.llm_mode,
+            endpoint=args.endpoint,
+            model_id=args.model_id,
+            timeout_seconds=args.timeout,
+            one_at_a_time=args.one_at_a_time,
+            write_vessel=args.write_vessel,
+            uri=args.uri,
+            user=args.user,
+            password=args.password,
+            database=args.database,
+            allow_no_auth=args.allow_no_auth,
+        )
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        if (
+            result.get("write_result") is not None
+            and isinstance(result.get("write_result"), dict)
+            and result["write_result"].get("write_status") == "write_failed"
+        ):
+            raise SystemExit(1)
+    elif args.command == "night-summarize-token-layer":
+        result = run_night_token_budget_layer_summary(
+            store_dir=args.store_dir,
+            batch_id=args.batch_id,
+            turn_id=args.turn_id,
+            max_bundle_chars=args.max_bundle_chars,
+            llm_mode=args.llm_mode,
+            endpoint=args.endpoint,
+            model_id=args.model_id,
+            timeout_seconds=args.timeout,
+            until_context_budget=args.until_context_budget,
+            target_context_chars=args.target_context_chars,
+            max_layer_depth=args.max_layer_depth,
+            max_steps=args.max_steps,
+            max_runtime_minutes=args.max_runtime_minutes,
+            progress_jsonl=args.progress_jsonl,
+            vessel_write_mode=args.vessel_write_mode,
+            stop_on_failure=not args.no_stop_on_failure,
+            write_vessel=args.write_vessel,
+            uri=args.uri,
+            user=args.user,
+            password=args.password,
+            database=args.database,
+            allow_no_auth=args.allow_no_auth,
+        )
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        if (
+            result.get("write_result") is not None
+            and isinstance(result.get("write_result"), dict)
+            and result["write_result"].get("write_status") == "write_failed"
+        ):
             raise SystemExit(1)
 
 

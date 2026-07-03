@@ -2,7 +2,7 @@
 
 발주서는 개발 지도에서 내려온 실무 계획서다.
 
-현재 정식 발주서는 `ORDER_001`부터 `ORDER_165`까지 있다.
+현재 정식 발주서는 `ORDER_001`부터 `ORDER_192`까지 있다.
 
 `ORDER_066`부터 `ORDER_075`까지는 메타정보 관리법을 실제 런타임과 LLM 노드 배선에 적용하기 위한 복구 로드맵이다.
 
@@ -135,6 +135,26 @@
 `ORDER_147`부터 `ORDER_161`까지는 R 결과 전달, graph traversal, activity ledger, graph source ingest, export packet, Vessel write plan boundary, local Neo4j first write, Vessel display vocabulary를 순서대로 잠그는 그래프 메모리/심야정부 전초 작업이다.
 
 `ORDER_162`부터 `ORDER_165`까지는 Vessel readback/inspect와 동적 원본 변경 시 source version lineage, observation ledger, summary invalidation ledger를 남기는 외부 그래프 DB 안전장치 작업이다.
+
+`ORDER_166`은 원본 `TimeBundle` graph node를 오염시키지 않고, LLM이 만든 심야정부 요약을 별도 `SummaryGraphNode`와 `SUMMARY_OF` edge로 붙이는 첫 summary node MVP 발주서다.
+
+`ORDER_167`은 ORDER_166의 심야정부 TimeBundle 요약 worker 이름을 `night_summarize_time_bundle` 계열로 정리하고, 기존 이름은 호환 alias로 남기는 명명 정리 발주서다.
+
+`ORDER_168`은 새로 관측됐거나 내용이 바뀐 코드/문서 `raw_source` leaf를 원문 text snapshot과 1:1로 연결해 LLM 요약 `SummaryGraphNode`를 붙이는 발주서다.
+
+`ORDER_169`는 ORDER_168의 source leaf 요약 엔진을 터미널에서 한 번에 실행하는 `night-summarize-changed-sources` CLI로 묶는 발주서다.
+
+`ORDER_170`은 `night-summarize-changed-sources --one-at-a-time` 모드로 변경 source leaf 요약 대상을 queue로 고정하고 한 실행에 하나씩만 요약해 재개 가능하게 만드는 발주서다.
+
+`ORDER_171`은 source leaf summary node들을 날짜가 아니라 예산 단위로 묶어, 한 실행에 하나의 token-budget summary bundle을 만들고 상위 mixed summary node를 붙이는 발주서다.
+
+`ORDER_172`는 token-budget summary layer를 사람이 반복 실행하지 않아도 되게, target context budget 이하가 될 때까지 `max_steps`와 `max_layer_depth` 안에서 자동으로 계층 요약을 진행하는 발주서다.
+
+`ORDER_173`은 ORDER_172 자동 reducer를 긴 실행으로 쓸 수 있게 progress JSONL, runtime limit, failure stop, Vessel write mode를 더한 checkpointed long runner 발주서다.
+
+`ORDER_174`는 Neo4j Vessel inspect가 summary/layer 노드를 read-only로 보여주게 하는 발주서다. 기본 CoreEgo 시간축 경로뿐 아니라 summary 수, depth, data_kind, sample preview를 확인한다.
+
+`ORDER_175`부터 `ORDER_192`까지는 Vessel-backed R read packet, R1/R2/R3 one-step traversal, 계층 surface, multi-step traversal, summary-before-raw 정책, raw original cap, R traverse live audit, token summary 하위 summary expansion, R2 branch role surface 안정화, R1 user question anchor copy로 이어지는 R루프 실전성 검증 작업이다.
 
 ## 임시 발주서
 
@@ -282,3 +302,30 @@
 - [ORDER 163: Vessel Inspect Manual Walk v0](ORDER_163_VESSEL_INSPECT_MANUAL_WALK_V0.md)
 - [ORDER 164: Dynamic Source Version Lineage And Summary Invalidation Ledger v0](ORDER_164_DYNAMIC_SOURCE_VERSION_LINEAGE_AND_SUMMARY_INVALIDATION_LEDGER_V0.md)
 - [ORDER 165: Same-Content Reobserve Observation Ledger v0](ORDER_165_SAME_CONTENT_REOBSERVE_OBSERVATION_LEDGER_V0.md)
+- [ORDER 166: Night TimeBundle Summary Node v0](ORDER_166_NIGHT_TIME_BUNDLE_SUMMARY_NODE_V0.md)
+- [ORDER 167: Night Summary Naming Clarity v0](ORDER_167_NIGHT_SUMMARY_NAMING_CLARITY_V0.md)
+- [ORDER 168: Night Summarize Changed Source Leaves v0](ORDER_168_NIGHT_SUMMARIZE_CHANGED_SOURCE_LEAVES_V0.md)
+- [ORDER 169: Night Changed Source Summary CLI v0](ORDER_169_NIGHT_CHANGED_SOURCE_SUMMARY_CLI_V0.md)
+- [ORDER 170: Night Changed Source One-At-A-Time Runner v0](ORDER_170_NIGHT_CHANGED_SOURCE_ONE_AT_A_TIME_RUNNER_V0.md)
+- [ORDER 171: Night Token Budget Layer Summary v0](ORDER_171_NIGHT_TOKEN_BUDGET_LAYER_SUMMARY_V0.md)
+- [ORDER 172: Night Token Layer Auto Reduce Until Context Budget v0](ORDER_172_NIGHT_TOKEN_LAYER_AUTO_REDUCE_UNTIL_CONTEXT_BUDGET_V0.md)
+- [ORDER 173: Night Checkpointed Long Runner v0](ORDER_173_NIGHT_CHECKPOINTED_LONG_RUNNER_V0.md)
+- [ORDER 174: Vessel Inspect Summary Layer View v0](ORDER_174_VESSEL_INSPECT_SUMMARY_LAYER_VIEW_V0.md)
+- [ORDER 175: Vessel-Backed R Graph Read Packet v0](ORDER_175_VESSEL_BACKED_R_GRAPH_READ_PACKET_V0.md)
+- [ORDER 176: Vessel R One-Step Traversal v0](ORDER_176_VESSEL_R_ONE_STEP_TRAVERSAL_V0.md)
+- [ORDER 177: R1 Candidate Text Blindness v0](ORDER_177_R1_CANDIDATE_TEXT_BLINDNESS_V0.md)
+- [ORDER 178: R Vessel Candidate Layer Surface v0](ORDER_178_R_VESSEL_CANDIDATE_LAYER_SURFACE_V0.md)
+- [ORDER 179: R2 Vessel Selection ID Disambiguation v0](ORDER_179_R2_VESSEL_SELECTION_ID_DISAMBIGUATION_V0.md)
+- [ORDER 180: R2 Prompt Example ID Removal v0](ORDER_180_R2_PROMPT_EXAMPLE_ID_REMOVAL_V0.md)
+- [ORDER 181: R2 Official Selection Ref Map v0](ORDER_181_R2_OFFICIAL_SELECTION_REF_MAP_V0.md)
+- [ORDER 182: R CoreEgo Start Selection Surface v0](ORDER_182_R_CORE_EGO_START_SELECTION_SURFACE_V0.md)
+- [ORDER 183: R Vessel Hierarchical Child Candidate Surface v0](ORDER_183_R_VESSEL_HIERARCHICAL_CHILD_CANDIDATE_SURFACE_V0.md)
+- [ORDER 184: R Vessel Multi-Step Traversal MVP v0](ORDER_184_R_VESSEL_MULTI_STEP_TRAVERSAL_MVP_V0.md)
+- [ORDER 185: R Terminal Material Budget And Early Stop Guard v0](ORDER_185_R_TERMINAL_MATERIAL_BUDGET_AND_EARLY_STOP_GUARD_V0.md)
+- [ORDER 186: R Vessel Exact Child Record Expansion v0](ORDER_186_R_VESSEL_EXACT_CHILD_RECORD_EXPANSION_V0.md)
+- [ORDER 187: R Vessel Summary Layer Before Raw v0](ORDER_187_R_VESSEL_SUMMARY_LAYER_BEFORE_RAW_V0.md)
+- [ORDER 188: R Vessel Raw Original Read Cap v0](ORDER_188_R_VESSEL_RAW_ORIGINAL_READ_CAP_V0.md)
+- [ORDER 189: R Traverse Live Audit v0](ORDER_189_R_TRAVERSE_LIVE_AUDIT_V0.md)
+- [ORDER 190: R Vessel Token Summary Deeper Child Expansion v0](ORDER_190_R_VESSEL_TOKEN_SUMMARY_DEEPER_CHILD_EXPANSION_V0.md)
+- [ORDER 191: R2 Source Ingest Branch Selection Stability v0](ORDER_191_R2_SOURCE_INGEST_BRANCH_SELECTION_STABILITY_V0.md)
+- [ORDER 192: R1 User Question Anchor Copy v0](ORDER_192_R1_USER_QUESTION_ANCHOR_COPY_V0.md)
