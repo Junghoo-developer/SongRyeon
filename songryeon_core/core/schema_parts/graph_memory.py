@@ -83,6 +83,7 @@ R_LOOP_MEMORY_HANDOFF_SEMANTIC_HINT_STATUSES = {"not_run", "ran", "failed"}
 TURN_ACTIVITY_GRAPH_LINK_ACTIVITY_KINDS = {
     "l_loop_activity_ledger",
     "r_graph_access_ledger",
+    "r_vessel_activity_ledger",
 }
 SOURCE_VERSION_LINEAGE_CODE_GENERATOR = "CODE:SOURCE_VERSION_LINEAGE_BUILDER"
 SOURCE_OBSERVATION_LEDGER_CODE_GENERATOR = "CODE:SOURCE_OBSERVATION_LEDGER_BUILDER"
@@ -334,6 +335,7 @@ class TurnActivityGraphLinkFrame:
     turn_capsule_graph_node_id: str
     l_loop_activity_ledger_data_ids: list[str] = field(default_factory=list)
     r_graph_access_ledger_data_ids: list[str] = field(default_factory=list)
+    r_vessel_activity_ledger_data_ids: list[str] = field(default_factory=list)
     activity_ledger_graph_node_ids: list[str] = field(default_factory=list)
     activity_ledger_graph_edge_ids: list[str] = field(default_factory=list)
     link_records: list[dict[str, str]] = field(default_factory=list)
@@ -1182,6 +1184,7 @@ def validate_turn_activity_graph_link_frame(frame: TurnActivityGraphLinkFrame) -
     list_fields = {
         "l_loop_activity_ledger_data_ids": frame.l_loop_activity_ledger_data_ids,
         "r_graph_access_ledger_data_ids": frame.r_graph_access_ledger_data_ids,
+        "r_vessel_activity_ledger_data_ids": frame.r_vessel_activity_ledger_data_ids,
         "activity_ledger_graph_node_ids": frame.activity_ledger_graph_node_ids,
         "activity_ledger_graph_edge_ids": frame.activity_ledger_graph_edge_ids,
         "source_trace_ids": frame.source_trace_ids,
@@ -1194,6 +1197,7 @@ def validate_turn_activity_graph_link_frame(frame: TurnActivityGraphLinkFrame) -
     ledger_data_ids = {
         *frame.l_loop_activity_ledger_data_ids,
         *frame.r_graph_access_ledger_data_ids,
+        *frame.r_vessel_activity_ledger_data_ids,
     }
     if len(frame.activity_ledger_graph_node_ids) != len(ledger_data_ids):
         raise ValueError(

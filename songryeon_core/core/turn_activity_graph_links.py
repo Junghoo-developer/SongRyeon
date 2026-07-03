@@ -18,6 +18,7 @@ from songryeon_core.core.trace_store import TraceStore
 
 L_LOOP_ACTIVITY_LEDGER_DATA_TYPE = "loop_activity:l_loop_activity_ledger_frame"
 R_GRAPH_ACCESS_LEDGER_DATA_TYPE = "graph_memory:turn_access_ledger_frame"
+R_VESSEL_ACTIVITY_LEDGER_DATA_TYPE = "r_loop:vessel_activity_ledger_frame"
 TURN_ACTIVITY_GRAPH_LINK_DATA_TYPE = "graph_memory:turn_activity_graph_link_frame"
 
 
@@ -48,6 +49,7 @@ def record_turn_activity_graph_links(
     turn_id: str,
     l_loop_activity_ledger_data_ids: list[str] | None = None,
     r_graph_access_ledger_data_ids: list[str] | None = None,
+    r_vessel_activity_ledger_data_ids: list[str] | None = None,
     frame_id: str | None = None,
 ) -> tuple[str, str, TurnActivityGraphLinkFrame]:
     """Create graph nodes/edges connecting a raw capsule to L/R activity ledgers."""
@@ -65,6 +67,12 @@ def record_turn_activity_graph_links(
         data_type=R_GRAPH_ACCESS_LEDGER_DATA_TYPE,
         explicit_data_ids=r_graph_access_ledger_data_ids,
     )
+    r_vessel_ledger_records = _ledger_records(
+        data_store=data_store,
+        turn_id=turn_id,
+        data_type=R_VESSEL_ACTIVITY_LEDGER_DATA_TYPE,
+        explicit_data_ids=r_vessel_activity_ledger_data_ids,
+    )
     activity_nodes: list[GraphMemoryNodeFrame] = []
     activity_edges: list[GraphMemoryEdgeFrame] = []
     link_records: list[dict[str, str]] = []
@@ -72,6 +80,11 @@ def record_turn_activity_graph_links(
     for activity_kind, records, source_field in [
         ("l_loop_activity_ledger", l_ledger_records, "l_loop_activity_ledger_data_ids"),
         ("r_graph_access_ledger", r_ledger_records, "r_graph_access_ledger_data_ids"),
+        (
+            "r_vessel_activity_ledger",
+            r_vessel_ledger_records,
+            "r_vessel_activity_ledger_data_ids",
+        ),
     ]:
         for record in records:
             node = _build_activity_ledger_node(
@@ -109,6 +122,7 @@ def record_turn_activity_graph_links(
             raw_node_id,
             *[record.data_id for record in l_ledger_records],
             *[record.data_id for record in r_ledger_records],
+            *[record.data_id for record in r_vessel_ledger_records],
             *[node.node_id for node in activity_nodes],
             *[edge.edge_id for edge in activity_edges],
         ]
@@ -119,6 +133,9 @@ def record_turn_activity_graph_links(
         turn_capsule_graph_node_id=raw_node_id,
         l_loop_activity_ledger_data_ids=[record.data_id for record in l_ledger_records],
         r_graph_access_ledger_data_ids=[record.data_id for record in r_ledger_records],
+        r_vessel_activity_ledger_data_ids=[
+            record.data_id for record in r_vessel_ledger_records
+        ],
         activity_ledger_graph_node_ids=[node.node_id for node in activity_nodes],
         activity_ledger_graph_edge_ids=[edge.edge_id for edge in activity_edges],
         link_records=link_records,
@@ -312,6 +329,7 @@ def _unique_strings(values: list[str | None]) -> list[str]:
 __all__ = [
     "L_LOOP_ACTIVITY_LEDGER_DATA_TYPE",
     "R_GRAPH_ACCESS_LEDGER_DATA_TYPE",
+    "R_VESSEL_ACTIVITY_LEDGER_DATA_TYPE",
     "TURN_ACTIVITY_GRAPH_LINK_DATA_TYPE",
     "activity_ledger_graph_edge_id",
     "activity_ledger_graph_node_id",

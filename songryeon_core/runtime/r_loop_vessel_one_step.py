@@ -12,6 +12,9 @@ from songryeon_core.core.r_loop_vessel_start_handoff import (
     record_r_loop_vessel_start_handoff_packet,
 )
 from songryeon_core.core.trace_store import TraceStore
+from songryeon_core.core.turn_activity_graph_links import (
+    record_turn_activity_graph_links,
+)
 from songryeon_core.llm.runtime import (
     build_llm_adapter,
     build_llm_runtime_config,
@@ -225,6 +228,18 @@ def run_local_r_loop_vessel_traverse(
         frame_label=batch_id,
         source_start_handoff_packet_id=start_handoff.packet.packet_id,
     )
+    (
+        turn_activity_link_trace_event_id,
+        turn_activity_link_frame_id,
+        turn_activity_link_frame,
+    ) = record_turn_activity_graph_links(
+        trace_store=trace_store,
+        data_store=data_store,
+        turn_id=turn_id,
+        l_loop_activity_ledger_data_ids=[],
+        r_graph_access_ledger_data_ids=[],
+        r_vessel_activity_ledger_data_ids=[activity_ledger_frame_id],
+    )
 
     return {
         "status": "R_LOOP_VESSEL_TRAVERSE_OK"
@@ -255,6 +270,17 @@ def run_local_r_loop_vessel_traverse(
         "activity_ledger_selected_count": len(activity_ledger.selected_graph_node_ids),
         "activity_ledger_inspected_count": len(activity_ledger.inspected_graph_node_ids),
         "activity_ledger_candidate_count": len(activity_ledger.candidate_graph_node_ids),
+        "turn_activity_graph_link_frame_id": turn_activity_link_frame_id,
+        "turn_activity_graph_link_trace_event_id": turn_activity_link_trace_event_id,
+        "turn_activity_graph_link_r_vessel_ledger_count": len(
+            turn_activity_link_frame.r_vessel_activity_ledger_data_ids
+        ),
+        "turn_activity_graph_link_node_count": len(
+            turn_activity_link_frame.activity_ledger_graph_node_ids
+        ),
+        "turn_activity_graph_link_edge_count": len(
+            turn_activity_link_frame.activity_ledger_graph_edge_ids
+        ),
         "terminal_material_seen_count": run.result_frame.terminal_material_seen_count,
         "min_terminal_material_count": run.result_frame.min_terminal_material_count,
         "raw_original_material_seen_count": (
@@ -278,6 +304,7 @@ def run_local_r_loop_vessel_traverse(
         "data_record_count": len(data_store.list_records()),
         "start_handoff_packet_frame": asdict(start_handoff.packet),
         "activity_ledger_frame": asdict(activity_ledger),
+        "turn_activity_graph_link_frame": asdict(turn_activity_link_frame),
         "result_frame": asdict(run.result_frame),
         "r1_goal_frame": asdict(run.r1_goal) if run.r1_goal is not None else None,
         "r2_selection_frames": [asdict(frame) for frame in run.r2_selections],
@@ -356,6 +383,10 @@ def render_r_loop_vessel_traverse_text(result: dict[str, object]) -> str:
         f"selected={result.get('activity_ledger_selected_count')} / "
         f"inspected={result.get('activity_ledger_inspected_count')} / "
         f"candidates={result.get('activity_ledger_candidate_count')}",
+        "R Vessel raw capsule link: "
+        f"r_vessel_ledgers={result.get('turn_activity_graph_link_r_vessel_ledger_count')} / "
+        f"nodes={result.get('turn_activity_graph_link_node_count')} / "
+        f"edges={result.get('turn_activity_graph_link_edge_count')}",
         f"terminal_material_seen_count: {result.get('terminal_material_seen_count')}",
         f"min_terminal_material_count: {result.get('min_terminal_material_count')}",
         f"raw_original_material_seen_count: {result.get('raw_original_material_seen_count')}",

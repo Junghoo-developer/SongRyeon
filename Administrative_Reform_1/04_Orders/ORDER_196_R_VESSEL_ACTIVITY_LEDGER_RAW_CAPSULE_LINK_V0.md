@@ -2,9 +2,13 @@
 
 ## Status
 
-Prepared on 2026-07-03 as the third implementation step after ORDER 195.
+Implemented on 2026-07-03 as the third implementation step after ORDER 195.
 
 This order depends on ORDER 195.
+
+Execution record:
+
+- `Administrative_Reform_1/05_Execution_Records/order_196_r_vessel_activity_ledger_raw_capsule_link_implementation_2026_07_03_001.md`
 
 ## Trigger
 
