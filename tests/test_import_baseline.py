@@ -27,6 +27,7 @@ def test_core_import_baseline() -> None:
         "songryeon_core.runtime.graph_vessel_inspect",
         "songryeon_core.runtime.graph_vessel_readback",
         "songryeon_core.runtime.r_loop_vessel_answer_demo",
+        "songryeon_core.runtime.r_loop_vessel_live_route",
         "songryeon_core.runtime.dry_run",
         "songryeon_core.runtime.smoke_cases.document_memory",
         "songryeon_core.runtime.smoke_cases.router_fallback",

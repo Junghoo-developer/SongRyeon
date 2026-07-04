@@ -408,6 +408,17 @@ def main() -> None:
             same_turn_l_reroute_enabled=args.same_turn_l_reroute,
             max_l_runs_per_turn=args.max_l_runs_per_turn,
             enable_r_route_experimental=args.enable_r_route_experimental,
+            enable_vessel_r_route=args.enable_vessel_r_route,
+            vessel_r_uri=args.vessel_uri,
+            vessel_r_user=args.vessel_user,
+            vessel_r_password=args.vessel_password,
+            vessel_r_database=args.database,
+            vessel_r_allow_no_auth=args.vessel_allow_no_auth,
+            vessel_r_limit=args.vessel_limit,
+            vessel_r_max_node_reads=args.vessel_max_node_reads,
+            vessel_r_max_raw_original_material_reads=(
+                args.vessel_max_raw_original_material_reads
+            ),
             live_trace=args.live_trace,
         )
         if args.pretty:
@@ -433,6 +444,17 @@ def main() -> None:
             same_turn_l_reroute_enabled=args.same_turn_l_reroute,
             max_l_runs_per_turn=args.max_l_runs_per_turn,
             enable_r_route_experimental=args.enable_r_route_experimental,
+            enable_vessel_r_route=args.enable_vessel_r_route,
+            vessel_r_uri=args.vessel_uri,
+            vessel_r_user=args.vessel_user,
+            vessel_r_password=args.vessel_password,
+            vessel_r_database=args.database,
+            vessel_r_allow_no_auth=args.vessel_allow_no_auth,
+            vessel_r_limit=args.vessel_limit,
+            vessel_r_max_node_reads=args.vessel_max_node_reads,
+            vessel_r_max_raw_original_material_reads=(
+                args.vessel_max_raw_original_material_reads
+            ),
             live_trace=args.live_trace,
         )
         if args.pretty:
@@ -664,6 +686,15 @@ def _add_turn_runtime_args(parser: argparse.ArgumentParser, *, include_qwen_args
     parser.add_argument("--same-turn-l-reroute", action="store_true")
     parser.add_argument("--max-l-runs-per-turn", type=int, default=1)
     parser.add_argument("--enable-r-route-experimental", action="store_true")
+    parser.add_argument("--enable-vessel-r-route", action="store_true")
+    parser.add_argument("--vessel-uri", default=None)
+    parser.add_argument("--vessel-user", default=None)
+    parser.add_argument("--vessel-password", default=None)
+    parser.add_argument("--database", default=None)
+    parser.add_argument("--vessel-allow-no-auth", action="store_true")
+    parser.add_argument("--vessel-limit", type=int, default=50)
+    parser.add_argument("--vessel-max-node-reads", type=int, default=6)
+    parser.add_argument("--vessel-max-raw-original-material-reads", type=int, default=5)
     parser.add_argument("--live-trace", action="store_true")
     if include_qwen_args:
         parser.add_argument("--endpoint", default=None)
@@ -719,6 +750,17 @@ def _run_qwen_chat(args: argparse.Namespace) -> None:
             same_turn_l_reroute_enabled=args.same_turn_l_reroute,
             max_l_runs_per_turn=args.max_l_runs_per_turn,
             enable_r_route_experimental=args.enable_r_route_experimental,
+            enable_vessel_r_route=args.enable_vessel_r_route,
+            vessel_r_uri=args.vessel_uri,
+            vessel_r_user=args.vessel_user,
+            vessel_r_password=args.vessel_password,
+            vessel_r_database=args.database,
+            vessel_r_allow_no_auth=args.vessel_allow_no_auth,
+            vessel_r_limit=args.vessel_limit,
+            vessel_r_max_node_reads=args.vessel_max_node_reads,
+            vessel_r_max_raw_original_material_reads=(
+                args.vessel_max_raw_original_material_reads
+            ),
             recent_raw_conversation=session_memory.recent_raw_conversation,
             previous_turn_capsules=session_memory.previous_turn_capsules,
             live_trace=args.live_trace,

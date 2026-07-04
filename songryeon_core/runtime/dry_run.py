@@ -44,6 +44,10 @@ from songryeon_core.runtime.same_turn_l_reroute import (
     SameTurnLReroutePolicy,
     run_same_turn_l_reroute_controller,
 )
+from songryeon_core.runtime.r_loop_vessel_live_route import (
+    VesselRLiveRouteRun,
+    record_vessel_r_live_route,
+)
 from songryeon_core.state.unified_state import (
     create_unified_state,
     enter_loop,
@@ -141,6 +145,17 @@ def run_dry_turn(
     enable_r_route_dry_run: bool = False,
     r_route_dry_run_force_budget_exhausted: bool = False,
     enable_r_route_experimental: bool = False,
+    enable_vessel_r_route: bool = False,
+    vessel_r_adapter: LLMAdapter | None = None,
+    vessel_r_uri: str | None = None,
+    vessel_r_user: str | None = None,
+    vessel_r_password: str | None = None,
+    vessel_r_database: str | None = None,
+    vessel_r_allow_no_auth: bool = False,
+    vessel_r_limit: int = 50,
+    vessel_r_max_node_reads: int = 6,
+    vessel_r_max_raw_original_material_reads: int = 5,
+    vessel_r_driver_factory_for_test: object | None = None,
 ) -> dict[str, object]:
     """한 턴의 구조 흐름을 trace/data로 실행한다.
 
@@ -186,6 +201,11 @@ def run_dry_turn(
     r_loop_memory_handoff_data_id: str | None = None
     r_loop_memory_handoff_frame = None
     r_loop_dry_run_result = None
+    vessel_r_route_status = "not_run"
+    vessel_r_route_run: VesselRLiveRouteRun | None = None
+    vessel_r_trace_event_ids: list[str] = []
+    vessel_r_output_data_ids: list[str] = []
+    vessel_r_close_route_id: str | None = None
     policy = SameTurnLReroutePolicy(
         enabled=same_turn_l_reroute_enabled,
         max_l_runs_per_turn=max_l_runs_per_turn,
@@ -335,7 +355,9 @@ def run_dry_turn(
             force_l_route=force_l_route,
             fallback_policy=node_1_router_fallback_policy,
             fallback_allowed_by_runtime_policy=allow_node_1_router_fallback,
-            allow_r_route_experimental=enable_r_route_experimental,
+            allow_r_route_experimental=(
+                enable_r_route_experimental or enable_vessel_r_route
+            ),
         )
     else:
         decision = route_next(
@@ -406,126 +428,245 @@ def run_dry_turn(
     route2_data_id: str | None = None
 
     if decision.route == "R":
-        r_route_experimental_status = "selected"
-        r_graph_build = build_graph_memory_snapshot_from_capsules(
-            capsules=zero_state.previous_turn_capsules,
-            batch_id=f"{turn_id}:r_route_experimental",
-        )
-        (
-            r_graph_trace_id,
-            r_route_experimental_graph_data_ids,
-        ) = _record_r_route_experimental_graph_sources(
-            trace_store=trace_store,
-            data_store=data_store,
-            turn_id=turn_id,
-            graph_build=r_graph_build,
-            input_ref=[route_trace_id],
-        )
-        append_movement(
-            node_id="graph_memory",
-            mode="r_route_experimental_graph_snapshot",
-            input_trace_ids=[route_trace_id],
-            output_trace_ids=[r_graph_trace_id],
-            input_data_ids=[route_data_id],
-            output_data_ids=r_route_experimental_graph_data_ids,
-            node_type="code",
-        )
-        (
-            r_route_handoff_trace_id,
-            r_route_handoff_data_id,
-            r_route_handoff_frame,
-        ) = record_r_loop_memory_handoff_packet(
-            trace_store=trace_store,
-            data_store=data_store,
-            turn_id=turn_id,
-            guide_packet=r_graph_build.guide_packet,
-            packet_id="node_0:r_loop_memory_handoff_packet_frame:r_route_experimental",
-            input_ref=[r_graph_trace_id],
-            source_data_ids=[
-                r_graph_build.snapshot.snapshot_id,
-                r_graph_build.guide_packet.packet_id,
-            ],
-            semantic_hint_status=r_graph_build.guide_packet.recommended_traversal_hints_status,
-        )
-        r_route_experimental_handoff_packet_id = r_route_handoff_data_id
-        append_movement(
-            node_id="node_0",
-            mode=R_ROUTE_EXPERIMENTAL_NEXT_0_MODE,
-            input_trace_ids=[r_graph_trace_id],
-            output_trace_ids=[r_route_handoff_trace_id],
-            input_data_ids=r_route_experimental_graph_data_ids,
-            output_data_ids=[r_route_handoff_data_id],
-        )
-        enter_loop(unified_state, "R")
-        r_route_result = run_r_loop_dry_run_skeleton(
-            trace_store=trace_store,
-            data_store=data_store,
-            turn_id=turn_id,
-            handoff_packet=r_route_handoff_frame,
-            input_ref=[r_route_handoff_trace_id],
-            frame_label="experimental",
-            generated_by=R_EXPERIMENTAL_ROUTE_GENERATOR,
-            graph_node_payloads={
-                node.node_id: asdict(node)
-                for node in r_graph_build.nodes
-            },
-            graph_edge_payloads=[asdict(edge) for edge in r_graph_build.edges],
-        )
-        exit_loop(unified_state, "R")
-        r_route_experimental_trace_event_ids = list(r_route_result.trace_event_ids)
-        r_route_experimental_output_data_ids = list(r_route_result.output_data_ids)
-        r_route_experimental_return_summary_id = r_route_result.return_summary.frame_id
-        r_route_experimental_candidate_surface_id = (
-            r_route_result.candidate_surface.frame_id
-        )
-        r_route_experimental_access_ledger_id = r_route_result.access_ledger.frame_id
-        append_movement(
-            node_id="R",
-            node_type="loop",
-            mode="R_route_experimental_skeleton",
-            input_trace_ids=[r_route_handoff_trace_id],
-            output_trace_ids=r_route_result.trace_event_ids,
-            input_data_ids=[r_route_handoff_data_id],
-            output_data_ids=r_route_result.output_data_ids,
-        )
-        close_decision = route_next(
-            user_input="보고",
-            memory_packet=packet_for_1,
-            schema_registry=schema_registry,
-        )
-        r_close_input_ref = _unique_strings(
-            [route_trace_id, *r_route_result.trace_event_ids]
-        )
-        r_close_source_data_ids = _unique_strings(
-            [
-                route_data_id,
+        if enable_vessel_r_route:
+            vessel_r_route_status = "selected"
+            enter_loop(unified_state, "R")
+            vessel_r_route_run = record_vessel_r_live_route(
+                trace_store=trace_store,
+                data_store=data_store,
+                turn_id=turn_id,
+                user_question=user_input,
+                batch_id=f"{turn_id}_vessel_r_live",
+                adapter=vessel_r_adapter,
+                uri=vessel_r_uri,
+                user=vessel_r_user,
+                password=vessel_r_password,
+                database=vessel_r_database,
+                allow_no_auth=vessel_r_allow_no_auth,
+                limit=vessel_r_limit,
+                max_node_reads=vessel_r_max_node_reads,
+                max_raw_original_material_reads=(
+                    vessel_r_max_raw_original_material_reads
+                ),
+                input_ref=[route_trace_id],
+                driver_factory_for_test=vessel_r_driver_factory_for_test,
+            )
+            exit_loop(unified_state, "R")
+            vessel_r_trace_event_ids = list(vessel_r_route_run.trace_event_ids)
+            vessel_r_output_data_ids = list(vessel_r_route_run.output_data_ids)
+            append_movement(
+                node_id="node_0",
+                mode="vessel_r_read_packet",
+                input_trace_ids=[route_trace_id],
+                output_trace_ids=[vessel_r_route_run.read_packet_trace_id],
+                input_data_ids=[route_data_id],
+                output_data_ids=[vessel_r_route_run.read_packet_id],
+            )
+            append_movement(
+                node_id="node_0",
+                mode="vessel_r_start_handoff",
+                input_trace_ids=[vessel_r_route_run.read_packet_trace_id],
+                output_trace_ids=[vessel_r_route_run.start_handoff_trace_id],
+                input_data_ids=[vessel_r_route_run.read_packet_id],
+                output_data_ids=[vessel_r_route_run.start_handoff_packet_id],
+            )
+            append_movement(
+                node_id="R",
+                node_type="loop",
+                mode="vessel_r_live_traverse",
+                input_trace_ids=[vessel_r_route_run.start_handoff_trace_id],
+                output_trace_ids=vessel_r_route_run.traverse_run.trace_event_ids,
+                input_data_ids=[vessel_r_route_run.start_handoff_packet_id],
+                output_data_ids=vessel_r_route_run.traverse_run.output_data_ids,
+            )
+            append_movement(
+                node_id="node_0",
+                mode="vessel_r_activity_ledger",
+                input_trace_ids=vessel_r_route_run.traverse_run.trace_event_ids,
+                output_trace_ids=[vessel_r_route_run.activity_ledger_trace_id],
+                input_data_ids=vessel_r_route_run.traverse_run.output_data_ids,
+                output_data_ids=[vessel_r_route_run.activity_ledger_id],
+            )
+            append_movement(
+                node_id="node_0",
+                mode="vessel_r_return_packet",
+                input_trace_ids=[vessel_r_route_run.activity_ledger_trace_id],
+                output_trace_ids=[vessel_r_route_run.return_packet_trace_id],
+                input_data_ids=[vessel_r_route_run.activity_ledger_id],
+                output_data_ids=[vessel_r_route_run.return_packet_id],
+            )
+            append_movement(
+                node_id="graph_memory",
+                node_type="code",
+                mode="vessel_r_turn_activity_graph_link",
+                input_trace_ids=[vessel_r_route_run.activity_ledger_trace_id],
+                output_trace_ids=[
+                    vessel_r_route_run.turn_activity_graph_link_trace_id
+                ],
+                input_data_ids=[vessel_r_route_run.activity_ledger_id],
+                output_data_ids=[vessel_r_route_run.turn_activity_graph_link_id],
+            )
+            close_decision = route_next(
+                user_input="보고",
+                memory_packet=packet_for_1,
+                schema_registry=schema_registry,
+            )
+            r_close_input_ref = _unique_strings(
+                [route_trace_id, *vessel_r_route_run.trace_event_ids]
+            )
+            r_close_source_data_ids = _unique_strings(
+                [route_data_id, *vessel_r_route_run.output_data_ids]
+            )
+            r_close_trace_id = record_routing(
+                trace_store=trace_store,
+                data_store=data_store,
+                turn_id=turn_id,
+                decision=close_decision,
+                input_ref=r_close_input_ref,
+                source_data_ids=r_close_source_data_ids,
+            )
+            vessel_r_close_route_id = f"route:{close_decision.route}"
+            route_data_ids.append(vessel_r_close_route_id)
+            set_current_route(unified_state, close_decision.route)
+            set_active_schema(unified_state, close_decision.required_schema)
+            append_movement(
+                node_id="node_1",
+                mode="routing_after_vessel_r_return",
+                input_trace_ids=r_close_input_ref,
+                output_trace_ids=[r_close_trace_id],
+                input_data_ids=r_close_source_data_ids,
+                output_data_ids=[vessel_r_close_route_id],
+            )
+            route2_trace_id = r_close_trace_id
+            route2_data_id = vessel_r_close_route_id
+            decision = close_decision
+        else:
+            r_route_experimental_status = "selected"
+            r_graph_build = build_graph_memory_snapshot_from_capsules(
+                capsules=zero_state.previous_turn_capsules,
+                batch_id=f"{turn_id}:r_route_experimental",
+            )
+            (
+                r_graph_trace_id,
+                r_route_experimental_graph_data_ids,
+            ) = _record_r_route_experimental_graph_sources(
+                trace_store=trace_store,
+                data_store=data_store,
+                turn_id=turn_id,
+                graph_build=r_graph_build,
+                input_ref=[route_trace_id],
+            )
+            append_movement(
+                node_id="graph_memory",
+                mode="r_route_experimental_graph_snapshot",
+                input_trace_ids=[route_trace_id],
+                output_trace_ids=[r_graph_trace_id],
+                input_data_ids=[route_data_id],
+                output_data_ids=r_route_experimental_graph_data_ids,
+                node_type="code",
+            )
+            (
+                r_route_handoff_trace_id,
                 r_route_handoff_data_id,
-                *r_route_result.output_data_ids,
-            ]
-        )
-        r_close_trace_id = record_routing(
-            trace_store=trace_store,
-            data_store=data_store,
-            turn_id=turn_id,
-            decision=close_decision,
-            input_ref=r_close_input_ref,
-            source_data_ids=r_close_source_data_ids,
-        )
-        r_route_experimental_close_route_id = f"route:{close_decision.route}"
-        route_data_ids.append(r_route_experimental_close_route_id)
-        set_current_route(unified_state, close_decision.route)
-        set_active_schema(unified_state, close_decision.required_schema)
-        append_movement(
-            node_id="node_1",
-            mode="routing_after_r_experimental_return",
-            input_trace_ids=r_close_input_ref,
-            output_trace_ids=[r_close_trace_id],
-            input_data_ids=r_close_source_data_ids,
-            output_data_ids=[r_route_experimental_close_route_id],
-        )
-        route2_trace_id = r_close_trace_id
-        route2_data_id = r_route_experimental_close_route_id
-        decision = close_decision
+                r_route_handoff_frame,
+            ) = record_r_loop_memory_handoff_packet(
+                trace_store=trace_store,
+                data_store=data_store,
+                turn_id=turn_id,
+                guide_packet=r_graph_build.guide_packet,
+                packet_id="node_0:r_loop_memory_handoff_packet_frame:r_route_experimental",
+                input_ref=[r_graph_trace_id],
+                source_data_ids=[
+                    r_graph_build.snapshot.snapshot_id,
+                    r_graph_build.guide_packet.packet_id,
+                ],
+                semantic_hint_status=(
+                    r_graph_build.guide_packet.recommended_traversal_hints_status
+                ),
+            )
+            r_route_experimental_handoff_packet_id = r_route_handoff_data_id
+            append_movement(
+                node_id="node_0",
+                mode=R_ROUTE_EXPERIMENTAL_NEXT_0_MODE,
+                input_trace_ids=[r_graph_trace_id],
+                output_trace_ids=[r_route_handoff_trace_id],
+                input_data_ids=r_route_experimental_graph_data_ids,
+                output_data_ids=[r_route_handoff_data_id],
+            )
+            enter_loop(unified_state, "R")
+            r_route_result = run_r_loop_dry_run_skeleton(
+                trace_store=trace_store,
+                data_store=data_store,
+                turn_id=turn_id,
+                handoff_packet=r_route_handoff_frame,
+                input_ref=[r_route_handoff_trace_id],
+                frame_label="experimental",
+                generated_by=R_EXPERIMENTAL_ROUTE_GENERATOR,
+                graph_node_payloads={
+                    node.node_id: asdict(node)
+                    for node in r_graph_build.nodes
+                },
+                graph_edge_payloads=[asdict(edge) for edge in r_graph_build.edges],
+            )
+            exit_loop(unified_state, "R")
+            r_route_experimental_trace_event_ids = list(r_route_result.trace_event_ids)
+            r_route_experimental_output_data_ids = list(r_route_result.output_data_ids)
+            r_route_experimental_return_summary_id = (
+                r_route_result.return_summary.frame_id
+            )
+            r_route_experimental_candidate_surface_id = (
+                r_route_result.candidate_surface.frame_id
+            )
+            r_route_experimental_access_ledger_id = (
+                r_route_result.access_ledger.frame_id
+            )
+            append_movement(
+                node_id="R",
+                node_type="loop",
+                mode="R_route_experimental_skeleton",
+                input_trace_ids=[r_route_handoff_trace_id],
+                output_trace_ids=r_route_result.trace_event_ids,
+                input_data_ids=[r_route_handoff_data_id],
+                output_data_ids=r_route_result.output_data_ids,
+            )
+            close_decision = route_next(
+                user_input="보고",
+                memory_packet=packet_for_1,
+                schema_registry=schema_registry,
+            )
+            r_close_input_ref = _unique_strings(
+                [route_trace_id, *r_route_result.trace_event_ids]
+            )
+            r_close_source_data_ids = _unique_strings(
+                [
+                    route_data_id,
+                    r_route_handoff_data_id,
+                    *r_route_result.output_data_ids,
+                ]
+            )
+            r_close_trace_id = record_routing(
+                trace_store=trace_store,
+                data_store=data_store,
+                turn_id=turn_id,
+                decision=close_decision,
+                input_ref=r_close_input_ref,
+                source_data_ids=r_close_source_data_ids,
+            )
+            r_route_experimental_close_route_id = f"route:{close_decision.route}"
+            route_data_ids.append(r_route_experimental_close_route_id)
+            set_current_route(unified_state, close_decision.route)
+            set_active_schema(unified_state, close_decision.required_schema)
+            append_movement(
+                node_id="node_1",
+                mode="routing_after_r_experimental_return",
+                input_trace_ids=r_close_input_ref,
+                output_trace_ids=[r_close_trace_id],
+                input_data_ids=r_close_source_data_ids,
+                output_data_ids=[r_route_experimental_close_route_id],
+            )
+            route2_trace_id = r_close_trace_id
+            route2_data_id = r_route_experimental_close_route_id
+            decision = close_decision
 
     # 4. route가 L이면 policy-guarded controller 아래에서 최대 2회차까지 다시 열 수 있다.
     if decision.route == "L":
@@ -882,6 +1023,7 @@ def run_dry_turn(
             *r_route_experimental_graph_data_ids,
             r_route_experimental_handoff_packet_id,
             *r_route_experimental_output_data_ids,
+            *vessel_r_output_data_ids,
             node0_final_data_id,
             outcome_id,
         ]
@@ -1345,6 +1487,69 @@ def run_dry_turn(
         "r_route_experimental_output_data_ids": r_route_experimental_output_data_ids,
         "r_route_experimental_trace_event_ids": r_route_experimental_trace_event_ids,
         "r_route_experimental_graph_data_ids": r_route_experimental_graph_data_ids,
+        "vessel_r_route_enabled": enable_vessel_r_route,
+        "vessel_r_route_status": vessel_r_route_status,
+        "vessel_r_policy_flag": (
+            "enable_vessel_r_route" if enable_vessel_r_route else None
+        ),
+        "vessel_r_read_packet_id": (
+            vessel_r_route_run.read_packet_id
+            if vessel_r_route_run is not None
+            else None
+        ),
+        "vessel_r_read_packet_status": (
+            vessel_r_route_run.read_packet_status
+            if vessel_r_route_run is not None
+            else "not_run"
+        ),
+        "vessel_r_start_handoff_packet_id": (
+            vessel_r_route_run.start_handoff_packet_id
+            if vessel_r_route_run is not None
+            else None
+        ),
+        "vessel_r_traverse_result_id": (
+            vessel_r_route_run.traverse_run.result_frame.frame_id
+            if vessel_r_route_run is not None
+            else None
+        ),
+        "vessel_r_traverse_status": (
+            vessel_r_route_run.traverse_run.result_frame.traverse_status
+            if vessel_r_route_run is not None
+            else "not_run"
+        ),
+        "vessel_r_task_status": (
+            vessel_r_route_run.traverse_run.result_frame.r_loop_task_status
+            if vessel_r_route_run is not None
+            else None
+        ),
+        "vessel_r_activity_ledger_id": (
+            vessel_r_route_run.activity_ledger_id
+            if vessel_r_route_run is not None
+            else None
+        ),
+        "vessel_r_return_packet_id": (
+            vessel_r_route_run.return_packet_id
+            if vessel_r_route_run is not None
+            else None
+        ),
+        "vessel_r_return_packet_status": (
+            vessel_r_route_run.return_packet_status
+            if vessel_r_route_run is not None
+            else "not_run"
+        ),
+        "vessel_r_node3_material_ready": (
+            vessel_r_route_run.return_packet_node3_material_ready
+            if vessel_r_route_run is not None
+            else False
+        ),
+        "vessel_r_turn_activity_graph_link_id": (
+            vessel_r_route_run.turn_activity_graph_link_id
+            if vessel_r_route_run is not None
+            else None
+        ),
+        "vessel_r_close_route_id": vessel_r_close_route_id,
+        "vessel_r_output_data_ids": vessel_r_output_data_ids,
+        "vessel_r_trace_event_ids": vessel_r_trace_event_ids,
         "r_route_dry_run_enabled": enable_r_route_dry_run,
         "r_route_dry_run_status": (
             r_loop_dry_run_result.return_summary.r_loop_task_status
@@ -1394,6 +1599,9 @@ def run_dry_turn(
         ),
         "turn_activity_graph_link_r_ledger_count": len(
             turn_activity_graph_link_frame.r_graph_access_ledger_data_ids
+        ),
+        "turn_activity_graph_link_r_vessel_ledger_count": len(
+            turn_activity_graph_link_frame.r_vessel_activity_ledger_data_ids
         ),
         "r_route_dry_run_candidate_surface_id": (
             r_loop_dry_run_result.candidate_surface.frame_id
@@ -1521,6 +1729,8 @@ def run_dry_turn(
             "brief_status",
             data_type="node_output:node3_input_brief_frame",
         ),
+        "node3_vessel_r_material_status": brief_frame.vessel_r_material_status,
+        "node3_vessel_r_material_count": brief_frame.vessel_r_material_count,
         "node2_answer_basis_mode": _read_payload_text(
             data_store,
             "node_2:answer_basis_frame",

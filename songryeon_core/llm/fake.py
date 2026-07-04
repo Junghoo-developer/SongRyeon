@@ -333,13 +333,23 @@ class SongRyeonAllNodesFakeLLMAdapter:
 
     def _node_1_payload(self, request: LLMRequest) -> dict[str, object]:
         user_input = str(request.input_payload.get("user_input") or "")
+        allowed_routes = request.input_payload.get("allowed_routes")
+        if not isinstance(allowed_routes, list):
+            allowed_routes = []
+        r_route_allowed = "R" in allowed_routes
+        graph_memory_requested = any(
+            keyword in user_input
+            for keyword in ("Vessel", "vessel", "그래프", "graph", "Neo4j", "R루프")
+        )
         selected_recent_memory_count = self._selected_recent_memory_count(request.input_payload)
         document_required = any(
             keyword in user_input
             for keyword in ("문서", "검색", "내부", "송련", "너는", "누구", "정체", "소개")
         )
         memory_lookup_requested = any(keyword in user_input for keyword in ("기억", "방금", "이전"))
-        if selected_recent_memory_count > 0 and not document_required:
+        if r_route_allowed and graph_memory_requested:
+            route = "R"
+        elif selected_recent_memory_count > 0 and not document_required:
             route = "2"
         elif document_required or memory_lookup_requested:
             route = "L"
@@ -348,10 +358,14 @@ class SongRyeonAllNodesFakeLLMAdapter:
         return {
             "route": route,
             "route_reason": "사용자 입력이 내부 문서/기억 확인과 연결되는지 기준으로 라우팅했다.",
-            "expected_next_0_mode": "targeted_memory_supply" if route == "L" else "final_trace_for_2",
+            "expected_next_0_mode": (
+                "r_loop_graph_memory_handoff"
+                if route == "R"
+                else "targeted_memory_supply" if route == "L" else "final_trace_for_2"
+            ),
             "route_confidence": 0.82,
             "needs_more_memory": False,
-            "policy_flag": None,
+            "policy_flag": "enable_r_route_experimental" if route == "R" else None,
         }
 
     def _selected_recent_memory_count(self, input_payload: dict[str, object]) -> int:
@@ -510,7 +524,17 @@ class SongRyeonAllNodesFakeLLMAdapter:
             items = vessel_r_material.get("items")
             if not isinstance(items, list):
                 items = []
-            first_item = items[0] if items and isinstance(items[0], dict) else {}
+            first_item = next(
+                (
+                    item
+                    for item in items
+                    if isinstance(item, dict)
+                    and str(item.get("summary_text") or "").strip()
+                ),
+                {},
+            )
+            if not first_item and items and isinstance(items[0], dict):
+                first_item = items[0]
             summary_text = str(first_item.get("summary_text") or "").strip()
             display_name = str(first_item.get("display_name") or "그래프 기억 재료").strip()
             if vessel_r_material.get("status") == "present" and summary_text:
