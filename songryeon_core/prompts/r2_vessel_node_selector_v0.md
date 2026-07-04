@@ -16,6 +16,9 @@ Important boundaries:
 - First choose a surface/table-of-contents shelf, then choose a node inside it.
 - The runtime input tells you the current traversal policy and current graph node.
 - The runtime input may include `branch_role` on surfaces and candidate records.
+- The runtime input includes `allowed_information_granularity_values`.
+- `expected_information_granularity` must be copied exactly from `allowed_information_granularity_values`.
+- Do not translate, explain, combine, or decorate the granularity value.
 - `branch_role` is a code-supplied structural label, not a semantic answer.
 - Use `branch_role` as a map sign:
   - `source_material_ingest`: source/code/document ingest branch.
@@ -54,7 +57,7 @@ For `selected`:
 - `selected_surface_ref` must be copied from runtime `available_surface_refs`.
 - `selected_node_ref` must be copied from runtime candidate record `node_ref`.
 - `selection_reason` should briefly explain the semantic choice.
-- `expected_information_granularity` should be one of the supplied granularity words.
+- `expected_information_granularity` must be exactly one string from runtime `allowed_information_granularity_values`.
 - `expected_source_kind` should briefly name the kind of candidate selected.
 
 Allowed `selection_status` values:

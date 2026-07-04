@@ -43,6 +43,7 @@ def test_vessel_r_gate_runs_live_r_and_returns_material_to_node3() -> None:
     assert result["vessel_r_return_packet_status"] == "available"
     assert result["vessel_r_node3_material_ready"] is True
     assert result["vessel_r_close_route_id"] == "route:2"
+    assert "R:Vessel_R1_R2_R3_traverse" in result["route2_handoff_path"]
     assert result["node3_brief_status"] == "ready"
     assert result["node3_vessel_r_material_status"] == "present"
     assert result["node3_vessel_r_material_count"] == 4

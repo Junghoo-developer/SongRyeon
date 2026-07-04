@@ -4,6 +4,7 @@ import json
 from collections import Counter
 from dataclasses import asdict
 from pathlib import Path
+import os
 
 from songryeon_core.core.schemas import (
     DocumentMemoryIndexFrame,
@@ -81,7 +82,26 @@ def save_document_memory_index(
     target_dir = Path(cache_dir)
     target_dir.mkdir(parents=True, exist_ok=True)
     path = target_dir / _cache_file_name(frame.snapshot_id)
-    path.write_text(json.dumps(asdict(frame), ensure_ascii=False, indent=2), encoding="utf-8")
+    payload_text = json.dumps(asdict(frame), ensure_ascii=False, indent=2)
+    if path.exists():
+        try:
+            if path.read_text(encoding="utf-8") == payload_text:
+                return path
+        except OSError:
+            pass
+    tmp_path = path.with_name(f"{path.name}.tmp")
+    try:
+        tmp_path.write_text(payload_text, encoding="utf-8")
+        os.replace(tmp_path, path)
+    except PermissionError:
+        if tmp_path.exists():
+            try:
+                tmp_path.unlink()
+            except OSError:
+                pass
+        if path.exists():
+            return path
+        raise
     return path
 
 

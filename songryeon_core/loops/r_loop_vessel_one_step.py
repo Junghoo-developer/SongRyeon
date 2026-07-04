@@ -75,6 +75,13 @@ R_TRAVERSE_MAX_NODE_READS = 6
 R_TRAVERSE_MAX_CONTEXT_TOKENS = 8000
 R_TRAVERSE_MIN_TERMINAL_MATERIAL_READS = 1
 R_TRAVERSE_MAX_RAW_ORIGINAL_MATERIAL_READS = 5
+R_INFORMATION_GRANULARITY_ENUM_VALUES = [
+    "raw",
+    "low_summary",
+    "medium_summary",
+    "high_summary",
+    "unknown",
+]
 
 
 @dataclass(frozen=True)
@@ -1552,6 +1559,14 @@ def _r2_input_payload(
         "candidate_layer_surface_ref_records": selection_ref_map["surface_records"],
         "available_surface_refs": selection_ref_map["available_surface_refs"],
         "candidate_records_by_surface_ref": selection_ref_map["candidate_records_by_surface_ref"],
+        "allowed_information_granularity_values": list(
+            R_INFORMATION_GRANULARITY_ENUM_VALUES
+        ),
+        "expected_information_granularity_contract": {
+            "output_field": "expected_information_granularity",
+            "copy_exactly_from": "allowed_information_granularity_values",
+            "no_free_text": True,
+        },
         "selection_ref_contract": {
             "surface_output_field": "selected_surface_ref",
             "node_output_field": "selected_node_ref",

@@ -350,6 +350,7 @@ def record_route2_handoff(
             *_same_turn_l_reroute_controller_ids(data_store),
         ]
     )
+    vessel_r_was_run = _vessel_r_was_run(data_store)
     frame = Node2HandoffFrame(
         frame_id=handoff_frame_id,
         turn_id=turn_id,
@@ -359,7 +360,11 @@ def record_route2_handoff(
         final_memory_packet_id=final_memory_packet_id,
         turn_outcome_id=turn_outcome_id,
         route_ids=_unique_strings(route_ids),
-        route_path=_route_path(route_ids, actual_l_run_count=actual_l_run_count),
+        route_path=_route_path(
+            route_ids,
+            actual_l_run_count=actual_l_run_count,
+            vessel_r_was_run=vessel_r_was_run,
+        ),
         l_loop_was_run=l_loop_was_run,
         l1_goal_present=l1_goal_present,
         l2_query_present=l2_query_present,
@@ -2750,7 +2755,12 @@ def _is_code_extract_record(data_type: str) -> bool:
     return data_type.startswith("tool_result:read_code_file")
 
 
-def _route_path(route_ids: list[str], *, actual_l_run_count: int) -> list[str]:
+def _route_path(
+    route_ids: list[str],
+    *,
+    actual_l_run_count: int,
+    vessel_r_was_run: bool = False,
+) -> list[str]:
     path: list[str] = []
     l_route_seen = 0
     for route_id in route_ids:
@@ -2769,12 +2779,28 @@ def _route_path(route_ids: list[str], *, actual_l_run_count: int) -> list[str]:
             path.append("1:route=2")
             path.append("0:final_trace_for_2")
         elif route == "R":
-            path.append("1:route=R_experimental")
-            path.append("0:r_loop_graph_guide_handoff")
-            path.append("R:R1_R2_R3_experimental_skeleton")
-            path.append("1:route=2_after_R_experimental")
-            path.append("0:final_trace_for_2")
+            if vessel_r_was_run:
+                path.append("1:route=R_vessel_experimental")
+                path.append("0:vessel_r_read_packet")
+                path.append("0:vessel_r_start_handoff")
+                path.append("R:Vessel_R1_R2_R3_traverse")
+                path.append("0:vessel_r_return_packet")
+            else:
+                path.append("1:route=R_experimental")
+                path.append("0:r_loop_graph_guide_handoff")
+                path.append("R:R1_R2_R3_experimental_skeleton")
     return path
+
+
+def _vessel_r_was_run(data_store: DataStore) -> bool:
+    return any(
+        record.data_type in {
+            R_LOOP_VESSEL_READ_PACKET_DATA_TYPE,
+            R_LOOP_VESSEL_TRAVERSE_RESULT_DATA_TYPE,
+            R_LOOP_VESSEL_RETURN_PACKET_DATA_TYPE,
+        }
+        for record in data_store.list_records()
+    )
 
 
 def _route_value(route_id: str) -> str | None:

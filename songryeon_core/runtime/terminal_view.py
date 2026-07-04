@@ -379,6 +379,7 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
                 f"raw={frame.get('turn_capsule_graph_node_id', 'unknown')} / "
                 f"L_ledgers={_list_count(frame.get('l_loop_activity_ledger_data_ids'))} / "
                 f"R_ledgers={_list_count(frame.get('r_graph_access_ledger_data_ids'))} / "
+                f"R_vessel_ledgers={_list_count(frame.get('r_vessel_activity_ledger_data_ids'))} / "
                 f"nodes={_list_count(frame.get('activity_ledger_graph_node_ids'))} / "
                 f"edges={_list_count(frame.get('activity_ledger_graph_edge_ids'))}"
             )

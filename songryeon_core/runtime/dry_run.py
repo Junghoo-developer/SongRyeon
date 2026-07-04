@@ -1723,6 +1723,12 @@ def run_dry_turn(
             "handoff_status",
             data_type="node_output:node2_handoff_frame",
         ),
+        "route2_handoff_path": _read_payload_string_list(
+            data_store,
+            "node_2:handoff_frame",
+            "route_path",
+            data_type="node_output:node2_handoff_frame",
+        ) or [],
         "node3_brief_status": _read_payload_text(
             data_store,
             "node_3:input_brief_frame",
