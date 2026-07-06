@@ -1053,6 +1053,8 @@ def _node3_vessel_r_material(
         ]
     )
     return_status = _text(return_packet_payload, "return_status", fallback="")
+    # R traversal이 끝났고 node_0 return packet도 실패가 아닐 때만
+    # node_3에게 줄 수 있는 Vessel R 재료로 취급한다.
     material_status = (
         "present"
         if traverse_status == "completed" and return_status != "failed"
@@ -1062,6 +1064,8 @@ def _node3_vessel_r_material(
     material_items: list[Node3VesselRMaterialItem] = []
     if material_status == "present" and read_packet_payload:
         records_by_id = _vessel_read_packet_records_by_id(read_packet_payload)
+        # R2/R3가 실제로 선택하거나 열람한 graph node만 read packet에서 다시 찾는다.
+        # 여기서 새 의미 판단을 하지 않고, 이미 기록된 절대 좌표를 item으로 옮긴다.
         material_ids = _unique_strings([*selected_ids, *inspected_ids])
         for graph_node_id in material_ids:
             record = records_by_id.get(graph_node_id)
@@ -1074,6 +1078,8 @@ def _node3_vessel_r_material(
             )
             material_items.append(item)
 
+    # 내부 감사용 장부다. graph node id를 일부러 보존해야 나중에 Neo4j/trace를
+    # 다시 따라갈 수 있다. 대신 node_3 LLM에게 보이는 payload에서는 별도로 가린다.
     source_data_ids = _unique_strings(
         [
             data_id,
@@ -1198,6 +1204,8 @@ def _node3_vessel_r_material_item(
             summary_text_char_count = len(summary_text)
         text_payload_status = "included_summary_text" if summary_text else "metadata_only"
 
+    # 이 source_data_ids는 사용자에게 보여주기 위한 말 재료가 아니라
+    # "이 item이 어떤 graph/data record에서 왔는가"를 추적하기 위한 장부다.
     item_source_data_ids = _unique_strings(
         [
             graph_node_id,
@@ -1592,6 +1600,9 @@ def _node3_vessel_r_material_llm_payload(
         ),
         "items": [
             {
+                # 여기부터는 node_3 LLM이 직접 보는 사용자-facing 재료다.
+                # graph_node_id/source_data_ids 같은 내부 좌표는 넣지 않고,
+                # 사람이 읽어도 되는 라벨과 redacted text만 넘긴다.
                 "material_label": item.material_label,
                 "material_kind": item.material_kind,
                 "display_name": _safe_vessel_r_display_name(

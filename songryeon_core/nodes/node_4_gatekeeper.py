@@ -386,6 +386,8 @@ def _vessel_r_material_code_guard(
             "Vessel R graph material과 read_doc/read_code_file/document context 근거를 분리해 말한다."
         )
 
+    # graph:... ID는 내부 장부 좌표다. 최종 사용자 답변에 나오면
+    # "감사용 번호표를 사람에게 그대로 읽은 것"이라 보고 node_4가 막는다.
     graph_id_leak_count = len(re.findall(r"graph:[A-Za-z0-9_:\-]+", rendered_markdown))
     if graph_id_leak_count:
         contradictions.append(f"vessel_r_graph_node_id_leak_count:{graph_id_leak_count}")
