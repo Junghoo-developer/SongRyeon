@@ -349,6 +349,8 @@ class SongRyeonAllNodesFakeLLMAdapter:
         memory_lookup_requested = any(keyword in user_input for keyword in ("기억", "방금", "이전"))
         if r_route_allowed and graph_memory_requested:
             route = "R"
+        elif _is_release_intro_request(user_input):
+            route = "2"
         elif selected_recent_memory_count > 0 and not document_required:
             route = "2"
         elif document_required or memory_lookup_requested:
@@ -484,6 +486,7 @@ class SongRyeonAllNodesFakeLLMAdapter:
         }
 
     def _node_3_payload(self, request: LLMRequest) -> dict[str, object]:
+        user_question = str(request.input_payload.get("user_question") or "")
         extracts = request.input_payload.get("supplied_document_contexts")
         if not isinstance(extracts, list):
             extracts = request.input_payload.get("read_documents")
@@ -519,6 +522,13 @@ class SongRyeonAllNodesFakeLLMAdapter:
                 body_markdown = (
                     "선택된 최근 기억은 들어왔지만, 그 복사본 안에서 테스트 암호를 확정할 수는 없어."
                 )
+        elif _is_release_intro_request(user_question):
+            body_markdown = (
+                "송련 Core는 코드가 확인한 사실과 LLM이 해석한 판단을 분리해 보여주려는 "
+                "로컬 우선 구조화 에이전트 런타임이야.\n\n"
+                "이 `fake-turn` 결과는 실제 Qwen 답변이 아니라, Qwen 없이도 라우팅, trace, "
+                "node_2/3/4 검사 흐름이 작동하는지 보여주는 배포용 데모야."
+            )
         elif vessel_r_material.get("status") in {"present", "failed"}:
             task_status = str(vessel_r_material.get("task_status") or "not_run")
             items = vessel_r_material.get("items")
@@ -596,3 +606,31 @@ class SongRyeonAllNodesFakeLLMAdapter:
             "contradictions": [],
             "revision_targets": [],
         }
+
+
+def _is_release_intro_request(user_input: str) -> bool:
+    """README 첫 실행에서 쓰는 송련 자기소개성 질문을 fake demo route=2로 닫는다."""
+
+    text = user_input.strip()
+    if not text:
+        return False
+    intro_markers = ("뭔지", "무엇인지", "뭐야", "소개", "짧게 설명")
+    subject_markers = ("송련", "SongRyeon", "songryeon")
+    source_lookup_markers = (
+        "문서",
+        "코드",
+        "검색",
+        "trace",
+        "Trace",
+        "Vessel",
+        "vessel",
+        "Neo4j",
+        "그래프",
+        "R루프",
+        "L루프",
+    )
+    if not any(marker in text for marker in subject_markers):
+        return False
+    if not any(marker in text for marker in intro_markers):
+        return False
+    return not any(marker in text for marker in source_lookup_markers)

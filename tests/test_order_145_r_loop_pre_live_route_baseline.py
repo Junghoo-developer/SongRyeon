@@ -21,7 +21,7 @@ def test_pre_live_route_r_is_not_allowed_by_routing_frame_validator() -> None:
         expected_next_0_mode="r_loop_memory_supply",
     )
 
-    with pytest.raises(ValueError, match="experimental policy flag"):
+    with pytest.raises(ValueError, match="explicit R policy flag"):
         validate_routing_decision_frame(frame)
 
 

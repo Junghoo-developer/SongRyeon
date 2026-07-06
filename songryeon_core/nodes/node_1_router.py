@@ -138,12 +138,15 @@ def route_next_with_llm(
     prompt = Path(prompt_ref).read_text(encoding="utf-8")
     allowed_routes = ["L", "2"]
     route_meanings = {
-        "L": "내부 문서/장기기억 검색 루프",
-        "2": "최종 메타정보 경계 및 보고 단계",
+        "L": "source document/code/artifact lookup loop for unread or source-grounded evidence",
+        "2": "direct metainfo boundary and final reporting when supplied context is enough",
     }
     if allow_r_route_experimental:
         allowed_routes.append("R")
-        route_meanings["R"] = "EXPERIMENTAL: graph memory R-loop skeleton; only available when the runtime flag is explicitly enabled."
+        route_meanings["R"] = (
+            "explicitly enabled Vessel/Neo4j graph-memory traversal route for already-ingested "
+            "graph memory, CoreEgo/time-axis/source-bundle/summary-layer structure, and graph-vs-document-search comparisons"
+        )
     input_payload = {
         "user_input": user_input,
         "memory_packet": {
@@ -161,6 +164,19 @@ def route_next_with_llm(
         ),
         "allowed_routes": allowed_routes,
         "route_meanings": route_meanings,
+        "route_capability_cards": _route_capability_cards(
+            allow_r_route_experimental=allow_r_route_experimental,
+        ),
+        "route_selection_policy": {
+            "policy_id": "NODE1_ROUTE_EVIDENCE_SURFACE_COMPARISON_V0",
+            "decision_basis": "Compare what evidence surface the user is asking for before selecting a route.",
+            "not_a_keyword_rule": True,
+            "code_semantic_routing_status": "not_run",
+            "llm_must_explain": (
+                "Write route_reason by naming why the selected route's evidence surface fits better "
+                "than the other available loop routes."
+            ),
+        },
         "experimental_route_policy": {
             "R": {
                 "enabled": allow_r_route_experimental,
@@ -201,6 +217,96 @@ def route_next_with_llm(
         llm_call_data_id=llm_result.call_data_id,
         allow_r_route_experimental=allow_r_route_experimental,
     )
+
+
+def _route_capability_cards(
+    *,
+    allow_r_route_experimental: bool,
+) -> list[dict[str, object]]:
+    """node_1에게 각 route가 보는 근거 표면을 명시적으로 알려준다.
+
+    이 함수는 사용자의 질문이 어떤 route에 맞는지 판단하지 않는다. 오직
+    선택 가능한 길들의 사용 목적을 적어 LLM router가 스스로 비교하게 한다.
+    """
+
+    cards: list[dict[str, object]] = [
+        {
+            "route": "L",
+            "role_label": "source_lookup_loop",
+            "plain_korean": "문서/코드/아티팩트 원문을 새로 찾거나 읽어야 할 때 쓰는 길.",
+            "best_for": [
+                "internal document lookup",
+                "source-code or artifact inspection",
+                "questions requiring unread project documents or exact source evidence",
+                "identity/project-definition questions that must be grounded in internal documents",
+            ],
+            "not_for": [
+                "already-ingested Vessel/Neo4j graph-memory traversal when R is enabled",
+                "questions that only need supplied recent conversation context",
+            ],
+            "evidence_surface": [
+                "search_docs",
+                "read_doc",
+                "read_code_file",
+                "document_context_pack",
+                "L3 document summaries",
+            ],
+            "expected_next_0_mode": "targeted_memory_supply",
+        },
+        {
+            "route": "2",
+            "role_label": "direct_report_boundary",
+            "plain_korean": "이미 공급된 기억/근거만으로 답할 수 있을 때 바로 보고 단계로 가는 길.",
+            "best_for": [
+                "selected recent memory context directly covers the question",
+                "no additional source lookup or graph traversal is needed",
+                "the user asks for a direct report on already-supplied runtime material",
+            ],
+            "not_for": [
+                "questions requiring new document/code lookup",
+                "questions requiring Vessel graph traversal",
+            ],
+            "evidence_surface": [
+                "current memory packet",
+                "selected recent memory context",
+                "already supplied runtime frames",
+            ],
+            "expected_next_0_mode": "final_trace_for_2",
+        },
+    ]
+    if allow_r_route_experimental:
+        cards.append(
+            {
+                "route": "R",
+                "role_label": "vessel_graph_memory_traversal_loop",
+                "plain_korean": (
+                    "이미 Vessel/Neo4j 그래프에 적재된 기억 구조를 CoreEgo/time axis/source bundle/"
+                    "summary layer 방향으로 탐색할 때 쓰는 길."
+                ),
+                "availability": "only when R is included in allowed_routes",
+                "best_for": [
+                    "already-ingested Vessel or Neo4j graph memory",
+                    "CoreEgo, Time Axis, Time Bundle, Source Kind Bundle, Raw Source, or SummaryGraphNode traversal",
+                    "questions comparing graph memory traversal against document search",
+                    "questions asking what the current graph-memory structure contains or how it is connected",
+                ],
+                "not_for": [
+                    "source documents/code that have not been ingested into Vessel graph memory",
+                    "requests that explicitly demand fresh document search or exact source-file reading",
+                    "recent conversation memory that selected context already covers",
+                ],
+                "evidence_surface": [
+                    "Vessel read packet",
+                    "R1 graph search goal",
+                    "R2 graph node/surface selection",
+                    "R3 graph inspection",
+                    "Vessel R return packet",
+                ],
+                "expected_next_0_mode": R_ROUTE_EXPERIMENTAL_NEXT_0_MODE,
+                "policy_flag": R_ROUTE_EXPERIMENTAL_POLICY_FLAG,
+            }
+        )
+    return cards
 
 
 def route_next_with_llm_or_policy_fallback(

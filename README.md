@@ -93,12 +93,24 @@ SongRyeon Core is my small, local-first attempt to make those questions visible 
 
 ## Current Demo Path
 
-If you only want to see the newest graph-memory path, start here:
+Start with the no-model path:
+
+```powershell
+python main.py fake-turn "송련이 뭔지 짧게 설명해줘" --pretty
+```
+
+Then verify the local baseline:
+
+```powershell
+python main.py smoke-test
+```
+
+If you want to see the optional graph-memory path, use Neo4j Vessel commands:
 
 ```powershell
 python main.py vessel-readback --database neo4j
 python main.py vessel-inspect --database neo4j --format text
-python main.py vessel-r-traverse "Trace how SongRyeon Core source summaries connect to token-bundle summaries." --database neo4j --llm-mode fake --format text
+python main.py vessel-r-traverse "송련 Core의 그래프 기억 구조를 계층적으로 탐색해줘" --database neo4j --llm-mode fake --format text
 ```
 
 For Qwen/Ollama live traversal:
@@ -107,7 +119,7 @@ For Qwen/Ollama live traversal:
 python main.py vessel-r-traverse "송련 Core의 그래프 기억 구조에서 소스 요약과 토큰 묶음 요약이 어떻게 이어지는지 계층적으로 탐색해줘." --database neo4j --llm-mode qwen --timeout 180 --format text
 ```
 
-See [DEMO.md](DEMO.md) for the fuller local setup, including Neo4j environment variables.
+See [DEMO.md](DEMO.md) for the fuller three-layer local setup, including Neo4j environment variables and failure meanings.
 
 ## Suggested GitHub Topics
 
@@ -144,7 +156,7 @@ SMOKE_TEST_OK
 Run a deterministic local turn without a real LLM:
 
 ```powershell
-python main.py fake-turn "송련의 문서 메모리 인덱스가 무엇인지 알려줘" --pretty
+python main.py fake-turn "송련이 뭔지 짧게 설명해줘" --pretty
 ```
 
 Run a dry turn:

@@ -113,6 +113,43 @@ def test_node2_answer_basis_rejects_source_outside_available_evidence_sources() 
     assert "source_data_id must exist" in frame.answer_basis_validation_error
 
 
+def test_node2_answer_basis_rejects_validation_placeholder_source_id() -> None:
+    trace_store, data_store, trace_id = _stores()
+
+    _, _, frame = run_node2_answer_basis_selection(
+        trace_store=trace_store,
+        data_store=data_store,
+        turn_id="turn_order_121_validation_placeholder",
+        user_question="그래프 기억 구조를 설명해줘.",
+        boundary_id="source:boundary",
+        boundary=MetainfoBoundary(),
+        handoff_frame_id="source:handoff",
+        adapter=AnswerBasisPayloadFakeAdapter(
+            {
+                "answer_basis_mode": "mixed_or_uncertain",
+                "basis_reason_codes": ["multi_source_bundle"],
+                "mode_selection_reason": "검증 더미 ID를 쓰면 안 된다.",
+                "mode_selection_reason_info_class": "mixed",
+                "evidence_roles": [
+                    {
+                        "source_data_id": "validation_data",
+                        "evidence_role": "supporting_context",
+                        "role_reason": "검증용 더미 ID는 실제 source가 아니다.",
+                        "role_reason_info_class": "mixed",
+                    }
+                ],
+            }
+        ),
+        input_ref=[trace_id],
+        source_data_ids=["source:runtime"],
+    )
+
+    assert frame.generated_by == "CODE:FALLBACK"
+    assert frame.answer_basis_mode == "mixed_or_uncertain"
+    assert frame.answer_basis_failure_type == "schema_failed"
+    assert "source_data_id must exist" in frame.answer_basis_validation_error
+
+
 def test_node3_brief_preserves_l_loop_failure_attitude() -> None:
     trace_store, data_store, trace_id = _stores()
     _record_l_loop_return_summary(data_store, trace_id)

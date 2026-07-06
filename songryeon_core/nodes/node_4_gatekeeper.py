@@ -418,6 +418,8 @@ def _claims_vessel_r_as_document_evidence(rendered_markdown: str) -> bool:
         lowered = line.lower()
         if not ("vessel" in lowered or "r " in lowered or "r루프" in line or "r 탐색" in line):
             continue
+        if _has_negated_role_claim(line):
+            continue
         if "read_doc" in lowered or "read_code_file" in lowered:
             return True
         if re.search(r"(문서\s*context|문서\s*근거|읽은\s*문서)", line):
@@ -488,6 +490,7 @@ def _has_negated_role_claim(line: str) -> bool:
     lowered = line.lower()
     negation_tokens = [
         "아니다",
+        "아니",
         "아니며",
         "않",
         "못",

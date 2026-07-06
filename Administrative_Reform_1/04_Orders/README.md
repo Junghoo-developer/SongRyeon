@@ -2,7 +2,7 @@
 
 발주서는 개발 지도에서 내려온 실무 계획서다.
 
-현재 정식 발주서는 `ORDER_001`부터 `ORDER_203`까지 있다.
+현재 정식 발주서는 `ORDER_001`부터 `ORDER_208`까지 있다.
 
 `ORDER_066`부터 `ORDER_075`까지는 메타정보 관리법을 실제 런타임과 LLM 노드 배선에 적용하기 위한 복구 로드맵이다.
 
@@ -159,6 +159,16 @@
 `ORDER_193`은 R traversal 결과를 node_3가 사용할 수 있는 read-only Vessel material로 전달하되, 아직 정상 live answer route가 완전히 R-powered인 척하지 않게 하는 MVP로 구현되었다.
 
 `ORDER_194`부터 `ORDER_199`까지는 Vessel R루프를 L루프처럼 0 기억공급관이 시작/중간/끝에서 관리하고, R 활동을 턴 캡슐/RawCapsule과 연결한 뒤, 마지막에 별도 answer demo route로만 확인하는 후속 구현 로드맵이다.
+
+`ORDER_204`는 node_1이 L루프와 Vessel R루프의 차이를 route capability card로 보고, 문서/코드 원문 검색이 필요한 요청과 이미 적재된 Vessel/Neo4j 그래프 기억 탐색이 적합한 요청을 더 자연스럽게 구분하게 하는 발주서다.
+
+`ORDER_205`는 빠른 기능 확장보다 사용자의 학습과 검수 가능성을 우선하도록, 인간 중심 학습 루프와 느린 확장 게이트를 `AGENTS.md`와 유지 체계 문서에 고정하는 발주서다.
+
+`ORDER_206`은 Qwen/Neo4j 없이 처음 실행하는 `fake-turn` 데모가 불필요한 L 검색이나 node_4 반려로 끝나지 않게, 배포 친화적인 fake adapter 첫 실행 경로를 정리하는 발주서다.
+
+`ORDER_207`은 README/DEMO/PUBLICATION_CHECKLIST의 배포용 데모 동선을 `fake-turn -> smoke-test -> optional Vessel/R traversal` 3층 구조로 정리하는 발주서다.
+
+`ORDER_208`은 GitHub 배포/커밋 전 env, secret pattern, local path, generated artifact, dirty worktree를 감사하고 커밋 가능한 파일 묶음을 분리하는 발주서다.
 
 ## 임시 발주서
 
@@ -344,3 +354,8 @@
 - [ORDER 201: R2 Granularity Enum Contract And Vessel R Runtime Display v0](ORDER_201_R2_GRANULARITY_AND_VESSEL_R_RUNTIME_DISPLAY_V0.md)
 - [ORDER 202: Vessel R Safe User-Facing Material v0](ORDER_202_VESSEL_R_SAFE_USER_FACING_MATERIAL_V0.md)
 - [ORDER 203: Force Vessel R Route For Live Verification v0](ORDER_203_FORCE_VESSEL_R_ROUTE_FOR_LIVE_VERIFICATION_V0.md)
+- [ORDER 204: Node1 Route Capability Cards For L/R Selection v0](ORDER_204_NODE1_ROUTE_CAPABILITY_CARDS_FOR_L_R_SELECTION_V0.md)
+- [ORDER 205: Human Learning First Agent Rules v0](ORDER_205_HUMAN_LEARNING_FIRST_AGENT_RULES_V0.md)
+- [ORDER 206: Release-Friendly Fake Turn First Demo v0](ORDER_206_RELEASE_FRIENDLY_FAKE_TURN_FIRST_DEMO_V0.md)
+- [ORDER 207: Release Demo Path Documentation v0](ORDER_207_RELEASE_DEMO_PATH_DOCUMENTATION_V0.md)
+- [ORDER 208: Release Safety And Commit Readiness Audit v0](ORDER_208_RELEASE_SAFETY_AND_COMMIT_READINESS_AUDIT_V0.md)

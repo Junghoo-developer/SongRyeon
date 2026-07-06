@@ -98,12 +98,24 @@ LLM 판단은 LLM 판단으로 둔다.
 
 ## 현재 데모 경로
 
-새 그래프 기억 경로만 빠르게 보고 싶다면 아래부터 시작하면 됩니다.
+먼저 모델 없이 실행되는 길부터 확인합니다.
+
+```powershell
+python main.py fake-turn "송련이 뭔지 짧게 설명해줘" --pretty
+```
+
+그다음 로컬 기준선을 확인합니다.
+
+```powershell
+python main.py smoke-test
+```
+
+선택 기능인 그래프 기억 경로를 보고 싶다면 Neo4j Vessel 명령을 사용합니다.
 
 ```powershell
 python main.py vessel-readback --database neo4j
 python main.py vessel-inspect --database neo4j --format text
-python main.py vessel-r-traverse "Trace how SongRyeon Core source summaries connect to token-bundle summaries." --database neo4j --llm-mode fake --format text
+python main.py vessel-r-traverse "송련 Core의 그래프 기억 구조를 계층적으로 탐색해줘" --database neo4j --llm-mode fake --format text
 ```
 
 Qwen/Ollama live traversal:
@@ -112,7 +124,7 @@ Qwen/Ollama live traversal:
 python main.py vessel-r-traverse "송련 Core의 그래프 기억 구조에서 소스 요약과 토큰 묶음 요약이 어떻게 이어지는지 계층적으로 탐색해줘." --database neo4j --llm-mode qwen --timeout 180 --format text
 ```
 
-Neo4j 환경변수와 더 자세한 실행 예시는 [DEMO.md](DEMO.md)에 있습니다.
+Neo4j 환경변수, 3단계 데모 흐름, 실패 상태의 뜻은 [DEMO.md](DEMO.md)에 있습니다.
 
 ## 추천 GitHub Topics
 
@@ -149,7 +161,7 @@ SMOKE_TEST_OK
 실제 LLM 없이 deterministic fake turn 실행:
 
 ```powershell
-python main.py fake-turn "송련의 문서 메모리 인덱스가 무엇인지 알려줘" --pretty
+python main.py fake-turn "송련이 뭔지 짧게 설명해줘" --pretty
 ```
 
 dry run 실행:

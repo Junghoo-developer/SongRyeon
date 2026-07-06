@@ -660,7 +660,7 @@ def _validate_answer_basis_payload(
         info_class=str(payload.get("mode_selection_reason_info_class") or "mixed").strip(),
         semantic_judgement_status="ran",
         source_trace_ids=["validation_trace"],
-        source_data_ids=_unique_strings(["validation_data", *allowed_source_data_ids]),
+        source_data_ids=_unique_strings(allowed_source_data_ids),
     )
     validate_node2_answer_basis_frame(frame)
 

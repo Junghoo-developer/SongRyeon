@@ -61,7 +61,7 @@ def test_route_r_frame_requires_policy_flag_llm_source_and_r_handoff_mode() -> N
         llm_routing_status="ran",
         route_rule_id="llm_router",
     )
-    with pytest.raises(ValueError, match="experimental policy flag"):
+    with pytest.raises(ValueError, match="explicit R policy flag"):
         validate_routing_decision_frame(missing_policy)
 
 
