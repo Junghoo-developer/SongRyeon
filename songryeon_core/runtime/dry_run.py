@@ -135,6 +135,7 @@ def run_dry_turn(
     max_input_chars: int = DEFAULT_MAX_INPUT_CHARS,
     max_document_context_chars: int = DEFAULT_MAX_DOCUMENT_CONTEXT_CHARS,
     force_l_route: bool = False,
+    force_vessel_r_route: bool = False,
     same_turn_l_reroute_enabled: bool = False,
     max_l_runs_per_turn: int = 1,
     allow_node_1_router_fallback: bool = True,
@@ -163,7 +164,11 @@ def run_dry_turn(
     그래서 이 함수는 현재 MVP의 중앙 배선도에 가깝다.
     """
 
+    if force_l_route and force_vessel_r_route:
+        raise ValueError("force_l_route and force_vessel_r_route cannot both be true")
+
     turn_id = turn_id or DEFAULT_TURN_ID
+    effective_enable_vessel_r_route = enable_vessel_r_route or force_vessel_r_route
     trace_store = TraceStore(on_event=live_trace_sink)
     data_store = DataStore()
     zero_state = ZeroState(
@@ -341,7 +346,7 @@ def run_dry_turn(
             selected_memory_context_data_id,
         ]
     )
-    if node_1_router_adapter is not None and not force_l_route:
+    if node_1_router_adapter is not None and not force_l_route and not force_vessel_r_route:
         decision = route_next_with_llm_or_policy_fallback(
             user_input=user_input,
             memory_packet=packet_for_1,
@@ -353,10 +358,11 @@ def run_dry_turn(
             input_ref=node1_route_input_refs,
             source_data_ids=node1_route_source_data_ids,
             force_l_route=force_l_route,
+            force_vessel_r_route=force_vessel_r_route,
             fallback_policy=node_1_router_fallback_policy,
             fallback_allowed_by_runtime_policy=allow_node_1_router_fallback,
             allow_r_route_experimental=(
-                enable_r_route_experimental or enable_vessel_r_route
+                enable_r_route_experimental or effective_enable_vessel_r_route
             ),
         )
     else:
@@ -365,6 +371,7 @@ def run_dry_turn(
             memory_packet=packet_for_1,
             schema_registry=schema_registry,
             force_l_route=force_l_route,
+            force_vessel_r_route=force_vessel_r_route,
         )
     route_input_ref = _unique_strings([*node1_route_input_refs, decision.llm_trace_event_id])
     route_source_data_ids = _unique_strings([*node1_route_source_data_ids, decision.llm_call_data_id])
@@ -428,7 +435,7 @@ def run_dry_turn(
     route2_data_id: str | None = None
 
     if decision.route == "R":
-        if enable_vessel_r_route:
+        if effective_enable_vessel_r_route:
             vessel_r_route_status = "selected"
             enter_loop(unified_state, "R")
             vessel_r_route_run = record_vessel_r_live_route(
@@ -1158,6 +1165,8 @@ def run_dry_turn(
         node_3_reporter_adapter=node_3_reporter_adapter,
         node_4_gatekeeper_adapter=node_4_gatekeeper_adapter,
     )
+    if force_l_route or force_vessel_r_route:
+        assigned_model_by_node["node_1"] = "CODE:POLICY_STUB"
     node2_brief_preview_movement = make_node_movement(
         movement_id=f"move_{next_step_index:03d}_preview",
         turn_id=turn_id,
@@ -1487,10 +1496,14 @@ def run_dry_turn(
         "r_route_experimental_output_data_ids": r_route_experimental_output_data_ids,
         "r_route_experimental_trace_event_ids": r_route_experimental_trace_event_ids,
         "r_route_experimental_graph_data_ids": r_route_experimental_graph_data_ids,
-        "vessel_r_route_enabled": enable_vessel_r_route,
+        "vessel_r_route_enabled": effective_enable_vessel_r_route,
         "vessel_r_route_status": vessel_r_route_status,
         "vessel_r_policy_flag": (
-            "enable_vessel_r_route" if enable_vessel_r_route else None
+            "force_vessel_r_route"
+            if force_vessel_r_route
+            else "enable_vessel_r_route"
+            if effective_enable_vessel_r_route
+            else None
         ),
         "vessel_r_read_packet_id": (
             vessel_r_route_run.read_packet_id
@@ -1828,6 +1841,7 @@ def run_dry_turn(
             data_type="node_output:node4_gatekeeper_frame",
         ),
         "force_l_route": force_l_route,
+        "force_vessel_r_route": force_vessel_r_route,
         "report": report,
     }
     if export_dir is not None:

@@ -8,6 +8,7 @@ from songryeon_core.core.schemas import (
     MemoryPacketFrom0,
     R_ROUTE_EXPERIMENTAL_NEXT_0_MODE,
     R_ROUTE_EXPERIMENTAL_POLICY_FLAG,
+    R_ROUTE_FORCE_VESSEL_POLICY_FLAG,
     RoutingDecision,
     RoutingDecisionFrame,
     validate_routing_decision_frame,
@@ -60,16 +61,28 @@ def route_next(
     memory_packet: MemoryPacketFrom0,
     schema_registry: SchemaRegistry,
     force_l_route: bool = False,
+    force_vessel_r_route: bool = False,
 ) -> RoutingDecision:
     """1 상황판단 라우터의 규칙 기반 라우팅."""
 
-    if force_l_route:
+    if force_l_route and force_vessel_r_route:
+        raise ValueError("force_l_route and force_vessel_r_route cannot both be true")
+
+    if force_vessel_r_route:
+        route = "R"
+        next_0_mode = R_ROUTE_EXPERIMENTAL_NEXT_0_MODE
+        reason = "CODE_STATUS:force_vessel_r_route_policy"
+        route_source = "CODE:POLICY_STUB"
+        route_rule_id = "force_vessel_r_route_policy"
+        matched_keywords: list[str] = []
+        policy_flag = R_ROUTE_FORCE_VESSEL_POLICY_FLAG
+    elif force_l_route:
         route = "L"
         next_0_mode = "targeted_memory_supply"
         reason = "CODE_STATUS:force_l_route_policy"
         route_source = "CODE:POLICY_STUB"
         route_rule_id = "force_l_route_policy"
-        matched_keywords: list[str] = []
+        matched_keywords = []
         policy_flag = "force_l_route"
     elif _should_route_to_l(user_input):
         route = "L"
@@ -88,7 +101,7 @@ def route_next(
         matched_keywords = []
         policy_flag = None
 
-    target_node = "node_2" if route == "2" else "L"
+    target_node = "node_2" if route == "2" else "L" if route == "L" else "R_LOOP"
     return RoutingDecision(
         route=route,
         route_reason=reason,
@@ -203,6 +216,7 @@ def route_next_with_llm_or_policy_fallback(
     source_data_ids: list[str],
     fallback_user_input: str | None = None,
     force_l_route: bool = False,
+    force_vessel_r_route: bool = False,
     fallback_policy: str = ROUTER_FALLBACK_POLICY_DEV_SMOKE,
     fallback_allowed_by_runtime_policy: bool = True,
     allow_r_route_experimental: bool = False,
@@ -232,6 +246,7 @@ def route_next_with_llm_or_policy_fallback(
             memory_packet=memory_packet,
             schema_registry=schema_registry,
             force_l_route=force_l_route,
+            force_vessel_r_route=force_vessel_r_route,
         )
         return _mark_llm_failure_fallback(
             decision=decision,

@@ -405,6 +405,7 @@ def main() -> None:
             max_document_context_chars=args.max_document_context_chars,
             include_data_records=args.pretty,
             force_l_route=args.force_l,
+            force_vessel_r_route=args.force_vessel_r_route,
             same_turn_l_reroute_enabled=args.same_turn_l_reroute,
             max_l_runs_per_turn=args.max_l_runs_per_turn,
             enable_r_route_experimental=args.enable_r_route_experimental,
@@ -441,6 +442,7 @@ def main() -> None:
             max_document_context_chars=args.max_document_context_chars,
             include_data_records=args.pretty,
             force_l_route=args.force_l,
+            force_vessel_r_route=args.force_vessel_r_route,
             same_turn_l_reroute_enabled=args.same_turn_l_reroute,
             max_l_runs_per_turn=args.max_l_runs_per_turn,
             enable_r_route_experimental=args.enable_r_route_experimental,
@@ -683,6 +685,7 @@ def _add_turn_runtime_args(parser: argparse.ArgumentParser, *, include_qwen_args
         default=DEFAULT_MAX_DOCUMENT_CONTEXT_CHARS,
     )
     parser.add_argument("--force-l", action="store_true")
+    parser.add_argument("--force-vessel-r-route", action="store_true")
     parser.add_argument("--same-turn-l-reroute", action="store_true")
     parser.add_argument("--max-l-runs-per-turn", type=int, default=1)
     parser.add_argument("--enable-r-route-experimental", action="store_true")
@@ -747,6 +750,7 @@ def _run_qwen_chat(args: argparse.Namespace) -> None:
             max_document_context_chars=args.max_document_context_chars,
             include_data_records=True,
             force_l_route=args.force_l,
+            force_vessel_r_route=args.force_vessel_r_route,
             same_turn_l_reroute_enabled=args.same_turn_l_reroute,
             max_l_runs_per_turn=args.max_l_runs_per_turn,
             enable_r_route_experimental=args.enable_r_route_experimental,

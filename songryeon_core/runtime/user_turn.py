@@ -38,6 +38,7 @@ def run_fake_user_turn(
     max_document_context_chars: int = DEFAULT_MAX_DOCUMENT_CONTEXT_CHARS,
     include_data_records: bool = False,
     force_l_route: bool = False,
+    force_vessel_r_route: bool = False,
     same_turn_l_reroute_enabled: bool = False,
     max_l_runs_per_turn: int = 1,
     enable_r_route_experimental: bool = False,
@@ -84,12 +85,15 @@ def run_fake_user_turn(
         max_input_chars=max_input_chars,
         max_document_context_chars=max_document_context_chars,
         force_l_route=force_l_route,
+        force_vessel_r_route=force_vessel_r_route,
         same_turn_l_reroute_enabled=same_turn_l_reroute_enabled,
         max_l_runs_per_turn=max_l_runs_per_turn,
         enable_r_route_experimental=enable_r_route_experimental,
-        enable_vessel_r_route=enable_vessel_r_route,
+        enable_vessel_r_route=enable_vessel_r_route or force_vessel_r_route,
         vessel_r_adapter=(
-            RLoopVesselTraverseFakeLLMAdapter() if enable_vessel_r_route else None
+            RLoopVesselTraverseFakeLLMAdapter()
+            if enable_vessel_r_route or force_vessel_r_route
+            else None
         ),
         vessel_r_uri=vessel_r_uri,
         vessel_r_user=vessel_r_user,
@@ -135,6 +139,7 @@ def run_qwen_user_turn(
     max_document_context_chars: int = DEFAULT_MAX_DOCUMENT_CONTEXT_CHARS,
     include_data_records: bool = False,
     force_l_route: bool = False,
+    force_vessel_r_route: bool = False,
     same_turn_l_reroute_enabled: bool = False,
     max_l_runs_per_turn: int = 1,
     enable_r_route_experimental: bool = False,
@@ -198,11 +203,12 @@ def run_qwen_user_turn(
             max_input_chars=max_input_chars,
             max_document_context_chars=max_document_context_chars,
             force_l_route=force_l_route,
+            force_vessel_r_route=force_vessel_r_route,
             same_turn_l_reroute_enabled=same_turn_l_reroute_enabled,
             max_l_runs_per_turn=max_l_runs_per_turn,
             enable_r_route_experimental=enable_r_route_experimental,
-            enable_vessel_r_route=enable_vessel_r_route,
-            vessel_r_adapter=adapter if enable_vessel_r_route else None,
+            enable_vessel_r_route=enable_vessel_r_route or force_vessel_r_route,
+            vessel_r_adapter=adapter if enable_vessel_r_route or force_vessel_r_route else None,
             vessel_r_uri=vessel_r_uri,
             vessel_r_user=vessel_r_user,
             vessel_r_password=vessel_r_password,
