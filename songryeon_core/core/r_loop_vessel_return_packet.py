@@ -13,32 +13,57 @@ R_LOOP_VESSEL_RETURN_PACKET_SCHEMA_NAME = "RLoopVesselReturnPacketFrame"
 R_LOOP_VESSEL_RETURN_PACKET_SCHEMA_VERSION = "0.1"
 R_LOOP_VESSEL_RETURN_STATUSES = {"available", "failed"}
 
+# 학습용 큰 그림:
+# R 루프는 그래프를 탐색하고 많은 내부 frame을 남긴다.
+# 하지만 node_2/node_3가 그 모든 내부 frame을 직접 이해하면 너무 위험하고 복잡하다.
+# 그래서 node_0이 R 활동 장부를 읽고 "이번 R 탐색 결과를 downstream에 넘겨도 되는가"를
+# 절대정보 봉투로 다시 포장한다. 그 봉투가 RLoopVesselReturnPacketFrame이다.
+
 
 @dataclass(frozen=True)
 class RLoopVesselReturnPacketFrame:
     """node_0 labels the finished Vessel R traversal for downstream nodes."""
 
+    # packet_id/turn_id/target/mode는 이 봉투 자체의 좌표와 용도다.
     packet_id: str
     turn_id: str
     target: str
     mode: str
+
+    # return_status는 R 결과를 downstream에 넘길 수 있는지에 대한 code 상태값이다.
+    # 여기서 의미 판단을 하는 것이 아니라, traverse가 completed였는지 같은 절대 상태만 본다.
     return_status: str
+
+    # source_* 필드는 이 return packet이 어떤 R 기록에서 나왔는지 알려주는 족보다.
+    # 송련식으로 말하면 "이 봉투의 출처 장부"다.
     source_start_handoff_packet_id: str | None
     source_activity_ledger_frame_id: str
     source_traverse_result_frame_id: str
     source_return_summary_frame_id: str | None
     source_read_packet_id: str
+
+    # R 루프가 자기 일을 얼마나 끝냈는지 나타내는 상태 요약.
+    # node_3는 이 값을 보고 "R이 충분히 봤다/부분만 봤다/실패했다"를 구분할 수 있다.
     r_loop_task_status: str
     traverse_status: str
     failure_stage: str | None
     failure_type: str | None
     failure_reason: str | None
+
+    # R이 실제로 고른 node 수, 검사한 node 수, summary/raw 재료 수.
+    # count는 code가 확정 가능한 절대정보라서 LLM에게 맡기지 않는다.
     selected_graph_node_count: int
     inspected_graph_node_count: int
     summary_material_count: int
     raw_original_material_count: int
+
+    # node3_material_ready=True는 "node_3에 넘길 R 재료 좌표가 있다"는 뜻이다.
+    # "그 재료가 사용자 질문에 의미적으로 충분하다"는 뜻은 아니다.
     node3_material_ready: bool
     node3_material_source_data_ids: list[str]
+
+    # trace/data 출처. 내부 ID는 사용자 답변에 그대로 새면 안 되지만,
+    # 시스템 내부 감사와 재현에는 반드시 필요하다.
     source_trace_ids: list[str]
     source_data_ids: list[str]
     generated_by: str = R_LOOP_VESSEL_RETURN_PACKET_GENERATOR
@@ -69,6 +94,8 @@ def build_r_loop_vessel_return_packet(
     activity_ledger_payload: dict[str, object],
     frame_label: str,
 ) -> RLoopVesselReturnPacketFrame:
+    # activity ledger는 R 탐색이 끝난 뒤의 장부다.
+    # 여기서 traverse result, read packet, return summary 같은 핵심 frame id를 꺼낸다.
     activity_ledger_id = _required_text(activity_ledger_payload, "frame_id")
     traverse_result_id = _required_text(activity_ledger_payload, "traverse_result_frame_id")
     read_packet_id = _required_text(activity_ledger_payload, "source_read_packet_id")
@@ -87,6 +114,10 @@ def build_r_loop_vessel_return_packet(
         fallback=_optional_text(activity_ledger_payload.get("r_loop_task_status"))
         or "failed",
     )
+
+    # selected_ids: R2가 선택한 그래프 node들.
+    # inspected_ids: R3가 실제로 검사한 그래프 node들.
+    # 둘 다 나중에 node_3 재료 후보가 되지만, 사용자-facing 답변에는 안전한 label/요약으로 바꿔야 한다.
     selected_ids = _string_list(
         traverse_payload.get("selected_graph_node_ids")
         if traverse_payload
@@ -97,7 +128,13 @@ def build_r_loop_vessel_return_packet(
         if traverse_payload
         else activity_ledger_payload.get("inspected_graph_node_ids")
     )
+
+    # completed만 available로 본다.
+    # partial/failed를 억지로 available로 고치지 않는 것이 정직성 원칙이다.
     return_status = "available" if traverse_status == "completed" else "failed"
+
+    # material_source_ids는 node_3가 R 자료를 찾아갈 수 있는 최소 좌표 묶음이다.
+    # 여기에는 내부 graph id가 들어가므로, 최종 답변에서는 그대로 노출하면 안 된다.
     material_source_ids = _unique_strings(
         [
             traverse_result_id,
@@ -139,7 +176,13 @@ def build_r_loop_vessel_return_packet(
         ),
         selected_graph_node_count=len(selected_ids),
         inspected_graph_node_count=len(inspected_ids),
-        summary_material_count=sum(1 for value in _unique_strings([*selected_ids, *inspected_ids]) if value.startswith("graph:summary:")),
+        # graph:summary:* 로 시작하는 node는 R이 본 요약 재료로 센다.
+        # 이것도 의미 판단이 아니라 id prefix와 record 구조에 근거한 절대 count다.
+        summary_material_count=sum(
+            1
+            for value in _unique_strings([*selected_ids, *inspected_ids])
+            if value.startswith("graph:summary:")
+        ),
         raw_original_material_count=_int(
             traverse_payload,
             "raw_original_material_seen_count",
@@ -178,6 +221,8 @@ def record_r_loop_vessel_return_packet(
     activity_ledger_frame_id: str,
     frame_label: str = "manual_vessel_r_traverse",
 ) -> RecordedRLoopVesselReturnPacket:
+    # record_* 함수는 build_*가 만든 frame을 TraceStore/DataStore에 실제로 기록한다.
+    # build_*는 객체 생성과 검증, record_*는 사건/데이터 저장이라고 보면 된다.
     activity_record = data_store.require_record(activity_ledger_frame_id)
     if not isinstance(activity_record.payload, dict):
         raise ValueError("R Vessel return packet requires activity ledger payload")

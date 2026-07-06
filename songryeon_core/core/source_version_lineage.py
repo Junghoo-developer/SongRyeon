@@ -23,9 +23,21 @@ SOURCE_VERSION_LINEAGE_POLICY_ID = "SOURCE_VERSION_LINEAGE_V0"
 SOURCE_OBSERVATION_LEDGER_POLICY_ID = "SOURCE_OBSERVATION_LEDGER_V0"
 SUMMARY_INVALIDATION_LEDGER_POLICY_ID = "SUMMARY_INVALIDATION_LEDGER_V0"
 
+# 학습용 큰 그림:
+# 이 파일은 "이 자료가 동적이냐 정적이냐"를 직접 판정하는 곳이 아니다.
+# 대신 같은 경로의 원본이 언제 어떤 내용 hash로 관측되었는지 줄 세우고,
+# 그 줄에서 최신 원본과 밀려난 원본을 구분한다.
+#
+# 왜 이게 중요하냐면, LLM 요약은 원본 자체가 아니라 "특정 원본 버전"을 보고
+# 만들어진 파생 정보이기 때문이다. 원본이 바뀌면 옛 요약을 지우는 대신
+# "이 요약은 옛 버전에 붙은 요약이다"라고 추적 가능하게 무효화해야 한다.
+
 
 @dataclass(frozen=True)
 class RecordedSourceVersionLineageResult:
+    # 한 번 lineage/invalidation 기록을 실행한 뒤의 결과 봉투.
+    # 새로 만든 data id와 이미 있던 data id를 나눠 두면,
+    # 같은 작업을 다시 돌렸을 때 중복 생성인지 실제 새 기록인지 구분할 수 있다.
     lineage_frames: list[SourceVersionLineageFrame]
     observation_ledger: SourceObservationLedgerFrame
     invalidation_ledger: SummaryInvalidationLedgerFrame
@@ -36,6 +48,9 @@ class RecordedSourceVersionLineageResult:
 
 @dataclass(frozen=True)
 class _SourceVersion:
+    # DataStore 안에 흩어진 raw_source record와 file_metadata record를
+    # lineage 계산용으로 작게 다시 묶은 내부 전용 카드.
+    # 외부 schema가 아니라 이 파일 안에서 정렬/비교하기 쉽게 만든 작업용 구조다.
     source_kind: str
     path: str
     source_graph_node_id: str
@@ -84,12 +99,16 @@ def build_source_version_lineage_frames(
 ) -> list[SourceVersionLineageFrame]:
     """Build absolute source version lineages from existing raw_source records."""
 
+    # 1단계: 같은 source_kind + path를 가진 관측본끼리 한 바구니에 모은다.
+    # 예를 들어 같은 README.md가 두 번 관측되었다면 같은 바구니로 들어간다.
     versions_by_identity: dict[tuple[str, str], list[_SourceVersion]] = {}
     for version in _iter_source_versions(data_store):
         versions_by_identity.setdefault((version.source_kind, version.path), []).append(version)
 
     frames: list[SourceVersionLineageFrame] = []
     for (source_kind, path), versions in sorted(versions_by_identity.items()):
+        # 2단계: 관측 시각과 graph node id 기준으로 순서를 정한다.
+        # 이 순서의 마지막 항목이 현재 active source version이 된다.
         ordered_versions = sorted(
             versions,
             key=lambda item: (item.observed_at, item.source_graph_node_id),
@@ -114,6 +133,8 @@ def build_summary_invalidation_ledger_frame(
     """Build an absolute ledger for summaries derived from superseded source versions."""
 
     timestamp = invalidated_at or _now_iso()
+    # content_changed인 lineage만 요약 무효화 후보가 된다.
+    # single_version이면 비교할 과거 버전이 없으므로 무효화할 요약도 없다.
     changed_lineages = [
         frame for frame in lineage_frames if frame.lineage_status == "content_changed"
     ]
@@ -133,6 +154,9 @@ def build_summary_invalidation_ledger_frame(
             continue
         summary_node_id = _payload_text(payload, "node_id") or summary_record.data_id
         source_graph_node_ids = _string_list(payload.get("source_graph_node_ids"))
+        # 요약 node가 바라본 source_graph_node_ids 중 하나가 superseded라면,
+        # 그 요약은 최신 원본에 대한 요약으로는 더 이상 쓰면 안 된다.
+        # 여기서도 요약을 삭제하지 않고 invalidation ledger에만 기록한다.
         for source_graph_node_id in source_graph_node_ids:
             if source_graph_node_id not in superseded_to_active:
                 continue
@@ -211,6 +235,9 @@ def build_source_observation_ledger_frame(
 ) -> SourceObservationLedgerFrame:
     """Build a per-batch absolute ledger of source observations."""
 
+    # observation ledger는 "이번 batch에서 무엇을 봤는가"를 적는 출석부에 가깝다.
+    # lineage frame이 파일별 전체 버전 족보라면,
+    # observation ledger는 이번 실행에서 새로 확인한 관측 사건 목록이다.
     metadata_records = _metadata_records_by_data_id(data_store)
     raw_source_by_identity_content = _raw_source_id_by_identity_content(data_store)
     metadata_by_identity = _metadata_records_by_identity(data_store)
@@ -259,6 +286,9 @@ def build_source_observation_ledger_frame(
                 if previous_content_sha1 == content_sha1
                 else "content_changed"
             )
+        # 여기서 "동적 파일"이라고 추측하지 않는다.
+        # 오직 이전 content_sha1과 지금 content_sha1이 같은지 다른지만 본다.
+        # 이것이 송련식 절대정보 판정이다.
 
         if not active_source_graph_node_id:
             continue
@@ -326,6 +356,10 @@ def record_source_version_lineage_and_summary_invalidation(
         raise ValueError("batch_id must not be empty")
 
     timestamp = created_at or _now_iso()
+    # 아래 세 frame은 서로 역할이 다르다.
+    # lineage_frames: 같은 원본의 버전 족보.
+    # observation_ledger: 이번 batch에서 실제로 관측한 source 목록.
+    # invalidation_ledger: 바뀐 원본 때문에 최신 근거로 쓰면 안 되는 요약 목록.
     lineage_frames = build_source_version_lineage_frames(data_store=data_store)
     observation_ledger = build_source_observation_ledger_frame(
         data_store=data_store,
@@ -405,6 +439,9 @@ def _build_lineage_frame(
 ) -> SourceVersionLineageFrame:
     source_graph_node_ids = [version.source_graph_node_id for version in versions]
     source_file_data_ids = [version.source_file_data_id for version in versions]
+    # 정렬된 versions의 마지막을 active로 본다.
+    # 이전 것들은 삭제하지 않고 superseded로 남긴다.
+    # 그래야 나중에 "옛 요약이 왜 무효화됐는지" 되짚을 수 있다.
     active_source_graph_node_id = source_graph_node_ids[-1]
     superseded_source_graph_node_ids = source_graph_node_ids[:-1]
     content_sha1_values = {version.content_sha1 for version in versions}
@@ -463,6 +500,9 @@ def _build_lineage_frame(
 
 
 def _iter_source_versions(data_store: DataStore) -> list[_SourceVersion]:
+    # raw_source record는 그래프의 원본 node이고,
+    # graph_source:file_metadata record는 그 원본의 path/hash/관측시각 같은 설명 카드다.
+    # 이 함수는 둘을 DataStore에서 찾아 연결해 _SourceVersion으로 변환한다.
     metadata_by_data_id = _metadata_records_by_data_id(data_store)
     versions: list[_SourceVersion] = []
     for record in data_store.list_records():
