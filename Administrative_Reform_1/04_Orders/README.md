@@ -2,7 +2,7 @@
 
 발주서는 개발 지도에서 내려온 실무 계획서다.
 
-현재 정식 발주서는 `ORDER_001`부터 `ORDER_199`까지 있다.
+현재 정식 발주서는 `ORDER_001`부터 `ORDER_202`까지 있다.
 
 `ORDER_066`부터 `ORDER_075`까지는 메타정보 관리법을 실제 런타임과 LLM 노드 배선에 적용하기 위한 복구 로드맵이다.
 
@@ -342,3 +342,4 @@
 - [ORDER 199: R Vessel Answer Demo Route v0](ORDER_199_R_VESSEL_ANSWER_DEMO_ROUTE_V0.md)
 - [ORDER 200: Vessel R Live Gated Integration MVP v0](ORDER_200_VESSEL_R_LIVE_GATED_INTEGRATION_MVP_V0.md)
 - [ORDER 201: R2 Granularity Enum Contract And Vessel R Runtime Display v0](ORDER_201_R2_GRANULARITY_AND_VESSEL_R_RUNTIME_DISPLAY_V0.md)
+- [ORDER 202: Vessel R Safe User-Facing Material v0](ORDER_202_VESSEL_R_SAFE_USER_FACING_MATERIAL_V0.md)

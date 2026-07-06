@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import re
 from dataclasses import asdict
 
 from songryeon_core.core.data_store import DataStore
@@ -48,6 +49,8 @@ R_LOOP_VESSEL_TRAVERSE_RESULT_DATA_TYPE = "r_loop:vessel_traverse_result"
 R_LOOP_VESSEL_READ_PACKET_DATA_TYPE = "r_loop:vessel_read_packet"
 R_LOOP_VESSEL_RETURN_PACKET_DATA_TYPE = "r_loop:vessel_return_packet"
 NODE3_VESSEL_R_MATERIAL_SUMMARY_MAX_CHARS = 1200
+VESSEL_R_INTERNAL_GRAPH_ID_RE = re.compile(r"graph:[A-Za-z0-9_:\-.]+")
+VESSEL_R_REDACTED_GRAPH_ID_LABEL = "[internal graph id omitted]"
 
 
 def selected_recent_memory_context_frame_data_id(selection_frame_id: str) -> str:
@@ -1242,6 +1245,26 @@ def _node3_vessel_r_material_item(
     )
 
 
+def _redact_vessel_r_internal_graph_ids(text: str) -> str:
+    """node_3 LLM에게 보이는 문자열에서 내부 graph node ID만 가린다."""
+
+    if not text:
+        return ""
+    return VESSEL_R_INTERNAL_GRAPH_ID_RE.sub(
+        VESSEL_R_REDACTED_GRAPH_ID_LABEL,
+        text,
+    )
+
+
+def _safe_vessel_r_display_name(display_name: str, *, fallback_label: str) -> str:
+    """사람에게 보일 이름이 내부 ID뿐이면 안전한 라벨로 대체한다."""
+
+    safe_name = _redact_vessel_r_internal_graph_ids(display_name).strip()
+    if not safe_name or safe_name == VESSEL_R_REDACTED_GRAPH_ID_LABEL:
+        return fallback_label
+    return safe_name
+
+
 def node3_brief_llm_payload(frame: Node3InputBriefFrame) -> dict[str, object]:
     """내부 ID를 제거한 node_3 LLM용 payload를 만든다."""
 
@@ -1571,7 +1594,10 @@ def _node3_vessel_r_material_llm_payload(
             {
                 "material_label": item.material_label,
                 "material_kind": item.material_kind,
-                "display_name": item.display_name,
+                "display_name": _safe_vessel_r_display_name(
+                    item.display_name,
+                    fallback_label=item.material_label,
+                ),
                 "node_kind": item.node_kind,
                 "data_kind": item.data_kind,
                 "summary_depth": item.summary_depth,
@@ -1579,7 +1605,7 @@ def _node3_vessel_r_material_llm_payload(
                 "source_summary_count": item.source_summary_count,
                 "info_class": item.info_class,
                 "generated_by": item.generated_by,
-                "summary_text": item.summary_text,
+                "summary_text": _redact_vessel_r_internal_graph_ids(item.summary_text),
                 "summary_text_char_count": item.summary_text_char_count,
                 "text_payload_status": item.text_payload_status,
             }
