@@ -228,3 +228,14 @@ Test layers:
 This project is not a production assistant.
 
 It is a learning and architecture prototype focused on provenance, runtime honesty, and agent self-reporting. The code favors explicit records and small smoke-tested MVPs over polished UX.
+
+## License
+
+This project is released under the [MIT License](LICENSE).
+
+## Third-Party Components
+
+- No model weights are included in this repository.
+- The Qwen/Ollama path is optional; users must follow the license of the model they configure.
+- The Neo4j Vessel path is optional and requires a local Neo4j setup.
+- Development tests use `pytest` through `requirements-dev.txt`.
