@@ -223,3 +223,14 @@ python main.py qwen-turn "송련의 문서 메모리 인덱스가 무엇인지 �
 
 송련 코어는 provenance, runtime honesty, agent self-reporting을 공부하기 위한 학습형 아키텍처 프로토타입입니다.
 겉보기에 화려한 데모보다, 기록이 남고 검증 가능한 작은 MVP를 우선합니다.
+
+## 라이선스
+
+이 프로젝트는 [MIT License](LICENSE)로 공개됩니다.
+
+## 제3자 구성요소
+
+- 이 저장소에는 모델 가중치가 포함되어 있지 않습니다.
+- Qwen/Ollama 경로는 선택 기능이며, 사용자가 설정한 모델의 라이선스를 따라야 합니다.
+- Neo4j Vessel 경로는 선택 기능이며, 로컬 Neo4j 설정이 필요합니다.
+- 개발 테스트는 `requirements-dev.txt`의 `pytest`를 사용합니다.
