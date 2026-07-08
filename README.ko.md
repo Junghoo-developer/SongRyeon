@@ -234,3 +234,4 @@ python main.py qwen-turn "송련의 문서 메모리 인덱스가 무엇인지 �
 - Qwen/Ollama 경로는 선택 기능이며, 사용자가 설정한 모델의 라이선스를 따라야 합니다.
 - Neo4j Vessel 경로는 선택 기능이며, 로컬 Neo4j 설정이 필요합니다.
 - 개발 테스트는 `requirements-dev.txt`의 `pytest`를 사용합니다.
+- 대회 제출용 라이선스 메모는 [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md)를 참고하세요.

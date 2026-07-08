@@ -227,3 +227,4 @@ This project is released under the [MIT License](LICENSE).
 - The Qwen/Ollama path is optional; users must follow the license of the model they configure.
 - The Neo4j Vessel path is optional and requires a local Neo4j setup.
 - Development tests use `pytest` through `requirements-dev.txt`.
+- See [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) for contest-oriented license notes.
