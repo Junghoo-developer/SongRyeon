@@ -48,6 +48,10 @@ def run_node4_gatekeeper(
         if id_namespace is not None
         else NODE4_GATEKEEPER_FRAME_DATA_ID
     )
+    # node_4의 기본 입력은 두 가지다.
+    # 1. node_3가 사용자에게 보여주려는 최종 보고문(rendered_markdown)
+    # 2. node_3가 보고문을 쓸 때 실제로 받은 근거 봉투(node3_input_brief)
+    # node_4는 이 둘 사이의 "말한 것"과 "받은 근거"가 어긋나는지 검사한다.
     prompt_ref = "songryeon_core/prompts/node_4_gatekeeper_v0.md"
     prompt = Path(prompt_ref).read_text(encoding="utf-8")
     brief_payload = node3_brief_llm_payload(brief_frame)
@@ -96,6 +100,8 @@ def run_node4_gatekeeper(
         revision_targets = _string_list(payload.get("revision_targets"))
         llm_gate_status = "ran"
     else:
+        # LLM gatekeeper가 깨져도 조용히 pass로 넘어가지 않는다.
+        # 실패 자체를 frame에 남겨 이후 terminal/fallback renderer가 정직하게 보여주게 한다.
         gate_status = "failed"
         reason = f"node_4 LLM gatekeeper failed: {llm_result.failure_type}"
         checked_claims = []
@@ -133,6 +139,8 @@ def run_node4_gatekeeper(
         brief_frame=brief_frame,
     )
     if recent_memory_guard["status"] == "needs_revision":
+        # 최근 대화 원문은 사용자-facing 답변 재료가 될 수 있지만,
+        # 내부 frame id나 raw trace id가 그대로 노출되면 사용자는 근거가 아니라 내부 장부를 보게 된다.
         if gate_status == "pass":
             gate_status = "needs_revision"
         if "CODE:RECENT_MEMORY_INTERNAL_ID_GUARD" not in gate_generation_source:
@@ -156,6 +164,8 @@ def run_node4_gatekeeper(
         brief_frame=brief_frame,
     )
     if document_role_guard["status"] == "needs_revision":
+        # "검색 후보"와 "실제로 읽은 문서"는 다른 절대정보다.
+        # 이 guard는 후보를 원문 근거처럼 과장하는 보고문을 code 차원에서 막는다.
         if gate_status == "pass":
             gate_status = "needs_revision"
         if "CODE:DOCUMENT_EVIDENCE_ROLE_GUARD" not in gate_generation_source:
@@ -177,6 +187,8 @@ def run_node4_gatekeeper(
         brief_frame=brief_frame,
     )
     if vessel_r_guard["status"] == "needs_revision":
+        # R material이 존재한다는 사실과 R traversal이 목표를 충분히 달성했다는 판단은 다르다.
+        # material count/status를 성공 주장으로 둔갑시키지 않는지 확인한다.
         if gate_status == "pass":
             gate_status = "needs_revision"
         if "CODE:VESSEL_R_MATERIAL_GUARD" not in gate_generation_source:
@@ -199,6 +211,9 @@ def run_node4_gatekeeper(
     frame_source_data_ids = _unique_strings(
         [*source_data_ids, report_id, brief_frame.frame_id, boundary_id, llm_result.call_data_id]
     )
+    # 최종 gatekeeper frame은 LLM 판단 결과와 code guard 결과를 함께 담는다.
+    # 중요한 점은 둘을 합치되, generated_by에 +CODE:* suffix를 남겨
+    # 어떤 부분이 LLM 판단이고 어떤 부분이 code 절대검사인지 추적 가능하게 한다는 것이다.
     frame = Node4GatekeeperFrame(
         gate_id=gatekeeper_frame_id,
         turn_id=turn_id,
@@ -414,10 +429,14 @@ def _claims_vessel_r_success(rendered_markdown: str) -> bool:
 
 
 def _claims_vessel_r_as_document_evidence(rendered_markdown: str) -> bool:
+    """Vessel R 재료를 read_doc/read_code_file 근거라고 우긴 문장을 찾는다."""
+
     for line in rendered_markdown.splitlines():
         lowered = line.lower()
         if not ("vessel" in lowered or "r " in lowered or "r루프" in line or "r 탐색" in line):
             continue
+        # "Vessel R은 read_doc 근거가 아니다" 같은 경계 설명은 안전한 문장이다.
+        # 부정문을 놓치면 오히려 정직한 설명을 node_4가 잘못 반려한다.
         if _has_negated_role_claim(line):
             continue
         if "read_doc" in lowered or "read_code_file" in lowered:

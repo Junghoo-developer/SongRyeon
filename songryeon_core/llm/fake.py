@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 
@@ -11,6 +11,9 @@ class FakeLLMAdapter:
     model_id = "fake-llm-adapter"
 
     def complete(self, request: LLMRequest) -> LLMResponse:
+        # 학습 포인트:
+        # fake adapter는 "똑똑한 답변"을 만들기 위한 장치가 아니라,
+        # LLM 없이도 런타임 배선과 schema 검증이 작동하는지 확인하기 위한 장치다.
         payload = {
             "echo": request.input_payload,
             "response_format": request.response_format,
@@ -29,6 +32,8 @@ class BrokenJSONFakeLLMAdapter:
     model_id = "broken-json-fake-llm-adapter"
 
     def complete(self, request: LLMRequest) -> LLMResponse:
+        # 의도적으로 JSON이 아닌 문자열을 돌려준다.
+        # 정상 adapter가 아니라 "LLM 출력이 깨졌을 때 runtime이 정직하게 실패하는가"를 보는 도구다.
         return LLMResponse(
             text="this is not json",
             model_id=self.model_id,
@@ -42,6 +47,9 @@ class MemoryRelevanceSelectedFakeLLMAdapter:
     model_id = "memory-relevance-selected-fake-llm-adapter"
 
     def complete(self, request: LLMRequest) -> LLMResponse:
+        # relevance selector의 핵심 계약:
+        # code가 후보 목록을 공급하고, LLM은 그 목록 안에서만 선택해야 한다.
+        # 이 fake는 첫 후보를 고르는 단순 행동으로 그 계약 자체를 테스트한다.
         candidates = request.input_payload.get("relevance_candidate_frames")
         first_candidate = candidates[0] if isinstance(candidates, list) and candidates else {}
         frame_id = (
@@ -96,6 +104,8 @@ class QueryPlannerFakeLLMAdapter:
     model_id = "query-planner-fake-llm-adapter"
 
     def complete(self, request: LLMRequest) -> LLMResponse:
+        # L2 query planner smoke에서는 "검색어가 멋진가"보다
+        # planner payload가 schema를 통과하고 source_data_ids를 보존하는지가 더 중요하다.
         user_input = str(request.input_payload.get("user_input") or "").strip()
         source_data_ids = request.input_payload.get("source_data_ids")
         if not isinstance(source_data_ids, list) or not source_data_ids:
@@ -171,6 +181,9 @@ class MixedToolQueryPlannerFakeLLMAdapter:
     model_id = "mixed-tool-query-planner-fake-llm-adapter"
 
     def complete(self, request: LLMRequest) -> LLMResponse:
+        # 실패 재현용 fake:
+        # L2가 허용하지 않은 도구(list_docs)를 섞어 내도,
+        # runtime이 허용 도구(search_docs)만 통과시키는지 확인한다.
         source_data_ids = request.input_payload.get("source_data_ids")
         if not isinstance(source_data_ids, list) or not source_data_ids:
             source_data_ids = ["L1:goal_frame"]
@@ -350,6 +363,8 @@ class SongRyeonAllNodesFakeLLMAdapter:
         if r_route_allowed and graph_memory_requested:
             route = "R"
         elif _is_release_intro_request(user_input):
+            # 배포 첫 실행용 질문은 "문서 검색 능력"을 시험하는 게 아니다.
+            # 그래서 fake adapter에서는 L루프를 태우지 않고 바로 보고 경로로 닫는다.
             route = "2"
         elif selected_recent_memory_count > 0 and not document_required:
             route = "2"
@@ -509,6 +524,8 @@ class SongRyeonAllNodesFakeLLMAdapter:
         search_candidate_count = int(request.input_payload.get("available_search_candidate_document_count") or 0)
         runtime_task_count = int(request.input_payload.get("available_runtime_task_count") or 0)
         if isinstance(selected_contexts, list) and selected_contexts:
+            # 최근 기억 context는 코드가 복사한 이전 대화 원문이다.
+            # fake adapter는 그 원문 안에 테스트 암호가 실제로 있는 경우만 답하게 한다.
             first_context = selected_contexts[0] if isinstance(selected_contexts[0], dict) else {}
             raw_user_text = str(first_context.get("raw_user_text") or "")
             raw_assistant_text = str(first_context.get("raw_assistant_text") or "")
@@ -523,6 +540,8 @@ class SongRyeonAllNodesFakeLLMAdapter:
                     "선택된 최근 기억은 들어왔지만, 그 복사본 안에서 테스트 암호를 확정할 수는 없어."
                 )
         elif _is_release_intro_request(user_question):
+            # 이 답변은 실제 Qwen 품질을 보여주는 문장이 아니라
+            # "송련의 노드 흐름이 끝까지 통과한다"는 배포용 deterministic 데모다.
             body_markdown = (
                 "송련 Core는 코드가 확인한 사실과 LLM이 해석한 판단을 분리해 보여주려는 "
                 "로컬 우선 구조화 에이전트 런타임이야.\n\n"
@@ -629,6 +648,8 @@ def _is_release_intro_request(user_input: str) -> bool:
         "R루프",
         "L루프",
     )
+    # 여기는 실제 라우터 정책이 아니라 fake-turn 첫인상 데모용 분기다.
+    # 문서/코드/그래프를 명시한 질문은 여전히 L/R 테스트 길로 남겨둔다.
     if not any(marker in text for marker in subject_markers):
         return False
     if not any(marker in text for marker in intro_markers):
