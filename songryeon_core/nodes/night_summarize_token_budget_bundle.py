@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import asdict, dataclass
+from datetime import datetime
 from pathlib import Path
 
 from songryeon_core.core.data_store import DataStore
@@ -67,6 +68,11 @@ class NightTokenBudgetBundleSummaryFrame:
     input_summary_char_count: int = 0
     validity_status: str = "active"
     review_status: str = "not_reviewed"
+    summary_run_id: str = ""
+    night_turn_id: str = ""
+    night_batch_id: str = ""
+    summary_created_at: str = ""
+    run_provenance_status: str = "legacy_not_recorded"
     llm_call_data_id: str | None = None
     llm_trace_event_id: str | None = None
     prompt_ref: str = NIGHT_SUMMARIZE_TOKEN_BUDGET_BUNDLE_PROMPT_REF
@@ -349,6 +355,7 @@ def run_night_summarize_token_budget_bundle(
         bundle_node.node_id,
         summary_run_id=summary_run_id,
     )
+    summary_created_at = datetime.now().isoformat(timespec="microseconds")
     summary_graph_node_id = night_summarize_token_budget_bundle_graph_node_id(
         bundle_node.node_id,
         summary_run_id=summary_run_id,
@@ -396,6 +403,10 @@ def run_night_summarize_token_budget_bundle(
             payload_parse_status="not_checked",
             source_trace_ids=frame_source_trace_ids,
             source_data_ids=frame_source_data_ids,
+            summary_run_id=summary_run_id,
+            night_turn_id=turn_id,
+            night_batch_id=summary_run_id,
+            summary_created_at=summary_created_at,
             llm_call_data_id=None,
             llm_trace_event_id=None,
         )
@@ -437,6 +448,10 @@ def run_night_summarize_token_budget_bundle(
             payload_parse_status=_payload_parse_status(llm_result.failure_type),
             source_trace_ids=source_trace_ids_after_llm,
             source_data_ids=source_data_ids_after_llm,
+            summary_run_id=summary_run_id,
+            night_turn_id=turn_id,
+            night_batch_id=summary_run_id,
+            summary_created_at=summary_created_at,
             llm_call_data_id=llm_result.call_data_id,
             llm_trace_event_id=llm_result.trace_event_id,
         )
@@ -456,6 +471,10 @@ def run_night_summarize_token_budget_bundle(
         model_id=llm_result.model_id,
         source_trace_ids=source_trace_ids_after_llm,
         source_data_ids=source_data_ids_after_llm,
+        summary_run_id=summary_run_id,
+        night_turn_id=turn_id,
+        night_batch_id=summary_run_id,
+        summary_created_at=summary_created_at,
         llm_call_data_id=llm_result.call_data_id,
         llm_trace_event_id=llm_result.trace_event_id,
     )
@@ -497,6 +516,10 @@ def _frame_from_payload(
     model_id: str,
     source_trace_ids: list[str],
     source_data_ids: list[str],
+    summary_run_id: str,
+    night_turn_id: str,
+    night_batch_id: str,
+    summary_created_at: str,
     llm_call_data_id: str | None,
     llm_trace_event_id: str | None,
 ) -> NightTokenBudgetBundleSummaryFrame:
@@ -516,6 +539,11 @@ def _frame_from_payload(
         source_summary_count=bundle_node.source_summary_count,
         char_budget=bundle_node.char_budget or 0,
         input_summary_char_count=bundle_node.source_char_count,
+        summary_run_id=summary_run_id,
+        night_turn_id=night_turn_id,
+        night_batch_id=night_batch_id,
+        summary_created_at=summary_created_at,
+        run_provenance_status="recorded",
         llm_call_data_id=llm_call_data_id,
         llm_trace_event_id=llm_trace_event_id,
         source_graph_node_ids=[bundle_node.node_id, *bundle_node.source_graph_node_ids],
@@ -539,6 +567,10 @@ def _failed_frame(
     payload_parse_status: str,
     source_trace_ids: list[str],
     source_data_ids: list[str],
+    summary_run_id: str,
+    night_turn_id: str,
+    night_batch_id: str,
+    summary_created_at: str,
     llm_call_data_id: str | None,
     llm_trace_event_id: str | None,
 ) -> NightTokenBudgetBundleSummaryFrame:
@@ -558,6 +590,11 @@ def _failed_frame(
         source_summary_count=bundle_node.source_summary_count,
         char_budget=bundle_node.char_budget or 0,
         input_summary_char_count=bundle_node.source_char_count,
+        summary_run_id=summary_run_id,
+        night_turn_id=night_turn_id,
+        night_batch_id=night_batch_id,
+        summary_created_at=summary_created_at,
+        run_provenance_status="recorded",
         llm_call_data_id=llm_call_data_id,
         llm_trace_event_id=llm_trace_event_id,
         source_graph_node_ids=[bundle_node.node_id, *bundle_node.source_graph_node_ids],
@@ -790,6 +827,7 @@ def _validate_token_budget_summary_frame(frame: NightTokenBudgetBundleSummaryFra
         "summary_status": frame.summary_status,
         "failure_type": frame.failure_type,
         "payload_parse_status": frame.payload_parse_status,
+        "run_provenance_status": frame.run_provenance_status,
         "generated_by": frame.generated_by,
         "info_class": frame.info_class,
         "semantic_judgement_status": frame.semantic_judgement_status,
@@ -804,6 +842,34 @@ def _validate_token_budget_summary_frame(frame: NightTokenBudgetBundleSummaryFra
         raise ValueError("token budget bundle semantic status is invalid")
     if frame.summary_status not in {"ran", "failed"}:
         raise ValueError("token budget bundle summary_status is invalid")
+    if frame.run_provenance_status not in {
+        "recorded",
+        "legacy_not_recorded",
+        "backfilled_from_trace",
+    }:
+        raise ValueError("token budget bundle run_provenance_status is invalid")
+    has_any_provenance_coordinate = any(
+        [
+            frame.summary_run_id,
+            frame.night_turn_id,
+            frame.night_batch_id,
+            frame.summary_created_at,
+        ]
+    )
+    if (
+        frame.run_provenance_status != "legacy_not_recorded"
+        or has_any_provenance_coordinate
+    ):
+        for field_name, value in {
+            "summary_run_id": frame.summary_run_id,
+            "night_turn_id": frame.night_turn_id,
+            "night_batch_id": frame.night_batch_id,
+            "summary_created_at": frame.summary_created_at,
+        }.items():
+            if not value:
+                raise ValueError(
+                    f"NightTokenBudgetBundleSummaryFrame.{field_name} must not be empty"
+                )
     if frame.failure_type not in {
         "none",
         "adapter_missing",

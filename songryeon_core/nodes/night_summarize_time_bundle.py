@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import asdict, dataclass
+from datetime import datetime
 from pathlib import Path
 
 from songryeon_core.core.data_store import DataStore
@@ -114,6 +115,7 @@ def run_night_summarize_time_bundle(
         target_time_bundle_node_id,
         summary_run_id=summary_run_id,
     )
+    summary_created_at = datetime.now().isoformat(timespec="microseconds")
     summary_graph_node_id = night_summarize_time_bundle_graph_node_id(
         target_time_bundle_node_id,
         summary_run_id=summary_run_id,
@@ -170,6 +172,10 @@ def run_night_summarize_time_bundle(
             payload_parse_status="not_checked",
             source_trace_ids=frame_source_trace_ids,
             source_data_ids=frame_base_source_data_ids,
+            summary_run_id=summary_run_id,
+            night_turn_id=turn_id,
+            night_batch_id=summary_run_id,
+            summary_created_at=summary_created_at,
             llm_call_data_id=None,
             llm_trace_event_id=None,
         )
@@ -222,6 +228,10 @@ def run_night_summarize_time_bundle(
             payload_parse_status=_payload_parse_status(llm_result.failure_type),
             source_trace_ids=source_trace_ids_after_llm,
             source_data_ids=source_data_ids_after_llm,
+            summary_run_id=summary_run_id,
+            night_turn_id=turn_id,
+            night_batch_id=summary_run_id,
+            summary_created_at=summary_created_at,
             llm_call_data_id=llm_result.call_data_id,
             llm_trace_event_id=llm_result.trace_event_id,
         )
@@ -242,6 +252,10 @@ def run_night_summarize_time_bundle(
         model_id=llm_result.model_id,
         source_trace_ids=source_trace_ids_after_llm,
         source_data_ids=source_data_ids_after_llm,
+        summary_run_id=summary_run_id,
+        night_turn_id=turn_id,
+        night_batch_id=summary_run_id,
+        summary_created_at=summary_created_at,
         llm_call_data_id=llm_result.call_data_id,
         llm_trace_event_id=llm_result.trace_event_id,
     )
@@ -287,6 +301,10 @@ def _frame_from_payload(
     model_id: str,
     source_trace_ids: list[str],
     source_data_ids: list[str],
+    summary_run_id: str,
+    night_turn_id: str,
+    night_batch_id: str,
+    summary_created_at: str,
     llm_call_data_id: str | None,
     llm_trace_event_id: str | None,
 ) -> NightTimeBundleSummaryFrame:
@@ -314,6 +332,11 @@ def _frame_from_payload(
         source_bundle_kind=_text(target_payload.get("source_bundle_kind")) or "time_bundle",
         validity_status="active",
         review_status="not_reviewed",
+        summary_run_id=summary_run_id,
+        night_turn_id=night_turn_id,
+        night_batch_id=night_batch_id,
+        summary_created_at=summary_created_at,
+        run_provenance_status="recorded",
         llm_call_data_id=llm_call_data_id,
         llm_trace_event_id=llm_trace_event_id,
         prompt_ref=NIGHT_SUMMARIZE_TIME_BUNDLE_PROMPT_REF,
@@ -342,6 +365,10 @@ def _failed_frame(
     payload_parse_status: str,
     source_trace_ids: list[str],
     source_data_ids: list[str],
+    summary_run_id: str,
+    night_turn_id: str,
+    night_batch_id: str,
+    summary_created_at: str,
     llm_call_data_id: str | None,
     llm_trace_event_id: str | None,
 ) -> NightTimeBundleSummaryFrame:
@@ -369,6 +396,11 @@ def _failed_frame(
         source_bundle_kind=_text(target_payload.get("source_bundle_kind")) or "time_bundle",
         validity_status="active",
         review_status="not_reviewed",
+        summary_run_id=summary_run_id,
+        night_turn_id=night_turn_id,
+        night_batch_id=night_batch_id,
+        summary_created_at=summary_created_at,
+        run_provenance_status="recorded",
         llm_call_data_id=llm_call_data_id,
         llm_trace_event_id=llm_trace_event_id,
         prompt_ref=NIGHT_SUMMARIZE_TIME_BUNDLE_PROMPT_REF,

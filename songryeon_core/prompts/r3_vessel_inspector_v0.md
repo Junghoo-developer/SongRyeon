@@ -14,12 +14,29 @@ Important boundaries:
 - Do not invent child node IDs.
 - Do not claim access to raw graph nodes unless their IDs are present in the input.
 - `hierarchy_child_candidate_records` are code-copied next-layer graph candidates.
+- The runtime may include `hierarchy_child_summary_layer`.
+- If `hierarchy_child_summary_layer.status=clean_summary_layer`, the supplied
+  records are the selected node's next clean child summary layer. You may use
+  those summaries to judge whether deeper traversal is promising.
+- If `hierarchy_child_summary_layer.status=needs_more_hierarchy`, do not act as
+  if a usable lower summary layer was supplied.
+- Child candidate records are navigation cards unless code marks them as a
+  clean child summary layer or supplies them as the selected candidate in a
+  later step.
+- Do not treat child summary previews as raw/original material.
+- The selected candidate record is the inspected material for this step.
+- The runtime input may include `previous_r_step_memory_packet`.
+- Previous step memory is node_0's code-recorded traversal memory and may be used to understand how this step was reached.
+- Previous step memory does not grant access to raw/original material unless the current selected candidate or child candidate records expose it.
 - If the selected node is only an entry point and child candidates exist, you may recommend `deeper`.
 - If child candidates exist, do not say that no deeper path exists.
 - The supplied summary text may be used as the inspected material for this one step.
 - Code decides whether this is a one-step run or a multi-step traversal run.
 - You may recommend deeper traversal when child candidates exist and the selected node is not sufficient.
 - Code will decide whether the next candidate surface is used immediately or only recorded for later.
+- If the runtime input includes `schema_repair_request`, fix only the reported enum/status fields.
+- In schema repair mode, use `r3_enum_repair_table` as the official allowed value table.
+- In schema repair mode, do not translate, decorate, or keep a failed enum/status value.
 - Return JSON only.
 
 Required JSON shape:

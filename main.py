@@ -13,6 +13,14 @@ from songryeon_core.runtime.graph_vessel_inspect import (
     run_local_vessel_inspect,
 )
 from songryeon_core.runtime.graph_vessel_readback import run_local_vessel_readback
+from songryeon_core.runtime.graph_vessel_summary_provenance_audit import (
+    render_vessel_summary_provenance_audit_text,
+    run_local_vessel_summary_provenance_audit,
+)
+from songryeon_core.runtime.graph_vessel_summary_invalidation_candidate_audit import (
+    render_vessel_summary_invalidation_candidate_audit_text,
+    run_local_vessel_summary_invalidation_candidate_audit,
+)
 from songryeon_core.runtime.l_loop_smoke import run_qwen_l_loop_smoke
 from songryeon_core.runtime.night_changed_source_summary import (
     DEFAULT_NIGHT_CHANGED_SOURCE_STORE_DIR,
@@ -40,6 +48,7 @@ from songryeon_core.runtime.r_loop_vessel_answer_demo import (
     run_local_r_loop_vessel_answer_demo,
 )
 from songryeon_core.runtime.replay import replay_run
+from songryeon_core.runtime.quick_smoke import run_quick_smoke_tests
 from songryeon_core.runtime.smoke_test import run_smoke_tests
 from songryeon_core.runtime.terminal_view import render_pretty_turn
 from songryeon_core.runtime.user_turn import run_fake_user_turn, run_qwen_user_turn
@@ -122,8 +131,12 @@ def main() -> None:
     qwen_chat_parser = subparsers.add_parser("qwen-chat")
     _add_turn_runtime_args(qwen_chat_parser, include_qwen_args=True)
 
-    # smoke-test는 "지금 기준선이 깨졌는가?"를 빠르게 확인하는 자동 점검이다.
+    # quick-smoke는 문서 검색/Neo4j/Qwen 없이 최소 건강 상태만 본다.
+    subparsers.add_parser("quick-smoke")
+
+    # smoke-test는 오래 걸리는 전체 통합 기준선이다. 빠른 점검은 quick-smoke/fast-test를 쓴다.
     subparsers.add_parser("smoke-test")
+    subparsers.add_parser("full-smoke")
     fast_test_parser = subparsers.add_parser("fast-test")
     fast_test_parser.add_argument("--profile", choices=["core", "graph"], default="graph")
     fast_test_parser.add_argument("--skip-compileall", action="store_true")
@@ -160,6 +173,59 @@ def main() -> None:
     vessel_inspect_parser.add_argument("--allow-no-auth", action="store_true")
     vessel_inspect_parser.add_argument("--limit", type=int, default=50)
     vessel_inspect_parser.add_argument("--format", choices=["json", "text"], default="json")
+
+    vessel_summary_provenance_audit_parser = subparsers.add_parser(
+        "vessel-summary-provenance-audit"
+    )
+    vessel_summary_provenance_audit_parser.add_argument(
+        "--batch-id",
+        default="manual_vessel_summary_provenance_audit",
+    )
+    vessel_summary_provenance_audit_parser.add_argument(
+        "--turn-id",
+        default="turn_vessel_summary_provenance_audit_0001",
+    )
+    vessel_summary_provenance_audit_parser.add_argument("--uri", default=None)
+    vessel_summary_provenance_audit_parser.add_argument("--user", default=None)
+    vessel_summary_provenance_audit_parser.add_argument("--password", default=None)
+    vessel_summary_provenance_audit_parser.add_argument("--database", default=None)
+    vessel_summary_provenance_audit_parser.add_argument("--allow-no-auth", action="store_true")
+    vessel_summary_provenance_audit_parser.add_argument("--limit", type=int, default=50)
+    vessel_summary_provenance_audit_parser.add_argument(
+        "--format",
+        choices=["json", "text"],
+        default="json",
+    )
+
+    vessel_summary_invalidation_candidate_audit_parser = subparsers.add_parser(
+        "vessel-summary-invalidation-candidate-audit"
+    )
+    vessel_summary_invalidation_candidate_audit_parser.add_argument(
+        "--batch-id",
+        default="manual_vessel_summary_invalidation_candidate_audit",
+    )
+    vessel_summary_invalidation_candidate_audit_parser.add_argument(
+        "--turn-id",
+        default="turn_vessel_summary_invalidation_candidate_audit_0001",
+    )
+    vessel_summary_invalidation_candidate_audit_parser.add_argument("--uri", default=None)
+    vessel_summary_invalidation_candidate_audit_parser.add_argument("--user", default=None)
+    vessel_summary_invalidation_candidate_audit_parser.add_argument("--password", default=None)
+    vessel_summary_invalidation_candidate_audit_parser.add_argument("--database", default=None)
+    vessel_summary_invalidation_candidate_audit_parser.add_argument(
+        "--allow-no-auth",
+        action="store_true",
+    )
+    vessel_summary_invalidation_candidate_audit_parser.add_argument(
+        "--limit",
+        type=int,
+        default=50,
+    )
+    vessel_summary_invalidation_candidate_audit_parser.add_argument(
+        "--format",
+        choices=["json", "text"],
+        default="json",
+    )
 
     r_loop_vessel_read_packet_parser = subparsers.add_parser("vessel-r-read-packet")
     r_loop_vessel_read_packet_parser.add_argument(
@@ -465,7 +531,11 @@ def main() -> None:
             print(json.dumps(_turn_summary(result, include_report=args.include_report), ensure_ascii=False, indent=2))
     elif args.command == "qwen-chat":
         _run_qwen_chat(args)
+    elif args.command == "quick-smoke":
+        print(json.dumps(run_quick_smoke_tests(), ensure_ascii=False, indent=2))
     elif args.command == "smoke-test":
+        print(json.dumps(run_smoke_tests(), ensure_ascii=False, indent=2))
+    elif args.command == "full-smoke":
         print(json.dumps(run_smoke_tests(), ensure_ascii=False, indent=2))
     elif args.command == "fast-test":
         result = run_fast_tests(
@@ -521,6 +591,40 @@ def main() -> None:
         else:
             print(json.dumps(result, ensure_ascii=False, indent=2))
         if result["inspect_status"] == "read_failed":
+            raise SystemExit(1)
+    elif args.command == "vessel-summary-provenance-audit":
+        result = run_local_vessel_summary_provenance_audit(
+            batch_id=args.batch_id,
+            turn_id=args.turn_id,
+            uri=args.uri,
+            user=args.user,
+            password=args.password,
+            database=args.database,
+            allow_no_auth=args.allow_no_auth,
+            limit=args.limit,
+        )
+        if args.format == "text":
+            print(render_vessel_summary_provenance_audit_text(result))
+        else:
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+        if result["audit_status"] == "read_failed":
+            raise SystemExit(1)
+    elif args.command == "vessel-summary-invalidation-candidate-audit":
+        result = run_local_vessel_summary_invalidation_candidate_audit(
+            batch_id=args.batch_id,
+            turn_id=args.turn_id,
+            uri=args.uri,
+            user=args.user,
+            password=args.password,
+            database=args.database,
+            allow_no_auth=args.allow_no_auth,
+            limit=args.limit,
+        )
+        if args.format == "text":
+            print(render_vessel_summary_invalidation_candidate_audit_text(result))
+        else:
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+        if result["audit_status"] == "read_failed":
             raise SystemExit(1)
     elif args.command == "vessel-r-read-packet":
         result = run_local_r_loop_vessel_read_packet(

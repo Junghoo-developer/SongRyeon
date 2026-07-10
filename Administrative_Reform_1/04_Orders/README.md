@@ -2,7 +2,7 @@
 
 발주서는 개발 지도에서 내려온 실무 계획서다.
 
-현재 정식 발주서는 `ORDER_001`부터 `ORDER_208`까지 있다.
+현재 정식 발주서는 `ORDER_001`부터 `ORDER_224`까지 있다.
 
 `ORDER_066`부터 `ORDER_075`까지는 메타정보 관리법을 실제 런타임과 LLM 노드 배선에 적용하기 위한 복구 로드맵이다.
 
@@ -169,6 +169,20 @@
 `ORDER_207`은 README/DEMO/PUBLICATION_CHECKLIST의 배포용 데모 동선을 `fake-turn -> smoke-test -> optional Vessel/R traversal` 3층 구조로 정리하는 발주서다.
 
 `ORDER_208`은 GitHub 배포/커밋 전 env, secret pattern, local path, generated artifact, dirty worktree를 감사하고 커밋 가능한 파일 묶음을 분리하는 발주서다.
+
+`ORDER_209`는 긴 runtime 출력 안에서 학습자가 먼저 확인해야 할 route/L/R/memory/node3/node4 절대 count를 한곳에 모아 보여주는 학습용 절대정보 감사판 발주서다.
+
+`ORDER_210`은 node_1이 최근 발주서/현재 개발 상태 브리핑 요청을 새 문서 검색으로만 보지 않고, 이미 Vessel graph memory에 적재된 프로젝트 흐름을 탐색해야 하는 경우 R route를 고를 수 있게 route capability card와 prompt 경계를 보강하는 발주서다.
+
+`ORDER_211`은 Vessel R material의 실제 상태가 failed인데 node_3 답변이 insufficient/partial 같은 다른 상태명으로 직접 표현하는 경우 node_4가 상태명 불일치로 잡게 하는 발주서다.
+
+`ORDER_212`는 qwen-turn/fake-turn runtime에서 Vessel R 실패 단계, 실패 유형, 실패 이유를 상단 감사판과 brief 표시에서 바로 볼 수 있게 하는 진단 표시 발주서다.
+
+`ORDER_213`부터 `ORDER_219`까지는 R2/R3 schema repair, R traversal path 보존, hierarchy visibility, R2 candidate card 구조 보강, 테스트 루틴 분리, document search runtime cache를 정리한 안정화 작업이다.
+
+`ORDER_220`은 R traversal이 아래 계층 후보 surface로 이어지는 구조가 실제로 존재하는지 감사하고, R2/R3가 현재 선택 노드뿐 아니라 깨끗한 child summary layer를 볼 필요가 있는지 다음 구현 경계를 정리한 감사 발주서다.
+
+`ORDER_221`은 R2/R3가 임의 제한 preview가 아니라 깨끗한 child summary layer 전체를 볼 수 있게 하고, 섞인 계층은 `needs_more_hierarchy` 상태로 남겨 주기적 계층화의 입력이 되게 하는 발주서다.
 
 ## 임시 발주서
 
@@ -359,3 +373,19 @@
 - [ORDER 206: Release-Friendly Fake Turn First Demo v0](ORDER_206_RELEASE_FRIENDLY_FAKE_TURN_FIRST_DEMO_V0.md)
 - [ORDER 207: Release Demo Path Documentation v0](ORDER_207_RELEASE_DEMO_PATH_DOCUMENTATION_V0.md)
 - [ORDER 208: Release Safety And Commit Readiness Audit v0](ORDER_208_RELEASE_SAFETY_AND_COMMIT_READINESS_AUDIT_V0.md)
+- [ORDER 209: Runtime Learning Absolute Audit Panel v0](ORDER_209_RUNTIME_LEARNING_ABSOLUTE_AUDIT_PANEL_V0.md)
+- [ORDER 210: Node1 Recent Development Status R Route Normalization v0](ORDER_210_NODE1_RECENT_DEVELOPMENT_STATUS_R_ROUTE_NORMALIZATION_V0.md)
+- [ORDER 211: Node4 Vessel R Status Name Consistency Guard v0](ORDER_211_NODE4_VESSEL_R_STATUS_NAME_CONSISTENCY_GUARD_V0.md)
+- [ORDER 212: Runtime Vessel R Failure Diagnostics Display v0](ORDER_212_RUNTIME_VESSEL_R_FAILURE_DIAGNOSTICS_DISPLAY_V0.md)
+- [ORDER 213: R2 Schema Repair Once v0](ORDER_213_R2_SCHEMA_REPAIR_ONCE_V0.md)
+- [ORDER 214: R3 Schema Repair Once v0](ORDER_214_R3_SCHEMA_REPAIR_ONCE_V0.md)
+- [ORDER 215: R Traverse Path Duplicate Preservation v0](ORDER_215_R_TRAVERSE_PATH_DUPLICATE_PRESERVATION_V0.md)
+- [ORDER 216: R Loop Hierarchy Visibility And Step Memory v0](ORDER_216_R_LOOP_HIERARCHY_VISIBILITY_AND_STEP_MEMORY_V0.md)
+- [ORDER 217: R2 Candidate Card Structural Enrichment v0](ORDER_217_R2_CANDIDATE_CARD_STRUCTURAL_ENRICHMENT_V0.md)
+- [ORDER 218: Test Routine Stratification And Quick Smoke v0](ORDER_218_TEST_ROUTINE_STRATIFICATION_AND_QUICK_SMOKE_V0.md)
+- [ORDER 219: Document Search Runtime Embedding Index Cache v0](ORDER_219_DOCUMENT_SEARCH_RUNTIME_EMBEDDING_INDEX_CACHE_V0.md)
+- [ORDER 220: R Traverse Continuation Surface Audit v0](ORDER_220_R_TRAVERSE_CONTINUATION_SURFACE_AUDIT_V0.md)
+- [ORDER 221: R Hierarchy-First Child Summary Visibility v0](ORDER_221_R_HIERARCHY_FIRST_CHILD_SUMMARY_VISIBILITY_V0.md)
+- [ORDER 222: Night Summary Run Provenance v0](ORDER_222_NIGHT_SUMMARY_RUN_PROVENANCE_V0.md)
+- [ORDER 223: Vessel Summary Provenance Audit v0](ORDER_223_VESSEL_SUMMARY_PROVENANCE_AUDIT_V0.md)
+- [ORDER 224: Summary Invalidation Candidate Audit v0](ORDER_224_SUMMARY_INVALIDATION_CANDIDATE_AUDIT_V0.md)

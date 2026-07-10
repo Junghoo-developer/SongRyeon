@@ -145,6 +145,11 @@ NIGHT_SOURCE_LEAF_SUMMARY_REVIEW_STATUSES = {
     "approved",
     "rejected",
 }
+NIGHT_SUMMARY_RUN_PROVENANCE_STATUSES = {
+    "recorded",
+    "legacy_not_recorded",
+    "backfilled_from_trace",
+}
 
 
 @dataclass
@@ -206,6 +211,11 @@ class NightTimeBundleSummaryFrame:
     source_bundle_kind: str = "time_bundle"
     validity_status: str = "active"
     review_status: str = "not_reviewed"
+    summary_run_id: str = ""
+    night_turn_id: str = ""
+    night_batch_id: str = ""
+    summary_created_at: str = ""
+    run_provenance_status: str = "legacy_not_recorded"
     llm_call_data_id: str | None = None
     llm_trace_event_id: str | None = None
     prompt_ref: str = "songryeon_core/prompts/night_summarize_time_bundle_v0.md"
@@ -248,6 +258,11 @@ class NightSourceLeafSummaryFrame:
     source_bundle_kind: str = "raw_source"
     validity_status: str = "active"
     review_status: str = "not_reviewed"
+    summary_run_id: str = ""
+    night_turn_id: str = ""
+    night_batch_id: str = ""
+    summary_created_at: str = ""
+    run_provenance_status: str = "legacy_not_recorded"
     llm_call_data_id: str | None = None
     llm_trace_event_id: str | None = None
     prompt_ref: str = "songryeon_core/prompts/night_summarize_source_leaf_v0.md"
@@ -524,6 +539,33 @@ class SummaryInvalidationLedgerFrame:
     schema_version: str = SUMMARY_INVALIDATION_LEDGER_FRAME_SCHEMA_VERSION
 
 
+def _validate_summary_run_provenance(
+    frame_name: str,
+    *,
+    summary_run_id: str,
+    night_turn_id: str,
+    night_batch_id: str,
+    summary_created_at: str,
+    run_provenance_status: str,
+) -> None:
+    if run_provenance_status not in NIGHT_SUMMARY_RUN_PROVENANCE_STATUSES:
+        raise ValueError(f"{frame_name}.run_provenance_status is invalid")
+    has_any_coordinate = any(
+        [summary_run_id, night_turn_id, night_batch_id, summary_created_at]
+    )
+    if run_provenance_status == "legacy_not_recorded" and not has_any_coordinate:
+        return
+    _require_text_fields(
+        frame_name,
+        {
+            "summary_run_id": summary_run_id,
+            "night_turn_id": night_turn_id,
+            "night_batch_id": night_batch_id,
+            "summary_created_at": summary_created_at,
+        },
+    )
+
+
 def validate_night_time_bundle_summary_frame(frame: NightTimeBundleSummaryFrame) -> None:
     _require_text_fields(
         "NightTimeBundleSummaryFrame",
@@ -540,6 +582,7 @@ def validate_night_time_bundle_summary_frame(frame: NightTimeBundleSummaryFrame)
             "source_bundle_kind": frame.source_bundle_kind,
             "validity_status": frame.validity_status,
             "review_status": frame.review_status,
+            "run_provenance_status": frame.run_provenance_status,
             "prompt_ref": frame.prompt_ref,
             "source_mode": frame.source_mode,
             "claim_alignment": frame.claim_alignment,
@@ -558,6 +601,14 @@ def validate_night_time_bundle_summary_frame(frame: NightTimeBundleSummaryFrame)
         raise ValueError(
             f"unknown NightTimeBundleSummaryFrame.schema_version: {frame.schema_version}"
         )
+    _validate_summary_run_provenance(
+        "NightTimeBundleSummaryFrame",
+        summary_run_id=frame.summary_run_id,
+        night_turn_id=frame.night_turn_id,
+        night_batch_id=frame.night_batch_id,
+        summary_created_at=frame.summary_created_at,
+        run_provenance_status=frame.run_provenance_status,
+    )
     if frame.node_kind != "summary":
         raise ValueError("NightTimeBundleSummaryFrame.node_kind must be summary")
     if frame.target_node_kind != "time_bundle":
@@ -700,6 +751,7 @@ def validate_night_source_leaf_summary_frame(frame: NightSourceLeafSummaryFrame)
             "source_bundle_kind": frame.source_bundle_kind,
             "validity_status": frame.validity_status,
             "review_status": frame.review_status,
+            "run_provenance_status": frame.run_provenance_status,
             "prompt_ref": frame.prompt_ref,
             "source_mode": frame.source_mode,
             "claim_alignment": frame.claim_alignment,
@@ -718,6 +770,14 @@ def validate_night_source_leaf_summary_frame(frame: NightSourceLeafSummaryFrame)
         raise ValueError(
             f"unknown NightSourceLeafSummaryFrame.schema_version: {frame.schema_version}"
         )
+    _validate_summary_run_provenance(
+        "NightSourceLeafSummaryFrame",
+        summary_run_id=frame.summary_run_id,
+        night_turn_id=frame.night_turn_id,
+        night_batch_id=frame.night_batch_id,
+        summary_created_at=frame.summary_created_at,
+        run_provenance_status=frame.run_provenance_status,
+    )
     if frame.node_kind != "summary":
         raise ValueError("NightSourceLeafSummaryFrame.node_kind must be summary")
     if frame.data_kind != "source_leaf_summary":
@@ -2033,6 +2093,7 @@ __all__ = [
     "NIGHT_SOURCE_LEAF_SUMMARY_REVIEW_STATUSES",
     "NIGHT_SOURCE_LEAF_SUMMARY_STATUSES",
     "NIGHT_SOURCE_LEAF_SUMMARY_VALIDITY_STATUSES",
+    "NIGHT_SUMMARY_RUN_PROVENANCE_STATUSES",
     "CoreEgoGuideWorkerHintFrame",
     "CoreEgoTimeAxisFrame",
     "GraphMemoryEdgeFrame",

@@ -19,3 +19,4 @@
 - [Source_Lineage_And_Summary_First_Surface_Philosophy_2026_07_05.md](Source_Lineage_And_Summary_First_Surface_Philosophy_2026_07_05.md): 동적/정적 분류를 운영 힌트로 낮추고, source version lineage와 summary-first R 탐색 표면을 분리하는 미승격 철학 문서.
 - [R_Loop_Graph_Guide_Philosophy_2026_06_30.md](R_Loop_Graph_Guide_Philosophy_2026_06_30.md): L루프의 목표/후보/예산/continuation 패턴을 R루프의 CoreEgo graph traversal, 정보 농도, 가지 전환, RLoopGraphGuidePacket 구상으로 옮긴 미승격 철학 문서.
 - [Dyadic_Vessel_Functional_Consciousness_Philosophy_2026_07_03.md](Dyadic_Vessel_Functional_Consciousness_Philosophy_2026_07_03.md): 두 LLM, 두 vessel matrix, survival tone, 예측오차, 중립적 사고 게임을 통해 기능적 의식 유사 루프를 검토하는 미승격 연구 철학 문서.
+- [Graph_DB_Management_Risk_Philosophy_2026_07_09.md](Graph_DB_Management_Risk_Philosophy_2026_07_09.md): Vessel graph DB 관리에서 legacy provenance, source lineage, invalidation, mixed hierarchy, DataStore/Neo4j drift가 만드는 위험을 정리한 미승격 철학 문서.

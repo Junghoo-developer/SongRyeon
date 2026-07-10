@@ -242,6 +242,7 @@ def _route_capability_cards(
             ],
             "not_for": [
                 "already-ingested Vessel/Neo4j graph-memory traversal when R is enabled",
+                "current or recent development-status briefing from already-ingested Vessel graph memory when R is enabled",
                 "questions that only need supplied recent conversation context",
             ],
             "evidence_surface": [
@@ -287,11 +288,14 @@ def _route_capability_cards(
                 "best_for": [
                     "already-ingested Vessel or Neo4j graph memory",
                     "CoreEgo, Time Axis, Time Bundle, Source Kind Bundle, Raw Source, or SummaryGraphNode traversal",
+                    "current or recent SongRyeon Core development-status briefing from already-ingested Vessel graph memory",
+                    "recent order history or implementation timeline briefing when the user wants the project state reconstructed from graph memory",
                     "questions comparing graph memory traversal against document search",
                     "questions asking what the current graph-memory structure contains or how it is connected",
                 ],
                 "not_for": [
                     "source documents/code that have not been ingested into Vessel graph memory",
+                    "freshly changed source files or order documents that must be read from disk because they may not be ingested yet",
                     "requests that explicitly demand fresh document search or exact source-file reading",
                     "recent conversation memory that selected context already covers",
                 ],

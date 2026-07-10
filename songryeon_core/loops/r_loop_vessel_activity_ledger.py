@@ -24,6 +24,7 @@ R_LOOP_VESSEL_ACTIVITY_STAGES = {
     "budget",
     "continuation",
     "continuation_checkpoint",
+    "step_memory",
     "return_summary",
 }
 
@@ -47,6 +48,7 @@ class RLoopVesselActivityLedgerFrame:
     budget_frame_ids: list[str] = field(default_factory=list)
     continuation_frame_ids: list[str] = field(default_factory=list)
     continuation_checkpoint_packet_ids: list[str] = field(default_factory=list)
+    step_memory_packet_ids: list[str] = field(default_factory=list)
     return_summary_frame_id: str | None = None
     selected_graph_node_ids: list[str] = field(default_factory=list)
     inspected_graph_node_ids: list[str] = field(default_factory=list)
@@ -155,6 +157,9 @@ def build_r_loop_vessel_activity_ledger_frame(
         "continuation_checkpoint": [
             frame.packet_id for frame in traverse_run.continuation_checkpoints
         ],
+        "step_memory": [
+            frame.packet_id for frame in traverse_run.step_memory_packets
+        ],
         "return_summary": (
             [traverse_run.return_summary.frame_id]
             if traverse_run.return_summary is not None
@@ -194,6 +199,7 @@ def build_r_loop_vessel_activity_ledger_frame(
         continuation_checkpoint_packet_ids=activity_sources[
             "continuation_checkpoint"
         ],
+        step_memory_packet_ids=activity_sources["step_memory"],
         return_summary_frame_id=(
             traverse_run.return_summary.frame_id
             if traverse_run.return_summary is not None
@@ -269,6 +275,7 @@ def validate_r_loop_vessel_activity_ledger_frame(
         "budget_frame_ids": frame.budget_frame_ids,
         "continuation_frame_ids": frame.continuation_frame_ids,
         "continuation_checkpoint_packet_ids": frame.continuation_checkpoint_packet_ids,
+        "step_memory_packet_ids": frame.step_memory_packet_ids,
         "selected_graph_node_ids": frame.selected_graph_node_ids,
         "inspected_graph_node_ids": frame.inspected_graph_node_ids,
         "candidate_graph_node_ids": frame.candidate_graph_node_ids,
@@ -294,6 +301,7 @@ def validate_r_loop_vessel_activity_ledger_frame(
             *frame.budget_frame_ids,
             *frame.continuation_frame_ids,
             *frame.continuation_checkpoint_packet_ids,
+            *frame.step_memory_packet_ids,
         ]
     )
     missing = sorted(set(required_source_ids) - set(frame.source_data_ids))
@@ -354,6 +362,8 @@ def _source_field_for_stage(stage: str) -> str:
         return "return_summary_frame_id"
     if stage == "continuation_checkpoint":
         return "continuation_checkpoint_packet_ids"
+    if stage == "step_memory":
+        return "step_memory_packet_ids"
     return f"{stage}_frame_ids"
 
 

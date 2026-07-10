@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import asdict, dataclass
+from datetime import datetime
 from pathlib import Path
 
 from songryeon_core.core.data_store import DataStore
@@ -285,6 +286,7 @@ def run_night_summarize_source_leaf(
         raw_source_graph_node_id,
         summary_run_id=summary_run_id,
     )
+    summary_created_at = datetime.now().isoformat(timespec="microseconds")
     base_source_data_ids = _unique_strings(
         [
             raw_source_graph_node_id,
@@ -311,6 +313,10 @@ def run_night_summarize_source_leaf(
             failure_type="no_text_snapshot",
             source_trace_ids=base_source_trace_ids,
             source_data_ids=base_source_data_ids,
+            summary_run_id=summary_run_id,
+            night_turn_id=turn_id,
+            night_batch_id=summary_run_id,
+            summary_created_at=summary_created_at,
         )
         return _record_failed_or_skipped_frame(
             trace_store=trace_store,
@@ -332,6 +338,10 @@ def run_night_summarize_source_leaf(
             failure_type="empty_text",
             source_trace_ids=base_source_trace_ids,
             source_data_ids=base_source_data_ids,
+            summary_run_id=summary_run_id,
+            night_turn_id=turn_id,
+            night_batch_id=summary_run_id,
+            summary_created_at=summary_created_at,
         )
         return _record_failed_or_skipped_frame(
             trace_store=trace_store,
@@ -378,6 +388,10 @@ def run_night_summarize_source_leaf(
             payload_parse_status="not_checked",
             source_trace_ids=frame_source_trace_ids,
             source_data_ids=frame_base_source_data_ids,
+            summary_run_id=summary_run_id,
+            night_turn_id=turn_id,
+            night_batch_id=summary_run_id,
+            summary_created_at=summary_created_at,
             llm_call_data_id=None,
             llm_trace_event_id=None,
         )
@@ -422,6 +436,10 @@ def run_night_summarize_source_leaf(
             payload_parse_status=_payload_parse_status(llm_result.failure_type),
             source_trace_ids=source_trace_ids_after_llm,
             source_data_ids=source_data_ids_after_llm,
+            summary_run_id=summary_run_id,
+            night_turn_id=turn_id,
+            night_batch_id=summary_run_id,
+            summary_created_at=summary_created_at,
             llm_call_data_id=llm_result.call_data_id,
             llm_trace_event_id=llm_result.trace_event_id,
         )
@@ -443,6 +461,10 @@ def run_night_summarize_source_leaf(
         model_id=llm_result.model_id,
         source_trace_ids=source_trace_ids_after_llm,
         source_data_ids=source_data_ids_after_llm,
+        summary_run_id=summary_run_id,
+        night_turn_id=turn_id,
+        night_batch_id=summary_run_id,
+        summary_created_at=summary_created_at,
         llm_call_data_id=llm_result.call_data_id,
         llm_trace_event_id=llm_result.trace_event_id,
     )
@@ -466,6 +488,10 @@ def _frame_from_payload(
     model_id: str,
     source_trace_ids: list[str],
     source_data_ids: list[str],
+    summary_run_id: str,
+    night_turn_id: str,
+    night_batch_id: str,
+    summary_created_at: str,
     llm_call_data_id: str | None,
     llm_trace_event_id: str | None,
 ) -> NightSourceLeafSummaryFrame:
@@ -483,6 +509,11 @@ def _frame_from_payload(
         summary_status="ran",
         failure_type="none",
         payload_parse_status="passed",
+        summary_run_id=summary_run_id,
+        night_turn_id=night_turn_id,
+        night_batch_id=night_batch_id,
+        summary_created_at=summary_created_at,
+        run_provenance_status="recorded",
         llm_call_data_id=llm_call_data_id,
         llm_trace_event_id=llm_trace_event_id,
         prompt_ref=NIGHT_SUMMARIZE_SOURCE_LEAF_PROMPT_REF,
@@ -510,6 +541,10 @@ def _failed_frame(
     payload_parse_status: str,
     source_trace_ids: list[str],
     source_data_ids: list[str],
+    summary_run_id: str,
+    night_turn_id: str,
+    night_batch_id: str,
+    summary_created_at: str,
     llm_call_data_id: str | None,
     llm_trace_event_id: str | None,
 ) -> NightSourceLeafSummaryFrame:
@@ -527,6 +562,11 @@ def _failed_frame(
         summary_status="failed",
         failure_type=failure_type,
         payload_parse_status=payload_parse_status,
+        summary_run_id=summary_run_id,
+        night_turn_id=night_turn_id,
+        night_batch_id=night_batch_id,
+        summary_created_at=summary_created_at,
+        run_provenance_status="recorded",
         llm_call_data_id=llm_call_data_id,
         llm_trace_event_id=llm_trace_event_id,
         prompt_ref=NIGHT_SUMMARIZE_SOURCE_LEAF_PROMPT_REF,
@@ -553,6 +593,10 @@ def _skipped_frame(
     failure_type: str,
     source_trace_ids: list[str],
     source_data_ids: list[str],
+    summary_run_id: str,
+    night_turn_id: str,
+    night_batch_id: str,
+    summary_created_at: str,
 ) -> NightSourceLeafSummaryFrame:
     frame = NightSourceLeafSummaryFrame(
         frame_id=frame_id,
@@ -568,6 +612,11 @@ def _skipped_frame(
         summary_status=summary_status,
         failure_type=failure_type,
         payload_parse_status="not_checked",
+        summary_run_id=summary_run_id,
+        night_turn_id=night_turn_id,
+        night_batch_id=night_batch_id,
+        summary_created_at=summary_created_at,
+        run_provenance_status="recorded",
         llm_call_data_id=None,
         llm_trace_event_id=None,
         prompt_ref=NIGHT_SUMMARIZE_SOURCE_LEAF_PROMPT_REF,

@@ -1535,6 +1535,31 @@ def run_dry_turn(
             if vessel_r_route_run is not None
             else None
         ),
+        "vessel_r_failure_stage": (
+            vessel_r_route_run.traverse_run.result_frame.failure_stage
+            if vessel_r_route_run is not None
+            else None
+        ),
+        "vessel_r_failure_type": (
+            vessel_r_route_run.traverse_run.result_frame.failure_type
+            if vessel_r_route_run is not None
+            else None
+        ),
+        "vessel_r_failure_reason": (
+            vessel_r_route_run.traverse_run.result_frame.failure_reason
+            if vessel_r_route_run is not None
+            else None
+        ),
+        "vessel_r_final_sufficiency_status": (
+            vessel_r_route_run.traverse_run.result_frame.final_sufficiency_status
+            if vessel_r_route_run is not None
+            else None
+        ),
+        "vessel_r_final_continuation_status": (
+            vessel_r_route_run.traverse_run.result_frame.final_continuation_status
+            if vessel_r_route_run is not None
+            else None
+        ),
         "vessel_r_activity_ledger_id": (
             vessel_r_route_run.activity_ledger_id
             if vessel_r_route_run is not None

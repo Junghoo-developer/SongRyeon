@@ -49,6 +49,8 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
         if len(task_frames) > 5:
             lines.append(f"  - ... +{len(task_frames) - 5} tasks")
 
+    lines.extend(_learning_absolute_audit_lines(result))
+
     l_loop_run_frames = _payloads_with_type(result, "node_output:L_loop_run_frame")
     if l_loop_run_frames:
         lines.append(
@@ -1507,6 +1509,14 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
                 f"summaries={vessel_r_material.get('summary_material_count', 0)} / "
                 f"raw_originals={vessel_r_material.get('raw_original_material_count', 0)}"
             )
+            failure_type = vessel_r_material.get("failure_type")
+            failure_reason = vessel_r_material.get("failure_reason")
+            if failure_type or failure_reason:
+                lines.append(
+                    "    Vessel R failure: "
+                    f"type={failure_type or 'none'} / "
+                    f"reason={_short_display_text(str(failure_reason or 'none'), limit=120)}"
+                )
         answer_basis_mode = node3_brief.get("answer_basis_mode")
         if isinstance(answer_basis_mode, str) and answer_basis_mode:
             lines.append(
@@ -1898,6 +1908,141 @@ def render_pretty_turn(result: dict[str, object], *, user_input: str) -> str:
     return f"{render_runtime_view(result, user_input=user_input)}\n\n{render_chat_answer(result, user_input=user_input)}"
 
 
+def _learning_absolute_audit_lines(result: dict[str, object]) -> list[str]:
+    """학습자가 먼저 봐야 할 절대정보만 한곳에 모은다.
+
+    전체 trace/data를 전부 펼치면 정확성은 올라가도 사람이 길을 잃는다.
+    그래서 이 패널은 라우팅, L/R 실행 여부, 최근 기억 전달, node_3 재료,
+    node_4 검사 count만 보여주고 원문 payload와 긴 source id 목록은 생략한다.
+    """
+
+    records = _records_by_id(result)
+    route_frames = _payloads_with_type(result, "node_output:routing_decision")
+    route_sequence = [
+        str(frame.get("route"))
+        for frame in route_frames
+        if isinstance(frame.get("route"), str) and frame.get("route")
+    ]
+    route_policy_flags = [
+        str(frame.get("policy_flag"))
+        for frame in route_frames
+        if isinstance(frame.get("policy_flag"), str) and frame.get("policy_flag")
+    ]
+    final_route = route_sequence[-1] if route_sequence else "none"
+    route_path = _latest_route_path(result, records)
+
+    r_handoff_packets = _payloads_with_type(
+        result,
+        "node_output:r_loop_memory_handoff_packet_frame",
+    )
+    latest_r_handoff = r_handoff_packets[-1] if r_handoff_packets else {}
+    turn_activity_links = _payloads_with_type(
+        result,
+        "graph_memory:turn_activity_graph_link_frame",
+    )
+    latest_activity_link = turn_activity_links[-1] if turn_activity_links else {}
+
+    memory_selection_frames = _payloads_with_type(
+        result,
+        "node_output:memory_relevance_selection_frame",
+    )
+    latest_memory_selection = memory_selection_frames[-1] if memory_selection_frames else {}
+    selected_context_frames = _payloads_with_type(
+        result,
+        "node_output:selected_recent_memory_context_frame",
+    )
+    latest_selected_context = selected_context_frames[-1] if selected_context_frames else {}
+
+    node3_brief_record = _latest_run_scoped_record(
+        result,
+        records,
+        "node_3:input_brief_frame",
+        data_type="node_output:node3_input_brief_frame",
+    )
+    node3_brief = _payload_from_record(node3_brief_record)
+    node4_gate_record = _latest_run_scoped_record(
+        result,
+        records,
+        "node_4:gatekeeper_frame",
+        data_type="node_output:node4_gatekeeper_frame",
+    )
+    node4_gate = _payload_from_record(node4_gate_record)
+    document_materials = _payloads_with_type(
+        result,
+        "node_output:node0_document_material_packet_frame",
+    )
+    latest_document_material = document_materials[-1] if document_materials else {}
+
+    selected_context_items = latest_selected_context.get("items")
+    node3_selected_contexts = node3_brief.get("selected_recent_memory_contexts")
+    node3_vessel_material = node3_brief.get("vessel_r_material")
+
+    lines = ["- 학습용 절대정보 감사판:"]
+    lines.append(
+        "  - 범위: "
+        "route/L/R/memory/node3/node4 핵심 count만 표시; "
+        "긴 trace 원문, 전체 source_data_ids, LLM raw text 전문은 생략"
+    )
+    lines.append(
+        "  - route: "
+        f"sequence={route_sequence or []} / final={final_route} / "
+        f"policy_flags={route_policy_flags or []} / "
+        f"path_steps={_list_count(route_path)}"
+    )
+    lines.append(
+        "  - L/R 실행: "
+        f"L_runs={_list_count(_payloads_with_type(result, 'node_output:L_loop_run_frame'))} / "
+        f"L_blocked_reroute={_blocked_same_turn_l_reroute_request_count(result)} / "
+        f"R_handoff_status={latest_r_handoff.get('packet_status', 'not_recorded')} / "
+        f"R_entry_nodes={_list_count(latest_r_handoff.get('available_entry_node_ids'))} / "
+        f"R_vessel_ledgers={_list_count(latest_activity_link.get('r_vessel_activity_ledger_data_ids'))}"
+    )
+    lines.append(
+        "  - 최근 기억 전달: "
+        f"selector={latest_memory_selection.get('selection_status', 'not_recorded')} / "
+        f"candidates={_list_count(latest_memory_selection.get('candidate_frame_ids'))} / "
+        f"selected={_list_count(latest_memory_selection.get('selected_candidate_frame_ids'))} / "
+        f"copied_contexts={_list_count(selected_context_items)} / "
+        f"missing_contexts={latest_selected_context.get('missing_selected_memory_context_count', 0)} / "
+        f"node3_selected_contexts={_list_count(node3_selected_contexts)}"
+    )
+    lines.append(
+        "  - L 문서 근거 전달: "
+        f"L_activity_ledgers={_record_count_with_type(result, 'loop_activity:l_loop_activity_ledger_frame')} / "
+        f"read_doc_records={_record_count_with_type_prefix(result, 'tool_result:read_doc')} / "
+        f"material_items={latest_document_material.get('item_count', 0)} / "
+        f"material_actual_read={latest_document_material.get('actual_tool_read_doc_count', 0)} / "
+        f"node3_actual_read_doc={node3_brief.get('actual_tool_read_doc_count', 0)} / "
+        f"node3_supplied_contexts={node3_brief.get('supplied_document_context_count', 0)}"
+    )
+    lines.append(
+        "  - R/Vessel 근거 전달: "
+        f"node3_vessel_status={_dict_value(node3_vessel_material, 'material_status', 'not_recorded')} / "
+        f"node3_vessel_items={_vessel_material_item_count(node3_vessel_material)} / "
+        f"node3_vessel_task={_dict_value(node3_vessel_material, 'r_loop_task_status', 'not_recorded')}"
+    )
+    vessel_failure_stage = result.get("vessel_r_failure_stage")
+    vessel_failure_type = result.get("vessel_r_failure_type")
+    vessel_failure_reason = result.get("vessel_r_failure_reason")
+    if vessel_failure_stage or vessel_failure_type or vessel_failure_reason:
+        lines.append(
+            "  - R/Vessel 실패 진단: "
+            f"stage={vessel_failure_stage or 'none'} / "
+            f"type={vessel_failure_type or 'none'} / "
+            f"reason={_short_display_text(str(vessel_failure_reason or 'none'), limit=120)}"
+        )
+    lines.append(
+        "  - node_4 검사: "
+        f"gate={node4_gate.get('gate_status', 'not_recorded')} / "
+        f"llm={node4_gate.get('llm_gate_status', 'not_recorded')} / "
+        f"checked={_list_count(node4_gate.get('checked_claims'))} / "
+        f"unsupported={_list_count(node4_gate.get('unsupported_claims'))} / "
+        f"contradictions={_list_count(node4_gate.get('contradictions'))} / "
+        f"recent_memory_guard={node4_gate.get('recent_memory_guard_status', 'not_recorded')}"
+    )
+    return lines
+
+
 def _records_by_id(result: dict[str, object]) -> dict[str, dict[str, object]]:
     records = result.get("data_records")
     if not isinstance(records, list):
@@ -2109,6 +2254,58 @@ def _payloads_with_type(result: dict[str, object], data_type: str) -> list[dict[
         if isinstance(payload, dict):
             payloads.append(payload)
     return payloads
+
+
+def _record_count_with_type(result: dict[str, object], data_type: str) -> int:
+    records = result.get("data_records")
+    if not isinstance(records, list):
+        return 0
+    return sum(
+        1
+        for record in records
+        if isinstance(record, dict) and record.get("data_type") == data_type
+    )
+
+
+def _record_count_with_type_prefix(result: dict[str, object], prefix: str) -> int:
+    records = result.get("data_records")
+    if not isinstance(records, list):
+        return 0
+    return sum(
+        1
+        for record in records
+        if isinstance(record, dict)
+        and isinstance(record.get("data_type"), str)
+        and str(record.get("data_type")).startswith(prefix)
+    )
+
+
+def _latest_route_path(
+    result: dict[str, object],
+    records: dict[str, dict[str, object]],
+) -> list[object]:
+    handoff_record = _latest_run_scoped_record(
+        result,
+        records,
+        "node_2:handoff_frame",
+        data_type="node_output:node2_handoff_frame",
+    )
+    handoff_payload = _payload_from_record(handoff_record)
+    route_path = handoff_payload.get("route_path")
+    return route_path if isinstance(route_path, list) else []
+
+
+def _dict_value(value: object, key: str, fallback: object) -> object:
+    if not isinstance(value, dict):
+        return fallback
+    result = value.get(key)
+    return result if result not in {None, ""} else fallback
+
+
+def _vessel_material_item_count(value: object) -> int:
+    if not isinstance(value, dict):
+        return 0
+    return _list_count(value.get("material_items"))
 
 
 def _metainfo_lines(

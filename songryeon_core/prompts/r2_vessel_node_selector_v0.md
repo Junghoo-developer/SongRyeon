@@ -16,9 +16,33 @@ Important boundaries:
 - First choose a surface/table-of-contents shelf, then choose a node inside it.
 - The runtime input tells you the current traversal policy and current graph node.
 - The runtime input may include `branch_role` on surfaces and candidate records.
+- The runtime input may include child structure fields on candidate records:
+  `child_candidate_count`, `child_candidate_kind_counts`,
+  `child_branch_role_counts`, `child_data_kind_counts`,
+  `child_summary_depths`, and boolean child-summary/raw fields.
+- Child structure fields are code-copied absolute graph facts.
+- Use child structure fields as map signs for choosing the next official `node_ref`.
+- Child structure fields are not selectable IDs and do not grant access to child text.
+- The runtime may include `child_summary_layer_status` and
+  `child_summary_layer_records`.
+- If `child_summary_layer_status=clean_summary_layer`, those records are the
+  current candidate's next clean child summary layer. Use them as summary-level
+  navigation evidence.
+- If `child_summary_layer_status=needs_more_hierarchy`, do not pretend the
+  runtime supplied a usable lower summary layer. Prefer a candidate whose
+  hierarchy is cleaner, or explain why this candidate still points toward the
+  requested branch.
+- Child summary layer records are not selectable IDs unless they appear as
+  official current candidate records with their own `node_ref`.
 - The runtime input includes `allowed_information_granularity_values`.
 - `expected_information_granularity` must be copied exactly from `allowed_information_granularity_values`.
 - Do not translate, explain, combine, or decorate the granularity value.
+- If the runtime input includes `schema_repair_request`, fix only the reported copy-contract fields.
+- In schema repair mode, use `r2_copy_repair_table` as the official allowed ref table.
+- In schema repair mode, do not invent a new surface/node label and do not keep a failed ref.
+- In schema repair mode, if `r2_copy_repair_table.preserve_failed_selection_refs.status`
+  is `valid_selected_refs`, preserve that `selected_surface_ref` and `selected_node_ref`
+  exactly. Repair only invalid non-ref fields such as `expected_information_granularity`.
 - `branch_role` is a code-supplied structural label, not a semantic answer.
 - Use `branch_role` as a map sign:
   - `source_material_ingest`: source/code/document ingest branch.
@@ -28,8 +52,28 @@ Important boundaries:
   - `graph_axis`: graph axis entry point.
 - If the R1 goal asks about source summaries, token summaries, source kinds, code files, internal documents, or graph ingest structure, prefer a structurally compatible source/material branch when it is supplied.
 - If the R1 goal asks about past conversation turns or time memory, prefer the conversation/time memory branch when it is supplied.
+- In a multi-step hierarchy traversal, do not return `none_selected` merely because the currently visible candidates are broad bundles.
+- If at least one current candidate has `has_child_candidates=true` and its `branch_role`,
+  `child_branch_role_counts`, `child_candidate_kind_counts`, or `child_data_kind_counts`
+  points toward the R1 goal, select the best official candidate ref and let R3 inspect it.
+- If a current candidate has `child_summary_layer_status=clean_summary_layer`,
+  prefer its child summary previews over bare structure counts when deciding
+  whether the candidate is the right next branch.
+- For source summary / token summary / code-document source questions, a candidate with
+  `branch_role=source_material_ingest`, `child_branch_role_counts.source_material_ingest`,
+  `has_summary_child_candidate=true`, `has_token_summary_child=true`, or nonzero
+  `child_candidate_count` is usually a valid next inspection step.
+- Use `none_selected` only when there are no current candidate refs or every current
+  candidate is structurally incompatible with the R1 goal.
+- Do not use `none_selected` as a way to repair an invalid enum. Repair the enum by copying
+  an allowed value and keep/select an official candidate ref when one is structurally suitable.
 - On the first layer, the supplied candidates are direct entry candidates from CoreEgo.
 - On later layers, the supplied candidates are code-copied child candidates from the previously inspected node.
+- The runtime input may include `previous_r_step_memory_packet`.
+- `previous_r_step_memory_packet` is code-recorded traversal memory from node_0.
+- Use previous step memory only to remember the prior selected/inspected node, R3 signal, and promoted next candidates.
+- Previous step memory is not a selectable candidate list by itself.
+- Even when previous step memory exists, `selected_surface_ref` and `selected_node_ref` must still be copied from the current runtime candidate surface.
 - Do not assume that leaf summaries are visible in the first R2 view.
 - If the visible candidate is an axis or bundle, choose the best entry point for the R3 inspection instead of inventing a deeper leaf node.
 - `selected_surface_ref` must be exactly one value from `available_surface_refs`.

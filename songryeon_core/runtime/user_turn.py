@@ -284,6 +284,15 @@ def _turn_response(
         "vessel_r_read_packet_status": result.get("vessel_r_read_packet_status"),
         "vessel_r_traverse_status": result.get("vessel_r_traverse_status"),
         "vessel_r_task_status": result.get("vessel_r_task_status"),
+        "vessel_r_failure_stage": result.get("vessel_r_failure_stage"),
+        "vessel_r_failure_type": result.get("vessel_r_failure_type"),
+        "vessel_r_failure_reason": result.get("vessel_r_failure_reason"),
+        "vessel_r_final_sufficiency_status": result.get(
+            "vessel_r_final_sufficiency_status"
+        ),
+        "vessel_r_final_continuation_status": result.get(
+            "vessel_r_final_continuation_status"
+        ),
         "vessel_r_return_packet_status": result.get("vessel_r_return_packet_status"),
         "vessel_r_node3_material_ready": result.get("vessel_r_node3_material_ready"),
         "vessel_r_return_packet_id": result.get("vessel_r_return_packet_id"),

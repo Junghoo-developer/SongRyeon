@@ -11,11 +11,17 @@ from songryeon_core.tools.document_memory_index import (
     save_document_memory_index,
 )
 from songryeon_core.tools.document_snapshot import build_document_snapshot
+from songryeon_core.tools.embedding_backend import HashEmbeddingBackend
 from songryeon_core.tools.embedding_store import EmbeddingIndex
 from songryeon_core.tools.vector_index_cache import load_cached_index_metadata, save_index_metadata
 
 
 DOCUMENT_MEMORY_INDEX_CACHE_DIR = Path(".songryeon_core_cache/document_memory_indexes")
+DEFAULT_EMBEDDING_CHUNK_MAX_CHARS = 900
+DEFAULT_EMBEDDING_CHUNK_OVERLAP_CHARS = 120
+
+_RUNTIME_EMBEDDING_INDEX_CACHE: dict[tuple[str, str, str, int, int], EmbeddingIndex] = {}
+_RUNTIME_DOCUMENT_MEMORY_INDEX_CACHE: dict[tuple[str, str, int, int], object] = {}
 
 
 def list_docs(*, root: str | Path) -> list[dict[str, object]]:
@@ -129,17 +135,22 @@ def search_docs(
 ) -> dict[str, object]:
     """문서 chunk 임베딩을 만들고 query와 가까운 chunk를 찾는다."""
 
-    memory_index = _build_and_cache_document_memory_index(root)
+    memory_index, document_memory_runtime_cache_status = _runtime_document_memory_index(root)
     index_items = item_by_doc_id(memory_index)
     snapshot = build_document_snapshot(root)
-    index = EmbeddingIndex.build(str(root))
     cache_dir = Path(".songryeon_core_cache/vector_indexes")
+    model_id = _default_embedding_model_id()
     cached = load_cached_index_metadata(
         cache_dir=cache_dir,
         snapshot=snapshot,
-        embedding_model_id=index.model.model_id,
+        embedding_model_id=model_id,
     )
-    cache_status = "hit" if cached is not None else "miss"
+    metadata_cache_status = "hit" if cached is not None else "miss"
+    index, runtime_index_cache_status = _runtime_embedding_index_for_snapshot(
+        root=root,
+        snapshot_id=snapshot.snapshot_id,
+        model_id=model_id,
+    )
     if cached is None:
         save_index_metadata(
             cache_dir=cache_dir,
@@ -167,18 +178,87 @@ def search_docs(
         "chunk_count": memory_index.total_chunks,
         "document_kind_counts": _count_field(memory_index.items, "document_kind"),
         "source_role_counts": _count_field(memory_index.items, "source_role"),
-        "cache_status": cache_status,
+        "cache_status": metadata_cache_status,
+        "metadata_cache_status": metadata_cache_status,
+        "document_memory_runtime_cache_status": document_memory_runtime_cache_status,
+        "runtime_index_cache_status": runtime_index_cache_status,
         "result_count": len(results),
         "results": result_payloads,
     }
 
 
+def clear_runtime_embedding_index_cache() -> None:
+    """테스트나 진단에서 프로세스 내부 검색 인덱스 캐시를 비운다."""
+
+    _RUNTIME_EMBEDDING_INDEX_CACHE.clear()
+
+
+def clear_runtime_document_search_caches() -> None:
+    """문서 검색 경로의 프로세스 내부 cache를 전부 비운다."""
+
+    _RUNTIME_DOCUMENT_MEMORY_INDEX_CACHE.clear()
+    _RUNTIME_EMBEDDING_INDEX_CACHE.clear()
+
+
 def _build_and_cache_document_memory_index(root: str | Path):
     """문서 메모리 인덱스를 만들고 cache metadata로 남긴다."""
 
-    frame = build_document_memory_index(root)
-    save_document_memory_index(cache_dir=DOCUMENT_MEMORY_INDEX_CACHE_DIR, frame=frame)
+    frame, _ = _runtime_document_memory_index(root)
     return frame
+
+
+def _runtime_document_memory_index(root: str | Path):
+    root_path = Path(root).resolve()
+    snapshot = build_document_snapshot(root_path)
+    cache_key = (
+        str(root_path),
+        snapshot.snapshot_id,
+        DEFAULT_EMBEDDING_CHUNK_MAX_CHARS,
+        DEFAULT_EMBEDDING_CHUNK_OVERLAP_CHARS,
+    )
+    cached = _RUNTIME_DOCUMENT_MEMORY_INDEX_CACHE.get(cache_key)
+    if cached is not None:
+        return cached, "hit"
+
+    frame = build_document_memory_index(
+        root_path,
+        max_chars=DEFAULT_EMBEDDING_CHUNK_MAX_CHARS,
+        overlap_chars=DEFAULT_EMBEDDING_CHUNK_OVERLAP_CHARS,
+    )
+    save_document_memory_index(cache_dir=DOCUMENT_MEMORY_INDEX_CACHE_DIR, frame=frame)
+    _RUNTIME_DOCUMENT_MEMORY_INDEX_CACHE[cache_key] = frame
+    return frame, "miss"
+
+
+def _runtime_embedding_index_for_snapshot(
+    *,
+    root: str | Path,
+    snapshot_id: str,
+    model_id: str,
+) -> tuple[EmbeddingIndex, str]:
+    resolved_root = str(Path(root).resolve())
+    cache_key = (
+        resolved_root,
+        snapshot_id,
+        model_id,
+        DEFAULT_EMBEDDING_CHUNK_MAX_CHARS,
+        DEFAULT_EMBEDDING_CHUNK_OVERLAP_CHARS,
+    )
+    cached = _RUNTIME_EMBEDDING_INDEX_CACHE.get(cache_key)
+    if cached is not None:
+        return cached, "hit"
+
+    index = EmbeddingIndex.build(
+        resolved_root,
+        max_chars=DEFAULT_EMBEDDING_CHUNK_MAX_CHARS,
+        overlap_chars=DEFAULT_EMBEDDING_CHUNK_OVERLAP_CHARS,
+    )
+    _RUNTIME_EMBEDDING_INDEX_CACHE[cache_key] = index
+    return index, "miss"
+
+
+def _default_embedding_model_id() -> str:
+    return HashEmbeddingBackend().model_id
 
 
 def _document_memory_payload(*, memory_index_id: str, item) -> dict[str, object]:

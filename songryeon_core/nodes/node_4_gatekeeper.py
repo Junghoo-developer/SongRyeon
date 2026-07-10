@@ -395,6 +395,17 @@ def _vessel_r_material_code_guard(
             "Vessel/R 탐색 상태가 sufficient가 아니면 성공으로 단정하지 않는다."
         )
 
+    status_name_mismatches = _vessel_r_status_name_mismatches(
+        rendered_markdown=rendered_markdown,
+        material_status=material_status,
+        task_status=task_status,
+    )
+    if status_name_mismatches:
+        contradictions.extend(status_name_mismatches)
+        revision_targets.append(
+            "Vessel R material의 status/task_status 상태명을 node3_input_brief와 정확히 맞춘다."
+        )
+
     if _claims_vessel_r_as_document_evidence(rendered_markdown):
         contradictions.append("vessel_r_material_claimed_as_document_evidence")
         revision_targets.append(
@@ -444,6 +455,74 @@ def _claims_vessel_r_as_document_evidence(rendered_markdown: str) -> bool:
         if re.search(r"(문서\s*context|문서\s*근거|읽은\s*문서)", line):
             return True
     return False
+
+
+def _vessel_r_status_name_mismatches(
+    *,
+    rendered_markdown: str,
+    material_status: str,
+    task_status: str,
+) -> list[str]:
+    """Vessel R 상태명을 brief와 다르게 직접 표기한 줄을 찾는다."""
+
+    actual_statuses = {material_status, task_status}
+    mismatches: list[str] = []
+    for line in rendered_markdown.splitlines():
+        if not _line_mentions_vessel_r_status(line):
+            continue
+        for status_name in _assigned_status_names_in_line(line):
+            if status_name in actual_statuses:
+                continue
+            mismatches.append(
+                "vessel_r_status_name_mismatch:"
+                f"expected_material_{material_status}_task_{task_status}_saw_{status_name}"
+            )
+    return _unique_strings(mismatches)
+
+
+def _line_mentions_vessel_r_status(line: str) -> bool:
+    lowered = line.lower()
+    mentions_vessel = (
+        "vessel" in lowered
+        or "vessel_r_material" in lowered
+        or "r 탐색" in line
+        or "r루프" in line
+        or "그래프 기억 탐색" in line
+    )
+    mentions_status_field = (
+        "status" in lowered
+        or "task_status" in lowered
+        or "material_status" in lowered
+        or "상태" in line
+    )
+    return mentions_vessel and mentions_status_field
+
+
+def _assigned_status_names_in_line(line: str) -> list[str]:
+    lowered = line.lower()
+    status_names: list[str] = []
+    for pattern in [
+        r"(?:material_status|task_status|status|task)[`'\"]?\s*(?:=|:|은|는|이|가|->)\s*`?([a-z_]+)`?",
+        r"상태[`'\"]?\s*(?:=|:|은|는|이|가|->)\s*`?([a-z_]+)`?",
+    ]:
+        for match in re.finditer(pattern, lowered):
+            name = match.group(1)
+            if name in _VESSEL_R_STATUS_NAMES:
+                status_names.append(name)
+    return _unique_strings(status_names)
+
+
+_VESSEL_R_STATUS_NAMES = {
+    "available",
+    "failed",
+    "insufficient",
+    "not_recorded",
+    "not_run",
+    "partial",
+    "present",
+    "sufficient",
+    "unknown",
+}
 
 
 def _claims_explicit_read_doc_role(

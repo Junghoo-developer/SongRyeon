@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import re
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from songryeon_core.core.data_store import DataStore
@@ -30,7 +30,7 @@ from songryeon_core.core.schemas import (
 )
 from songryeon_core.core.trace_store import TraceStore
 from songryeon_core.llm.base import LLMAdapter, LLMRequest, LLMResponse
-from songryeon_core.llm.node_executor import LLMNodeExecutor
+from songryeon_core.llm.node_executor import LLMNodeExecutionResult, LLMNodeExecutor
 
 
 R_LOOP_VESSEL_ONE_STEP_GENERATOR = "CODE:R_LOOP_VESSEL_ONE_STEP_ASSEMBLER"
@@ -52,6 +52,10 @@ R_LOOP_VESSEL_CANDIDATE_LAYER_SURFACE_DATA_TYPE = (
 R_LOOP_VESSEL_CANDIDATE_LAYER_SURFACE_SCHEMA_NAME = (
     "RLoopVesselCandidateLayerSurfaceFrame"
 )
+R_LOOP_VESSEL_STEP_MEMORY_DATA_TYPE = "r_loop:vessel_step_memory_packet"
+R_LOOP_VESSEL_STEP_MEMORY_GENERATOR = "CODE:NODE_0_R_VESSEL_STEP_MEMORY"
+R_LOOP_VESSEL_STEP_MEMORY_SCHEMA_NAME = "RLoopVesselStepMemoryPacketFrame"
+R_LOOP_VESSEL_STEP_MEMORY_SCHEMA_VERSION = "0.1"
 R_LOOP_VESSEL_SURFACE_SELECTION_DATA_TYPE = (
     "node_output:R_loop_vessel_surface_selection_frame"
 )
@@ -75,6 +79,8 @@ R_TRAVERSE_MAX_NODE_READS = 6
 R_TRAVERSE_MAX_CONTEXT_TOKENS = 8000
 R_TRAVERSE_MIN_TERMINAL_MATERIAL_READS = 1
 R_TRAVERSE_MAX_RAW_ORIGINAL_MATERIAL_READS = 5
+R2_SCHEMA_REPAIR_MAX_ATTEMPTS = 1
+R3_SCHEMA_REPAIR_MAX_ATTEMPTS = 1
 R_INFORMATION_GRANULARITY_ENUM_VALUES = [
     "raw",
     "low_summary",
@@ -82,6 +88,10 @@ R_INFORMATION_GRANULARITY_ENUM_VALUES = [
     "high_summary",
     "unknown",
 ]
+R3_SUFFICIENCY_STATUS_VALUES = ["sufficient", "insufficient", "unknown"]
+R3_GRANULARITY_PROBLEM_STATUS_VALUES = ["none", "needs_lower_granularity", "unknown"]
+R3_BRANCH_PROBLEM_STATUS_VALUES = ["none", "wrong_branch", "unknown"]
+R3_RECOMMENDED_NEXT_ACTION_VALUES = ["stop", "deeper", "switch_branch", "fail"]
 
 
 @dataclass(frozen=True)
@@ -148,6 +158,7 @@ class RLoopVesselTraverseResultFrame:
     max_raw_original_material_count: int
     raw_original_read_cap_reached: bool
     early_stop_guard_trigger_count: int
+    step_memory_packet_ids: list[str]
     llm_call_data_ids: list[str]
     output_data_ids: list[str]
     source_data_ids: list[str]
@@ -157,6 +168,54 @@ class RLoopVesselTraverseResultFrame:
     info_class: str = "absolute"
     semantic_judgement_status: str = "not_run"
     schema_name: str = R_LOOP_VESSEL_TRAVERSE_SCHEMA_NAME
+
+
+@dataclass(frozen=True)
+class RLoopVesselStepMemoryPacketFrame:
+    """node_0 remembers one completed Vessel R step for the next R decision."""
+
+    packet_id: str
+    turn_id: str
+    step_index: int
+    target: str
+    mode: str
+    source_read_packet_id: str
+    source_candidate_surface_frame_id: str
+    source_r2_selection_frame_id: str
+    source_r3_inspection_frame_id: str
+    source_continuation_frame_id: str
+    selected_graph_node_id: str | None
+    inspected_graph_node_id: str
+    selected_node_kind: str
+    selected_summary_depth: int
+    selected_source_leaf_count: int
+    selected_is_terminal_material: bool
+    selected_is_raw_original_material: bool
+    visible_child_candidate_node_ids: list[str]
+    visible_child_candidate_count: int
+    visible_child_candidate_records: list[dict[str, object]] = field(default_factory=list)
+    promoted_next_candidate_graph_node_ids: list[str] = field(default_factory=list)
+    promoted_next_candidate_count: int = 0
+    r3_current_information_granularity: str = "unknown"
+    r3_sufficiency_status: str = "unknown"
+    r3_granularity_problem_status: str = "unknown"
+    r3_branch_problem_status: str = "unknown"
+    r3_recommended_next_action: str = "fail"
+    continuation_status: str = "stop_no_actionable_path"
+    continuation_reason_code: str = ""
+    remaining_node_reads: int = 0
+    remaining_traversal_depth: int = 0
+    terminal_material_seen_count: int = 0
+    raw_original_material_seen_count: int = 0
+    raw_original_read_cap_reached: bool = False
+    raw_original_candidate_node_ids: list[str] = field(default_factory=list)
+    source_trace_ids: list[str] = field(default_factory=list)
+    source_data_ids: list[str] = field(default_factory=list)
+    generated_by: str = R_LOOP_VESSEL_STEP_MEMORY_GENERATOR
+    info_class: str = "absolute"
+    semantic_judgement_status: str = "not_run"
+    schema_name: str = R_LOOP_VESSEL_STEP_MEMORY_SCHEMA_NAME
+    schema_version: str = R_LOOP_VESSEL_STEP_MEMORY_SCHEMA_VERSION
 
 
 @dataclass(frozen=True)
@@ -224,6 +283,7 @@ class RLoopVesselTraverseRun:
     surface_selections: list[RLoopVesselSurfaceSelectionFrame]
     graph_traversal_candidate_surfaces: list[RGraphTraversalCandidateSurfaceFrame]
     continuation_checkpoints: list[RLoopVesselContinuationCheckpointPacketFrame]
+    step_memory_packets: list[RLoopVesselStepMemoryPacketFrame]
     trace_event_ids: list[str]
     output_data_ids: list[str]
 
@@ -550,29 +610,25 @@ def run_r_loop_vessel_one_step(
     )
 
     available_graph_node_ids = _available_graph_node_ids(read_packet)
-    r2_result = executor.run(
-        node_id=R2_VESSEL_NODE_ID,
-        prompt=_prompt(R2_VESSEL_SELECTOR_PROMPT_REF),
-        input_payload=_r2_input_payload(
-            user_question=user_question,
-            read_packet=read_packet,
-            r1=r1,
-            candidate_layer_surface=candidate_layer_surface,
-            available_graph_node_ids=available_graph_node_ids,
-        ),
+    r2_result, r2_attempt_results = _run_r2_with_schema_repair(
+        executor=executor,
+        user_question=user_question,
+        read_packet=read_packet,
+        r1=r1,
+        candidate_layer_surface=candidate_layer_surface,
+        available_graph_node_ids=available_graph_node_ids,
         trace_store=trace_store,
         data_store=data_store,
         turn_id=turn_id,
-        prompt_ref=R2_VESSEL_SELECTOR_PROMPT_REF,
         input_ref=_unique_strings([*source_trace_ids, *trace_event_ids]),
-        source_data_ids=[read_packet.packet_id, r1.frame_id, candidate_layer_surface.frame_id],
-        payload_validator=lambda payload: _validate_r2_payload(
-            payload,
-            available_graph_node_ids=available_graph_node_ids,
-            candidate_layer_surface=candidate_layer_surface,
-        ),
+        source_data_ids=[
+            read_packet.packet_id,
+            r1.frame_id,
+            candidate_layer_surface.frame_id,
+        ],
     )
-    _append_llm_refs(r2_result, llm_call_data_ids, trace_event_ids)
+    for attempt_result in r2_attempt_results:
+        _append_llm_refs(attempt_result, llm_call_data_ids, trace_event_ids)
     if r2_result.failure_type != "none" or r2_result.validation.payload is None:
         return _record_failure_result(
             trace_store=trace_store,
@@ -704,24 +760,20 @@ def run_r_loop_vessel_one_step(
         )
 
     selected_record = _selected_candidate_record(read_packet, r2.selected_graph_node_id)
-    r3_result = executor.run(
-        node_id=R3_VESSEL_NODE_ID,
-        prompt=_prompt(R3_VESSEL_INSPECTOR_PROMPT_REF),
-        input_payload=_r3_input_payload(
-            user_question=user_question,
-            r1=r1,
-            r2=r2,
-            selected_record=selected_record,
-        ),
+    r3_result, r3_attempt_results = _run_r3_with_schema_repair(
+        executor=executor,
+        user_question=user_question,
+        r1=r1,
+        r2=r2,
+        selected_record=selected_record,
         trace_store=trace_store,
         data_store=data_store,
         turn_id=turn_id,
-        prompt_ref=R3_VESSEL_INSPECTOR_PROMPT_REF,
         input_ref=_unique_strings([*source_trace_ids, *trace_event_ids]),
         source_data_ids=[read_packet.packet_id, r1.frame_id, r2.frame_id, r2.selected_graph_node_id],
-        payload_validator=_validate_r3_payload,
     )
-    _append_llm_refs(r3_result, llm_call_data_ids, trace_event_ids)
+    for attempt_result in r3_attempt_results:
+        _append_llm_refs(attempt_result, llm_call_data_ids, trace_event_ids)
     if r3_result.failure_type != "none" or r3_result.validation.payload is None:
         return _record_failure_result(
             trace_store=trace_store,
@@ -946,6 +998,8 @@ def run_r_loop_vessel_traverse(
     graph_surfaces: list[RGraphTraversalCandidateSurfaceFrame] = []
     continuations: list[RLoopContinuationFrame] = []
     continuation_checkpoints: list[RLoopVesselContinuationCheckpointPacketFrame] = []
+    step_memory_packets: list[RLoopVesselStepMemoryPacketFrame] = []
+    previous_step_memory_packet: RLoopVesselStepMemoryPacketFrame | None = None
     terminal_material_seen_count = 0
     raw_original_material_seen_count = 0
     raw_original_read_cap_reached = False
@@ -1044,37 +1098,30 @@ def run_r_loop_vessel_traverse(
         )
 
         available_graph_node_ids = _surface_all_candidate_ids(candidate_layer_surface)
-        r2_result = executor.run(
-            node_id=R2_VESSEL_NODE_ID,
-            prompt=_prompt(R2_VESSEL_SELECTOR_PROMPT_REF),
-            input_payload=_r2_input_payload(
-                user_question=user_question,
-                read_packet=read_packet,
-                r1=r1,
-                candidate_layer_surface=candidate_layer_surface,
-                available_graph_node_ids=available_graph_node_ids,
-                current_graph_node_id=_surface_current_graph_node_id(candidate_layer_surface),
-                traversal_policy="hierarchical_child_candidates"
-                if step_index > 1
-                else "core_ego_direct_entry_candidates_only",
-            ),
+        r2_result, r2_attempt_results = _run_r2_with_schema_repair(
+            executor=executor,
+            user_question=user_question,
+            read_packet=read_packet,
+            r1=r1,
+            candidate_layer_surface=candidate_layer_surface,
+            available_graph_node_ids=available_graph_node_ids,
             trace_store=trace_store,
             data_store=data_store,
             turn_id=turn_id,
-            prompt_ref=R2_VESSEL_SELECTOR_PROMPT_REF,
             input_ref=_unique_strings([*source_trace_ids, *trace_event_ids]),
             source_data_ids=[
                 *base_source_data_ids,
                 r1.frame_id,
                 candidate_layer_surface.frame_id,
             ],
-            payload_validator=lambda payload, surface=candidate_layer_surface, ids=available_graph_node_ids: _validate_r2_payload(
-                payload,
-                available_graph_node_ids=ids,
-                candidate_layer_surface=surface,
-            ),
+            current_graph_node_id=_surface_current_graph_node_id(candidate_layer_surface),
+            traversal_policy="hierarchical_child_candidates"
+            if step_index > 1
+            else "core_ego_direct_entry_candidates_only",
+            previous_step_memory_packet=previous_step_memory_packet,
         )
-        _append_llm_refs(r2_result, llm_call_data_ids, trace_event_ids)
+        for attempt_result in r2_attempt_results:
+            _append_llm_refs(attempt_result, llm_call_data_ids, trace_event_ids)
         if r2_result.failure_type != "none" or r2_result.validation.payload is None:
             return _record_traverse_failure_result(
                 trace_store=trace_store,
@@ -1110,6 +1157,7 @@ def run_r_loop_vessel_traverse(
                 graph_surfaces=graph_surfaces,
                 continuations=continuations,
                 continuation_checkpoints=continuation_checkpoints,
+                step_memory_packets=step_memory_packets,
             )
 
         surface_selection = _surface_selection_frame_from_payload(
@@ -1182,19 +1230,16 @@ def run_r_loop_vessel_traverse(
         selected_record = _selected_candidate_record(read_packet, r2.selected_graph_node_id)
         selected_is_terminal_material = _is_terminal_material_record(selected_record)
         selected_is_raw_original_material = _is_raw_original_material_record(selected_record)
-        r3_result = executor.run(
-            node_id=R3_VESSEL_NODE_ID,
-            prompt=_prompt(R3_VESSEL_INSPECTOR_PROMPT_REF),
-            input_payload=_r3_input_payload(
-                user_question=user_question,
-                r1=r1,
-                r2=r2,
-                selected_record=selected_record,
-            ),
+        r3_result, r3_attempt_results = _run_r3_with_schema_repair(
+            executor=executor,
+            user_question=user_question,
+            r1=r1,
+            r2=r2,
+            selected_record=selected_record,
+            previous_step_memory_packet=previous_step_memory_packet,
             trace_store=trace_store,
             data_store=data_store,
             turn_id=turn_id,
-            prompt_ref=R3_VESSEL_INSPECTOR_PROMPT_REF,
             input_ref=_unique_strings([*source_trace_ids, *trace_event_ids]),
             source_data_ids=[
                 *base_source_data_ids,
@@ -1202,9 +1247,9 @@ def run_r_loop_vessel_traverse(
                 r2.frame_id,
                 r2.selected_graph_node_id,
             ],
-            payload_validator=_validate_r3_payload,
         )
-        _append_llm_refs(r3_result, llm_call_data_ids, trace_event_ids)
+        for attempt_result in r3_attempt_results:
+            _append_llm_refs(attempt_result, llm_call_data_ids, trace_event_ids)
         if r3_result.failure_type != "none" or r3_result.validation.payload is None:
             return _record_traverse_failure_result(
                 trace_store=trace_store,
@@ -1236,6 +1281,7 @@ def run_r_loop_vessel_traverse(
                 graph_surfaces=graph_surfaces,
                 continuations=continuations,
                 continuation_checkpoints=continuation_checkpoints,
+                step_memory_packets=step_memory_packets,
             )
 
         r3 = _r3_frame_from_payload(
@@ -1351,6 +1397,39 @@ def run_r_loop_vessel_traverse(
             output_data_ids=output_data_ids,
         )
 
+        promoted_candidate_ids = (
+            list(graph_surface.candidate_graph_node_ids)
+            if final_continuation.continuation_status == "continue_deeper"
+            else []
+        )
+        step_memory_packet = _record_r_loop_vessel_step_memory_packet(
+            trace_store=trace_store,
+            data_store=data_store,
+            turn_id=turn_id,
+            frame_label=frame_label,
+            step_index=step_index,
+            source_read_packet_id=read_packet.packet_id,
+            source_candidate_surface_frame_id=candidate_layer_surface.frame_id,
+            source_r2_selection_frame_id=r2.frame_id,
+            source_r3_inspection_frame_id=r3.frame_id,
+            source_continuation_frame_id=final_continuation.frame_id,
+            selected_record=selected_record,
+            r2=r2,
+            r3=r3,
+            continuation=final_continuation,
+            selected_is_terminal_material=selected_is_terminal_material,
+            selected_is_raw_original_material=selected_is_raw_original_material,
+            promoted_next_candidate_graph_node_ids=promoted_candidate_ids,
+            terminal_material_seen_count=terminal_material_seen_count,
+            raw_original_material_seen_count=raw_original_material_seen_count,
+            raw_original_read_cap_reached=raw_original_read_cap_reached,
+            source_trace_ids=_unique_strings([*source_trace_ids, *trace_event_ids]),
+            trace_event_ids=trace_event_ids,
+            output_data_ids=output_data_ids,
+        )
+        step_memory_packets.append(step_memory_packet)
+        previous_step_memory_packet = step_memory_packet
+
         if final_continuation.continuation_status == "continue_deeper":
             next_candidate_surface = _candidate_layer_surface_frame_from_graph_surface(
                 frame_label=f"{frame_label}_step_{step_index + 1:04d}",
@@ -1465,6 +1544,7 @@ def run_r_loop_vessel_traverse(
         r2_selections=r2_selections,
         r3_inspections=r3_inspections,
         continuations=continuations,
+        step_memory_packets=step_memory_packets,
         llm_call_data_ids=llm_call_data_ids,
         output_data_ids=output_data_ids,
         source_data_ids=base_source_data_ids,
@@ -1496,6 +1576,7 @@ def run_r_loop_vessel_traverse(
         surface_selections=surface_selections,
         graph_traversal_candidate_surfaces=graph_surfaces,
         continuation_checkpoints=continuation_checkpoints,
+        step_memory_packets=step_memory_packets,
         trace_event_ids=trace_event_ids,
         output_data_ids=output_data_ids,
     )
@@ -1550,9 +1631,10 @@ def _r2_input_payload(
     available_graph_node_ids: list[str],
     current_graph_node_id: str = "graph:core_ego:root",
     traversal_policy: str = "core_ego_direct_entry_candidates_only",
+    previous_step_memory_packet: RLoopVesselStepMemoryPacketFrame | None = None,
 ) -> dict[str, object]:
     selection_ref_map = _r2_selection_ref_map(read_packet, candidate_layer_surface)
-    return {
+    payload = {
         "user_question": user_question,
         "r1_goal": asdict(r1),
         "read_packet_id": read_packet.packet_id,
@@ -1578,6 +1660,225 @@ def _r2_input_payload(
         },
         "source_data_ids": [read_packet.packet_id, r1.frame_id, candidate_layer_surface.frame_id],
     }
+    if previous_step_memory_packet is not None:
+        payload["previous_r_step_memory_packet"] = asdict(previous_step_memory_packet)
+        payload["source_data_ids"] = _unique_strings(
+            [
+                *payload["source_data_ids"],  # type: ignore[list-item]
+                previous_step_memory_packet.packet_id,
+            ]
+        )
+    return payload
+
+
+def _run_r2_with_schema_repair(
+    *,
+    executor: LLMNodeExecutor,
+    user_question: str,
+    read_packet: RLoopVesselReadPacketFrame,
+    r1: R1GraphGoalFrame,
+    candidate_layer_surface: RLoopVesselCandidateLayerSurfaceFrame,
+    available_graph_node_ids: list[str],
+    trace_store: TraceStore,
+    data_store: DataStore,
+    turn_id: str,
+    input_ref: list[str],
+    source_data_ids: list[str],
+    current_graph_node_id: str = "graph:core_ego:root",
+    traversal_policy: str = "core_ego_direct_entry_candidates_only",
+    previous_step_memory_packet: RLoopVesselStepMemoryPacketFrame | None = None,
+) -> tuple[LLMNodeExecutionResult, list[LLMNodeExecutionResult]]:
+    base_payload = _r2_input_payload(
+        user_question=user_question,
+        read_packet=read_packet,
+        r1=r1,
+        candidate_layer_surface=candidate_layer_surface,
+        available_graph_node_ids=available_graph_node_ids,
+        current_graph_node_id=current_graph_node_id,
+        traversal_policy=traversal_policy,
+        previous_step_memory_packet=previous_step_memory_packet,
+    )
+    effective_source_data_ids = _unique_strings(
+        [
+            *source_data_ids,
+            previous_step_memory_packet.packet_id
+            if previous_step_memory_packet is not None
+            else None,
+        ]
+    )
+
+    def validator(payload: dict[str, object]) -> None:
+        _validate_r2_payload(
+            payload,
+            available_graph_node_ids=available_graph_node_ids,
+            candidate_layer_surface=candidate_layer_surface,
+        )
+
+    first_result = executor.run(
+        node_id=R2_VESSEL_NODE_ID,
+        prompt=_prompt(R2_VESSEL_SELECTOR_PROMPT_REF),
+        input_payload=base_payload,
+        trace_store=trace_store,
+        data_store=data_store,
+        turn_id=turn_id,
+        prompt_ref=R2_VESSEL_SELECTOR_PROMPT_REF,
+        input_ref=input_ref,
+        source_data_ids=effective_source_data_ids,
+        payload_validator=validator,
+    )
+    attempt_results = [first_result]
+    if not _should_repair_r2_schema_failure(first_result):
+        return first_result, attempt_results
+
+    repair_payload = _r2_schema_repair_input_payload(
+        base_payload=base_payload,
+        failed_payload=first_result.validation.payload,
+        failure_reason=first_result.validation.error,
+    )
+    repair_result = executor.run(
+        node_id=R2_VESSEL_NODE_ID,
+        prompt=_prompt(R2_VESSEL_SELECTOR_PROMPT_REF),
+        input_payload=repair_payload,
+        trace_store=trace_store,
+        data_store=data_store,
+        turn_id=turn_id,
+        prompt_ref=R2_VESSEL_SELECTOR_PROMPT_REF,
+        input_ref=_unique_strings([*input_ref, first_result.trace_event_id]),
+        source_data_ids=_unique_strings(
+            [*effective_source_data_ids, first_result.call_data_id]
+        ),
+        payload_validator=validator,
+    )
+    attempt_results.append(repair_result)
+    return repair_result, attempt_results
+
+
+def _should_repair_r2_schema_failure(result: LLMNodeExecutionResult) -> bool:
+    if R2_SCHEMA_REPAIR_MAX_ATTEMPTS < 1:
+        return False
+    if result.failure_type != "schema_failed":
+        return False
+    if not isinstance(result.validation.payload, dict):
+        return False
+    error = result.validation.error or ""
+    return any(
+        marker in error
+        for marker in (
+            "selected_surface_ref",
+            "selected_node_ref",
+            "selected_surface_id",
+            "selected_graph_node_id",
+            "expected_information_granularity",
+        )
+    )
+
+
+def _r2_schema_repair_input_payload(
+    *,
+    base_payload: dict[str, object],
+    failed_payload: dict[str, object] | None,
+    failure_reason: str | None,
+) -> dict[str, object]:
+    payload = dict(base_payload)
+    payload["schema_repair_request"] = {
+        "repair_status": "requested",
+        "max_repair_attempts": R2_SCHEMA_REPAIR_MAX_ATTEMPTS,
+        "repair_attempt_index": 1,
+        "failure_reason": failure_reason or "R2 schema validation failed.",
+        "repair_scope": (
+            "Fix only R2 copy-contract fields. Do not invent refs. "
+            "Do not change the graph memory or validator."
+        ),
+        "failed_output_fields": _r2_failed_output_fields(failed_payload),
+    }
+    payload["r2_copy_repair_table"] = _r2_copy_repair_table(
+        base_payload,
+        failed_payload=failed_payload,
+    )
+    return payload
+
+
+def _r2_failed_output_fields(
+    failed_payload: dict[str, object] | None,
+) -> dict[str, object]:
+    if not isinstance(failed_payload, dict):
+        return {}
+    keys = [
+        "selection_status",
+        "selected_surface_ref",
+        "selected_node_ref",
+        "expected_information_granularity",
+        "expected_source_kind",
+    ]
+    return {key: failed_payload.get(key) for key in keys if key in failed_payload}
+
+
+def _r2_copy_repair_table(
+    base_payload: dict[str, object],
+    *,
+    failed_payload: dict[str, object] | None = None,
+) -> dict[str, object]:
+    records_by_surface = base_payload.get("candidate_records_by_surface_ref")
+    node_refs_by_surface: dict[str, list[str]] = {}
+    if isinstance(records_by_surface, dict):
+        for surface_ref, records in records_by_surface.items():
+            if not isinstance(surface_ref, str) or not isinstance(records, list):
+                continue
+            refs: list[str] = []
+            for record in records:
+                if not isinstance(record, dict):
+                    continue
+                node_ref = record.get("node_ref")
+                if isinstance(node_ref, str) and node_ref:
+                    refs.append(node_ref)
+            node_refs_by_surface[surface_ref] = refs
+    return {
+        "allowed_surface_refs": base_payload.get("available_surface_refs"),
+        "allowed_node_refs_by_surface_ref": node_refs_by_surface,
+        "preserve_failed_selection_refs": _valid_failed_selection_refs_for_repair(
+            failed_payload=failed_payload,
+            node_refs_by_surface=node_refs_by_surface,
+        ),
+        "allowed_information_granularity_values": base_payload.get(
+            "allowed_information_granularity_values"
+        ),
+        "repair_output_contract": {
+            "selected_surface_ref": "copy one allowed_surface_refs value, or null for none_selected",
+            "selected_node_ref": "copy one node ref under selected_surface_ref, or null for none_selected",
+            "expected_information_granularity": (
+                "copy one allowed_information_granularity_values value"
+            ),
+        },
+    }
+
+
+def _valid_failed_selection_refs_for_repair(
+    *,
+    failed_payload: dict[str, object] | None,
+    node_refs_by_surface: dict[str, list[str]],
+) -> dict[str, object]:
+    if not isinstance(failed_payload, dict):
+        return {"status": "not_available"}
+    if failed_payload.get("selection_status") != "selected":
+        return {"status": "not_selected"}
+    selected_surface_ref = failed_payload.get("selected_surface_ref")
+    selected_node_ref = failed_payload.get("selected_node_ref")
+    if not isinstance(selected_surface_ref, str) or not isinstance(
+        selected_node_ref,
+        str,
+    ):
+        return {"status": "missing_ref"}
+    allowed_node_refs = node_refs_by_surface.get(selected_surface_ref, [])
+    if selected_node_ref not in allowed_node_refs:
+        return {"status": "invalid_ref"}
+    return {
+        "status": "valid_selected_refs",
+        "selected_surface_ref": selected_surface_ref,
+        "selected_node_ref": selected_node_ref,
+        "instruction": (
+            "Preserve these refs exactly and repair only invalid non-ref fields."
+        ),
+    }
 
 
 def _r3_input_payload(
@@ -1586,22 +1887,185 @@ def _r3_input_payload(
     r1: R1GraphGoalFrame,
     r2: R2GraphNodeSelectionFrame,
     selected_record: dict[str, object],
+    previous_step_memory_packet: RLoopVesselStepMemoryPacketFrame | None = None,
 ) -> dict[str, object]:
-    return {
+    payload = {
         "user_question": user_question,
         "r1_goal": asdict(r1),
         "r2_selection": asdict(r2),
-        "selected_candidate_record": selected_record,
+        "selected_candidate_record": _r3_selected_candidate_record_view(selected_record),
         "known_child_node_ids": _candidate_child_node_ids(selected_record),
         "hierarchy_child_candidate_records": _hierarchy_child_candidate_record_views(selected_record),
+        "hierarchy_child_summary_layer": _child_summary_layer_payload(
+            _selected_record_child_records(selected_record)
+        ),
         "hierarchy_child_candidate_count": len(_candidate_child_node_ids(selected_record)),
         "hierarchy_read_policy": {
             "child_candidates_generated_by": "CODE:R_VESSEL_HIERARCHY_CHILD_CANDIDATE_BUILDER",
             "child_candidates_info_class": "absolute",
+            "child_summary_layer_policy": (
+                "If children form one clean summary layer, code exposes that entire "
+                "layer as summary previews. If the child layer is structurally mixed, "
+                "code reports the layer status instead of trimming candidates."
+            ),
             "llm_may_judge_sufficiency": True,
             "llm_must_not_invent_child_ids": True,
         },
+        "allowed_r3_status_values": _r3_allowed_status_values(),
+        "r3_status_contract": {
+            "current_information_granularity": "copy exactly from allowed_r3_status_values.current_information_granularity",
+            "sufficiency_status": "copy exactly from allowed_r3_status_values.sufficiency_status",
+            "granularity_problem_status": "copy exactly from allowed_r3_status_values.granularity_problem_status",
+            "branch_problem_status": "copy exactly from allowed_r3_status_values.branch_problem_status",
+            "recommended_next_action": "copy exactly from allowed_r3_status_values.recommended_next_action",
+            "no_free_text_for_status_fields": True,
+        },
         "source_data_ids": [r1.frame_id, r2.frame_id, _record_node_id(selected_record)],
+    }
+    if previous_step_memory_packet is not None:
+        payload["previous_r_step_memory_packet"] = asdict(previous_step_memory_packet)
+        payload["source_data_ids"] = _unique_strings(
+            [
+                *payload["source_data_ids"],  # type: ignore[list-item]
+                previous_step_memory_packet.packet_id,
+            ]
+        )
+    return payload
+
+
+def _run_r3_with_schema_repair(
+    *,
+    executor: LLMNodeExecutor,
+    user_question: str,
+    r1: R1GraphGoalFrame,
+    r2: R2GraphNodeSelectionFrame,
+    selected_record: dict[str, object],
+    trace_store: TraceStore,
+    data_store: DataStore,
+    turn_id: str,
+    input_ref: list[str],
+    source_data_ids: list[str],
+    previous_step_memory_packet: RLoopVesselStepMemoryPacketFrame | None = None,
+) -> tuple[LLMNodeExecutionResult, list[LLMNodeExecutionResult]]:
+    base_payload = _r3_input_payload(
+        user_question=user_question,
+        r1=r1,
+        r2=r2,
+        selected_record=selected_record,
+        previous_step_memory_packet=previous_step_memory_packet,
+    )
+    effective_source_data_ids = _unique_strings(
+        [
+            *source_data_ids,
+            previous_step_memory_packet.packet_id
+            if previous_step_memory_packet is not None
+            else None,
+        ]
+    )
+    first_result = executor.run(
+        node_id=R3_VESSEL_NODE_ID,
+        prompt=_prompt(R3_VESSEL_INSPECTOR_PROMPT_REF),
+        input_payload=base_payload,
+        trace_store=trace_store,
+        data_store=data_store,
+        turn_id=turn_id,
+        prompt_ref=R3_VESSEL_INSPECTOR_PROMPT_REF,
+        input_ref=input_ref,
+        source_data_ids=effective_source_data_ids,
+        payload_validator=_validate_r3_payload,
+    )
+    attempt_results = [first_result]
+    if not _should_repair_r3_schema_failure(first_result):
+        return first_result, attempt_results
+
+    repair_payload = _r3_schema_repair_input_payload(
+        base_payload=base_payload,
+        failed_payload=first_result.validation.payload,
+        failure_reason=first_result.validation.error,
+    )
+    repair_result = executor.run(
+        node_id=R3_VESSEL_NODE_ID,
+        prompt=_prompt(R3_VESSEL_INSPECTOR_PROMPT_REF),
+        input_payload=repair_payload,
+        trace_store=trace_store,
+        data_store=data_store,
+        turn_id=turn_id,
+        prompt_ref=R3_VESSEL_INSPECTOR_PROMPT_REF,
+        input_ref=_unique_strings([*input_ref, first_result.trace_event_id]),
+        source_data_ids=_unique_strings(
+            [*effective_source_data_ids, first_result.call_data_id]
+        ),
+        payload_validator=_validate_r3_payload,
+    )
+    attempt_results.append(repair_result)
+    return repair_result, attempt_results
+
+
+def _should_repair_r3_schema_failure(result: LLMNodeExecutionResult) -> bool:
+    if R3_SCHEMA_REPAIR_MAX_ATTEMPTS < 1:
+        return False
+    if result.failure_type != "schema_failed":
+        return False
+    if not isinstance(result.validation.payload, dict):
+        return False
+    error = result.validation.error or ""
+    return any(
+        marker in error
+        for marker in (
+            "current_information_granularity",
+            "sufficiency_status",
+            "granularity_problem_status",
+            "branch_problem_status",
+            "recommended_next_action",
+        )
+    )
+
+
+def _r3_schema_repair_input_payload(
+    *,
+    base_payload: dict[str, object],
+    failed_payload: dict[str, object] | None,
+    failure_reason: str | None,
+) -> dict[str, object]:
+    payload = dict(base_payload)
+    payload["schema_repair_request"] = {
+        "repair_status": "requested",
+        "max_repair_attempts": R3_SCHEMA_REPAIR_MAX_ATTEMPTS,
+        "repair_attempt_index": 1,
+        "failure_reason": failure_reason or "R3 schema validation failed.",
+        "repair_scope": (
+            "Fix only R3 enum/status fields. Do not change graph memory, "
+            "selected candidate records, or validator."
+        ),
+        "failed_output_fields": _r3_failed_output_fields(failed_payload),
+    }
+    payload["r3_enum_repair_table"] = _r3_allowed_status_values()
+    return payload
+
+
+def _r3_failed_output_fields(
+    failed_payload: dict[str, object] | None,
+) -> dict[str, object]:
+    if not isinstance(failed_payload, dict):
+        return {}
+    keys = [
+        "current_information_granularity",
+        "sufficiency_status",
+        "granularity_problem_status",
+        "branch_problem_status",
+        "recommended_next_action",
+        "inspection_reason",
+    ]
+    return {key: failed_payload.get(key) for key in keys if key in failed_payload}
+
+
+def _r3_allowed_status_values() -> dict[str, list[str]]:
+    return {
+        "current_information_granularity": list(R_INFORMATION_GRANULARITY_ENUM_VALUES),
+        "sufficiency_status": list(R3_SUFFICIENCY_STATUS_VALUES),
+        "granularity_problem_status": list(R3_GRANULARITY_PROBLEM_STATUS_VALUES),
+        "branch_problem_status": list(R3_BRANCH_PROBLEM_STATUS_VALUES),
+        "recommended_next_action": list(R3_RECOMMENDED_NEXT_ACTION_VALUES),
     }
 
 
@@ -1702,38 +2166,25 @@ def _validate_r2_payload(
 
 
 def _validate_r3_payload(payload: dict[str, object]) -> None:
-    if _payload_text(payload, "current_information_granularity") not in {
-        "raw",
-        "low_summary",
-        "medium_summary",
-        "high_summary",
-        "unknown",
-    }:
+    if _payload_text(payload, "current_information_granularity") not in set(
+        R_INFORMATION_GRANULARITY_ENUM_VALUES
+    ):
         raise ValueError("R3 current_information_granularity is invalid")
-    if _payload_text(payload, "sufficiency_status") not in {
-        "sufficient",
-        "insufficient",
-        "unknown",
-    }:
+    if _payload_text(payload, "sufficiency_status") not in set(
+        R3_SUFFICIENCY_STATUS_VALUES
+    ):
         raise ValueError("R3 sufficiency_status is invalid")
-    if _payload_text(payload, "granularity_problem_status") not in {
-        "none",
-        "needs_lower_granularity",
-        "unknown",
-    }:
+    if _payload_text(payload, "granularity_problem_status") not in set(
+        R3_GRANULARITY_PROBLEM_STATUS_VALUES
+    ):
         raise ValueError("R3 granularity_problem_status is invalid")
-    if _payload_text(payload, "branch_problem_status") not in {
-        "none",
-        "wrong_branch",
-        "unknown",
-    }:
+    if _payload_text(payload, "branch_problem_status") not in set(
+        R3_BRANCH_PROBLEM_STATUS_VALUES
+    ):
         raise ValueError("R3 branch_problem_status is invalid")
-    if _payload_text(payload, "recommended_next_action") not in {
-        "stop",
-        "deeper",
-        "switch_branch",
-        "fail",
-    }:
+    if _payload_text(payload, "recommended_next_action") not in set(
+        R3_RECOMMENDED_NEXT_ACTION_VALUES
+    ):
         raise ValueError("R3 recommended_next_action is invalid")
     if not _payload_text(payload, "inspection_reason"):
         raise ValueError("R3 inspection_reason must not be empty")
@@ -2184,6 +2635,57 @@ def _hierarchy_child_record_source_ids(selected_record: dict[str, object]) -> li
     return _unique_strings(source_ids)
 
 
+def _r3_selected_candidate_record_view(
+    selected_record: dict[str, object],
+) -> dict[str, object]:
+    """Expose selected node material while keeping child candidates as previews.
+
+    The selected node itself is the material R3 is inspecting in this step.
+    Child candidates are only next-step signs, so their full summary/raw payload
+    must not be bulk-copied into the selected record view.
+    """
+
+    allowed_fields = [
+        "candidate_node_id",
+        "summary_node_id",
+        "candidate_kind",
+        "branch_role",
+        "display_name",
+        "summary_display_name",
+        "node_kind",
+        "data_kind",
+        "created_at",
+        "written_at",
+        "summary_depth",
+        "source_leaf_count",
+        "source_summary_count",
+        "target_graph_node_id",
+        "target_display_name",
+        "target_node_kind",
+        "summary_status",
+        "validity_status",
+        "review_status",
+        "info_class",
+        "generated_by",
+        "summary_text",
+        "summary_text_char_count",
+        "summary_text_preview",
+        "source_graph_node_ids",
+        "source_data_ids",
+    ]
+    view = {
+        field_name: selected_record.get(field_name)
+        for field_name in allowed_fields
+        if field_name in selected_record
+    }
+    view["hierarchy_child_node_ids"] = _candidate_child_node_ids(selected_record)
+    view["hierarchy_child_candidate_records"] = _hierarchy_child_candidate_record_views(
+        selected_record
+    )
+    view["hierarchy_child_candidate_visibility"] = "preview_only"
+    return view
+
+
 def _return_summary_for_no_selection(
     *,
     frame_label: str,
@@ -2428,6 +2930,7 @@ def _record_traverse_failure_result(
     graph_surfaces: list[RGraphTraversalCandidateSurfaceFrame] | None = None,
     continuations: list[RLoopContinuationFrame] | None = None,
     continuation_checkpoints: list[RLoopVesselContinuationCheckpointPacketFrame] | None = None,
+    step_memory_packets: list[RLoopVesselStepMemoryPacketFrame] | None = None,
 ) -> RLoopVesselTraverseRun:
     result_frame = _traverse_result_frame(
         frame_id=frame_id,
@@ -2445,6 +2948,7 @@ def _record_traverse_failure_result(
         r2_selections=list(r2_selections or []),
         r3_inspections=list(r3_inspections or []),
         continuations=list(continuations or []),
+        step_memory_packets=list(step_memory_packets or []),
         llm_call_data_ids=llm_call_data_ids or [],
         output_data_ids=output_data_ids or [],
         source_data_ids=source_data_ids,
@@ -2473,6 +2977,7 @@ def _record_traverse_failure_result(
         surface_selections=list(surface_selections or []),
         graph_traversal_candidate_surfaces=list(graph_surfaces or []),
         continuation_checkpoints=list(continuation_checkpoints or []),
+        step_memory_packets=list(step_memory_packets or []),
         trace_event_ids=trace_event_ids,
         output_data_ids=final_output_data_ids,
     )
@@ -2578,6 +3083,7 @@ def _traverse_result_frame(
     r2_selections: list[R2GraphNodeSelectionFrame] | None = None,
     r3_inspections: list[R3GraphInspectionFrame] | None = None,
     continuations: list[RLoopContinuationFrame] | None = None,
+    step_memory_packets: list[RLoopVesselStepMemoryPacketFrame] | None = None,
     llm_call_data_ids: list[str] | None = None,
     output_data_ids: list[str] | None = None,
     source_data_ids: list[str] | None = None,
@@ -2595,10 +3101,11 @@ def _traverse_result_frame(
     r2_selections = list(r2_selections or [])
     r3_inspections = list(r3_inspections or [])
     continuations = list(continuations or [])
-    selected_ids = _unique_strings(
-        [r2.selected_graph_node_id for r2 in r2_selections if r2.selected_graph_node_id]
+    step_memory_packets = list(step_memory_packets or [])
+    selected_ids = _path_strings(
+        [r2.selected_graph_node_id for r2 in r2_selections]
     )
-    inspected_ids = _unique_strings([r3.inspected_graph_node_id for r3 in r3_inspections])
+    inspected_ids = _path_strings([r3.inspected_graph_node_id for r3 in r3_inspections])
     final_r3 = r3_inspections[-1] if r3_inspections else None
     frame = RLoopVesselTraverseResultFrame(
         frame_id=frame_id,
@@ -2636,6 +3143,7 @@ def _traverse_result_frame(
         max_raw_original_material_count=max_raw_original_material_count,
         raw_original_read_cap_reached=raw_original_read_cap_reached,
         early_stop_guard_trigger_count=early_stop_guard_trigger_count,
+        step_memory_packet_ids=[packet.packet_id for packet in step_memory_packets],
         llm_call_data_ids=_unique_strings(llm_call_data_ids or []),
         output_data_ids=_unique_strings(output_data_ids or []),
         source_data_ids=_unique_strings(
@@ -2650,6 +3158,7 @@ def _traverse_result_frame(
                 *[r2.frame_id for r2 in r2_selections],
                 *[r3.frame_id for r3 in r3_inspections],
                 *[continuation.frame_id for continuation in continuations],
+                *[packet.packet_id for packet in step_memory_packets],
                 *selected_ids,
                 *inspected_ids,
             ]
@@ -2722,6 +3231,194 @@ def _record_frame(
     output_data_ids.append(frame_id)
 
 
+def _record_r_loop_vessel_step_memory_packet(
+    *,
+    trace_store: TraceStore,
+    data_store: DataStore,
+    turn_id: str,
+    frame_label: str,
+    step_index: int,
+    source_read_packet_id: str,
+    source_candidate_surface_frame_id: str,
+    source_r2_selection_frame_id: str,
+    source_r3_inspection_frame_id: str,
+    source_continuation_frame_id: str,
+    selected_record: dict[str, object],
+    r2: R2GraphNodeSelectionFrame,
+    r3: R3GraphInspectionFrame,
+    continuation: RLoopContinuationFrame,
+    selected_is_terminal_material: bool,
+    selected_is_raw_original_material: bool,
+    promoted_next_candidate_graph_node_ids: list[str],
+    terminal_material_seen_count: int,
+    raw_original_material_seen_count: int,
+    raw_original_read_cap_reached: bool,
+    source_trace_ids: list[str],
+    trace_event_ids: list[str],
+    output_data_ids: list[str],
+) -> RLoopVesselStepMemoryPacketFrame:
+    visible_child_ids = _candidate_child_node_ids(selected_record)
+    raw_candidate_ids = [
+        child_id for child_id in visible_child_ids if _is_raw_source_id(child_id)
+    ]
+    packet = RLoopVesselStepMemoryPacketFrame(
+        packet_id=_r_loop_vessel_step_memory_packet_id(
+            frame_label=frame_label,
+            step_index=step_index,
+        ),
+        turn_id=turn_id,
+        step_index=step_index,
+        target="R_LOOP",
+        mode="vessel_r_step_memory",
+        source_read_packet_id=source_read_packet_id,
+        source_candidate_surface_frame_id=source_candidate_surface_frame_id,
+        source_r2_selection_frame_id=source_r2_selection_frame_id,
+        source_r3_inspection_frame_id=source_r3_inspection_frame_id,
+        source_continuation_frame_id=source_continuation_frame_id,
+        selected_graph_node_id=r2.selected_graph_node_id,
+        inspected_graph_node_id=r3.inspected_graph_node_id,
+        selected_node_kind=_candidate_node_kind(selected_record),
+        selected_summary_depth=_candidate_summary_depth(selected_record),
+        selected_source_leaf_count=_candidate_source_leaf_count(selected_record),
+        selected_is_terminal_material=selected_is_terminal_material,
+        selected_is_raw_original_material=selected_is_raw_original_material,
+        visible_child_candidate_node_ids=visible_child_ids,
+        visible_child_candidate_count=len(visible_child_ids),
+        visible_child_candidate_records=_hierarchy_child_candidate_record_views(
+            selected_record
+        ),
+        promoted_next_candidate_graph_node_ids=_unique_strings(
+            promoted_next_candidate_graph_node_ids
+        ),
+        promoted_next_candidate_count=len(
+            _unique_strings(promoted_next_candidate_graph_node_ids)
+        ),
+        r3_current_information_granularity=r3.current_information_granularity,
+        r3_sufficiency_status=r3.sufficiency_status,
+        r3_granularity_problem_status=r3.granularity_problem_status,
+        r3_branch_problem_status=r3.branch_problem_status,
+        r3_recommended_next_action=r3.recommended_next_action,
+        continuation_status=continuation.continuation_status,
+        continuation_reason_code=continuation.continuation_reason_code,
+        remaining_node_reads=continuation.remaining_node_reads,
+        remaining_traversal_depth=continuation.remaining_traversal_depth,
+        terminal_material_seen_count=terminal_material_seen_count,
+        raw_original_material_seen_count=raw_original_material_seen_count,
+        raw_original_read_cap_reached=raw_original_read_cap_reached,
+        raw_original_candidate_node_ids=raw_candidate_ids,
+        source_trace_ids=_unique_strings(source_trace_ids),
+        source_data_ids=_unique_strings(
+            [
+                source_read_packet_id,
+                source_candidate_surface_frame_id,
+                source_r2_selection_frame_id,
+                source_r3_inspection_frame_id,
+                source_continuation_frame_id,
+                r2.selected_graph_node_id,
+                r3.inspected_graph_node_id,
+                *visible_child_ids,
+                *promoted_next_candidate_graph_node_ids,
+            ]
+        ),
+    )
+    _validate_r_loop_vessel_step_memory_packet_frame(packet)
+    event = trace_store.create_event(
+        turn_id=turn_id,
+        actor="node_0",
+        event_type="memory_packet",
+        input_ref=packet.source_trace_ids,
+        output_ref=[packet.packet_id],
+        schema_status="passed",
+    )
+    data_store.create_record(
+        data_id=packet.packet_id,
+        data_type=R_LOOP_VESSEL_STEP_MEMORY_DATA_TYPE,
+        exists=True,
+        created_at=event.timestamp,
+        source_trace_id=event.event_id,
+        payload=asdict(packet),
+    )
+    trace_event_ids.append(event.event_id)
+    output_data_ids.append(packet.packet_id)
+    return packet
+
+
+def _r_loop_vessel_step_memory_packet_id(*, frame_label: str, step_index: int) -> str:
+    if not frame_label:
+        raise ValueError("frame_label must not be empty")
+    if step_index < 1:
+        raise ValueError("step_index must be positive")
+    return (
+        "r_loop:vessel_step_memory:"
+        f"{_safe_frame_label(frame_label)}:step_{step_index:04d}"
+    )
+
+
+def _validate_r_loop_vessel_step_memory_packet_frame(
+    frame: RLoopVesselStepMemoryPacketFrame,
+) -> None:
+    if frame.generated_by != R_LOOP_VESSEL_STEP_MEMORY_GENERATOR:
+        raise ValueError("RLoopVesselStepMemoryPacketFrame.generated_by is invalid")
+    if frame.info_class != "absolute":
+        raise ValueError("RLoopVesselStepMemoryPacketFrame.info_class must be absolute")
+    if frame.semantic_judgement_status != "not_run":
+        raise ValueError(
+            "RLoopVesselStepMemoryPacketFrame semantic status must be not_run"
+        )
+    if frame.schema_name != R_LOOP_VESSEL_STEP_MEMORY_SCHEMA_NAME:
+        raise ValueError("RLoopVesselStepMemoryPacketFrame.schema_name is invalid")
+    if frame.schema_version != R_LOOP_VESSEL_STEP_MEMORY_SCHEMA_VERSION:
+        raise ValueError("RLoopVesselStepMemoryPacketFrame.schema_version is invalid")
+    if frame.target != "R_LOOP":
+        raise ValueError("RLoopVesselStepMemoryPacketFrame.target must be R_LOOP")
+    if frame.mode != "vessel_r_step_memory":
+        raise ValueError("RLoopVesselStepMemoryPacketFrame.mode is invalid")
+    for field_name, value in {
+        "step_index": frame.step_index,
+        "selected_summary_depth": frame.selected_summary_depth,
+        "selected_source_leaf_count": frame.selected_source_leaf_count,
+        "visible_child_candidate_count": frame.visible_child_candidate_count,
+        "promoted_next_candidate_count": frame.promoted_next_candidate_count,
+        "remaining_node_reads": frame.remaining_node_reads,
+        "remaining_traversal_depth": frame.remaining_traversal_depth,
+        "terminal_material_seen_count": frame.terminal_material_seen_count,
+        "raw_original_material_seen_count": frame.raw_original_material_seen_count,
+    }.items():
+        if not isinstance(value, int):
+            raise TypeError(f"RLoopVesselStepMemoryPacketFrame.{field_name} must be int")
+        if value < 0:
+            raise ValueError(
+                f"RLoopVesselStepMemoryPacketFrame.{field_name} must not be negative"
+            )
+    if frame.visible_child_candidate_count != len(frame.visible_child_candidate_node_ids):
+        raise ValueError("RLoopVesselStepMemoryPacketFrame visible child count mismatch")
+    if frame.promoted_next_candidate_count != len(
+        frame.promoted_next_candidate_graph_node_ids
+    ):
+        raise ValueError("RLoopVesselStepMemoryPacketFrame promoted count mismatch")
+    for field_name, values in {
+        "visible_child_candidate_node_ids": frame.visible_child_candidate_node_ids,
+        "promoted_next_candidate_graph_node_ids": (
+            frame.promoted_next_candidate_graph_node_ids
+        ),
+        "raw_original_candidate_node_ids": frame.raw_original_candidate_node_ids,
+        "source_trace_ids": frame.source_trace_ids,
+        "source_data_ids": frame.source_data_ids,
+    }.items():
+        if not isinstance(values, list):
+            raise TypeError(f"RLoopVesselStepMemoryPacketFrame.{field_name} must be list")
+        if any(not isinstance(value, str) for value in values):
+            raise TypeError(
+                f"RLoopVesselStepMemoryPacketFrame.{field_name} must contain strings"
+            )
+    if not frame.source_read_packet_id or not frame.source_r3_inspection_frame_id:
+        raise ValueError("RLoopVesselStepMemoryPacketFrame requires source IDs")
+    if frame.inspected_graph_node_id not in frame.source_data_ids:
+        raise ValueError(
+            "RLoopVesselStepMemoryPacketFrame.source_data_ids must include inspected node"
+        )
+
+
 def _validate_result_frame(frame: RLoopVesselOneStepResultFrame) -> None:
     if frame.generated_by != R_LOOP_VESSEL_ONE_STEP_GENERATOR:
         raise ValueError("RLoopVesselOneStepResultFrame.generated_by must be assembler")
@@ -2754,8 +3451,10 @@ def _validate_traverse_result_frame(frame: RLoopVesselTraverseResultFrame) -> No
         raise ValueError("completed RLoopVesselTraverseResultFrame must not include failure_stage")
     if frame.step_count != len(frame.r3_inspection_frame_ids):
         raise ValueError("RLoopVesselTraverseResultFrame.step_count mismatch")
-    if len(frame.selected_graph_node_ids) != len(frame.r2_selection_frame_ids):
-        raise ValueError("RLoopVesselTraverseResultFrame selected path mismatch")
+    if len(frame.selected_graph_node_ids) > len(frame.r2_selection_frame_ids):
+        raise ValueError("RLoopVesselTraverseResultFrame selected path exceeds R2 frames")
+    if len(frame.step_memory_packet_ids) > frame.step_count:
+        raise ValueError("RLoopVesselTraverseResultFrame has too many step memories")
     for field_name, value in {
         "terminal_material_seen_count": frame.terminal_material_seen_count,
         "min_terminal_material_count": frame.min_terminal_material_count,
@@ -3039,7 +3738,14 @@ def _r2_selection_ref_map(
             node_refs_by_surface_ref[surface_ref].append(node_ref)
             candidate_node_refs.append(node_ref)
             visible_record = dict(candidate_record)
+            visible_record.update(
+                _r2_candidate_card_structural_enrichment(
+                    read_packet=read_packet,
+                    graph_node_id=graph_node_id,
+                )
+            )
             visible_record.pop("graph_node_id", None)
+            visible_record.pop("summary_text", None)
             visible_record["node_ref"] = node_ref
             candidate_records_by_surface_ref[surface_ref].append(visible_record)
 
@@ -3065,6 +3771,100 @@ def _r2_selection_ref_map(
         "node_ref_to_graph_node_id": node_ref_to_graph_node_id,
         "node_refs_by_surface_ref": node_refs_by_surface_ref,
     }
+
+
+def _r2_candidate_card_structural_enrichment(
+    *,
+    read_packet: RLoopVesselReadPacketFrame,
+    graph_node_id: str,
+) -> dict[str, object]:
+    """Return absolute next-layer structure facts for an R2 candidate card.
+
+    R2 should not receive child summary text or raw/original material here.
+    It only receives counts and kind labels so it can choose an official
+    `node_ref` with better structural awareness.
+    """
+
+    selected_record = _selected_candidate_record(read_packet, graph_node_id)
+    child_records = _hierarchy_child_candidate_records(
+        read_packet=read_packet,
+        selected_node_id=graph_node_id,
+        selected_record=selected_record,
+    )
+    child_summary_depths = sorted(
+        {
+            value
+            for record in child_records
+            for value in [record.get("summary_depth")]
+            if isinstance(value, int)
+        }
+    )
+    child_data_kind_counts = _count_record_text_values(child_records, "data_kind")
+    child_candidate_kind_counts = _count_record_text_values(
+        child_records,
+        "candidate_kind",
+    )
+    child_summary_layer = _child_summary_layer_payload(child_records)
+    return {
+        "child_candidate_visibility": (
+            "structure_counts_and_clean_summary_layer_preview"
+        ),
+        "child_candidate_count": len(child_records),
+        "child_candidate_kind_counts": child_candidate_kind_counts,
+        "child_branch_role_counts": _count_child_branch_roles(child_records),
+        "child_data_kind_counts": child_data_kind_counts,
+        "child_summary_depths": child_summary_depths,
+        "child_summary_layer_status": child_summary_layer["status"],
+        "child_summary_layer_data_kind": child_summary_layer["data_kind"],
+        "child_summary_layer_summary_depths": child_summary_layer["summary_depths"],
+        "child_summary_layer_record_count": child_summary_layer["record_count"],
+        "child_summary_layer_records": child_summary_layer["records"],
+        "has_child_candidates": bool(child_records),
+        "has_summary_child_candidate": (
+            child_candidate_kind_counts.get("summary", 0) > 0
+        ),
+        "has_token_summary_child": (
+            child_data_kind_counts.get("token_budget_bundle_summary", 0) > 0
+        ),
+        "has_leaf_summary_child": (
+            child_data_kind_counts.get("source_leaf_summary", 0) > 0
+        ),
+        "has_raw_original_child_candidate": any(
+            _child_record_is_raw_original(record) for record in child_records
+        ),
+    }
+
+
+def _count_record_text_values(
+    records: list[dict[str, object]],
+    field_name: str,
+) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for record in records:
+        value = record.get(field_name)
+        if not isinstance(value, str) or not value:
+            continue
+        counts[value] = counts.get(value, 0) + 1
+    return dict(sorted(counts.items()))
+
+
+def _count_child_branch_roles(records: list[dict[str, object]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for record in records:
+        branch_role = record.get("branch_role")
+        if not isinstance(branch_role, str) or not branch_role:
+            branch_role = _branch_role_for_record(record)
+        counts[branch_role] = counts.get(branch_role, 0) + 1
+    return dict(sorted(counts.items()))
+
+
+def _child_record_is_raw_original(record: dict[str, object]) -> bool:
+    candidate_id = record.get("candidate_node_id")
+    if _is_raw_source_id(candidate_id):
+        return True
+    return record.get("candidate_kind") in {"raw_source", "raw_capsule"} or record.get(
+        "node_kind"
+    ) in {"raw_source", "raw_capsule"}
 
 
 def _first_visible_ref(payload: dict[str, object]) -> tuple[str | None, str | None, str | None]:
@@ -3382,6 +4182,105 @@ def _with_hierarchy_child_candidates(
     result["hierarchy_child_node_ids"] = child_node_ids
     result["hierarchy_child_candidate_records"] = child_records
     return result
+
+
+def _selected_record_child_records(
+    selected_record: dict[str, object],
+) -> list[dict[str, object]]:
+    records = selected_record.get("hierarchy_child_candidate_records")
+    if not isinstance(records, list):
+        return []
+    return [record for record in records if isinstance(record, dict)]
+
+
+def _child_summary_layer_payload(
+    child_records: list[dict[str, object]],
+) -> dict[str, object]:
+    """Return next-layer summary previews only when the layer is structurally clean.
+
+    한 계층의 하위 후보를 임의 개수로 자르지 않는다. 대신 전부 요약 노드이고
+    같은 종류의 요약층이면 그 계층 전체를 preview로 공개한다. 섞인 계층이면
+    LLM에게 일부만 보여주지 않고, 계층화가 더 필요하다는 상태를 남긴다.
+    """
+
+    if not child_records:
+        return {
+            "status": "no_child_candidates",
+            "data_kind": None,
+            "summary_depths": [],
+            "record_count": 0,
+            "records": [],
+        }
+
+    summary_records = [
+        record
+        for record in child_records
+        if record.get("candidate_kind") == "summary"
+    ]
+    if len(summary_records) != len(child_records):
+        return {
+            "status": "non_summary_navigation_layer",
+            "data_kind": None,
+            "summary_depths": _record_int_values(child_records, "summary_depth"),
+            "record_count": len(child_records),
+            "records": [],
+        }
+
+    data_kinds = _record_string_values(summary_records, "data_kind")
+    if len(data_kinds) != 1:
+        return {
+            "status": "needs_more_hierarchy",
+            "data_kind": None,
+            "summary_depths": _record_int_values(summary_records, "summary_depth"),
+            "record_count": len(summary_records),
+            "records": [],
+        }
+
+    return {
+        "status": "clean_summary_layer",
+        "data_kind": data_kinds[0],
+        "summary_depths": _record_int_values(summary_records, "summary_depth"),
+        "record_count": len(summary_records),
+        "records": [_child_summary_layer_record_view(record) for record in summary_records],
+    }
+
+
+def _child_summary_layer_record_view(
+    record: dict[str, object],
+) -> dict[str, object]:
+    return {
+        "candidate_node_id": record.get("candidate_node_id"),
+        "display_name": record.get("display_name"),
+        "data_kind": record.get("data_kind"),
+        "summary_depth": record.get("summary_depth"),
+        "source_leaf_count": record.get("source_leaf_count"),
+        "source_summary_count": record.get("source_summary_count"),
+        "summary_text_preview": record.get("summary_text_preview"),
+    }
+
+
+def _record_string_values(
+    records: list[dict[str, object]],
+    field_name: str,
+) -> list[str]:
+    values: list[str] = []
+    for record in records:
+        value = record.get(field_name)
+        if isinstance(value, str) and value not in values:
+            values.append(value)
+    return values
+
+
+def _record_int_values(
+    records: list[dict[str, object]],
+    field_name: str,
+) -> list[int]:
+    values: list[int] = []
+    for record in records:
+        value = record.get(field_name)
+        if isinstance(value, int) and value not in values:
+            values.append(value)
+    return sorted(values)
 
 
 def _hierarchy_child_candidate_records(
@@ -3713,6 +4612,7 @@ def _hierarchy_child_candidate_record_views(
             continue
         result.append(
             {
+                "candidate_node_id": record.get("candidate_node_id"),
                 "candidate_kind": record.get("candidate_kind"),
                 "display_name": record.get("display_name"),
                 "node_kind": record.get("node_kind"),
@@ -3870,6 +4770,10 @@ def _unique_strings(values: list[str | None]) -> list[str]:
         seen.add(value)
         result.append(value)
     return result
+
+
+def _path_strings(values: list[str | None]) -> list[str]:
+    return [value for value in values if value]
 
 
 __all__ = [
