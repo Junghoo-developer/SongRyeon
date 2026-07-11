@@ -41,7 +41,7 @@ def test_node3_grounding_block_marks_r_skeleton_as_limited() -> None:
     grounding_block = build_node3_grounding_block(frame)
 
     assert "R 탐색 실험 상태: partial / continue_deeper" in grounding_block
-    assert "graph memory 탐색 성공으로 단정하지 않는다" in grounding_block
+    assert "graph memory 탐색이 요구 수준에 도달했다고 보지 않는다" in grounding_block
 
 
 def test_node3_llm_payload_contains_safe_r_result_boundary() -> None:

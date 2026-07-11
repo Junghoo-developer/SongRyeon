@@ -28,7 +28,7 @@ def test_node4_blocks_vessel_r_failed_status_renamed_as_insufficient() -> None:
     rendered_markdown = "\n\n".join(
         [
             build_node3_grounding_block(brief),
-            "`vessel_r_material.task_status`는 `insufficient`로 표시되어 있습니다.",
+            "`vessel_r_material.task_status` = `insufficient`",
         ]
     )
 

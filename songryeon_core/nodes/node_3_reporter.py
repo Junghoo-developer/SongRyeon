@@ -253,21 +253,25 @@ def _strip_accidental_grounding_block(markdown: str) -> str:
     lines = stripped.splitlines()
     if not lines:
         return ""
-    first_line = lines[0].strip()
-    if first_line not in {"근거 기준:", "**근거 기준:**"}:
-        return stripped
 
-    index = 1
+    # LLM이 본문 중간에 count 블록을 다시 써도 CODE grounding block과
+    # 경쟁하지 못하게 위치와 관계없이 제거한다.
+    headings = {"근거 기준:", "**근거 기준:**"}
+    kept_lines: list[str] = []
+    index = 0
     while index < len(lines):
-        line = lines[index]
-        if not line.strip():
-            index += 1
-            break
-        if line.lstrip().startswith("-"):
+        if lines[index].strip() not in headings:
+            kept_lines.append(lines[index])
             index += 1
             continue
-        break
-    return "\n".join(lines[index:]).strip()
+
+        index += 1
+        while index < len(lines) and lines[index].lstrip().startswith("-"):
+            index += 1
+        if index < len(lines) and not lines[index].strip():
+            index += 1
+
+    return "\n".join(kept_lines).strip()
 
 
 def _grounding_limit_text(brief_frame: Node3InputBriefFrame) -> str:
@@ -281,12 +285,12 @@ def _grounding_limit_text(brief_frame: Node3InputBriefFrame) -> str:
         brief_frame.r_loop_result_material is not None
         and brief_frame.r_loop_result_material.attitude_hint != "r_loop_sufficient"
     ):
-        return "R route 실험 결과는 skeleton/부분 장부이므로 graph memory 탐색 성공으로 단정하지 않는다."
+        return "R route 실험 결과는 skeleton/부분 장부이므로 graph memory 탐색이 요구 수준에 도달했다고 보지 않는다."
     if (
         brief_frame.vessel_r_material is not None
         and brief_frame.vessel_r_material.r_loop_task_status != "sufficient"
     ):
-        return "Vessel R material이 있어도 R 탐색 상태가 요구 수준에 도달했다고 단정하지 않는다."
+        return "Vessel R material이 있어도 R 탐색이 요구 수준에 도달했다고 보지 않는다."
     if brief_frame.insufficiency_reasons:
         return "자료 부족 신호가 있어 제공된 문서/허용 주장/현재 턴 실행 순서 자료 범위 안에서만 답한다."
     if brief_frame.answer_basis_mode == "absolute_first":

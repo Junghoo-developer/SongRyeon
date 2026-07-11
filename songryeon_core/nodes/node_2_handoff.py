@@ -789,7 +789,7 @@ def record_node3_input_brief(
             "R loop result material은 R return summary 장부에서 복사된 절대 상태이며, R1/R2/R3 의미 판단이 실행됐다는 뜻이 아니다.",
             "Vessel R material은 graph memory 탐색 결과에서 code가 복사한 read-only 재료이며, read_doc 문서나 read_code_file 원문이 아니다.",
             "Vessel R material의 summary_text는 graph memory에 이미 저장된 요약 재료이고, code가 새로 작성한 요약이 아니다.",
-            "Vessel R material status가 present가 아니거나 r_loop_task_status가 sufficient가 아니면 R 탐색 성공으로 단정하지 않는다.",
+            "Vessel R material status가 present가 아니거나 r_loop_task_status가 sufficient가 아니면 R 탐색이 요구 수준에 도달했다고 말하지 않는다.",
         ],
         insufficiency_reasons=insufficiency_reasons,
         source_trace_ids=_unique_strings([*input_trace_ids, *runtime_trace_ids]),
@@ -799,6 +799,20 @@ def record_node3_input_brief(
                 material_policy_frame_id,
                 *source_data_ids,
                 answer_basis_frame_id,
+                *(
+                    answer_basis_frame.source_data_ids
+                    if answer_basis_frame is not None
+                    else []
+                ),
+                *(
+                    [
+                        role.source_data_id
+                        for role in answer_basis_frame.evidence_roles
+                        if role.source_data_id
+                    ]
+                    if answer_basis_frame is not None
+                    else []
+                ),
                 memory_selection_source_data_id,
                 selected_memory_context_source_data_id,
                 document_context_pack_frame_id or None,
@@ -1195,6 +1209,8 @@ def _node3_vessel_r_material_item(
 
     summary_text = ""
     summary_text_char_count = 0
+    raw_text = ""
+    raw_text_char_count = 0
     text_payload_status = "metadata_only"
     if is_summary:
         raw_summary_text = _text(record, "summary_text", fallback="")
@@ -1203,6 +1219,18 @@ def _node3_vessel_r_material_item(
         if not summary_text_char_count and summary_text:
             summary_text_char_count = len(summary_text)
         text_payload_status = "included_summary_text" if summary_text else "metadata_only"
+    elif material_kind == "raw_original":
+        raw_materials = _dict_list(record.get("raw_original_text_materials"))
+        raw_text_parts = [
+            _text(material, "text", fallback="")
+            for material in raw_materials
+            if _text(material, "text", fallback="")
+        ]
+        raw_text = "\n\n".join(raw_text_parts)
+        raw_text_char_count = len(raw_text)
+        text_payload_status = (
+            "included_raw_original_text" if raw_text else "metadata_only"
+        )
 
     # 이 source_data_ids는 사용자에게 보여주기 위한 말 재료가 아니라
     # "이 item이 어떤 graph/data record에서 왔는가"를 추적하기 위한 장부다.
@@ -1217,6 +1245,11 @@ def _node3_vessel_r_material_item(
             *(
                 _string_list(record.get("source_graph_node_ids"))
                 if is_summary
+                else []
+            ),
+            *(
+                _string_list(record.get("raw_original_text_data_ids"))
+                if material_kind == "raw_original"
                 else []
             ),
             _text(record, "target_graph_node_id", fallback="") if is_summary else None,
@@ -1248,6 +1281,8 @@ def _node3_vessel_r_material_item(
         ),
         summary_text=summary_text,
         summary_text_char_count=summary_text_char_count,
+        raw_text=raw_text,
+        raw_text_char_count=raw_text_char_count,
         text_payload_status=text_payload_status,
         source_data_ids=item_source_data_ids,
     )
@@ -1275,6 +1310,9 @@ def _safe_vessel_r_display_name(display_name: str, *, fallback_label: str) -> st
 
 def node3_brief_llm_payload(frame: Node3InputBriefFrame) -> dict[str, object]:
     """내부 ID를 제거한 node_3 LLM용 payload를 만든다."""
+
+    if _node3_uses_vessel_r_focused_payload(frame):
+        return _node3_vessel_r_focused_llm_payload(frame)
 
     raw_document_payloads = _node3_raw_document_payloads(frame)
     omitted_raw_document_payloads = _node3_omitted_raw_document_payloads(frame)
@@ -1542,6 +1580,77 @@ def node3_brief_llm_payload(frame: Node3InputBriefFrame) -> dict[str, object]:
     }
 
 
+def _node3_uses_vessel_r_focused_payload(frame: Node3InputBriefFrame) -> bool:
+    """Vessel R만 실제 말 재료인 턴인지 count와 존재 여부로만 확인한다."""
+
+    material = frame.vessel_r_material
+    return bool(
+        material is not None
+        and material.material_status == "present"
+        and material.material_items
+        and frame.actual_tool_read_doc_count == 0
+        and frame.actual_tool_read_code_file_count == 0
+        and frame.supplied_document_context_count == 0
+        and not frame.source_code_outlines
+        and not frame.document_material_items
+        and not frame.l3_document_summaries
+        and not frame.allowed_claims
+        and not frame.selected_recent_memory_contexts
+    )
+
+
+def _node3_vessel_r_focused_llm_payload(
+    frame: Node3InputBriefFrame,
+) -> dict[str, object]:
+    """R-only 답변에서 빈 문서 장부를 덜고 Vessel 말 재료를 앞에 둔다."""
+
+    return {
+        "user_question": frame.user_question,
+        "brief_status": frame.brief_status,
+        "evidence_source_mode": "vessel_r_focused",
+        "vessel_r_material": _node3_vessel_r_material_llm_payload(
+            frame.vessel_r_material,
+            raw_original_primary=True,
+        ),
+        "r_loop_result": _node3_r_loop_result_llm_payload(
+            frame.r_loop_result_material
+        ),
+        "non_vessel_evidence_counts": {
+            "actual_tool_read_doc_count": frame.actual_tool_read_doc_count,
+            "actual_tool_read_code_file_count": (
+                frame.actual_tool_read_code_file_count
+            ),
+            "supplied_document_context_count": (
+                frame.supplied_document_context_count
+            ),
+            "selected_recent_memory_context_count": len(
+                frame.selected_recent_memory_contexts
+            ),
+        },
+        "answer_basis": {
+            "answer_basis_mode": frame.answer_basis_mode,
+            "basis_reason_codes": list(frame.basis_reason_codes),
+            "mode_selection_reason": frame.mode_selection_reason,
+            "generated_by": frame.answer_basis_generated_by,
+            "info_class": frame.answer_basis_info_class,
+            "semantic_judgement_status": (
+                frame.answer_basis_semantic_judgement_status
+            ),
+        },
+        "reporting_boundaries": [
+            "Answer directly from Vessel R material when it is present.",
+            "Do not describe Vessel R material as read_doc or read_code_file evidence.",
+            "Preserve each material item's info_class when using its summary or raw text.",
+            "Do not expose graph node IDs or internal tracking IDs.",
+            "Zero normal document counts do not erase present Vessel R material.",
+        ],
+        "insufficiency_reasons": list(frame.insufficiency_reasons),
+        "reporter_identity_boundary": (
+            "Speak as SongRyeon's final respondent, not as an internal node."
+        ),
+    }
+
+
 def _node3_r_loop_result_llm_payload(
     material: Node3RLoopResultMaterial | None,
 ) -> dict[str, object]:
@@ -1574,6 +1683,8 @@ def _node3_r_loop_result_llm_payload(
 
 def _node3_vessel_r_material_llm_payload(
     material: Node3VesselRMaterial | None,
+    *,
+    raw_original_primary: bool = False,
 ) -> dict[str, object]:
     if material is None:
         return {
@@ -1581,6 +1692,20 @@ def _node3_vessel_r_material_llm_payload(
             "boundary": "No Vessel R traversal material was supplied to node_3.",
             "items": [],
         }
+    visible_items = list(material.material_items)
+    omitted_auxiliary_summary_count = 0
+    material_delivery_mode = "all_traversal_materials"
+    if raw_original_primary and any(
+        item.material_kind == "raw_original" and item.raw_text
+        for item in visible_items
+    ):
+        omitted_auxiliary_summary_count = sum(
+            1 for item in visible_items if item.material_kind == "summary"
+        )
+        visible_items = [
+            item for item in visible_items if item.material_kind == "raw_original"
+        ]
+        material_delivery_mode = "raw_original_primary"
     return {
         "status": material.material_status,
         "traverse_status": material.traverse_status,
@@ -1590,6 +1715,9 @@ def _node3_vessel_r_material_llm_payload(
         "traversal_path_count": material.traversal_path_count,
         "summary_material_count": material.summary_material_count,
         "raw_original_material_count": material.raw_original_material_count,
+        "material_delivery_mode": material_delivery_mode,
+        "visible_material_count": len(visible_items),
+        "omitted_auxiliary_summary_count": omitted_auxiliary_summary_count,
         "generated_by": material.generated_by,
         "info_class": material.info_class,
         "semantic_judgement_status": material.semantic_judgement_status,
@@ -1618,9 +1746,11 @@ def _node3_vessel_r_material_llm_payload(
                 "generated_by": item.generated_by,
                 "summary_text": _redact_vessel_r_internal_graph_ids(item.summary_text),
                 "summary_text_char_count": item.summary_text_char_count,
+                "raw_text": item.raw_text,
+                "raw_text_char_count": item.raw_text_char_count,
                 "text_payload_status": item.text_payload_status,
             }
-            for item in material.material_items
+            for item in visible_items
         ],
     }
 

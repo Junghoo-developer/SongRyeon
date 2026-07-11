@@ -27,7 +27,8 @@ def test_node1_l_card_separates_fresh_lookup_from_ingested_status_briefing() -> 
     l_best_for = " ".join(str(item) for item in l_card["best_for"])
     l_not_for = " ".join(str(item) for item in l_card["not_for"])
 
-    assert "questions requiring unread project documents or exact source evidence" in l_best_for
+    assert "source evidence not already ingested" in l_best_for
+    assert "latest disk state" in l_best_for
     assert "current or recent development-status briefing" in l_not_for
     assert "already-ingested Vessel graph memory" in l_not_for
 
@@ -40,4 +41,5 @@ def test_node1_prompt_keeps_recent_status_as_evidence_surface_comparison() -> No
     assert "Do not choose by keyword alone" in text
     assert "current/recent SongRyeon Core development status" in text
     assert "already-ingested Vessel graph memory" in text
-    assert "freshly changed files/orders that may not yet be ingested" in text
+    assert "files/orders" in text
+    assert "may be newer than the graph observation" in text

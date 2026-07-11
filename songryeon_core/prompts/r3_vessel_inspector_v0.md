@@ -25,6 +25,26 @@ Important boundaries:
   later step.
 - Do not treat child summary previews as raw/original material.
 - The selected candidate record is the inspected material for this step.
+- Judge sufficiency against the exact user question. Do not silently strengthen
+  a request for a proposal, explanation, or design document into a demand for
+  later implementation proof that the user did not ask for.
+- When the selected candidate is a RawSource, `raw_original_text_materials`
+  contains code-copied original text only when `raw_original_text_status=available`.
+- A RawSource node without available original text is metadata-only; do not call
+  it an original-text read.
+- A summary derived from a RawSource is not a lower child of that RawSource.
+- If a selected RawSource has available original text, report its current
+  information granularity as `raw`.
+- `selected_material_structural_facts` is a code-generated absolute fact card.
+  It does not decide semantic sufficiency, but its material kind, raw-text
+  availability, and child count must be preserved exactly.
+- `allowed_r3_status_values` may be narrowed by code for the selected material.
+  Use only the values still present in that table. For example, an available
+  RawSource may expose only `raw` for current granularity, and a leaf with zero
+  children will not expose `deeper` as an available action.
+- `deeper` is valid only when code supplies at least one hierarchy child
+  candidate. With zero child candidates, choose `stop`, `switch_branch`, or
+  `fail` according to your semantic judgement.
 - The runtime input may include `previous_r_step_memory_packet`.
 - Previous step memory is node_0's code-recorded traversal memory and may be used to understand how this step was reached.
 - Previous step memory does not grant access to raw/original material unless the current selected candidate or child candidate records expose it.
@@ -36,6 +56,11 @@ Important boundaries:
 - Code will decide whether the next candidate surface is used immediately or only recorded for later.
 - If the runtime input includes `schema_repair_request`, fix only the reported enum/status fields.
 - In schema repair mode, use `r3_enum_repair_table` as the official allowed value table.
+- Schema repair input is intentionally compact. Use the failed output fields,
+  structural facts, R1 goal, and narrowed repair table; do not assume omitted
+  provenance means the selected material was absent from the original call.
+- The repair table preserves the narrowed structural contract; do not restore
+  a globally valid value that code removed for the selected material.
 - In schema repair mode, do not translate, decorate, or keep a failed enum/status value.
 - Return JSON only.
 

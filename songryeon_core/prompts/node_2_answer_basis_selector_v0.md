@@ -12,7 +12,7 @@ Choose how node_3 should speak in the final answer. Return only one JSON object:
   "mode_selection_reason_info_class": "mixed",
   "evidence_roles": [
     {
-      "source_data_id": "one supplied source_data_id",
+      "evidence_ref": "E001",
       "evidence_role": "supporting_context",
       "role_reason": "short Korean reason",
       "role_reason_info_class": "mixed"
@@ -50,6 +50,17 @@ Allowed `evidence_role` values:
 - `failed_or_empty`
 - `not_supplied`
 
+Allowed `role_reason_info_class` values are exactly:
+
+- `relative`
+- `mixed`
+
+`role_reason_info_class` describes the semantic reason for assigning an evidence role.
+It does not copy the information class of the source record itself.
+Use `relative` when the role reason is grounded in one specific source.
+Use `mixed` when the role reason uses multiple sources or a source bundle.
+Never use `absolute` or `absolute_status` for an evidence-role reason.
+
 Metainfo education:
 
 - Absolute information is information code, files, trace/data, schema, tool results, or payload fields can check as existing values.
@@ -72,9 +83,14 @@ Rules:
 - Do not create any mode outside the three allowed values.
 - Do not use detailed modes such as `document_primary` or `recent_conversation_primary`.
 - Do not use `llm_mode_selection_failed` unless the runtime explicitly tells you this selection failed.
-- For each `evidence_roles` item, use only a `source_data_id` from the supplied `available_evidence_sources`.
+- For each `evidence_roles` item, use only an `evidence_ref` from the supplied `available_evidence_sources`.
 - If `available_evidence_sources` is supplied, treat it as the exact allowed source table for `evidence_roles`.
-- Use `source_label` and `source_kind` from `available_evidence_sources` to understand the source role, but copy the exact `source_data_id` value.
-- Do not use a `source_data_id` that appears only inside an info sample unless it also appears in `available_evidence_sources`.
+- Use `source_label` and `source_kind` to understand the source role, but copy only the exact `evidence_ref` such as `E001`.
+- Never invent or return a raw source_data_id, info_id, trace_id, frame ID, or file-internal ID.
+- An info sample may contain the same `evidence_ref` as its source table row. Select that ref, not any identifier mentioned inside semantic text.
 - `evidence_roles` are your judgement. They do not make a source semantically true.
+- If `schema_repair_request` is supplied, return one complete corrected JSON object.
+- In schema repair mode, preserve valid semantic choices from `failed_payload` and fix only the reported schema contract failure.
+- Every object in `evidence_roles` must contain all four fields: `evidence_ref`, `evidence_role`, `role_reason`, and `role_reason_info_class`.
+- Schema repair does not authorize an unlisted evidence ref. Choose only from `available_evidence_sources`.
 - Do not expose raw internal IDs in prose intended for the user. This JSON is internal, but keep reasons short and avoid unnecessary ID copying.

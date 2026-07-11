@@ -1,7 +1,7 @@
 ﻿from __future__ import annotations
 
 import re
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 
 from songryeon_core.core.data_store import DataStore
@@ -74,15 +74,15 @@ def run_l3_result_keeper(
     achievement_frame_data_id: str = L3_ACHIEVEMENT_FRAME_DATA_ID,
     target_goal_data_id: str = "L1:goal_frame",
 ) -> TraceEvent:
-    """L3 달성 판단/보존 노드의 규칙 기반 드라이런 실행.
+    """L3 보존, 코드 운영 판정, LLM 의미 적합성 판단을 기록한다.
 
     preserved_frame_data_id / achievement_frame_data_id / target_goal_data_id는
     L루프 실행 회차별 primary ID를 주입하기 위한 값이다. 같은 턴에서 L을 다시
     돌릴 때 L3가 기존 `L3:achievement_frame`을 덮지 않게 만드는 배관이다.
     """
 
-    # 지금은 LLM 판단을 하지 않는다.
-    # 대신 L3가 L1/L2/도구 결과를 받아 어떤 데이터들을 보존했는지 payload로 남긴다.
+    # 후보와 도구 결과는 코드가 보존한다. adapter가 있으면 LLM은 그 재료가
+    # 사용자 요청에 의미상 맞는지만 판단하며, 운영 count와 상태는 다시 쓰지 않는다.
     input_ref = [l1_event.event_id, l2_event.event_id]
     input_ref.extend(extra_input_trace_ids or [])
     source_data_ids = extra_input_data_ids or []
@@ -96,7 +96,7 @@ def run_l3_result_keeper(
     validate_l3_preserved_info_frame(preserved_frame)
     if adapter is not None and data_store is not None:
         try:
-            # LLM 판정 경로와 fallback 코드 판정 경로가 같은 achievement_frame_data_id를 써야 한다.
+            # LLM 의미 판단 경로와 fallback 코드 판정 경로가 같은 achievement_frame_data_id를 써야 한다.
             # 그래야 LLM 실패가 발생해도 scoped ID 계약이 깨지지 않는다.
             achievement_frame = _build_llm_achievement_frame(
                 trace_store=trace_store,
@@ -709,15 +709,11 @@ def _build_llm_achievement_frame(
     achievement_frame_data_id: str,
     target_goal_data_id: str,
 ) -> L3AchievementFrame:
-    """LLM으로 L1 목표 대비 L루프 산출의 달성 여부를 판단한다."""
+    """코드 운영 판정에 LLM의 의미 적합성 판단만 결합한다."""
 
     prompt_ref = "songryeon_core/prompts/l3_result_keeper_v0.md"
     prompt = Path(prompt_ref).read_text(encoding="utf-8")
     l1_goal = _read_l1_goal_frame(data_store=data_store, input_data_ids=input_data_ids)
-    controller_decision = _read_controller_decision(
-        data_store=data_store,
-        final_control_data_id=final_control_data_id,
-    )
     goal_match = _build_goal_match_context(
         user_query=user_query,
         preserved_frame=preserved_frame,
@@ -726,38 +722,52 @@ def _build_llm_achievement_frame(
     read_doc_ids = list(goal_match["read_doc_ids"])
     read_code_file_paths = list(goal_match["read_code_file_paths"])
     search_result_doc_ids = list(goal_match["search_result_doc_ids"])
+    operation_frame = _build_achievement_frame(
+        frame_id=achievement_frame_data_id,
+        turn_id=turn_id,
+        preserved_frame=preserved_frame,
+        input_trace_ids=input_trace_ids,
+        input_data_ids=input_data_ids,
+        data_store=data_store,
+        final_control_data_id=final_control_data_id,
+        user_query=user_query,
+        target_goal_data_id=target_goal_data_id,
+    )
     input_payload = {
         "user_query": user_query,
-        "target_goal_data_id": target_goal_data_id,
-        "l1_goal": l1_goal,
-        "l1_success_requirements": _l1_success_requirements(l1_goal),
+        "l1_goal": _l1_semantic_goal_payload(l1_goal),
         "l3_judgement_contract": _l3_judgement_contract(l1_goal),
-        "controller_decision": controller_decision,
-        "candidate_count": len(preserved_frame.candidates),
-        "evidence_counts": {
-            "preserved_candidate_count": len(preserved_frame.candidates),
-            "unique_search_result_document_count": len(search_result_doc_ids),
-            "read_document_count": len(read_doc_ids),
-            "read_code_file_count": len(read_code_file_paths),
+        "code_operation_status": {
+            "achievement_status": operation_frame.achievement_status,
+            "macro_achievement_status": operation_frame.macro_achievement_status,
+            "micro_achievement_status": operation_frame.micro_achievement_status,
+            "goal_match_status": operation_frame.goal_match_status,
+            "has_read_document_material": bool(read_doc_ids),
+            "has_read_code_material": bool(read_code_file_paths),
+            "has_search_candidates": bool(search_result_doc_ids),
         },
-        "read_doc_ids": read_doc_ids,
-        "read_code_file_paths": read_code_file_paths,
-        "search_result_doc_ids": search_result_doc_ids,
-        "specific_document_request": goal_match,
-        "read_document_previews": _read_doc_previews_from_data_store(data_store),
-        "read_code_file_previews": _read_code_file_previews_from_data_store(data_store),
+        "specific_document_request": _l3_specific_request_semantic_payload(goal_match),
+        "read_document_previews": [
+            {
+                "doc_id": preview.get("doc_id"),
+                "text_preview": preview.get("text_preview"),
+            }
+            for preview in _read_doc_previews_from_data_store(data_store)
+        ],
+        "read_code_file_previews": [
+            {
+                "file_path": preview.get("file_path"),
+                "text_preview": preview.get("text_preview"),
+            }
+            for preview in _read_code_file_previews_from_data_store(data_store)
+        ],
         "candidate_previews": [
             {
-                "candidate_id": candidate.candidate_id,
                 "doc_id": candidate.doc_id,
-                "chunk_id": candidate.chunk_id,
-                "score": candidate.score,
                 "text_preview": candidate.text_preview,
-                "source_data_id": candidate.source_data_id,
             }
             for candidate in preserved_frame.candidates[:5]
         ],
-        "source_data_ids": input_data_ids,
     }
     llm_result = LLMNodeExecutor(adapter).run(
         node_id="L3",
@@ -769,7 +779,7 @@ def _build_llm_achievement_frame(
         prompt_ref=prompt_ref,
         input_ref=input_trace_ids,
         source_data_ids=input_data_ids,
-        payload_validator=_validate_l3_achievement_payload,
+        payload_validator=_validate_l3_semantic_payload,
     )
     if llm_result.failure_type != "none" or llm_result.validation.payload is None:
         raise ValueError(f"L3 LLM result keeper failed: {llm_result.failure_type}")
@@ -786,39 +796,16 @@ def _build_llm_achievement_frame(
             llm_result.call_data_id,
         ]
     )
-    target_macro_goal = str(l1_goal.get("macro_goal") or "")
-    target_micro_goal = str(l1_goal.get("micro_goal") or "")
-    achievement_status = str(payload.get("achievement_status") or "").strip()
-    reason = str(payload.get("reason") or "").strip()
-    macro_status = str(payload.get("macro_achievement_status") or achievement_status).strip()
-    macro_reason = str(payload.get("macro_achievement_reason") or reason).strip()
-    micro_status = str(payload.get("micro_achievement_status") or achievement_status).strip()
-    micro_reason = str(payload.get("micro_achievement_reason") or reason).strip()
     semantic_goal_match_status = str(payload.get("semantic_goal_match_status") or "not_run").strip()
     semantic_goal_match_reason = str(
         payload.get("semantic_goal_match_reason") or "CODE_STATUS:llm_semantic_goal_match_not_run"
     ).strip()
-
-    original_status = achievement_status
-    (
-        achievement_status,
-        reason,
-        macro_status,
-        macro_reason,
-        micro_status,
-        micro_reason,
-    ) = _apply_goal_match_guard(
-        achievement_status=achievement_status,
-        reason=reason,
-        macro_status=macro_status,
-        macro_reason=macro_reason,
-        micro_status=micro_status,
-        micro_reason=micro_reason,
-        goal_match=goal_match,
-    )
-    generation_source = f"LLM:{llm_result.model_id}"
-    if achievement_status != original_status:
-        generation_source = f"{generation_source}+CODE:GOAL_MATCH_GUARD"
+    achievement_status = operation_frame.achievement_status
+    reason = operation_frame.reason
+    macro_status = operation_frame.macro_achievement_status
+    macro_reason = operation_frame.macro_achievement_reason
+    micro_status = operation_frame.micro_achievement_status
+    micro_reason = operation_frame.micro_achievement_reason
     status_before_semantic_guard = achievement_status
     (
         achievement_status,
@@ -837,79 +824,41 @@ def _build_llm_achievement_frame(
         semantic_goal_match_status=semantic_goal_match_status,
         semantic_goal_match_reason=semantic_goal_match_reason,
     )
+    generation_source = (
+        f"{operation_frame.achievement_generation_source}"
+        f"+LLM:{llm_result.model_id}:SEMANTIC_GOAL_MATCH"
+    )
     if achievement_status != status_before_semantic_guard:
         generation_source = f"{generation_source}+CODE:SEMANTIC_GOAL_GUARD"
-    status_before_l1_requirement_guard = achievement_status
-    (
-        achievement_status,
-        reason,
-        macro_status,
-        macro_reason,
-        micro_status,
-        micro_reason,
-    ) = _apply_l1_requirement_count_guard(
-        achievement_status=achievement_status,
-        reason=reason,
-        macro_status=macro_status,
-        macro_reason=macro_reason,
-        micro_status=micro_status,
-        micro_reason=micro_reason,
-        l1_goal=l1_goal,
-        read_document_count=len(read_doc_ids),
-        read_code_file_count=len(read_code_file_paths),
-        source_code_evidence_expected=_source_code_evidence_expected(
-            l1_goal=l1_goal,
-            data_store=data_store,
-            input_data_ids=input_data_ids,
-        ),
-    )
-    if achievement_status != status_before_l1_requirement_guard:
-        generation_source = f"{generation_source}+CODE:L1_REQUIREMENT_COUNT_GUARD"
 
-    return L3AchievementFrame(
-        frame_id=achievement_frame_data_id,
-        turn_id=turn_id,
+    return replace(
+        operation_frame,
         achievement_status=achievement_status,
         reason=reason,
-        target_goal_data_id=target_goal_data_id,
-        preserved_info_frame_id=preserved_frame.frame_id,
-        candidate_count=len(preserved_frame.candidates),
         evidence_trace_ids=_unique_strings(frame_source_trace_ids),
         evidence_data_ids=frame_source_data_ids,
         source_trace_ids=_unique_strings(frame_source_trace_ids),
         source_data_ids=frame_source_data_ids,
-        final_control_data_id=final_control_data_id,
-        controller_decision=controller_decision,
         achievement_generation_source=generation_source,
         llm_semantic_judgement_status="ran",
-        target_macro_goal=target_macro_goal,
-        target_micro_goal=target_micro_goal,
         macro_achievement_status=macro_status,
         macro_achievement_reason=macro_reason,
         micro_achievement_status=micro_status,
         micro_achievement_reason=micro_reason,
-        requested_doc_hint=str(goal_match["requested_doc_hint"]),
-        read_doc_ids=list(goal_match["read_doc_ids"]),
-        read_code_file_paths=list(goal_match["read_code_file_paths"]),
-        actual_read_code_file_count=len(goal_match["read_code_file_paths"]),
-        search_result_doc_ids=list(goal_match["search_result_doc_ids"]),
-        goal_match_status=str(goal_match["goal_match_status"]),
-        goal_match_reason=str(goal_match["goal_match_reason"]),
         semantic_goal_match_status=semantic_goal_match_status,
         semantic_goal_match_reason=semantic_goal_match_reason,
     )
 
 
-def _l1_success_requirements(l1_goal: dict[str, object]) -> dict[str, object]:
-    """L3가 L1 목표를 판정할 때 우선 확인해야 할 구조화 요구사항."""
+def _l1_semantic_goal_payload(l1_goal: dict[str, object]) -> dict[str, object]:
+    """L3 의미 판단에 필요한 목표 문장만 넘기고 예산 숫자는 제외한다."""
 
     return {
+        "macro_goal": str(l1_goal.get("macro_goal") or ""),
+        "micro_goal": str(l1_goal.get("micro_goal") or ""),
         "evidence_requirement_kind": str(
             l1_goal.get("evidence_requirement_kind") or "unspecified"
         ),
-        "minimum_read_documents": l1_goal.get("minimum_read_documents")
-        if isinstance(l1_goal.get("minimum_read_documents"), int)
-        else 0,
         "requires_cross_document_analysis": bool(
             l1_goal.get("requires_cross_document_analysis")
         ),
@@ -917,6 +866,25 @@ def _l1_success_requirements(l1_goal: dict[str, object]) -> dict[str, object]:
         "l_loop_success_condition": str(
             l1_goal.get("l_loop_success_condition") or ""
         ),
+    }
+
+
+def _l3_specific_request_semantic_payload(
+    goal_match: dict[str, object],
+) -> dict[str, object]:
+    """특정 문서 대응의 code 상태와 사람이 읽을 이름만 의미 판단에 제공한다."""
+
+    return {
+        "requested_doc_hint": str(goal_match.get("requested_doc_hint") or ""),
+        "requested_doc_hint_source": str(
+            goal_match.get("requested_doc_hint_source") or "none"
+        ),
+        "goal_match_status": str(
+            goal_match.get("goal_match_status") or "not_applicable"
+        ),
+        "goal_match_reason": str(goal_match.get("goal_match_reason") or ""),
+        "read_doc_ids": list(goal_match.get("read_doc_ids") or []),
+        "read_code_file_paths": list(goal_match.get("read_code_file_paths") or []),
     }
 
 
@@ -938,35 +906,15 @@ def _l3_judgement_contract(l1_goal: dict[str, object]) -> list[str]:
     return contract
 
 
-def _validate_l3_achievement_payload(payload: dict[str, object]) -> None:
-    frame = L3AchievementFrame(
-        frame_id=L3_ACHIEVEMENT_FRAME_DATA_ID,
-        turn_id="validation_turn",
-        achievement_status=str(payload.get("achievement_status") or "").strip(),
-        reason=str(payload.get("reason") or "").strip(),
-        target_goal_data_id="L1:goal_frame",
-        preserved_info_frame_id=L3_PRESERVED_FRAME_DATA_ID,
-        candidate_count=0,
-        evidence_trace_ids=["validation_trace"],
-        evidence_data_ids=["validation_data"],
-        source_trace_ids=["validation_trace"],
-        source_data_ids=["validation_data"],
-        achievement_generation_source="LLM:validation-model",
-        llm_semantic_judgement_status="ran",
-        macro_achievement_status=str(payload.get("macro_achievement_status") or payload.get("achievement_status") or "").strip(),
-        macro_achievement_reason=str(payload.get("macro_achievement_reason") or payload.get("reason") or "").strip(),
-        micro_achievement_status=str(payload.get("micro_achievement_status") or payload.get("achievement_status") or "").strip(),
-        micro_achievement_reason=str(payload.get("micro_achievement_reason") or payload.get("reason") or "").strip(),
-        goal_match_status=str(payload.get("goal_match_status") or "not_applicable").strip(),
-        goal_match_reason=str(
-            payload.get("goal_match_reason") or "CODE_STATUS:no_specific_doc_hint_detected"
-        ).strip(),
-        semantic_goal_match_status=str(payload.get("semantic_goal_match_status") or "not_run").strip(),
-        semantic_goal_match_reason=str(
-            payload.get("semantic_goal_match_reason") or "CODE_STATUS:llm_semantic_goal_match_not_run"
-        ).strip(),
-    )
-    validate_l3_achievement_frame(frame)
+def _validate_l3_semantic_payload(payload: dict[str, object]) -> None:
+    """Qwen L3가 생성할 수 있는 의미 적합성 필드만 검증한다."""
+
+    status = str(payload.get("semantic_goal_match_status") or "").strip()
+    reason = str(payload.get("semantic_goal_match_reason") or "").strip()
+    if status not in {"matched", "partial", "missing", "not_run"}:
+        raise ValueError("unknown L3 semantic_goal_match_status")
+    if status != "not_run" and not reason:
+        raise ValueError("L3 semantic_goal_match_reason must not be empty")
 
 
 def _extract_search_candidates(
@@ -1083,7 +1031,15 @@ def _build_goal_match_context(
 ) -> dict[str, object]:
     """사용자가 특정 문서를 요구했는지와 실제 L루프 산출이 맞았는지 코드로 대조한다."""
 
-    requested_doc_hint = _extract_requested_doc_hint(user_query)
+    explicit_artifact_hint = _explicit_artifact_requested_doc_hint(data_store)
+    requested_doc_hint = explicit_artifact_hint or _extract_requested_doc_hint(user_query)
+    requested_doc_hint_source = (
+        "explicit_artifact_reference_frame"
+        if explicit_artifact_hint
+        else "user_query_syntax"
+        if requested_doc_hint
+        else "none"
+    )
     read_doc_ids = _read_doc_ids_from_data_store(data_store)
     read_code_file_paths = _read_code_file_paths_from_data_store(data_store)
     search_result_doc_ids = _unique_strings(
@@ -1093,6 +1049,7 @@ def _build_goal_match_context(
     if not requested_doc_hint:
         return {
             "requested_doc_hint": "",
+            "requested_doc_hint_source": requested_doc_hint_source,
             "read_doc_ids": read_doc_ids,
             "read_code_file_paths": read_code_file_paths,
             "search_result_doc_ids": search_result_doc_ids,
@@ -1103,6 +1060,7 @@ def _build_goal_match_context(
     if any(_doc_matches_hint(doc_id, requested_doc_hint) for doc_id in read_doc_ids):
         return {
             "requested_doc_hint": requested_doc_hint,
+            "requested_doc_hint_source": requested_doc_hint_source,
             "read_doc_ids": read_doc_ids,
             "read_code_file_paths": read_code_file_paths,
             "search_result_doc_ids": search_result_doc_ids,
@@ -1113,6 +1071,7 @@ def _build_goal_match_context(
     if any(_doc_matches_hint(file_path, requested_doc_hint) for file_path in read_code_file_paths):
         return {
             "requested_doc_hint": requested_doc_hint,
+            "requested_doc_hint_source": requested_doc_hint_source,
             "read_doc_ids": read_doc_ids,
             "read_code_file_paths": read_code_file_paths,
             "search_result_doc_ids": search_result_doc_ids,
@@ -1123,6 +1082,7 @@ def _build_goal_match_context(
     if any(_doc_matches_hint(doc_id, requested_doc_hint) for doc_id in search_result_doc_ids):
         return {
             "requested_doc_hint": requested_doc_hint,
+            "requested_doc_hint_source": requested_doc_hint_source,
             "read_doc_ids": read_doc_ids,
             "read_code_file_paths": read_code_file_paths,
             "search_result_doc_ids": search_result_doc_ids,
@@ -1133,6 +1093,7 @@ def _build_goal_match_context(
     if read_doc_ids or read_code_file_paths or search_result_doc_ids:
         return {
             "requested_doc_hint": requested_doc_hint,
+            "requested_doc_hint_source": requested_doc_hint_source,
             "read_doc_ids": read_doc_ids,
             "read_code_file_paths": read_code_file_paths,
             "search_result_doc_ids": search_result_doc_ids,
@@ -1142,6 +1103,7 @@ def _build_goal_match_context(
 
     return {
         "requested_doc_hint": requested_doc_hint,
+        "requested_doc_hint_source": requested_doc_hint_source,
         "read_doc_ids": read_doc_ids,
         "read_code_file_paths": read_code_file_paths,
         "search_result_doc_ids": search_result_doc_ids,
@@ -1322,6 +1284,34 @@ def _extract_requested_doc_hint(text: str) -> str:
     if token_match:
         return _clean_doc_hint(token_match.group(1))
 
+    return ""
+
+
+def _explicit_artifact_requested_doc_hint(data_store: DataStore | None) -> str:
+    """명시 문서 resolver가 남긴 절대 좌표를 L3 목표 대조에 재사용한다."""
+
+    if data_store is None:
+        return ""
+
+    for record in reversed(data_store.list_records()):
+        if record.data_type != "node_output:explicit_artifact_reference_frame":
+            continue
+        payload = record.payload
+        if not isinstance(payload, dict):
+            continue
+        resolved_references = payload.get("resolved_references")
+        if not isinstance(resolved_references, list):
+            continue
+        for item in resolved_references:
+            if not isinstance(item, dict):
+                continue
+            selected_doc_id = item.get("selected_doc_id")
+            if item.get("resolve_status") == "unique" and isinstance(selected_doc_id, str) and selected_doc_id:
+                return selected_doc_id
+            for key in ("normalized_ref", "raw_ref"):
+                value = item.get(key)
+                if isinstance(value, str) and value:
+                    return value
     return ""
 
 

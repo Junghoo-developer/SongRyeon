@@ -26,7 +26,7 @@ _ARTIFACT_REF_RE = re.compile(
     r"(?<![A-Za-z0-9_./\\-])"
     r"(?:Administrative_Reform_1[/\\])?"
     r"(?:[A-Za-z0-9_.-]+[/\\])*"
-    r"ORDER_\d{3}(?:_[A-Za-z0-9]+)*(?:\.md)?"
+    r"ORDER(?:_|\s+)\d{3}(?:_[A-Za-z0-9]+)*(?:\.md)?"
     r"(?![A-Za-z0-9_./\\-])",
     re.IGNORECASE,
 )
@@ -131,7 +131,10 @@ def build_explicit_artifact_reference_frame(
     refs = extract_explicit_artifact_references(user_text)
     resolved: list[ExplicitArtifactResolvedReference] = []
     for index, raw_ref in enumerate(refs, start=1):
-        payload = read_artifact(root=document_root, artifact_ref=raw_ref)
+        # 사용자가 쓴 표기는 그대로 보존하되, resolver에는 저장소의 실제 ORDER 파일
+        # 이름과 맞는 표준 표기(ORDER_090)를 넘긴다.
+        resolver_ref = _canonical_explicit_artifact_ref(raw_ref)
+        payload = read_artifact(root=document_root, artifact_ref=resolver_ref)
         status = str(payload.get("match_status") or "not_found")
         if status == "invalid_ref":
             resolve_status = "invalid_ref"
@@ -145,7 +148,7 @@ def build_explicit_artifact_reference_frame(
         resolved.append(
             ExplicitArtifactResolvedReference(
                 raw_ref=raw_ref,
-                normalized_ref=_normalize_ref(raw_ref),
+                normalized_ref=_normalize_ref(resolver_ref),
                 occurrence_index=index,
                 resolve_status=resolve_status,
                 candidate_count=_int(payload.get("candidate_count")),
@@ -457,6 +460,12 @@ def _normalize_ref(raw_ref: str) -> str:
     normalized = normalized.strip().strip("/")
     normalized = normalized.removeprefix("Administrative_Reform_1/")
     return normalized.lower()
+
+
+def _canonical_explicit_artifact_ref(raw_ref: str) -> str:
+    """사람이 쓴 ``ORDER 090``을 파일명 표기 ``ORDER_090``으로만 정규화한다."""
+
+    return re.sub(r"(?i)\bORDER\s+(\d{3})\b", r"ORDER_\1", str(raw_ref or ""))
 
 
 def _document_name(doc_id: str) -> str:

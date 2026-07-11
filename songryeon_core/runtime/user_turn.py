@@ -5,6 +5,11 @@ from pathlib import Path
 
 from songryeon_core.core.schemas import TurnStateCapsule
 from songryeon_core.llm.fake import SongRyeonAllNodesFakeLLMAdapter
+from songryeon_core.llm.codex_sdk_adapter import (
+    DEFAULT_CODEX_SDK_MODEL_ID,
+    DEFAULT_CODEX_SDK_REASONING_EFFORT,
+    CodexSDKAdapter,
+)
 from songryeon_core.loops.r_loop_vessel_one_step import RLoopVesselTraverseFakeLLMAdapter
 from songryeon_core.llm.runtime import (
     build_llm_adapter,
@@ -23,6 +28,25 @@ from songryeon_core.nodes.node_1_router import ROUTER_FALLBACK_POLICY_QWEN_STRIC
 from songryeon_core.runtime.dry_run import run_dry_turn
 from songryeon_core.runtime.live_trace import make_live_trace_sink
 from songryeon_core.runtime.replay import replay_run
+
+
+DEFAULT_HYBRID_QWEN_MODEL_ID = "qwen3:14b"
+DEFAULT_HYBRID_CODEX_MODEL_ID = "gpt-5.6-sol"
+HYBRID_NODE_ALLOCATION_POLICY = "qwen_worker_codex_node3_node4_v1"
+HYBRID_QWEN_NODES = (
+    "node_1_router",
+    "memory_relevance_selector",
+    "L1_goal",
+    "L_tool_scope",
+    "L2_query_planner",
+    "L3_result_keeper",
+    "node_2_metainfo_boundary",
+    "Vessel_R",
+)
+HYBRID_CODEX_NODES = (
+    "node_3_reporter",
+    "node_4_gatekeeper",
+)
 
 
 def run_fake_user_turn(
@@ -245,6 +269,437 @@ def run_qwen_user_turn(
         export_dir=export_dir,
         include_data_records=include_data_records,
     )
+
+
+def run_openai_user_turn(
+    *,
+    user_input: str,
+    model_id: str | None = None,
+    timeout_seconds: int | None = None,
+    reasoning_effort: str | None = None,
+    max_output_tokens: int | None = None,
+    export_dir: str | Path | None = None,
+    max_tool_calls: int = DEFAULT_MAX_TOOL_CALLS,
+    search_top_k: int = DEFAULT_SEARCH_TOP_K,
+    max_query_attempts: int = DEFAULT_MAX_QUERY_ATTEMPTS,
+    max_query_candidates: int | None = None,
+    max_read_doc_calls: int = DEFAULT_MAX_READ_DOC_CALLS,
+    max_input_chars: int = DEFAULT_MAX_INPUT_CHARS,
+    max_document_context_chars: int = DEFAULT_MAX_DOCUMENT_CONTEXT_CHARS,
+    include_data_records: bool = False,
+    force_l_route: bool = False,
+    force_vessel_r_route: bool = False,
+    same_turn_l_reroute_enabled: bool = False,
+    max_l_runs_per_turn: int = 1,
+    enable_r_route_experimental: bool = False,
+    enable_vessel_r_route: bool = False,
+    vessel_r_uri: str | None = None,
+    vessel_r_user: str | None = None,
+    vessel_r_password: str | None = None,
+    vessel_r_database: str | None = None,
+    vessel_r_allow_no_auth: bool = False,
+    vessel_r_limit: int = 50,
+    vessel_r_max_node_reads: int = 6,
+    vessel_r_max_raw_original_material_reads: int = 5,
+    vessel_r_driver_factory_for_test: object | None = None,
+    live_trace: bool = False,
+    turn_id: str | None = None,
+    previous_turn_capsules: list[TurnStateCapsule] | None = None,
+    recent_raw_conversation: list[dict[str, str]] | None = None,
+) -> dict[str, object]:
+    """외부 OpenAI/Codex adapter 하나를 송련의 모든 LLM 노드에 주입한다."""
+
+    config = build_llm_runtime_config(
+        mode="openai",
+        model_id=model_id,
+        timeout_seconds=timeout_seconds,
+        reasoning_effort=reasoning_effort,
+        max_output_tokens=max_output_tokens,
+    )
+    runtime = llm_runtime_status(config)
+    if not config.api_key_configured:
+        return {
+            "status": "skipped",
+            "reason": "openai_api_key_missing",
+            "runtime": runtime,
+            "user_input": user_input,
+        }
+    adapter = build_llm_adapter(config)
+    if adapter is None:
+        return {
+            "status": "skipped",
+            "reason": "adapter_missing",
+            "runtime": runtime,
+            "user_input": user_input,
+        }
+
+    try:
+        result = run_dry_turn(
+            user_input=user_input,
+            turn_id=turn_id,
+            node_1_router_adapter=adapter,
+            memory_relevance_selector_adapter=adapter,
+            l1_goal_adapter=adapter,
+            l_tool_scope_adapter=adapter,
+            l2_query_planner_adapter=adapter,
+            l3_result_adapter=adapter,
+            node_2_boundary_adapter=adapter,
+            node_3_reporter_adapter=adapter,
+            node_4_gatekeeper_adapter=adapter,
+            export_dir=str(export_dir) if export_dir is not None else None,
+            max_tool_calls=max_tool_calls,
+            search_top_k=search_top_k,
+            max_query_attempts=max_query_attempts,
+            max_query_candidates=max_query_candidates,
+            max_read_doc_calls=max_read_doc_calls,
+            max_input_chars=max_input_chars,
+            max_document_context_chars=max_document_context_chars,
+            force_l_route=force_l_route,
+            force_vessel_r_route=force_vessel_r_route,
+            same_turn_l_reroute_enabled=same_turn_l_reroute_enabled,
+            max_l_runs_per_turn=max_l_runs_per_turn,
+            enable_r_route_experimental=enable_r_route_experimental,
+            enable_vessel_r_route=enable_vessel_r_route or force_vessel_r_route,
+            vessel_r_adapter=adapter if enable_vessel_r_route or force_vessel_r_route else None,
+            vessel_r_uri=vessel_r_uri,
+            vessel_r_user=vessel_r_user,
+            vessel_r_password=vessel_r_password,
+            vessel_r_database=vessel_r_database,
+            vessel_r_allow_no_auth=vessel_r_allow_no_auth,
+            vessel_r_limit=vessel_r_limit,
+            vessel_r_max_node_reads=vessel_r_max_node_reads,
+            vessel_r_max_raw_original_material_reads=(
+                vessel_r_max_raw_original_material_reads
+            ),
+            vessel_r_driver_factory_for_test=vessel_r_driver_factory_for_test,
+            allow_node_1_router_fallback=False,
+            node_1_router_fallback_policy=ROUTER_FALLBACK_POLICY_QWEN_STRICT_BLOCKED,
+            previous_turn_capsules=previous_turn_capsules,
+            recent_raw_conversation=recent_raw_conversation,
+            live_trace_sink=make_live_trace_sink(enabled=live_trace),
+        )
+    except Exception as exc:
+        _attach_adapter_usage(runtime, adapter)
+        diagnostics = _structure_failure_diagnostics(exc)
+        return {
+            "status": "structure_failed",
+            "reason": exc.__class__.__name__,
+            "error": str(exc),
+            **diagnostics,
+            "runtime": runtime,
+            "user_input": user_input,
+        }
+
+    _attach_adapter_usage(runtime, adapter)
+    return _turn_response(
+        status=_status_from_result(result),
+        runtime=runtime,
+        result=result,
+        export_dir=export_dir,
+        include_data_records=include_data_records,
+    )
+
+
+def _attach_adapter_usage(runtime: dict[str, object], adapter: object) -> None:
+    usage_snapshot = getattr(adapter, "usage_snapshot", None)
+    if callable(usage_snapshot):
+        runtime["api_usage"] = usage_snapshot()
+
+
+def run_codex_sdk_user_turn(
+    *,
+    user_input: str,
+    model_id: str = DEFAULT_CODEX_SDK_MODEL_ID,
+    reasoning_effort: str = DEFAULT_CODEX_SDK_REASONING_EFFORT,
+    codex_bin: str | None = None,
+    export_dir: str | Path | None = None,
+    max_tool_calls: int = DEFAULT_MAX_TOOL_CALLS,
+    search_top_k: int = DEFAULT_SEARCH_TOP_K,
+    max_query_attempts: int = DEFAULT_MAX_QUERY_ATTEMPTS,
+    max_query_candidates: int | None = None,
+    max_read_doc_calls: int = DEFAULT_MAX_READ_DOC_CALLS,
+    max_input_chars: int = DEFAULT_MAX_INPUT_CHARS,
+    max_document_context_chars: int = DEFAULT_MAX_DOCUMENT_CONTEXT_CHARS,
+    include_data_records: bool = False,
+    force_l_route: bool = False,
+    force_vessel_r_route: bool = False,
+    same_turn_l_reroute_enabled: bool = False,
+    max_l_runs_per_turn: int = 1,
+    enable_r_route_experimental: bool = False,
+    enable_vessel_r_route: bool = False,
+    vessel_r_uri: str | None = None,
+    vessel_r_user: str | None = None,
+    vessel_r_password: str | None = None,
+    vessel_r_database: str | None = None,
+    vessel_r_allow_no_auth: bool = False,
+    vessel_r_limit: int = 50,
+    vessel_r_max_node_reads: int = 6,
+    vessel_r_max_raw_original_material_reads: int = 5,
+    vessel_r_driver_factory_for_test: object | None = None,
+    live_trace: bool = False,
+    turn_id: str | None = None,
+    previous_turn_capsules: list[TurnStateCapsule] | None = None,
+    recent_raw_conversation: list[dict[str, str]] | None = None,
+) -> dict[str, object]:
+    """ChatGPT 인증 Codex SDK를 기존 송련 LLM node 경계 전체에 주입한다."""
+
+    runtime: dict[str, object] = {
+        "mode": "codex_sdk",
+        "model_id": model_id,
+        "transport": "codex_sdk_app_server",
+        "auth_policy": "chatgpt_subscription_required",
+        "reasoning_effort": reasoning_effort,
+        "sandbox": "read-only",
+        "approval_mode": "deny_all",
+        "api_key_forwarded": False,
+        "enabled": True,
+        "adapter_kind": "codex_sdk",
+    }
+    adapter = CodexSDKAdapter(
+        model_id=model_id,
+        reasoning_effort=reasoning_effort,
+        codex_bin=codex_bin,
+    )
+    runtime["codex_bin_source"] = getattr(
+        adapter,
+        "codex_bin_source",
+        "unknown",
+    )
+    try:
+        try:
+            result = run_dry_turn(
+                user_input=user_input,
+                turn_id=turn_id,
+                node_1_router_adapter=adapter,
+                memory_relevance_selector_adapter=adapter,
+                l1_goal_adapter=adapter,
+                l_tool_scope_adapter=adapter,
+                l2_query_planner_adapter=adapter,
+                l3_result_adapter=adapter,
+                node_2_boundary_adapter=adapter,
+                node_3_reporter_adapter=adapter,
+                node_4_gatekeeper_adapter=adapter,
+                export_dir=str(export_dir) if export_dir is not None else None,
+                max_tool_calls=max_tool_calls,
+                search_top_k=search_top_k,
+                max_query_attempts=max_query_attempts,
+                max_query_candidates=max_query_candidates,
+                max_read_doc_calls=max_read_doc_calls,
+                max_input_chars=max_input_chars,
+                max_document_context_chars=max_document_context_chars,
+                force_l_route=force_l_route,
+                force_vessel_r_route=force_vessel_r_route,
+                same_turn_l_reroute_enabled=same_turn_l_reroute_enabled,
+                max_l_runs_per_turn=max_l_runs_per_turn,
+                enable_r_route_experimental=enable_r_route_experimental,
+                enable_vessel_r_route=enable_vessel_r_route or force_vessel_r_route,
+                vessel_r_adapter=(
+                    adapter if enable_vessel_r_route or force_vessel_r_route else None
+                ),
+                vessel_r_uri=vessel_r_uri,
+                vessel_r_user=vessel_r_user,
+                vessel_r_password=vessel_r_password,
+                vessel_r_database=vessel_r_database,
+                vessel_r_allow_no_auth=vessel_r_allow_no_auth,
+                vessel_r_limit=vessel_r_limit,
+                vessel_r_max_node_reads=vessel_r_max_node_reads,
+                vessel_r_max_raw_original_material_reads=(
+                    vessel_r_max_raw_original_material_reads
+                ),
+                vessel_r_driver_factory_for_test=vessel_r_driver_factory_for_test,
+                allow_node_1_router_fallback=False,
+                node_1_router_fallback_policy=ROUTER_FALLBACK_POLICY_QWEN_STRICT_BLOCKED,
+                previous_turn_capsules=previous_turn_capsules,
+                recent_raw_conversation=recent_raw_conversation,
+                live_trace_sink=make_live_trace_sink(enabled=live_trace),
+            )
+        except Exception as exc:
+            _attach_adapter_usage(runtime, adapter)
+            diagnostics = _structure_failure_diagnostics(exc)
+            return {
+                "status": "structure_failed",
+                "reason": exc.__class__.__name__,
+                "error": str(exc),
+                **diagnostics,
+                "runtime": runtime,
+                "user_input": user_input,
+            }
+
+        _attach_adapter_usage(runtime, adapter)
+        return _turn_response(
+            status=_status_from_result(result),
+            runtime=runtime,
+            result=result,
+            export_dir=export_dir,
+            include_data_records=include_data_records,
+        )
+    finally:
+        adapter.close()
+
+
+def run_qwen_codex_hybrid_user_turn(
+    *,
+    user_input: str,
+    qwen_endpoint: str | None = None,
+    qwen_model_id: str = DEFAULT_HYBRID_QWEN_MODEL_ID,
+    qwen_timeout_seconds: int | None = None,
+    codex_model_id: str = DEFAULT_HYBRID_CODEX_MODEL_ID,
+    codex_reasoning_effort: str = DEFAULT_CODEX_SDK_REASONING_EFFORT,
+    codex_bin: str | None = None,
+    export_dir: str | Path | None = None,
+    max_tool_calls: int = DEFAULT_MAX_TOOL_CALLS,
+    search_top_k: int = DEFAULT_SEARCH_TOP_K,
+    max_query_attempts: int = DEFAULT_MAX_QUERY_ATTEMPTS,
+    max_query_candidates: int | None = None,
+    max_read_doc_calls: int = DEFAULT_MAX_READ_DOC_CALLS,
+    max_input_chars: int = DEFAULT_MAX_INPUT_CHARS,
+    max_document_context_chars: int = DEFAULT_MAX_DOCUMENT_CONTEXT_CHARS,
+    include_data_records: bool = False,
+    force_l_route: bool = False,
+    force_vessel_r_route: bool = False,
+    same_turn_l_reroute_enabled: bool = False,
+    max_l_runs_per_turn: int = 1,
+    enable_r_route_experimental: bool = False,
+    enable_vessel_r_route: bool = False,
+    vessel_r_uri: str | None = None,
+    vessel_r_user: str | None = None,
+    vessel_r_password: str | None = None,
+    vessel_r_database: str | None = None,
+    vessel_r_allow_no_auth: bool = False,
+    vessel_r_limit: int = 50,
+    vessel_r_max_node_reads: int = 6,
+    vessel_r_max_raw_original_material_reads: int = 5,
+    vessel_r_driver_factory_for_test: object | None = None,
+    live_trace: bool = False,
+    turn_id: str | None = None,
+    previous_turn_capsules: list[TurnStateCapsule] | None = None,
+    recent_raw_conversation: list[dict[str, str]] | None = None,
+) -> dict[str, object]:
+    """Qwen은 현장 판단을, Codex는 최종 보고·검사를 맡는 혼합 턴을 실행한다."""
+
+    qwen_config = build_llm_runtime_config(
+        mode="qwen",
+        endpoint=qwen_endpoint,
+        model_id=qwen_model_id,
+        timeout_seconds=qwen_timeout_seconds,
+    )
+    selected_endpoint = (
+        qwen_endpoint
+        if qwen_endpoint is not None
+        else os.environ.get("QWEN_LOCAL_ENDPOINT")
+    )
+    qwen_adapter = build_llm_adapter(qwen_config, endpoint=selected_endpoint)
+    runtime: dict[str, object] = {
+        "mode": "qwen_codex_hybrid",
+        "model_id": f"{qwen_config.model_id}+{codex_model_id}",
+        "worker_model_id": qwen_config.model_id,
+        "judgement_model_id": codex_model_id,
+        "final_report_gate_model_id": codex_model_id,
+        "worker_transport": qwen_config.transport,
+        "judgement_transport": "codex_sdk_app_server",
+        "node_allocation_policy": HYBRID_NODE_ALLOCATION_POLICY,
+        "qwen_nodes": list(HYBRID_QWEN_NODES),
+        "codex_nodes": list(HYBRID_CODEX_NODES),
+        "auth_policy": "chatgpt_subscription_required_for_codex",
+        "reasoning_effort": codex_reasoning_effort,
+        "sandbox": "read-only",
+        "approval_mode": "deny_all",
+        "api_key_forwarded": False,
+        "enabled": True,
+        "adapter_kind": "qwen_codex_hybrid",
+    }
+    if qwen_adapter is None:
+        return {
+            "status": "skipped",
+            "reason": "qwen_adapter_missing",
+            "runtime": runtime,
+            "user_input": user_input,
+        }
+
+    codex_adapter = CodexSDKAdapter(
+        model_id=codex_model_id,
+        reasoning_effort=codex_reasoning_effort,
+        codex_bin=codex_bin,
+    )
+    runtime["codex_bin_source"] = getattr(
+        codex_adapter,
+        "codex_bin_source",
+        "unknown",
+    )
+    try:
+        try:
+            result = run_dry_turn(
+                user_input=user_input,
+                turn_id=turn_id,
+                node_1_router_adapter=qwen_adapter,
+                memory_relevance_selector_adapter=qwen_adapter,
+                l1_goal_adapter=qwen_adapter,
+                l_tool_scope_adapter=qwen_adapter,
+                l2_query_planner_adapter=qwen_adapter,
+                l3_result_adapter=qwen_adapter,
+                node_2_boundary_adapter=qwen_adapter,
+                node_3_reporter_adapter=codex_adapter,
+                node_4_gatekeeper_adapter=codex_adapter,
+                export_dir=str(export_dir) if export_dir is not None else None,
+                max_tool_calls=max_tool_calls,
+                search_top_k=search_top_k,
+                max_query_attempts=max_query_attempts,
+                max_query_candidates=max_query_candidates,
+                max_read_doc_calls=max_read_doc_calls,
+                max_input_chars=max_input_chars,
+                max_document_context_chars=max_document_context_chars,
+                force_l_route=force_l_route,
+                force_vessel_r_route=force_vessel_r_route,
+                same_turn_l_reroute_enabled=same_turn_l_reroute_enabled,
+                max_l_runs_per_turn=max_l_runs_per_turn,
+                enable_r_route_experimental=enable_r_route_experimental,
+                enable_vessel_r_route=enable_vessel_r_route or force_vessel_r_route,
+                vessel_r_adapter=(
+                    qwen_adapter
+                    if enable_vessel_r_route or force_vessel_r_route
+                    else None
+                ),
+                vessel_r_uri=vessel_r_uri,
+                vessel_r_user=vessel_r_user,
+                vessel_r_password=vessel_r_password,
+                vessel_r_database=vessel_r_database,
+                vessel_r_allow_no_auth=vessel_r_allow_no_auth,
+                vessel_r_limit=vessel_r_limit,
+                vessel_r_max_node_reads=vessel_r_max_node_reads,
+                vessel_r_max_raw_original_material_reads=(
+                    vessel_r_max_raw_original_material_reads
+                ),
+                vessel_r_driver_factory_for_test=vessel_r_driver_factory_for_test,
+                allow_node_1_router_fallback=False,
+                node_1_router_fallback_policy=(
+                    ROUTER_FALLBACK_POLICY_QWEN_STRICT_BLOCKED
+                ),
+                previous_turn_capsules=previous_turn_capsules,
+                recent_raw_conversation=recent_raw_conversation,
+                live_trace_sink=make_live_trace_sink(enabled=live_trace),
+            )
+        except Exception as exc:
+            _attach_adapter_usage(runtime, codex_adapter)
+            diagnostics = _structure_failure_diagnostics(exc)
+            return {
+                "status": "structure_failed",
+                "reason": exc.__class__.__name__,
+                "error": str(exc),
+                **diagnostics,
+                "runtime": runtime,
+                "user_input": user_input,
+            }
+
+        _attach_adapter_usage(runtime, codex_adapter)
+        return _turn_response(
+            status=_status_from_result(result),
+            runtime=runtime,
+            result=result,
+            export_dir=export_dir,
+            include_data_records=include_data_records,
+        )
+    finally:
+        codex_adapter.close()
 
 
 def _turn_response(

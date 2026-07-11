@@ -155,6 +155,8 @@ class RLoopVesselTraverseResultFrame:
     terminal_material_seen_count: int
     min_terminal_material_count: int
     raw_original_material_seen_count: int
+    raw_original_node_selected_count: int
+    raw_original_text_read_count: int
     max_raw_original_material_count: int
     raw_original_read_cap_reached: bool
     early_stop_guard_trigger_count: int
@@ -191,6 +193,10 @@ class RLoopVesselStepMemoryPacketFrame:
     selected_source_leaf_count: int
     selected_is_terminal_material: bool
     selected_is_raw_original_material: bool
+    selected_raw_original_text_status: str
+    selected_raw_original_text_data_ids: list[str]
+    selected_raw_original_text_char_count: int
+    selected_has_raw_original_text: bool
     visible_child_candidate_node_ids: list[str]
     visible_child_candidate_count: int
     visible_child_candidate_records: list[dict[str, object]] = field(default_factory=list)
@@ -207,6 +213,8 @@ class RLoopVesselStepMemoryPacketFrame:
     remaining_traversal_depth: int = 0
     terminal_material_seen_count: int = 0
     raw_original_material_seen_count: int = 0
+    raw_original_node_selected_count: int = 0
+    raw_original_text_read_count: int = 0
     raw_original_read_cap_reached: bool = False
     raw_original_candidate_node_ids: list[str] = field(default_factory=list)
     source_trace_ids: list[str] = field(default_factory=list)
@@ -537,6 +545,8 @@ def run_r_loop_vessel_one_step(
             payload,
             read_packet=read_packet,
             user_question=user_question,
+            max_traversal_depth=R_ONE_STEP_MAX_TRAVERSAL_DEPTH,
+            max_node_reads=R_ONE_STEP_MAX_NODE_READS,
         ),
     )
     _append_llm_refs(r1_result, llm_call_data_ids, trace_event_ids)
@@ -1002,6 +1012,8 @@ def run_r_loop_vessel_traverse(
     previous_step_memory_packet: RLoopVesselStepMemoryPacketFrame | None = None
     terminal_material_seen_count = 0
     raw_original_material_seen_count = 0
+    raw_original_node_selected_count = 0
+    raw_original_text_read_count = 0
     raw_original_read_cap_reached = False
     early_stop_guard_trigger_count = 0
 
@@ -1027,6 +1039,8 @@ def run_r_loop_vessel_traverse(
             payload,
             read_packet=read_packet,
             user_question=user_question,
+            max_traversal_depth=max_traversal_depth,
+            max_node_reads=max_node_reads,
         ),
     )
     _append_llm_refs(r1_result, llm_call_data_ids, trace_event_ids)
@@ -1230,6 +1244,7 @@ def run_r_loop_vessel_traverse(
         selected_record = _selected_candidate_record(read_packet, r2.selected_graph_node_id)
         selected_is_terminal_material = _is_terminal_material_record(selected_record)
         selected_is_raw_original_material = _is_raw_original_material_record(selected_record)
+        selected_has_raw_original_text = _has_raw_original_text_material(selected_record)
         r3_result, r3_attempt_results = _run_r3_with_schema_repair(
             executor=executor,
             user_question=user_question,
@@ -1299,9 +1314,12 @@ def run_r_loop_vessel_traverse(
             terminal_material_seen_count += 1
         if selected_is_raw_original_material:
             raw_original_material_seen_count += 1
+            raw_original_node_selected_count += 1
             raw_original_read_cap_reached = (
                 raw_original_material_seen_count >= max_raw_original_material_reads
             )
+        if selected_has_raw_original_text:
+            raw_original_text_read_count += 1
         _record_frame(
             trace_store=trace_store,
             data_store=data_store,
@@ -1362,9 +1380,21 @@ def run_r_loop_vessel_traverse(
             continuation=final_continuation,
             graph_surface=graph_surface,
             terminal_material_seen_count=terminal_material_seen_count,
-            min_terminal_material_count=R_TRAVERSE_MIN_TERMINAL_MATERIAL_READS,
+            min_terminal_material_count=final_budget.min_terminal_material_count,
         ):
             final_continuation = _terminal_material_guard_continuation_frame(
+                frame_id=final_continuation.frame_id,
+                r3=r3,
+                budget=final_budget,
+                source_trace_ids=_unique_strings([*source_trace_ids, *trace_event_ids]),
+            )
+            early_stop_guard_trigger_count += 1
+        if _should_force_deeper_for_minimum_budget(
+            continuation=final_continuation,
+            graph_surface=graph_surface,
+            budget=final_budget,
+        ):
+            final_continuation = _minimum_budget_guard_continuation_frame(
                 frame_id=final_continuation.frame_id,
                 r3=r3,
                 budget=final_budget,
@@ -1419,9 +1449,12 @@ def run_r_loop_vessel_traverse(
             continuation=final_continuation,
             selected_is_terminal_material=selected_is_terminal_material,
             selected_is_raw_original_material=selected_is_raw_original_material,
+            selected_has_raw_original_text=selected_has_raw_original_text,
             promoted_next_candidate_graph_node_ids=promoted_candidate_ids,
             terminal_material_seen_count=terminal_material_seen_count,
             raw_original_material_seen_count=raw_original_material_seen_count,
+            raw_original_node_selected_count=raw_original_node_selected_count,
+            raw_original_text_read_count=raw_original_text_read_count,
             raw_original_read_cap_reached=raw_original_read_cap_reached,
             source_trace_ids=_unique_strings([*source_trace_ids, *trace_event_ids]),
             trace_event_ids=trace_event_ids,
@@ -1550,8 +1583,10 @@ def run_r_loop_vessel_traverse(
         source_data_ids=base_source_data_ids,
         source_trace_ids=_unique_strings([*source_trace_ids, *trace_event_ids]),
         terminal_material_seen_count=terminal_material_seen_count,
-        min_terminal_material_count=R_TRAVERSE_MIN_TERMINAL_MATERIAL_READS,
+        min_terminal_material_count=r1.min_terminal_material_count,
         raw_original_material_seen_count=raw_original_material_seen_count,
+        raw_original_node_selected_count=raw_original_node_selected_count,
+        raw_original_text_read_count=raw_original_text_read_count,
         max_raw_original_material_count=max_raw_original_material_reads,
         raw_original_read_cap_reached=raw_original_read_cap_reached,
         early_stop_guard_trigger_count=early_stop_guard_trigger_count,
@@ -1613,12 +1648,145 @@ def _r1_input_payload(
             "max_node_reads": max_node_reads,
             "max_context_tokens": max_context_tokens,
         },
+        "hierarchy_primer": _r1_hierarchy_primer(read_packet),
+        "minimum_budget_contract": {
+            "purpose": (
+                "R1 may set minimum traversal requirements so R3 cannot stop "
+                "at a high navigation layer before enough graph material is inspected."
+            ),
+            "output_fields": [
+                "min_traversal_depth",
+                "min_node_reads",
+                "min_terminal_material_count",
+            ],
+            "bounds": {
+                "min_traversal_depth": f"0..{max_traversal_depth}",
+                "min_node_reads": f"0..{max_node_reads}",
+                "min_terminal_material_count": f"0..{max_node_reads}",
+            },
+            "meaning": {
+                "min_traversal_depth": "Minimum graph levels that should be inspected before accepting stop_sufficient.",
+                "min_node_reads": "Minimum selected/inspected graph nodes before accepting stop_sufficient.",
+                "min_terminal_material_count": "Minimum terminal material nodes, such as summary/raw material, before accepting stop_sufficient.",
+            },
+        },
         "candidate_text_visibility_policy": (
             "R1 does not receive candidate IDs, summary text, or summary previews. "
             "R1 must copy user_question_anchor.anchor_id exactly into user_question_anchor_id "
             "and set graph_search_goal from the user question plus packet-level counts only."
         ),
         "source_data_ids": [read_packet.packet_id],
+    }
+
+
+def _r1_hierarchy_primer(read_packet: RLoopVesselReadPacketFrame) -> dict[str, object]:
+    return {
+        "visibility": "structure_only_without_candidate_ids_or_content",
+        "concept": (
+            "Graph traversal usually starts high and moves downward. Higher layers are map/navigation layers; "
+            "lower layers are closer to actual summary or raw source material."
+        ),
+        "typical_layers": [
+            {
+                "layer": "CoreEgo",
+                "role": "root entry point",
+                "usually_terminal_material": False,
+            },
+            {
+                "layer": "TimeAxis",
+                "role": "time-order map",
+                "usually_terminal_material": False,
+            },
+            {
+                "layer": "SourceIngestBundle",
+                "role": "source ingest time bundle",
+                "usually_terminal_material": False,
+            },
+            {
+                "layer": "SourceKindBundle",
+                "role": "source type branch, such as code or internal document",
+                "usually_terminal_material": False,
+            },
+            {
+                "layer": "TokenBudgetSummary",
+                "role": "token-sized summary bundle",
+                "usually_terminal_material": True,
+            },
+            {
+                "layer": "SourceLeafSummaryOrRawSource",
+                "role": "material closest to one source leaf or original",
+                "usually_terminal_material": True,
+            },
+        ],
+        "packet_counts": {
+            "entry_candidate_count": read_packet.entry_candidate_count,
+            "summary_candidate_count": read_packet.summary_candidate_count,
+            "summary_count_by_depth": read_packet.summary_count_by_depth,
+            "summary_count_by_data_kind": read_packet.summary_count_by_data_kind,
+        },
+    }
+
+
+def _r2_continuation_work_order(
+    *,
+    candidate_layer_surface: RLoopVesselCandidateLayerSurfaceFrame,
+    previous_step_memory_packet: RLoopVesselStepMemoryPacketFrame | None,
+) -> dict[str, object]:
+    if previous_step_memory_packet is None:
+        has_candidates = candidate_layer_surface.total_candidate_count > 0
+        return {
+            "work_order_status": "entry_selection",
+            "stop_allowed": not has_candidates,
+            "none_selected_allowed": not has_candidates,
+            "candidate_count": candidate_layer_surface.total_candidate_count,
+            "reason_code": (
+                "CODE_STATUS:r2_entry_candidates_require_selection"
+                if has_candidates
+                else "CODE_STATUS:r2_entry_candidates_empty"
+            ),
+            "next_selection_task": (
+                "select one official entry candidate for R3 inspection"
+                if has_candidates
+                else "return none_selected because no official entry candidate exists"
+            ),
+            "boundary": (
+                "This work order depends only on whether code supplied entry candidates. "
+                "It does not assume a TimeAxis and does not choose among future axes."
+            ),
+        }
+
+    previous_continuation_requires_selection = (
+        previous_step_memory_packet.continuation_status
+        in {"continue_deeper", "continue_switch_branch"}
+    )
+    has_candidates = candidate_layer_surface.total_candidate_count > 0
+    stop_allowed = not (previous_continuation_requires_selection and has_candidates)
+    return {
+        "work_order_status": "continuation",
+        "previous_step_index": previous_step_memory_packet.step_index,
+        "previous_inspected_graph_node_id": previous_step_memory_packet.inspected_graph_node_id,
+        "previous_selected_node_kind": previous_step_memory_packet.selected_node_kind,
+        "previous_r3_recommended_next_action": (
+            previous_step_memory_packet.r3_recommended_next_action
+        ),
+        "previous_continuation_status": previous_step_memory_packet.continuation_status,
+        "candidate_count": candidate_layer_surface.total_candidate_count,
+        "stop_allowed": stop_allowed,
+        "none_selected_allowed": not has_candidates or stop_allowed,
+        "reason_code": (
+            "CODE_STATUS:r_loop_continuation_requires_selection"
+            if previous_continuation_requires_selection and has_candidates
+            else "CODE_STATUS:r2_continuation_selection_optional"
+        ),
+        "next_selection_task": (
+            "select one current official candidate row for R3 inspection"
+            if previous_continuation_requires_selection and has_candidates
+            else "select a compatible candidate, or none_selected if no candidate is suitable"
+        ),
+        "boundary": (
+            "This work order follows the effective code-recorded continuation state "
+            "and current candidate counts. It does not choose the candidate."
+        ),
     }
 
 
@@ -1635,6 +1803,11 @@ def _r2_input_payload(
 ) -> dict[str, object]:
     selection_ref_map = _r2_selection_ref_map(read_packet, candidate_layer_surface)
     payload = {
+        "official_selection_table": selection_ref_map["official_selection_table"],
+        "continuation_work_order": _r2_continuation_work_order(
+            candidate_layer_surface=candidate_layer_surface,
+            previous_step_memory_packet=previous_step_memory_packet,
+        ),
         "user_question": user_question,
         "r1_goal": asdict(r1),
         "read_packet_id": read_packet.packet_id,
@@ -1650,10 +1823,13 @@ def _r2_input_payload(
             "no_free_text": True,
         },
         "selection_ref_contract": {
+            "official_table_source": "official_selection_table",
             "surface_output_field": "selected_surface_ref",
             "node_output_field": "selected_node_ref",
-            "surface_ref_source": "available_surface_refs",
-            "node_ref_source": "candidate_records_by_surface_ref[*][*].node_ref",
+            "surface_ref_source": "official_selection_table.allowed_surface_refs",
+            "node_ref_source": (
+                "official_selection_table.allowed_node_refs_by_surface_ref[selected_surface_ref]"
+            ),
             "actual_graph_ids_hidden_from_r2": True,
             "current_graph_node_id": current_graph_node_id,
             "first_step_policy": traversal_policy,
@@ -1661,7 +1837,9 @@ def _r2_input_payload(
         "source_data_ids": [read_packet.packet_id, r1.frame_id, candidate_layer_surface.frame_id],
     }
     if previous_step_memory_packet is not None:
-        payload["previous_r_step_memory_packet"] = asdict(previous_step_memory_packet)
+        payload["previous_r_step_memory_packet"] = _r_step_memory_llm_view(
+            previous_step_memory_packet
+        )
         payload["source_data_ids"] = _unique_strings(
             [
                 *payload["source_data_ids"],  # type: ignore[list-item]
@@ -1712,6 +1890,7 @@ def _run_r2_with_schema_repair(
             payload,
             available_graph_node_ids=available_graph_node_ids,
             candidate_layer_surface=candidate_layer_surface,
+            input_contract_payload=base_payload,
         )
 
     first_result = executor.run(
@@ -1769,6 +1948,8 @@ def _should_repair_r2_schema_failure(result: LLMNodeExecutionResult) -> bool:
             "selected_surface_id",
             "selected_graph_node_id",
             "expected_information_granularity",
+            "continuation_work_order",
+            "none_selected",
         )
     )
 
@@ -1818,7 +1999,79 @@ def _r2_copy_repair_table(
     *,
     failed_payload: dict[str, object] | None = None,
 ) -> dict[str, object]:
-    records_by_surface = base_payload.get("candidate_records_by_surface_ref")
+    node_refs_by_surface = _r2_allowed_node_refs_by_surface_from_payload(base_payload)
+    return {
+        "official_selection_table": base_payload.get("official_selection_table"),
+        "continuation_work_order": base_payload.get("continuation_work_order"),
+        "allowed_surface_refs": _r2_allowed_surface_refs_from_payload(base_payload),
+        "allowed_node_refs_by_surface_ref": node_refs_by_surface,
+        "preserve_failed_selection_refs": _valid_failed_selection_refs_for_repair(
+            failed_payload=failed_payload,
+            node_refs_by_surface=node_refs_by_surface,
+        ),
+        "allowed_information_granularity_values": base_payload.get(
+            "allowed_information_granularity_values"
+        ),
+        "safe_output_defaults": {
+            "expected_information_granularity": _safe_r2_repair_granularity_default(
+                base_payload
+            ),
+            "boundary": (
+                "This conservative enum default is for schema repair only. "
+                "It does not choose the graph candidate."
+            ),
+        },
+        "repair_output_contract": {
+            "selected_surface_ref": "copy one allowed_surface_refs value, or null for none_selected",
+            "selected_node_ref": "copy one node ref under selected_surface_ref, or null for none_selected",
+            "expected_information_granularity": (
+                "copy safe_output_defaults.expected_information_granularity exactly"
+            ),
+        },
+    }
+
+
+def _safe_r2_repair_granularity_default(base_payload: dict[str, object]) -> str:
+    values = base_payload.get("allowed_information_granularity_values")
+    if isinstance(values, list):
+        allowed = [value for value in values if isinstance(value, str) and value]
+        if "unknown" in allowed:
+            return "unknown"
+        if allowed:
+            return allowed[0]
+    return "unknown"
+
+
+def _r2_allowed_surface_refs_from_payload(payload: dict[str, object]) -> list[str]:
+    table = payload.get("official_selection_table")
+    if isinstance(table, dict):
+        values = table.get("allowed_surface_refs")
+        if isinstance(values, list):
+            return [value for value in values if isinstance(value, str) and value]
+    values = payload.get("available_surface_refs")
+    if isinstance(values, list):
+        return [value for value in values if isinstance(value, str) and value]
+    return []
+
+
+def _r2_allowed_node_refs_by_surface_from_payload(
+    payload: dict[str, object],
+) -> dict[str, list[str]]:
+    table = payload.get("official_selection_table")
+    if isinstance(table, dict):
+        values = table.get("allowed_node_refs_by_surface_ref")
+        if isinstance(values, dict):
+            return {
+                surface_ref: [
+                    node_ref
+                    for node_ref in node_refs
+                    if isinstance(node_ref, str) and node_ref
+                ]
+                for surface_ref, node_refs in values.items()
+                if isinstance(surface_ref, str) and isinstance(node_refs, list)
+            }
+
+    records_by_surface = payload.get("candidate_records_by_surface_ref")
     node_refs_by_surface: dict[str, list[str]] = {}
     if isinstance(records_by_surface, dict):
         for surface_ref, records in records_by_surface.items():
@@ -1832,24 +2085,7 @@ def _r2_copy_repair_table(
                 if isinstance(node_ref, str) and node_ref:
                     refs.append(node_ref)
             node_refs_by_surface[surface_ref] = refs
-    return {
-        "allowed_surface_refs": base_payload.get("available_surface_refs"),
-        "allowed_node_refs_by_surface_ref": node_refs_by_surface,
-        "preserve_failed_selection_refs": _valid_failed_selection_refs_for_repair(
-            failed_payload=failed_payload,
-            node_refs_by_surface=node_refs_by_surface,
-        ),
-        "allowed_information_granularity_values": base_payload.get(
-            "allowed_information_granularity_values"
-        ),
-        "repair_output_contract": {
-            "selected_surface_ref": "copy one allowed_surface_refs value, or null for none_selected",
-            "selected_node_ref": "copy one node ref under selected_surface_ref, or null for none_selected",
-            "expected_information_granularity": (
-                "copy one allowed_information_granularity_values value"
-            ),
-        },
-    }
+    return node_refs_by_surface
 
 
 def _valid_failed_selection_refs_for_repair(
@@ -1889,10 +2125,38 @@ def _r3_input_payload(
     selected_record: dict[str, object],
     previous_step_memory_packet: RLoopVesselStepMemoryPacketFrame | None = None,
 ) -> dict[str, object]:
+    structural_status_values = _r3_allowed_status_values_for_selected_record(
+        selected_record
+    )
+    structural_facts = _r3_structural_material_facts(selected_record)
+    if (
+        structural_facts["raw_original_text_available"] is True
+        and structural_facts["hierarchy_child_candidate_count"] == 0
+    ):
+        payload = {
+            "user_question": user_question,
+            "selected_candidate_record": _r3_selected_raw_source_record_view(
+                selected_record
+            ),
+            "selected_material_structural_facts": structural_facts,
+            "r1_goal": _r1_raw_material_goal_llm_view(r1),
+            "allowed_r3_status_values": structural_status_values,
+            "r3_decision_boundary": {
+                "semantic_question": (
+                    "Decide whether the supplied original text is sufficient for the "
+                    "exact user question and R1 goal."
+                ),
+                "do_not_strengthen_user_request": True,
+                "code_does_not_decide_semantic_sufficiency": True,
+            },
+        }
+        if previous_step_memory_packet is not None:
+            payload["previous_r_step_memory_packet"] = (
+                _r_step_memory_raw_material_llm_view(previous_step_memory_packet)
+            )
+        return payload
     payload = {
         "user_question": user_question,
-        "r1_goal": asdict(r1),
-        "r2_selection": asdict(r2),
         "selected_candidate_record": _r3_selected_candidate_record_view(selected_record),
         "known_child_node_ids": _candidate_child_node_ids(selected_record),
         "hierarchy_child_candidate_records": _hierarchy_child_candidate_record_views(selected_record),
@@ -1900,6 +2164,9 @@ def _r3_input_payload(
             _selected_record_child_records(selected_record)
         ),
         "hierarchy_child_candidate_count": len(_candidate_child_node_ids(selected_record)),
+        "selected_material_structural_facts": structural_facts,
+        "r1_goal": _r1_goal_llm_view(r1),
+        "r2_selection": _r2_selection_llm_view(r2),
         "hierarchy_read_policy": {
             "child_candidates_generated_by": "CODE:R_VESSEL_HIERARCHY_CHILD_CANDIDATE_BUILDER",
             "child_candidates_info_class": "absolute",
@@ -1911,7 +2178,7 @@ def _r3_input_payload(
             "llm_may_judge_sufficiency": True,
             "llm_must_not_invent_child_ids": True,
         },
-        "allowed_r3_status_values": _r3_allowed_status_values(),
+        "allowed_r3_status_values": structural_status_values,
         "r3_status_contract": {
             "current_information_granularity": "copy exactly from allowed_r3_status_values.current_information_granularity",
             "sufficiency_status": "copy exactly from allowed_r3_status_values.sufficiency_status",
@@ -1923,7 +2190,9 @@ def _r3_input_payload(
         "source_data_ids": [r1.frame_id, r2.frame_id, _record_node_id(selected_record)],
     }
     if previous_step_memory_packet is not None:
-        payload["previous_r_step_memory_packet"] = asdict(previous_step_memory_packet)
+        payload["previous_r_step_memory_packet"] = _r_step_memory_llm_view(
+            previous_step_memory_packet
+        )
         payload["source_data_ids"] = _unique_strings(
             [
                 *payload["source_data_ids"],  # type: ignore[list-item]
@@ -1931,6 +2200,85 @@ def _r3_input_payload(
             ]
         )
     return payload
+
+
+def _r1_goal_llm_view(r1: R1GraphGoalFrame) -> dict[str, object]:
+    return {
+        "frame_id": r1.frame_id,
+        "graph_search_goal": r1.graph_search_goal,
+        "required_information_granularity": r1.required_information_granularity,
+        "allowed_summary_depth": r1.allowed_summary_depth,
+        "max_traversal_depth": r1.max_traversal_depth,
+        "max_branch_switches": r1.max_branch_switches,
+        "max_node_reads": r1.max_node_reads,
+        "max_context_tokens": r1.max_context_tokens,
+        "min_traversal_depth": r1.min_traversal_depth,
+        "min_node_reads": r1.min_node_reads,
+        "min_terminal_material_count": r1.min_terminal_material_count,
+        "stop_condition": r1.stop_condition,
+        "user_question_anchor_id": r1.user_question_anchor_id,
+        "generated_by": r1.generated_by,
+        "info_class": r1.info_class,
+        "semantic_judgement_status": r1.semantic_judgement_status,
+    }
+
+
+def _r1_raw_material_goal_llm_view(r1: R1GraphGoalFrame) -> dict[str, object]:
+    return {
+        "graph_search_goal": r1.graph_search_goal,
+        "required_information_granularity": r1.required_information_granularity,
+        "stop_condition": r1.stop_condition,
+    }
+
+
+def _r2_selection_llm_view(r2: R2GraphNodeSelectionFrame) -> dict[str, object]:
+    return {
+        "frame_id": r2.frame_id,
+        "selection_scope": r2.selection_scope,
+        "selection_status": r2.selection_status,
+        "selected_graph_node_id": r2.selected_graph_node_id,
+        "selection_reason": r2.selection_reason,
+        "expected_information_granularity": r2.expected_information_granularity,
+        "expected_source_kind": r2.expected_source_kind,
+        "source_r1_goal_frame_id": r2.source_r1_goal_frame_id,
+        "generated_by": r2.generated_by,
+        "info_class": r2.info_class,
+        "semantic_judgement_status": r2.semantic_judgement_status,
+    }
+
+
+def _r_step_memory_llm_view(
+    packet: RLoopVesselStepMemoryPacketFrame,
+) -> dict[str, object]:
+    return {
+        "packet_id": packet.packet_id,
+        "step_index": packet.step_index,
+        "selected_graph_node_id": packet.selected_graph_node_id,
+        "inspected_graph_node_id": packet.inspected_graph_node_id,
+        "selected_node_kind": packet.selected_node_kind,
+        "selected_summary_depth": packet.selected_summary_depth,
+        "selected_is_terminal_material": packet.selected_is_terminal_material,
+        "selected_is_raw_original_material": packet.selected_is_raw_original_material,
+        "selected_raw_original_text_status": packet.selected_raw_original_text_status,
+        "selected_has_raw_original_text": packet.selected_has_raw_original_text,
+        "promoted_next_candidate_graph_node_ids": list(
+            packet.promoted_next_candidate_graph_node_ids
+        ),
+        "r3_current_information_granularity": (
+            packet.r3_current_information_granularity
+        ),
+        "r3_sufficiency_status": packet.r3_sufficiency_status,
+        "r3_granularity_problem_status": packet.r3_granularity_problem_status,
+        "r3_branch_problem_status": packet.r3_branch_problem_status,
+        "r3_recommended_next_action": packet.r3_recommended_next_action,
+        "continuation_status": packet.continuation_status,
+        "continuation_reason_code": packet.continuation_reason_code,
+        "remaining_node_reads": packet.remaining_node_reads,
+        "remaining_traversal_depth": packet.remaining_traversal_depth,
+        "terminal_material_seen_count": packet.terminal_material_seen_count,
+        "raw_original_node_selected_count": packet.raw_original_node_selected_count,
+        "raw_original_text_read_count": packet.raw_original_text_read_count,
+    }
 
 
 def _run_r3_with_schema_repair(
@@ -1972,7 +2320,10 @@ def _run_r3_with_schema_repair(
         prompt_ref=R3_VESSEL_INSPECTOR_PROMPT_REF,
         input_ref=input_ref,
         source_data_ids=effective_source_data_ids,
-        payload_validator=_validate_r3_payload,
+        payload_validator=lambda payload: _validate_r3_payload(
+            payload,
+            input_contract_payload=base_payload,
+        ),
     )
     attempt_results = [first_result]
     if not _should_repair_r3_schema_failure(first_result):
@@ -1995,7 +2346,10 @@ def _run_r3_with_schema_repair(
         source_data_ids=_unique_strings(
             [*effective_source_data_ids, first_result.call_data_id]
         ),
-        payload_validator=_validate_r3_payload,
+        payload_validator=lambda payload: _validate_r3_payload(
+            payload,
+            input_contract_payload=repair_payload,
+        ),
     )
     attempt_results.append(repair_result)
     return repair_result, attempt_results
@@ -2027,7 +2381,20 @@ def _r3_schema_repair_input_payload(
     failed_payload: dict[str, object] | None,
     failure_reason: str | None,
 ) -> dict[str, object]:
-    payload = dict(base_payload)
+    supplied_status_values = base_payload.get("allowed_r3_status_values")
+    repair_table = (
+        supplied_status_values
+        if isinstance(supplied_status_values, dict)
+        else _r3_allowed_status_values()
+    )
+    payload = {
+        "user_question": base_payload.get("user_question"),
+        "selected_material_structural_facts": base_payload.get(
+            "selected_material_structural_facts", {}
+        ),
+        "r1_goal": base_payload.get("r1_goal", {}),
+        "allowed_r3_status_values": repair_table,
+    }
     payload["schema_repair_request"] = {
         "repair_status": "requested",
         "max_repair_attempts": R3_SCHEMA_REPAIR_MAX_ATTEMPTS,
@@ -2039,7 +2406,7 @@ def _r3_schema_repair_input_payload(
         ),
         "failed_output_fields": _r3_failed_output_fields(failed_payload),
     }
-    payload["r3_enum_repair_table"] = _r3_allowed_status_values()
+    payload["r3_enum_repair_table"] = repair_table
     return payload
 
 
@@ -2066,6 +2433,57 @@ def _r3_allowed_status_values() -> dict[str, list[str]]:
         "granularity_problem_status": list(R3_GRANULARITY_PROBLEM_STATUS_VALUES),
         "branch_problem_status": list(R3_BRANCH_PROBLEM_STATUS_VALUES),
         "recommended_next_action": list(R3_RECOMMENDED_NEXT_ACTION_VALUES),
+    }
+
+
+def _r3_allowed_status_values_for_selected_record(
+    selected_record: dict[str, object],
+) -> dict[str, list[str]]:
+    """코드가 확정한 재료 구조에 맞춰 R3가 고를 수 있는 상태값만 남긴다."""
+
+    values = _r3_allowed_status_values()
+    facts = _r3_structural_material_facts(selected_record)
+    if facts["raw_original_text_available"] is True:
+        values["current_information_granularity"] = ["raw"]
+    if facts["hierarchy_child_candidate_count"] == 0:
+        values["recommended_next_action"] = [
+            value
+            for value in values["recommended_next_action"]
+            if value != "deeper"
+        ]
+    return values
+
+
+def _r3_structural_material_facts(
+    selected_record: dict[str, object],
+) -> dict[str, object]:
+    """의미 판단 없이 현재 선택 재료의 검증 가능한 구조 사실만 만든다."""
+
+    raw_text_char_count = selected_record.get("raw_original_text_char_count")
+    raw_text_available = (
+        selected_record.get("node_kind") == "raw_source"
+        and selected_record.get("raw_original_text_status") == "available"
+        and isinstance(raw_text_char_count, int)
+        and raw_text_char_count > 0
+    )
+    child_count = len(_candidate_child_node_ids(selected_record))
+    return {
+        "selected_node_kind": selected_record.get("node_kind"),
+        "raw_original_text_status": selected_record.get(
+            "raw_original_text_status"
+        ),
+        "raw_original_text_char_count": (
+            raw_text_char_count if isinstance(raw_text_char_count, int) else 0
+        ),
+        "raw_original_text_available": raw_text_available,
+        "hierarchy_child_candidate_count": child_count,
+        "current_information_granularity_constraint": (
+            "raw" if raw_text_available else "not_structurally_fixed"
+        ),
+        "deeper_action_available": child_count > 0,
+        "generated_by": "CODE:R3_SELECTED_MATERIAL_STRUCTURAL_FACT_BUILDER",
+        "info_class": "absolute",
+        "semantic_judgement_status": "not_run",
     }
 
 
@@ -2097,6 +2515,8 @@ def _validate_r1_payload(
     *,
     read_packet: RLoopVesselReadPacketFrame,
     user_question: str,
+    max_traversal_depth: int,
+    max_node_reads: int,
 ) -> None:
     granularity = _payload_text(payload, "required_information_granularity")
     if granularity not in {"raw", "low_summary", "medium_summary", "high_summary", "unknown"}:
@@ -2111,6 +2531,21 @@ def _validate_r1_payload(
         raise ValueError("R1 graph_search_goal must not be empty")
     if not _payload_text(payload, "stop_condition"):
         raise ValueError("R1 stop_condition must not be empty")
+    min_traversal_depth = _payload_int(payload, "min_traversal_depth")
+    min_node_reads = _payload_int(payload, "min_node_reads")
+    min_terminal_material_count = _payload_int(payload, "min_terminal_material_count")
+    if min_traversal_depth < 0:
+        raise ValueError("R1 min_traversal_depth must not be negative")
+    if min_node_reads < 0:
+        raise ValueError("R1 min_node_reads must not be negative")
+    if min_terminal_material_count < 0:
+        raise ValueError("R1 min_terminal_material_count must not be negative")
+    if min_traversal_depth > max_traversal_depth:
+        raise ValueError("R1 min_traversal_depth must not exceed traversal max")
+    if min_node_reads > max_node_reads:
+        raise ValueError("R1 min_node_reads must not exceed node read max")
+    if min_terminal_material_count > max_node_reads:
+        raise ValueError("R1 min_terminal_material_count must not exceed node read max")
     expected_anchor_id = _user_question_anchor_id(user_question)
     if _payload_text(payload, "user_question_anchor_id") != expected_anchor_id:
         raise ValueError("R1 user_question_anchor_id must copy the supplied user question anchor")
@@ -2121,6 +2556,7 @@ def _validate_r2_payload(
     *,
     available_graph_node_ids: list[str],
     candidate_layer_surface: RLoopVesselCandidateLayerSurfaceFrame,
+    input_contract_payload: dict[str, object] | None = None,
 ) -> None:
     selection_ref_map = _r2_selection_ref_map_from_surface(candidate_layer_surface)
     status = _payload_text(payload, "selection_status")
@@ -2152,6 +2588,10 @@ def _validate_r2_payload(
         surface_candidate_ids = _surface_candidate_ids(candidate_layer_surface, selected_surface_id)
         if selected_id not in surface_candidate_ids:
             raise ValueError("R2 selected_graph_node_id must belong to selected_surface_id")
+    elif _r2_none_selected_forbidden_by_work_order(
+        input_contract_payload if input_contract_payload is not None else payload
+    ):
+        raise ValueError("R2 none_selected is forbidden by continuation_work_order")
     elif selected_id is not None or selected_node_ref is not None:
         raise ValueError("none_selected R2 payload must set selected_node_ref to null")
     elif selected_surface_id is not None or selected_surface_ref is not None:
@@ -2165,7 +2605,27 @@ def _validate_r2_payload(
         raise ValueError("R2 expected_source_kind must not be empty")
 
 
-def _validate_r3_payload(payload: dict[str, object]) -> None:
+def _r2_none_selected_forbidden_by_work_order(payload: dict[str, object]) -> bool:
+    work_order = payload.get("continuation_work_order")
+    if not isinstance(work_order, dict):
+        return False
+    if work_order.get("none_selected_allowed") is not False:
+        return False
+    candidate_count = work_order.get("candidate_count")
+    if not isinstance(candidate_count, int) or candidate_count <= 0:
+        return False
+    official_table = payload.get("official_selection_table")
+    if not isinstance(official_table, dict):
+        return False
+    candidate_rows = official_table.get("candidate_rows")
+    return isinstance(candidate_rows, list) and bool(candidate_rows)
+
+
+def _validate_r3_payload(
+    payload: dict[str, object],
+    *,
+    input_contract_payload: dict[str, object] | None = None,
+) -> None:
     if _payload_text(payload, "current_information_granularity") not in set(
         R_INFORMATION_GRANULARITY_ENUM_VALUES
     ):
@@ -2188,6 +2648,49 @@ def _validate_r3_payload(payload: dict[str, object]) -> None:
         raise ValueError("R3 recommended_next_action is invalid")
     if not _payload_text(payload, "inspection_reason"):
         raise ValueError("R3 inspection_reason must not be empty")
+    input_contract_payload = input_contract_payload or {}
+    narrowed_status_values = input_contract_payload.get("allowed_r3_status_values")
+    if isinstance(narrowed_status_values, dict):
+        for field_name in (
+            "current_information_granularity",
+            "sufficiency_status",
+            "granularity_problem_status",
+            "branch_problem_status",
+            "recommended_next_action",
+        ):
+            allowed_values = narrowed_status_values.get(field_name)
+            if (
+                isinstance(allowed_values, list)
+                and allowed_values
+                and _payload_text(payload, field_name) not in set(allowed_values)
+            ):
+                raise ValueError(
+                    f"R3 {field_name} violates code-supplied structural status contract"
+                )
+    child_count = input_contract_payload.get("hierarchy_child_candidate_count")
+    if (
+        isinstance(child_count, int)
+        and child_count <= 0
+        and _payload_text(payload, "recommended_next_action") == "deeper"
+    ):
+        raise ValueError(
+            "R3 recommended_next_action=deeper requires an actionable child candidate"
+        )
+    selected_record = input_contract_payload.get("selected_candidate_record")
+    if isinstance(selected_record, dict):
+        raw_text_available = (
+            selected_record.get("node_kind") == "raw_source"
+            and selected_record.get("raw_original_text_status") == "available"
+            and isinstance(selected_record.get("raw_original_text_char_count"), int)
+            and int(selected_record["raw_original_text_char_count"]) > 0
+        )
+        if (
+            raw_text_available
+            and _payload_text(payload, "current_information_granularity") != "raw"
+        ):
+            raise ValueError(
+                "R3 current_information_granularity must be raw when original text is available"
+            )
 
 
 def _r2_failure_payload_summary(
@@ -2256,6 +2759,11 @@ def _r1_frame_from_payload(
     max_node_reads: int = R_ONE_STEP_MAX_NODE_READS,
     max_context_tokens: int = R_ONE_STEP_MAX_CONTEXT_TOKENS,
 ) -> R1GraphGoalFrame:
+    default_min_terminal_material = (
+        R_TRAVERSE_MIN_TERMINAL_MATERIAL_READS
+        if max_node_reads > R_ONE_STEP_MAX_NODE_READS
+        else 0
+    )
     frame = R1GraphGoalFrame(
         frame_id=f"R1:{frame_label}:vessel_goal_frame",
         graph_search_goal=_payload_text(payload, "graph_search_goal"),
@@ -2267,6 +2775,21 @@ def _r1_frame_from_payload(
         max_context_tokens=max_context_tokens,
         stop_condition=_payload_text(payload, "stop_condition"),
         source_graph_guide_packet_id=read_packet.packet_id,
+        min_traversal_depth=_payload_optional_int(
+            payload,
+            "min_traversal_depth",
+            default=0,
+        ),
+        min_node_reads=_payload_optional_int(
+            payload,
+            "min_node_reads",
+            default=0,
+        ),
+        min_terminal_material_count=_payload_optional_int(
+            payload,
+            "min_terminal_material_count",
+            default=default_min_terminal_material,
+        ),
         user_question_anchor_id=_payload_text(payload, "user_question_anchor_id"),
         source_data_ids=_unique_strings([read_packet.packet_id, llm_call_data_id]),
         source_trace_ids=source_trace_ids,
@@ -2286,6 +2809,9 @@ def _budget_frame(*, r1: R1GraphGoalFrame, frame_label: str) -> RLoopBudgetFrame
         max_branch_switches=r1.max_branch_switches,
         max_node_reads=r1.max_node_reads,
         max_context_tokens=r1.max_context_tokens,
+        min_traversal_depth=r1.min_traversal_depth,
+        min_node_reads=r1.min_node_reads,
+        min_terminal_material_count=r1.min_terminal_material_count,
         used_traversal_depth=0,
         used_branch_switches=0,
         used_node_reads=1,
@@ -2315,6 +2841,9 @@ def _traverse_budget_frame(
         max_branch_switches=r1.max_branch_switches,
         max_node_reads=r1.max_node_reads,
         max_context_tokens=r1.max_context_tokens,
+        min_traversal_depth=r1.min_traversal_depth,
+        min_node_reads=r1.min_node_reads,
+        min_terminal_material_count=r1.min_terminal_material_count,
         used_traversal_depth=safe_step,
         used_branch_switches=0,
         used_node_reads=safe_step,
@@ -2378,6 +2907,80 @@ def _terminal_material_guard_continuation_frame(
         source_budget_frame_id=budget.frame_id,
         continuation_status="continue_deeper",
         continuation_reason_code="CODE_STATUS:r_loop_terminal_material_not_seen",
+        next_target_node="R2",
+        remaining_traversal_depth=remaining_traversal_depth,
+        remaining_branch_switches=remaining_branch_switches,
+        remaining_node_reads=remaining_node_reads,
+        remaining_context_tokens=remaining_context_tokens,
+        source_data_ids=_unique_strings(
+            [
+                r3.frame_id,
+                budget.frame_id,
+                *r3.source_data_ids,
+                *budget.source_data_ids,
+            ]
+        ),
+        source_trace_ids=_unique_strings(
+            [
+                *source_trace_ids,
+                *r3.source_trace_ids,
+                *budget.source_trace_ids,
+            ]
+        ),
+    )
+    validate_r_loop_continuation_frame(frame)
+    return frame
+
+
+def _should_force_deeper_for_minimum_budget(
+    *,
+    continuation: RLoopContinuationFrame,
+    graph_surface: RGraphTraversalCandidateSurfaceFrame,
+    budget: RLoopBudgetFrame,
+) -> bool:
+    if continuation.continuation_status != "stop_sufficient":
+        return False
+    if graph_surface.candidate_count <= 0:
+        return False
+    if continuation.remaining_node_reads <= 0:
+        return False
+    if continuation.remaining_traversal_depth <= 0:
+        return False
+    if continuation.remaining_context_tokens <= 0:
+        return False
+    if budget.used_traversal_depth < budget.min_traversal_depth:
+        return True
+    if budget.used_node_reads < budget.min_node_reads:
+        return True
+    return False
+
+
+def _minimum_budget_guard_continuation_frame(
+    *,
+    frame_id: str,
+    r3: R3GraphInspectionFrame,
+    budget: RLoopBudgetFrame,
+    source_trace_ids: list[str],
+) -> RLoopContinuationFrame:
+    remaining_traversal_depth = max(
+        budget.max_traversal_depth - budget.used_traversal_depth,
+        0,
+    )
+    remaining_branch_switches = max(
+        budget.max_branch_switches - budget.used_branch_switches,
+        0,
+    )
+    remaining_node_reads = max(budget.max_node_reads - budget.used_node_reads, 0)
+    remaining_context_tokens = max(
+        budget.max_context_tokens - budget.used_context_tokens,
+        0,
+    )
+    frame = RLoopContinuationFrame(
+        frame_id=frame_id,
+        source_r3_inspection_frame_id=r3.frame_id,
+        source_budget_frame_id=budget.frame_id,
+        continuation_status="continue_deeper",
+        continuation_reason_code="CODE_STATUS:r_loop_r1_minimum_budget_not_satisfied",
         next_target_node="R2",
         remaining_traversal_depth=remaining_traversal_depth,
         remaining_branch_switches=remaining_branch_switches,
@@ -2672,6 +3275,10 @@ def _r3_selected_candidate_record_view(
         "summary_text_preview",
         "source_graph_node_ids",
         "source_data_ids",
+        "raw_original_text_status",
+        "raw_original_text_data_ids",
+        "raw_original_text_char_count",
+        "raw_original_text_materials",
     ]
     view = {
         field_name: selected_record.get(field_name)
@@ -2684,6 +3291,68 @@ def _r3_selected_candidate_record_view(
     )
     view["hierarchy_child_candidate_visibility"] = "preview_only"
     return view
+
+
+def _r3_selected_raw_source_record_view(
+    selected_record: dict[str, object],
+) -> dict[str, object]:
+    """RawSource 판정에 필요한 원문과 최소 구조만 LLM 보기로 만든다."""
+
+    material_views: list[dict[str, object]] = []
+    materials = selected_record.get("raw_original_text_materials")
+    if isinstance(materials, list):
+        for material in materials:
+            if not isinstance(material, dict):
+                continue
+            material_views.append(
+                {
+                    key: material.get(key)
+                    for key in (
+                        "text",
+                        "text_char_count",
+                        "path",
+                        "source_kind",
+                        "info_class",
+                    )
+                    if key in material
+                }
+            )
+    return {
+        "candidate_kind": selected_record.get("candidate_kind"),
+        "node_kind": selected_record.get("node_kind"),
+        "data_kind": selected_record.get("data_kind"),
+        "raw_original_text_status": selected_record.get(
+            "raw_original_text_status"
+        ),
+        "raw_original_text_char_count": selected_record.get(
+            "raw_original_text_char_count"
+        ),
+        "raw_original_text_materials": material_views,
+        "hierarchy_child_candidate_count": len(
+            _candidate_child_node_ids(selected_record)
+        ),
+    }
+
+
+def _r_step_memory_raw_material_llm_view(
+    packet: RLoopVesselStepMemoryPacketFrame,
+) -> dict[str, object]:
+    """원문 판정에는 직전 경로의 상태와 예산만 짧게 보존한다."""
+
+    return {
+        "step_index": packet.step_index,
+        "selected_node_kind": packet.selected_node_kind,
+        "selected_summary_depth": packet.selected_summary_depth,
+        "r3_current_information_granularity": (
+            packet.r3_current_information_granularity
+        ),
+        "r3_sufficiency_status": packet.r3_sufficiency_status,
+        "r3_recommended_next_action": packet.r3_recommended_next_action,
+        "continuation_status": packet.continuation_status,
+        "remaining_node_reads": packet.remaining_node_reads,
+        "remaining_traversal_depth": packet.remaining_traversal_depth,
+        "raw_original_text_read_count": packet.raw_original_text_read_count,
+    }
 
 
 def _return_summary_for_no_selection(
@@ -3092,6 +3761,8 @@ def _traverse_result_frame(
     terminal_material_seen_count: int = 0,
     min_terminal_material_count: int = R_TRAVERSE_MIN_TERMINAL_MATERIAL_READS,
     raw_original_material_seen_count: int = 0,
+    raw_original_node_selected_count: int = 0,
+    raw_original_text_read_count: int = 0,
     max_raw_original_material_count: int = R_TRAVERSE_MAX_RAW_ORIGINAL_MATERIAL_READS,
     raw_original_read_cap_reached: bool = False,
     early_stop_guard_trigger_count: int = 0,
@@ -3140,6 +3811,8 @@ def _traverse_result_frame(
         terminal_material_seen_count=terminal_material_seen_count,
         min_terminal_material_count=min_terminal_material_count,
         raw_original_material_seen_count=raw_original_material_seen_count,
+        raw_original_node_selected_count=raw_original_node_selected_count,
+        raw_original_text_read_count=raw_original_text_read_count,
         max_raw_original_material_count=max_raw_original_material_count,
         raw_original_read_cap_reached=raw_original_read_cap_reached,
         early_stop_guard_trigger_count=early_stop_guard_trigger_count,
@@ -3249,9 +3922,12 @@ def _record_r_loop_vessel_step_memory_packet(
     continuation: RLoopContinuationFrame,
     selected_is_terminal_material: bool,
     selected_is_raw_original_material: bool,
+    selected_has_raw_original_text: bool,
     promoted_next_candidate_graph_node_ids: list[str],
     terminal_material_seen_count: int,
     raw_original_material_seen_count: int,
+    raw_original_node_selected_count: int,
+    raw_original_text_read_count: int,
     raw_original_read_cap_reached: bool,
     source_trace_ids: list[str],
     trace_event_ids: list[str],
@@ -3282,6 +3958,20 @@ def _record_r_loop_vessel_step_memory_packet(
         selected_source_leaf_count=_candidate_source_leaf_count(selected_record),
         selected_is_terminal_material=selected_is_terminal_material,
         selected_is_raw_original_material=selected_is_raw_original_material,
+        selected_raw_original_text_status=_record_text(
+            selected_record,
+            "raw_original_text_status",
+            default="not_applicable",
+        ),
+        selected_raw_original_text_data_ids=_record_string_list(
+            selected_record,
+            "raw_original_text_data_ids",
+        ),
+        selected_raw_original_text_char_count=_record_non_negative_int(
+            selected_record,
+            "raw_original_text_char_count",
+        ),
+        selected_has_raw_original_text=selected_has_raw_original_text,
         visible_child_candidate_node_ids=visible_child_ids,
         visible_child_candidate_count=len(visible_child_ids),
         visible_child_candidate_records=_hierarchy_child_candidate_record_views(
@@ -3304,6 +3994,8 @@ def _record_r_loop_vessel_step_memory_packet(
         remaining_traversal_depth=continuation.remaining_traversal_depth,
         terminal_material_seen_count=terminal_material_seen_count,
         raw_original_material_seen_count=raw_original_material_seen_count,
+        raw_original_node_selected_count=raw_original_node_selected_count,
+        raw_original_text_read_count=raw_original_text_read_count,
         raw_original_read_cap_reached=raw_original_read_cap_reached,
         raw_original_candidate_node_ids=raw_candidate_ids,
         source_trace_ids=_unique_strings(source_trace_ids),
@@ -3383,6 +4075,8 @@ def _validate_r_loop_vessel_step_memory_packet_frame(
         "remaining_traversal_depth": frame.remaining_traversal_depth,
         "terminal_material_seen_count": frame.terminal_material_seen_count,
         "raw_original_material_seen_count": frame.raw_original_material_seen_count,
+        "raw_original_node_selected_count": frame.raw_original_node_selected_count,
+        "raw_original_text_read_count": frame.raw_original_text_read_count,
     }.items():
         if not isinstance(value, int):
             raise TypeError(f"RLoopVesselStepMemoryPacketFrame.{field_name} must be int")
@@ -3470,6 +4164,10 @@ def _validate_traverse_result_frame(frame: RLoopVesselTraverseResultFrame) -> No
         raise ValueError("RLoopVesselTraverseResultFrame.max_raw_original_material_count must be positive")
     if frame.raw_original_material_seen_count > frame.max_raw_original_material_count:
         raise ValueError("RLoopVesselTraverseResultFrame raw original count exceeds cap")
+    if frame.raw_original_node_selected_count != frame.raw_original_material_seen_count:
+        raise ValueError("legacy raw material count must match raw node selection count")
+    if frame.raw_original_text_read_count > frame.raw_original_node_selected_count:
+        raise ValueError("raw text reads must not exceed selected RawSource nodes")
     if not isinstance(frame.raw_original_read_cap_reached, bool):
         raise TypeError("RLoopVesselTraverseResultFrame.raw_original_read_cap_reached must be bool")
 
@@ -3767,9 +4465,110 @@ def _r2_selection_ref_map(
         "available_surface_refs": list(surface_ref_to_surface_id),
         "surface_records": surface_records,
         "candidate_records_by_surface_ref": candidate_records_by_surface_ref,
+        "official_selection_table": _r2_official_selection_table(
+            available_surface_refs=list(surface_ref_to_surface_id),
+            node_refs_by_surface_ref=node_refs_by_surface_ref,
+            surface_records=surface_records,
+            candidate_records_by_surface_ref=candidate_records_by_surface_ref,
+        ),
         "surface_ref_to_surface_id": surface_ref_to_surface_id,
         "node_ref_to_graph_node_id": node_ref_to_graph_node_id,
         "node_refs_by_surface_ref": node_refs_by_surface_ref,
+    }
+
+
+def _r2_official_selection_table(
+    *,
+    available_surface_refs: list[str],
+    node_refs_by_surface_ref: dict[str, list[str]],
+    surface_records: list[dict[str, object]],
+    candidate_records_by_surface_ref: dict[str, list[dict[str, object]]],
+) -> dict[str, object]:
+    """R2가 가장 먼저 볼 공식 번호표를 만든다.
+
+    긴 후보 설명과 실제 graph id는 R2가 헷갈리기 쉽다. 그래서 이 표에는
+    복사 가능한 `surface_ref`와 `node_ref`, 그리고 짧은 구조 표지만 둔다.
+    """
+
+    surface_rows: list[dict[str, object]] = []
+    surface_record_by_ref = {
+        record.get("surface_ref"): record
+        for record in surface_records
+        if isinstance(record.get("surface_ref"), str)
+    }
+    for surface_ref in available_surface_refs:
+        surface_record = surface_record_by_ref.get(surface_ref, {})
+        node_refs = node_refs_by_surface_ref.get(surface_ref, [])
+        surface_rows.append(
+            {
+                "surface_ref": surface_ref,
+                "allowed_node_refs": node_refs,
+                "surface_kind": surface_record.get("surface_kind"),
+                "candidate_kind": surface_record.get("candidate_kind"),
+                "data_kind": surface_record.get("data_kind"),
+                "branch_role": surface_record.get("branch_role"),
+                "candidate_count": len(node_refs),
+            }
+        )
+
+    candidate_rows: list[dict[str, object]] = []
+    surface_records_by_ref = {
+        record.get("surface_ref"): record
+        for record in surface_records
+        if isinstance(record.get("surface_ref"), str)
+    }
+    for surface_ref in available_surface_refs:
+        surface_record = surface_records_by_ref.get(surface_ref, {})
+        for record in candidate_records_by_surface_ref.get(surface_ref, []):
+            node_ref = record.get("node_ref")
+            if not isinstance(node_ref, str):
+                continue
+            candidate_rows.append(
+                {
+                    "surface_ref": surface_ref,
+                    "node_ref": node_ref,
+                    "selection_affordance": "valid_current_layer_candidate",
+                    "is_listed_in_current_candidate_surface": True,
+                    "is_hierarchy_child_candidate": (
+                        surface_record.get("surface_kind")
+                        == "hierarchy_child_candidate_kind"
+                    ),
+                    "candidate_kind": record.get("candidate_kind"),
+                    "data_kind": record.get("data_kind"),
+                    "branch_role": record.get("branch_role"),
+                    "display_name": record.get("display_name"),
+                    "summary_depth": record.get("summary_depth"),
+                    "child_candidate_count": record.get("child_candidate_count"),
+                    "child_summary_layer_status": record.get("child_summary_layer_status"),
+                    "has_child_candidates": record.get("has_child_candidates"),
+                    "has_summary_child_candidate": record.get("has_summary_child_candidate"),
+                    "has_token_summary_child": record.get("has_token_summary_child"),
+                    "has_raw_original_child_candidate": record.get(
+                        "has_raw_original_child_candidate"
+                    ),
+                }
+            )
+
+    return {
+        "table_status": "available" if candidate_rows else "empty",
+        "copy_priority": "Use this official_selection_table before any other candidate payload.",
+        "allowed_surface_refs": available_surface_refs,
+        "allowed_node_refs_by_surface_ref": node_refs_by_surface_ref,
+        "surface_rows": surface_rows,
+        "candidate_rows": candidate_rows,
+        "output_contract": {
+            "selected_surface_ref": (
+                "copy one official_selection_table.allowed_surface_refs value"
+            ),
+            "selected_node_ref": (
+                "copy one value from official_selection_table."
+                "allowed_node_refs_by_surface_ref[selected_surface_ref]"
+            ),
+            "none_selected": (
+                "use only when official_selection_table.table_status is empty "
+                "or every candidate row is structurally incompatible"
+            ),
+        },
     }
 
 
@@ -4143,6 +4942,26 @@ def _is_raw_original_material_record(record: dict[str, object]) -> bool:
     }
 
 
+def _has_raw_original_text_material(record: dict[str, object]) -> bool:
+    if not _is_raw_original_material_record(record):
+        return False
+    status = record.get("raw_original_text_status")
+    char_count = record.get("raw_original_text_char_count")
+    materials = record.get("raw_original_text_materials")
+    return (
+        status == "available"
+        and isinstance(char_count, int)
+        and char_count > 0
+        and isinstance(materials, list)
+        and any(
+            isinstance(material, dict)
+            and isinstance(material.get("text"), str)
+            and bool(str(material.get("text")).strip())
+            for material in materials
+        )
+    )
+
+
 def _candidate_child_node_ids(record: dict[str, object]) -> list[str]:
     values: list[str | None] = []
     hierarchy_child_node_ids = record.get("hierarchy_child_node_ids")
@@ -4283,6 +5102,34 @@ def _record_int_values(
     return sorted(values)
 
 
+def _record_text(
+    record: dict[str, object],
+    field_name: str,
+    *,
+    default: str,
+) -> str:
+    value = record.get(field_name)
+    return value if isinstance(value, str) and value else default
+
+
+def _record_string_list(
+    record: dict[str, object],
+    field_name: str,
+) -> list[str]:
+    value = record.get(field_name)
+    if not isinstance(value, list):
+        return []
+    return _unique_strings([item for item in value if isinstance(item, str)])
+
+
+def _record_non_negative_int(
+    record: dict[str, object],
+    field_name: str,
+) -> int:
+    value = record.get(field_name)
+    return value if isinstance(value, int) and value >= 0 else 0
+
+
 def _hierarchy_child_candidate_records(
     *,
     read_packet: RLoopVesselReadPacketFrame,
@@ -4329,12 +5176,13 @@ def _hierarchy_child_candidate_records(
             if isinstance(child_id, str):
                 child_ids.append(child_id)
 
-    for record in read_packet.summary_candidate_records:
-        target_id = record.get("target_graph_node_id")
-        if target_id == selected_node_id:
-            summary_id = record.get("summary_node_id")
-            if isinstance(summary_id, str):
-                child_ids.append(summary_id)
+    if not _is_raw_original_material_record(selected_record):
+        for record in read_packet.summary_candidate_records:
+            target_id = record.get("target_graph_node_id")
+            if target_id == selected_node_id:
+                summary_id = record.get("summary_node_id")
+                if isinstance(summary_id, str):
+                    child_ids.append(summary_id)
 
     child_records: list[dict[str, object]] = []
     for child_id in _unique_strings(child_ids):
@@ -4578,6 +5426,9 @@ def _full_candidate_records_by_id(
                 "summary_depth": record.get("summary_depth"),
                 "source_leaf_count": record.get("source_leaf_count"),
                 "source_summary_count": record.get("source_summary_count"),
+                "raw_original_text_status": record.get("raw_original_text_status"),
+                "raw_original_text_data_ids": record.get("raw_original_text_data_ids"),
+                "raw_original_text_char_count": record.get("raw_original_text_char_count"),
             }
     for record in read_packet.summary_candidate_records:
         graph_node_id = record.get("summary_node_id")
@@ -4676,6 +5527,17 @@ def _payload_int(payload: dict[str, object], field_name: str) -> int:
         except ValueError:
             return 0
     return 0
+
+
+def _payload_optional_int(
+    payload: dict[str, object],
+    field_name: str,
+    *,
+    default: int,
+) -> int:
+    if field_name not in payload:
+        return default
+    return _payload_int(payload, field_name)
 
 
 def _shares_user_question_anchor(*, user_question: str, generated_goal: str) -> bool:

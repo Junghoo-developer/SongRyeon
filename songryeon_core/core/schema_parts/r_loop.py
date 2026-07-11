@@ -70,6 +70,9 @@ class R1GraphGoalFrame:
     max_context_tokens: int
     stop_condition: str
     source_graph_guide_packet_id: str
+    min_traversal_depth: int = 0
+    min_node_reads: int = 0
+    min_terminal_material_count: int = 0
     user_question_anchor_id: str = ""
     source_data_ids: list[str] = field(default_factory=list)
     source_trace_ids: list[str] = field(default_factory=list)
@@ -88,6 +91,9 @@ class RLoopBudgetFrame:
     max_branch_switches: int
     max_node_reads: int
     max_context_tokens: int
+    min_traversal_depth: int = 0
+    min_node_reads: int = 0
+    min_terminal_material_count: int = 0
     used_traversal_depth: int = 0
     used_branch_switches: int = 0
     used_node_reads: int = 0
@@ -244,8 +250,17 @@ def validate_r1_graph_goal_frame(frame: R1GraphGoalFrame) -> None:
             "max_branch_switches": frame.max_branch_switches,
             "max_node_reads": frame.max_node_reads,
             "max_context_tokens": frame.max_context_tokens,
+            "min_traversal_depth": frame.min_traversal_depth,
+            "min_node_reads": frame.min_node_reads,
+            "min_terminal_material_count": frame.min_terminal_material_count,
         },
     )
+    if frame.min_traversal_depth > frame.max_traversal_depth:
+        raise ValueError("R1GraphGoalFrame.min_traversal_depth must not exceed max")
+    if frame.min_node_reads > frame.max_node_reads:
+        raise ValueError("R1GraphGoalFrame.min_node_reads must not exceed max")
+    if frame.min_terminal_material_count > frame.max_node_reads:
+        raise ValueError("R1GraphGoalFrame.min_terminal_material_count must not exceed max_node_reads")
     _validate_string_list("R1GraphGoalFrame.source_data_ids", frame.source_data_ids)
     _validate_string_list("R1GraphGoalFrame.source_trace_ids", frame.source_trace_ids)
     _validate_no_duplicates("R1GraphGoalFrame.source_data_ids", frame.source_data_ids)
@@ -285,6 +300,9 @@ def validate_r_loop_budget_frame(frame: RLoopBudgetFrame) -> None:
             "max_branch_switches": frame.max_branch_switches,
             "max_node_reads": frame.max_node_reads,
             "max_context_tokens": frame.max_context_tokens,
+            "min_traversal_depth": frame.min_traversal_depth,
+            "min_node_reads": frame.min_node_reads,
+            "min_terminal_material_count": frame.min_terminal_material_count,
             "used_traversal_depth": frame.used_traversal_depth,
             "used_branch_switches": frame.used_branch_switches,
             "used_node_reads": frame.used_node_reads,
@@ -299,6 +317,12 @@ def validate_r_loop_budget_frame(frame: RLoopBudgetFrame) -> None:
         raise ValueError("RLoopBudgetFrame.used_node_reads must not exceed max")
     if frame.used_context_tokens > frame.max_context_tokens:
         raise ValueError("RLoopBudgetFrame.used_context_tokens must not exceed max")
+    if frame.min_traversal_depth > frame.max_traversal_depth:
+        raise ValueError("RLoopBudgetFrame.min_traversal_depth must not exceed max")
+    if frame.min_node_reads > frame.max_node_reads:
+        raise ValueError("RLoopBudgetFrame.min_node_reads must not exceed max")
+    if frame.min_terminal_material_count > frame.max_node_reads:
+        raise ValueError("RLoopBudgetFrame.min_terminal_material_count must not exceed max_node_reads")
     _validate_string_list("RLoopBudgetFrame.source_data_ids", frame.source_data_ids)
     _validate_string_list("RLoopBudgetFrame.source_trace_ids", frame.source_trace_ids)
     _validate_no_duplicates("RLoopBudgetFrame.source_data_ids", frame.source_data_ids)

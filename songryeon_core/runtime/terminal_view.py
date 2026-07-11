@@ -19,6 +19,7 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
     ]
     if result.get("status") == "structure_failed":
         lines.extend(_structure_failure_runtime_lines(result))
+    lines.extend(_codex_sdk_runtime_lines(result))
     session_memory = result.get("session_memory")
     if isinstance(session_memory, dict):
         lines.append(
@@ -596,12 +597,13 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
     query_plan_source_id = str(query_plan_record.get("data_id") or "L2:query_plan_frame")
     selected_candidate = _selected_query_candidate(query_plan)
     if selected_candidate:
+        l2_model_id = _llm_model_id_for_node(result, "L2") or _runtime_model_id(result)
         l2_sources = _source_data_ids(
             query_plan,
             fallback=[query_plan_source_id, *llm_call_ids.get("L2", [])],
         )
         lines.append(
-            f"- L2 계획 [LLM:{_runtime_model_id(result)} | SCHEMA_PASSED | source={query_plan_source_id}]: "
+            f"- L2 계획 [LLM:{l2_model_id} | SCHEMA_PASSED | source={query_plan_source_id}]: "
             f"{selected_candidate.get('query_text', '')} "
             f"(출처: {result.get('l2_query_source', 'unknown')})"
         )
@@ -611,7 +613,7 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
         lines.extend(
             _metainfo_lines(
                 indent=2,
-                generated_by=f"LLM:{_runtime_model_id(result)}",
+                generated_by=f"LLM:{l2_model_id}",
                 info_class="mixed",
                 source_data_ids=l2_sources,
                 semantic_judgement_status="llm_query_plan_ran",
@@ -2355,6 +2357,74 @@ def _structure_failure_runtime_lines(result: dict[str, object]) -> list[str]:
     budget_lines = _budget_failure_runtime_lines(result)
     if budget_lines:
         lines.extend(budget_lines)
+    lines.extend(_openai_api_failure_runtime_lines(result))
+    return lines
+
+
+def _openai_api_failure_runtime_lines(result: dict[str, object]) -> list[str]:
+    runtime = result.get("runtime")
+    if not isinstance(runtime, dict) or runtime.get("mode") != "openai":
+        return []
+    usage = runtime.get("api_usage")
+    if not isinstance(usage, dict):
+        return []
+
+    lines: list[str] = []
+    failure_type = usage.get("last_failure_type")
+    failure_reason = usage.get("last_failure_reason")
+    if isinstance(failure_type, str) and failure_type:
+        lines.append(f"- openai_api_failure_type: {_short_display_text(failure_type)}")
+    if isinstance(failure_reason, str) and failure_reason:
+        lines.append(f"- openai_api_failure_reason: {_short_display_text(failure_reason)}")
+    attempted = usage.get("attempted_api_call_count")
+    completed = usage.get("completed_api_call_count")
+    if isinstance(attempted, int) and isinstance(completed, int):
+        lines.append(
+            "- openai_api_calls: "
+            f"attempted={attempted} / completed={completed}"
+        )
+    return lines
+
+
+def _codex_sdk_runtime_lines(result: dict[str, object]) -> list[str]:
+    runtime = result.get("runtime")
+    if not isinstance(runtime, dict) or runtime.get("mode") not in {
+        "codex_sdk",
+        "qwen_codex_hybrid",
+    }:
+        return []
+    usage = runtime.get("api_usage")
+    if not isinstance(usage, dict):
+        return []
+    lines: list[str] = []
+    if runtime.get("mode") == "qwen_codex_hybrid":
+        lines.append(
+            "- hybrid_models: "
+            f"worker={runtime.get('worker_model_id') or 'unknown'} / "
+            "final_report_gate="
+            f"{runtime.get('final_report_gate_model_id') or runtime.get('judgement_model_id') or 'unknown'} / "
+            f"policy={runtime.get('node_allocation_policy') or 'unknown'}"
+        )
+        lines.append(
+            "- hybrid_codex_nodes: "
+            + ", ".join(str(value) for value in runtime.get("codex_nodes", []))
+        )
+    lines.append(
+        "- codex_sdk: "
+        f"auth={usage.get('auth_type') or 'unknown'} / "
+        f"plan={usage.get('plan_type') or 'unknown'} / "
+        f"turns={usage.get('attempted_turn_count', 0)}/"
+        f"{usage.get('completed_turn_count', 0)}/"
+        f"{usage.get('accepted_response_count', 0)} / "
+        f"tokens={usage.get('total_tokens', 0)} / "
+        f"tool_activity={usage.get('last_tool_activity_count', 0)}"
+    )
+    failure_type = usage.get("last_failure_type")
+    failure_reason = usage.get("last_failure_reason")
+    if isinstance(failure_type, str) and failure_type:
+        lines.append(f"- codex_sdk_failure_type: {_short_display_text(failure_type)}")
+    if isinstance(failure_reason, str) and failure_reason:
+        lines.append(f"- codex_sdk_failure_reason: {_short_display_text(failure_reason)}")
     return lines
 
 
@@ -2449,6 +2519,24 @@ def _llm_call_ids_by_node(result: dict[str, object]) -> dict[str, list[str]]:
             continue
         mapped.setdefault(node_id, []).append(data_id)
     return mapped
+
+
+def _llm_model_id_for_node(result: dict[str, object], node_id: str) -> str | None:
+    """개별 노드의 실제 LLM call record에서 모델 ID를 읽는다."""
+
+    records = result.get("data_records")
+    if not isinstance(records, list):
+        return None
+    for record in reversed(records):
+        if not isinstance(record, dict) or record.get("data_type") != "llm_call":
+            continue
+        payload = record.get("payload")
+        if not isinstance(payload, dict) or payload.get("node_id") != node_id:
+            continue
+        model_id = payload.get("model_id")
+        if isinstance(model_id, str) and model_id:
+            return model_id
+    return None
 
 
 def _selected_query_candidate(plan_payload: dict[str, object]) -> dict[str, object]:

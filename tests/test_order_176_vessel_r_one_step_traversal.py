@@ -119,9 +119,9 @@ def test_vessel_r3_child_ids_are_copied_from_packet_not_llm() -> None:
     assert result.r3_inspection is not None
     assert result.r3_inspection.child_node_ids == []
     assert "graph:invented:child" not in result.r3_inspection.child_node_ids
-    assert result.r3_inspection.recommended_next_action == "deeper"
+    assert result.r3_inspection.recommended_next_action == "stop"
     assert result.continuation is not None
-    assert result.continuation.continuation_status == "stop_budget_exhausted"
+    assert result.continuation.continuation_status == "stop_sufficient"
 
 
 def test_vessel_r_one_step_records_expected_frames_in_datastore() -> None:
@@ -269,11 +269,11 @@ class InventingR3Adapter:
         elif "R3 Vessel Inspector" in request.prompt:
             payload = {
                 "current_information_granularity": "low_summary",
-                "sufficiency_status": "insufficient",
-                "granularity_problem_status": "needs_lower_granularity",
+                "sufficiency_status": "sufficient",
+                "granularity_problem_status": "none",
                 "branch_problem_status": "none",
-                "recommended_next_action": "deeper",
-                "inspection_reason": "Pretend to want a fabricated child, but schema has no child id field.",
+                "recommended_next_action": "stop",
+                "inspection_reason": "Return a valid decision while attempting to attach a fabricated child field.",
                 "child_node_ids": ["graph:invented:child"],
             }
         else:

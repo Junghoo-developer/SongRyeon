@@ -22,12 +22,22 @@ Rules:
 - `gate_status` must be one of `pass`, `needs_revision`, `failed`.
 - Use `needs_revision` when the report contains claims that are not visibly grounded.
 - Use `failed` only when the report is unusable or the input is insufficient to check.
-- Treat supplied `node3_input_brief.read_documents`, `node3_input_brief.allowed_claims`, and `node3_input_brief.runtime_task_sequence` as the only checkable grounding material.
+- Treat supplied `node3_input_brief.read_documents`, `node3_input_brief.allowed_claims`,
+  `node3_input_brief.runtime_task_sequence`, `selected_recent_memory_contexts`, and
+  `node3_input_brief.vessel_r_material` as the checkable grounding channels.
 - Treat supplied `node3_input_brief.document_material_packet.items` and `node3_input_brief.document_evidence_role_boundaries` as the checkable document role ledger.
 - Treat supplied `selected_recent_memory_contexts` as the only allowed grounding material for previous-conversation utterance claims.
 - Treat supplied `node3_input_brief.answer_basis` as the answer posture chosen by node_2.
 - Treat supplied `node3_input_brief.l_loop_result` as the checkable L search goal status.
 - Treat supplied `node3_input_brief.vessel_r_material` as the only checkable Vessel/R graph-memory material.
+- If a Vessel item has `material_kind=raw_original` and contains `raw_text`, allow
+  the report to explain what that original source proposes. Do not require the same
+  claim to also appear in `runtime_task_sequence`, `read_documents`, or selected memory.
+- Preserve source modality when checking claims: proposal/example/candidate text
+  supports proposal-language claims, but not claims that the current runtime already
+  executed or approved those values.
+- Read the supplied Vessel and L status fields exactly. Do not invent
+  `not_recorded`, `failed`, or `budget_exhausted` when the brief supplies another value.
 - If `l_loop_result.attitude_hint` is `l_loop_budget_exhausted` or `l_loop_partial_or_failed`, the report must not claim or imply that the L search goal succeeded.
 - If packed/read documents are supplied after an L failure signal, allow the report to use those documents, but require it to preserve the distinction between usable material and L search-goal success.
 - If `vessel_r_material.status` is `not_recorded` or `failed`, the report must not claim Vessel/R traversal succeeded.

@@ -24,6 +24,7 @@ from songryeon_core.loops.l_loop_namespace import LRunIds
 
 
 NODE2_ANSWER_BASIS_FRAME_DATA_ID = "node_2:answer_basis_frame"
+NODE2_ANSWER_BASIS_SCHEMA_REPAIR_MAX_ATTEMPTS = 1
 
 
 def build_metainfo_boundary(
@@ -331,6 +332,14 @@ def run_node2_answer_basis_selection(
         boundary=boundary,
         base_source_data_ids=base_source_data_ids,
     )
+    evidence_source_id_by_ref = {
+        str(source["evidence_ref"]): str(source["source_data_id"])
+        for source in available_evidence_sources
+    }
+    evidence_ref_by_source_id = {
+        source_data_id: evidence_ref
+        for evidence_ref, source_data_id in evidence_source_id_by_ref.items()
+    }
     allowed_answer_basis_source_data_ids = _unique_strings(
         [
             str(source["source_data_id"])
@@ -362,54 +371,68 @@ def run_node2_answer_basis_selection(
         )
 
     prompt = Path(prompt_ref).read_text(encoding="utf-8")
-    llm_result = LLMNodeExecutor(adapter).run(
+    input_payload = {
+        "user_question": user_question,
+        "boundary_id": boundary_id,
+        "handoff_frame_id": handoff_frame_id,
+        "absolute_info_count": len(boundary.absolute_info),
+        "relative_info_count": len(boundary.relative_info),
+        "mixed_info_count": len(boundary.mixed_info),
+        "absolute_info_samples": _answer_basis_absolute_samples(
+            boundary=boundary,
+            evidence_ref_by_source_id=evidence_ref_by_source_id,
+        ),
+        "relative_info_samples": _answer_basis_semantic_samples(
+            info_refs=boundary.relative_info[:12],
+            evidence_ref_by_source_id=evidence_ref_by_source_id,
+            info_class="relative",
+        ),
+        "mixed_info_samples": _answer_basis_semantic_samples(
+            info_refs=boundary.mixed_info[:12],
+            evidence_ref_by_source_id=evidence_ref_by_source_id,
+            info_class="mixed",
+        ),
+        "available_evidence_sources": [
+            {
+                "evidence_ref": source["evidence_ref"],
+                "source_label": source["source_label"],
+                "source_kind": source["source_kind"],
+            }
+            for source in available_evidence_sources
+        ],
+        "answer_basis_modes": [
+            "absolute_first",
+            "relative_allowed",
+            "mixed_or_uncertain",
+        ],
+        "basis_reason_codes": [
+            "code_verified_fact_required",
+            "user_asked_for_interpretation",
+            "multi_source_bundle",
+            "source_mapping_unclear",
+            "insufficient_grounding",
+            "partial_evidence_only",
+            "recent_conversation_basis_present",
+            "document_basis_present",
+            "runtime_state_basis_present",
+            "llm_mode_selection_failed",
+        ],
+        "evidence_role_values": [
+            "primary_answer_basis",
+            "supporting_context",
+            "available_but_not_used",
+            "candidate_not_read",
+            "excluded_by_budget",
+            "failed_or_empty",
+            "not_supplied",
+        ],
+        "role_reason_info_class_values": ["relative", "mixed"],
+    }
+    executor = LLMNodeExecutor(adapter)
+    first_result = executor.run(
         node_id="node_2",
         prompt=prompt,
-        input_payload={
-            "user_question": user_question,
-            "boundary_id": boundary_id,
-            "handoff_frame_id": handoff_frame_id,
-            "absolute_info_count": len(boundary.absolute_info),
-            "relative_info_count": len(boundary.relative_info),
-            "mixed_info_count": len(boundary.mixed_info),
-            "absolute_info_samples": [
-                asdict(data_ref) for data_ref in boundary.absolute_info[:16]
-            ],
-            "relative_info_samples": [
-                asdict(info_ref) for info_ref in boundary.relative_info[:12]
-            ],
-            "mixed_info_samples": [
-                asdict(info_ref) for info_ref in boundary.mixed_info[:12]
-            ],
-            "source_data_ids": allowed_answer_basis_source_data_ids,
-            "available_evidence_sources": available_evidence_sources,
-            "answer_basis_modes": [
-                "absolute_first",
-                "relative_allowed",
-                "mixed_or_uncertain",
-            ],
-            "basis_reason_codes": [
-                "code_verified_fact_required",
-                "user_asked_for_interpretation",
-                "multi_source_bundle",
-                "source_mapping_unclear",
-                "insufficient_grounding",
-                "partial_evidence_only",
-                "recent_conversation_basis_present",
-                "document_basis_present",
-                "runtime_state_basis_present",
-                "llm_mode_selection_failed",
-            ],
-            "evidence_role_values": [
-                "primary_answer_basis",
-                "supporting_context",
-                "available_but_not_used",
-                "candidate_not_read",
-                "excluded_by_budget",
-                "failed_or_empty",
-                "not_supplied",
-            ],
-        },
+        input_payload=input_payload,
         trace_store=trace_store,
         data_store=data_store,
         turn_id=turn_id,
@@ -418,14 +441,47 @@ def run_node2_answer_basis_selection(
         source_data_ids=base_source_data_ids,
         payload_validator=lambda payload: _validate_answer_basis_payload(
             payload,
-            allowed_source_data_ids=allowed_answer_basis_source_data_ids,
+            evidence_source_id_by_ref=evidence_source_id_by_ref,
         ),
     )
-    frame_source_trace_ids = list(input_ref)
-    if llm_result.trace_event_id:
-        frame_source_trace_ids.append(llm_result.trace_event_id)
+    attempt_results = [first_result]
+    llm_result = first_result
+    if _should_repair_answer_basis_schema_failure(first_result):
+        repair_input_payload = _answer_basis_schema_repair_input_payload(
+            base_payload=input_payload,
+            failed_payload=first_result.validation.payload,
+            failure_reason=first_result.validation.error,
+        )
+        llm_result = executor.run(
+            node_id="node_2",
+            prompt=prompt,
+            input_payload=repair_input_payload,
+            trace_store=trace_store,
+            data_store=data_store,
+            turn_id=turn_id,
+            prompt_ref=prompt_ref,
+            input_ref=_unique_strings([*input_ref, first_result.trace_event_id]),
+            source_data_ids=_unique_strings(
+                [*base_source_data_ids, first_result.call_data_id]
+            ),
+            payload_validator=lambda payload: _validate_answer_basis_payload(
+                payload,
+                evidence_source_id_by_ref=evidence_source_id_by_ref,
+            ),
+        )
+        attempt_results.append(llm_result)
+
+    frame_source_trace_ids = _unique_strings(
+        [
+            *input_ref,
+            *(result.trace_event_id for result in attempt_results),
+        ]
+    )
     frame_source_data_ids = _unique_strings(
-        [*allowed_answer_basis_source_data_ids, llm_result.call_data_id]
+        [
+            *allowed_answer_basis_source_data_ids,
+            *(result.call_data_id for result in attempt_results),
+        ]
     )
     if llm_result.failure_type == "none" and llm_result.validation.payload is not None:
         payload = llm_result.validation.payload
@@ -438,7 +494,10 @@ def run_node2_answer_basis_selection(
             mode_selection_reason_info_class=str(
                 payload.get("mode_selection_reason_info_class") or "mixed"
             ).strip(),
-            evidence_roles=_evidence_roles_from_payload(payload.get("evidence_roles")),
+            evidence_roles=_evidence_roles_from_payload(
+                payload.get("evidence_roles"),
+                evidence_source_id_by_ref=evidence_source_id_by_ref,
+            ),
             generated_by=f"LLM:{llm_result.model_id}",
             info_class=str(payload.get("mode_selection_reason_info_class") or "mixed").strip(),
             semantic_judgement_status="ran",
@@ -500,12 +559,65 @@ def _answer_basis_available_evidence_sources(
     )
     return [
         {
+            "evidence_ref": f"E{index:03d}",
             "source_data_id": source_data_id,
             "source_label": _answer_basis_source_label(source_data_id),
             "source_kind": _answer_basis_source_kind(source_data_id),
         }
-        for source_data_id in candidate_ids
+        for index, source_data_id in enumerate(candidate_ids, start=1)
     ]
+
+
+def _answer_basis_absolute_samples(
+    *,
+    boundary: MetainfoBoundary,
+    evidence_ref_by_source_id: dict[str, str],
+) -> list[dict[str, object]]:
+    """절대정보 sample에서 raw ID를 빼고 code evidence ref만 남긴다."""
+
+    samples: list[dict[str, object]] = []
+    for data_ref in boundary.absolute_info[:16]:
+        evidence_ref = evidence_ref_by_source_id.get(data_ref.data_id)
+        if evidence_ref is None:
+            continue
+        samples.append(
+            {
+                "evidence_ref": evidence_ref,
+                "source_label": _answer_basis_source_label(data_ref.data_id),
+                "source_kind": _answer_basis_source_kind(data_ref.data_id),
+                "exists": data_ref.exists,
+            }
+        )
+    return samples
+
+
+def _answer_basis_semantic_samples(
+    *,
+    info_refs: list[object],
+    evidence_ref_by_source_id: dict[str, str],
+    info_class: str,
+) -> list[dict[str, object]]:
+    """상대/혼합 sample은 의미 text와 ref만 보여주고 내부 info ID는 숨긴다."""
+
+    samples: list[dict[str, object]] = []
+    for info_ref in info_refs:
+        source_data_id = getattr(info_ref, "source_data_id", None)
+        if not isinstance(source_data_id, str):
+            continue
+        evidence_ref = evidence_ref_by_source_id.get(source_data_id)
+        if evidence_ref is None:
+            continue
+        samples.append(
+            {
+                "evidence_ref": evidence_ref,
+                "source_label": _answer_basis_source_label(source_data_id),
+                "info_class": info_class,
+                "info_kind": str(getattr(info_ref, "info_kind", "")),
+                "field_path": str(getattr(info_ref, "field_path", "")),
+                "text": str(getattr(info_ref, "text", "")),
+            }
+        )
+    return samples
 
 
 def _answer_basis_source_label(source_data_id: str) -> str:
@@ -644,8 +756,12 @@ def _record_answer_basis_frame(
 def _validate_answer_basis_payload(
     payload: dict[str, object],
     *,
-    allowed_source_data_ids: list[str],
+    evidence_source_id_by_ref: dict[str, str],
 ) -> None:
+    resolved_roles = _evidence_roles_from_payload(
+        payload.get("evidence_roles"),
+        evidence_source_id_by_ref=evidence_source_id_by_ref,
+    )
     frame = Node2AnswerBasisFrame(
         frame_id="validation_answer_basis",
         turn_id="validation_turn",
@@ -655,27 +771,73 @@ def _validate_answer_basis_payload(
         mode_selection_reason_info_class=str(
             payload.get("mode_selection_reason_info_class") or "mixed"
         ).strip(),
-        evidence_roles=_evidence_roles_from_payload(payload.get("evidence_roles")),
+        evidence_roles=resolved_roles,
         generated_by="LLM:validation-model",
         info_class=str(payload.get("mode_selection_reason_info_class") or "mixed").strip(),
         semantic_judgement_status="ran",
         source_trace_ids=["validation_trace"],
-        source_data_ids=_unique_strings(allowed_source_data_ids),
+        source_data_ids=_unique_strings(list(evidence_source_id_by_ref.values())),
     )
     validate_node2_answer_basis_frame(frame)
 
 
-def _evidence_roles_from_payload(value: object) -> list[Node2EvidenceRole]:
+def _should_repair_answer_basis_schema_failure(result: object) -> bool:
+    """parse된 JSON의 schema 계약만 실패했을 때 repair를 한 번 허용한다."""
+
+    validation = getattr(result, "validation", None)
+    return (
+        getattr(result, "failure_type", None) == "schema_failed"
+        and isinstance(getattr(validation, "payload", None), dict)
+    )
+
+
+def _answer_basis_schema_repair_input_payload(
+    *,
+    base_payload: dict[str, object],
+    failed_payload: dict[str, object] | None,
+    failure_reason: str | None,
+) -> dict[str, object]:
+    """의미를 고치지 않고 실패한 JSON 계약을 LLM이 다시 맞추도록 입력을 만든다."""
+
+    payload = dict(base_payload)
+    payload["schema_repair_request"] = {
+        "repair_status": "requested",
+        "max_repair_attempts": NODE2_ANSWER_BASIS_SCHEMA_REPAIR_MAX_ATTEMPTS,
+        "repair_attempt_index": 1,
+        "validation_error": failure_reason or "schema_failed",
+        "failed_payload": failed_payload or {},
+        "required_evidence_role_fields": [
+            "evidence_ref",
+            "evidence_role",
+            "role_reason",
+            "role_reason_info_class",
+        ],
+        "boundary": (
+            "Repair the complete JSON object using only official evidence refs. "
+            "Code still validates every field and does not choose semantic roles."
+        ),
+    }
+    return payload
+
+
+def _evidence_roles_from_payload(
+    value: object,
+    *,
+    evidence_source_id_by_ref: dict[str, str],
+) -> list[Node2EvidenceRole]:
     if not isinstance(value, list):
         return []
     roles: list[Node2EvidenceRole] = []
     for item in value:
         if not isinstance(item, dict):
             continue
-        source_data_id = str(item.get("source_data_id") or "").strip()
+        evidence_ref = str(item.get("evidence_ref") or "").strip()
         evidence_role = str(item.get("evidence_role") or "").strip()
-        if not source_data_id or not evidence_role:
-            continue
+        if not evidence_ref or not evidence_role:
+            raise ValueError("Node2 evidence role requires evidence_ref and evidence_role")
+        source_data_id = evidence_source_id_by_ref.get(evidence_ref)
+        if source_data_id is None:
+            raise ValueError("Node2 evidence_ref must exist in available_evidence_sources")
         roles.append(
             Node2EvidenceRole(
                 source_data_id=source_data_id,

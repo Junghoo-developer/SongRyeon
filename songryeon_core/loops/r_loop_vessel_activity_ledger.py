@@ -55,6 +55,8 @@ class RLoopVesselActivityLedgerFrame:
     candidate_graph_node_ids: list[str] = field(default_factory=list)
     terminal_material_seen_count: int = 0
     raw_original_material_seen_count: int = 0
+    raw_original_node_selected_count: int = 0
+    raw_original_text_read_count: int = 0
     r_loop_task_status: str | None = None
     final_continuation_status: str | None = None
     failure_stage: str | None = None
@@ -210,6 +212,8 @@ def build_r_loop_vessel_activity_ledger_frame(
         candidate_graph_node_ids=_candidate_graph_node_ids(traverse_run),
         terminal_material_seen_count=result.terminal_material_seen_count,
         raw_original_material_seen_count=result.raw_original_material_seen_count,
+        raw_original_node_selected_count=result.raw_original_node_selected_count,
+        raw_original_text_read_count=result.raw_original_text_read_count,
         r_loop_task_status=result.r_loop_task_status,
         final_continuation_status=result.final_continuation_status,
         failure_stage=result.failure_stage,
@@ -262,6 +266,8 @@ def validate_r_loop_vessel_activity_ledger_frame(
         {
             "terminal_material_seen_count": frame.terminal_material_seen_count,
             "raw_original_material_seen_count": frame.raw_original_material_seen_count,
+            "raw_original_node_selected_count": frame.raw_original_node_selected_count,
+            "raw_original_text_read_count": frame.raw_original_text_read_count,
         },
     )
     list_fields = {

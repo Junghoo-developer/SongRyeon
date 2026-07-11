@@ -51,7 +51,13 @@ from songryeon_core.runtime.replay import replay_run
 from songryeon_core.runtime.quick_smoke import run_quick_smoke_tests
 from songryeon_core.runtime.smoke_test import run_smoke_tests
 from songryeon_core.runtime.terminal_view import render_pretty_turn
-from songryeon_core.runtime.user_turn import run_fake_user_turn, run_qwen_user_turn
+from songryeon_core.runtime.user_turn import (
+    run_codex_sdk_user_turn,
+    run_fake_user_turn,
+    run_openai_user_turn,
+    run_qwen_codex_hybrid_user_turn,
+    run_qwen_user_turn,
+)
 from songryeon_core.runtime.live_trace import make_live_trace_sink
 from songryeon_core.runtime.chat_session import (
     ChatSessionMemory,
@@ -67,7 +73,8 @@ from songryeon_core.runtime.defaults import (
     DEFAULT_MAX_TOOL_CALLS,
     DEFAULT_SEARCH_TOP_K,
 )
-from songryeon_core.llm.runtime import ping_qwen
+from songryeon_core.llm.runtime import ping_openai, ping_qwen
+from songryeon_core.llm.codex_sdk_adapter import ping_codex_sdk
 from songryeon_core.tools.document_tools import search_docs
 
 
@@ -109,6 +116,41 @@ def main() -> None:
     qwen_ping_parser.add_argument("--model-id", default=None)
     qwen_ping_parser.add_argument("--timeout", type=int, default=None)
 
+    # openai-ping은 전체 송련을 돌리기 전에 API 키/모델/과금 연결을 한 번만 확인한다.
+    openai_ping_parser = subparsers.add_parser("openai-ping")
+    openai_ping_parser.add_argument("--model-id", default=None)
+    openai_ping_parser.add_argument("--timeout", type=int, default=None)
+    openai_ping_parser.add_argument(
+        "--reasoning-effort",
+        choices=["low", "medium", "high", "xhigh"],
+        default=None,
+    )
+    openai_ping_parser.add_argument("--max-output-tokens", type=int, default=1024)
+
+    codex_sdk_ping_parser = subparsers.add_parser("codex-sdk-ping")
+    codex_sdk_ping_parser.add_argument("--model-id", default="gpt-5.4")
+    codex_sdk_ping_parser.add_argument("--codex-bin", default=None)
+    codex_sdk_ping_parser.add_argument(
+        "--reasoning-effort",
+        choices=["none", "minimal", "low", "medium", "high", "xhigh"],
+        default="low",
+    )
+
+    codex_sdk_turn_parser = subparsers.add_parser("codex-sdk-turn")
+    codex_sdk_turn_parser.add_argument("user_input")
+    _add_codex_sdk_turn_runtime_args(codex_sdk_turn_parser)
+
+    codex_sdk_chat_parser = subparsers.add_parser("codex-sdk-chat")
+    _add_codex_sdk_turn_runtime_args(codex_sdk_chat_parser)
+
+    # 혼합 모드는 Qwen이 탐색하고 Codex가 판단·보고하는 비용 절약형 경로다.
+    hybrid_turn_parser = subparsers.add_parser("hybrid-turn")
+    hybrid_turn_parser.add_argument("user_input")
+    _add_hybrid_turn_runtime_args(hybrid_turn_parser)
+
+    hybrid_chat_parser = subparsers.add_parser("hybrid-chat")
+    _add_hybrid_turn_runtime_args(hybrid_chat_parser)
+
     # qwen-l-loop-smoke는 Qwen이 붙은 L루프만 좁게 점검한다.
     qwen_l_loop_parser = subparsers.add_parser("qwen-l-loop-smoke")
     qwen_l_loop_parser.add_argument("--endpoint", default=None)
@@ -130,6 +172,14 @@ def main() -> None:
     # 세션 안 raw conversation과 capsule을 다음 턴의 ZeroState로 이어준다.
     qwen_chat_parser = subparsers.add_parser("qwen-chat")
     _add_turn_runtime_args(qwen_chat_parser, include_qwen_args=True)
+
+    # 외부 Codex 비교 실험은 기존 qwen 명령과 분리해 실수로 과금하지 않게 한다.
+    openai_turn_parser = subparsers.add_parser("openai-turn")
+    openai_turn_parser.add_argument("user_input")
+    _add_openai_turn_runtime_args(openai_turn_parser)
+
+    openai_chat_parser = subparsers.add_parser("openai-chat")
+    _add_openai_turn_runtime_args(openai_chat_parser)
 
     # quick-smoke는 문서 검색/Neo4j/Qwen 없이 최소 건강 상태만 본다.
     subparsers.add_parser("quick-smoke")
@@ -450,6 +500,49 @@ def main() -> None:
             timeout_seconds=args.timeout,
         )
         print(json.dumps(result, ensure_ascii=False, indent=2))
+    elif args.command == "openai-ping":
+        result = ping_openai(
+            model_id=args.model_id,
+            timeout_seconds=args.timeout,
+            reasoning_effort=args.reasoning_effort,
+            max_output_tokens=args.max_output_tokens,
+        )
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    elif args.command == "codex-sdk-ping":
+        result = ping_codex_sdk(
+            model_id=args.model_id,
+            reasoning_effort=args.reasoning_effort,
+            codex_bin=args.codex_bin,
+        )
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    elif args.command == "codex-sdk-turn":
+        result = _run_codex_sdk_turn_from_args(args, user_input=args.user_input)
+        if args.pretty:
+            print(render_pretty_turn(result, user_input=args.user_input))
+        else:
+            print(
+                json.dumps(
+                    _turn_summary(result, include_report=args.include_report),
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
+    elif args.command == "codex-sdk-chat":
+        _run_codex_sdk_chat(args)
+    elif args.command == "hybrid-turn":
+        result = _run_hybrid_turn_from_args(args, user_input=args.user_input)
+        if args.pretty:
+            print(render_pretty_turn(result, user_input=args.user_input))
+        else:
+            print(
+                json.dumps(
+                    _turn_summary(result, include_report=args.include_report),
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
+    elif args.command == "hybrid-chat":
+        _run_hybrid_chat(args)
     elif args.command == "qwen-l-loop-smoke":
         result = run_qwen_l_loop_smoke(
             endpoint=args.endpoint,
@@ -531,6 +624,20 @@ def main() -> None:
             print(json.dumps(_turn_summary(result, include_report=args.include_report), ensure_ascii=False, indent=2))
     elif args.command == "qwen-chat":
         _run_qwen_chat(args)
+    elif args.command == "openai-turn":
+        result = _run_openai_turn_from_args(args, user_input=args.user_input)
+        if args.pretty:
+            print(render_pretty_turn(result, user_input=args.user_input))
+        else:
+            print(
+                json.dumps(
+                    _turn_summary(result, include_report=args.include_report),
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
+    elif args.command == "openai-chat":
+        _run_openai_chat(args)
     elif args.command == "quick-smoke":
         print(json.dumps(run_quick_smoke_tests(), ensure_ascii=False, indent=2))
     elif args.command == "smoke-test":
@@ -809,6 +916,187 @@ def _add_turn_runtime_args(parser: argparse.ArgumentParser, *, include_qwen_args
         parser.add_argument("--timeout", type=int, default=None)
 
 
+def _add_openai_turn_runtime_args(parser: argparse.ArgumentParser) -> None:
+    """외부 API 실험 옵션은 qwen endpoint 옵션과 섞지 않는다."""
+
+    _add_turn_runtime_args(parser, include_qwen_args=False)
+    parser.add_argument("--model-id", default=None)
+    parser.add_argument("--timeout", type=int, default=None)
+    parser.add_argument(
+        "--reasoning-effort",
+        choices=["low", "medium", "high", "xhigh"],
+        default=None,
+    )
+    parser.add_argument("--max-output-tokens", type=int, default=None)
+
+
+def _add_codex_sdk_turn_runtime_args(parser: argparse.ArgumentParser) -> None:
+    _add_turn_runtime_args(parser, include_qwen_args=False)
+    parser.add_argument("--model-id", default="gpt-5.4")
+    parser.add_argument("--codex-bin", default=None)
+    parser.add_argument(
+        "--reasoning-effort",
+        choices=["none", "minimal", "low", "medium", "high", "xhigh"],
+        default="low",
+    )
+
+
+def _add_hybrid_turn_runtime_args(parser: argparse.ArgumentParser) -> None:
+    _add_turn_runtime_args(parser, include_qwen_args=False)
+    parser.add_argument("--endpoint", default=None)
+    parser.add_argument("--qwen-model-id", default="qwen3:14b")
+    parser.add_argument("--qwen-timeout", type=int, default=None)
+    parser.add_argument("--codex-model-id", default="gpt-5.6-sol")
+    parser.add_argument("--codex-bin", default=None)
+    parser.add_argument(
+        "--codex-reasoning-effort",
+        choices=["none", "minimal", "low", "medium", "high", "xhigh"],
+        default="low",
+    )
+
+
+def _run_openai_turn_from_args(
+    args: argparse.Namespace,
+    *,
+    user_input: str,
+    turn_id: str | None = None,
+    export_dir: str | None = None,
+    previous_turn_capsules: list | None = None,
+    recent_raw_conversation: list | None = None,
+) -> dict[str, object]:
+    return run_openai_user_turn(
+        user_input=user_input,
+        turn_id=turn_id,
+        model_id=args.model_id,
+        timeout_seconds=args.timeout,
+        reasoning_effort=args.reasoning_effort,
+        max_output_tokens=args.max_output_tokens,
+        export_dir=export_dir if export_dir is not None else args.export,
+        max_tool_calls=args.max_tool_calls,
+        search_top_k=args.search_top_k,
+        max_query_attempts=args.max_query_attempts,
+        max_query_candidates=args.max_query_candidates,
+        max_read_doc_calls=args.max_read_doc_calls,
+        max_input_chars=args.max_input_chars,
+        max_document_context_chars=args.max_document_context_chars,
+        include_data_records=args.pretty or turn_id is not None,
+        force_l_route=args.force_l,
+        force_vessel_r_route=args.force_vessel_r_route,
+        same_turn_l_reroute_enabled=args.same_turn_l_reroute,
+        max_l_runs_per_turn=args.max_l_runs_per_turn,
+        enable_r_route_experimental=args.enable_r_route_experimental,
+        enable_vessel_r_route=args.enable_vessel_r_route,
+        vessel_r_uri=args.vessel_uri,
+        vessel_r_user=args.vessel_user,
+        vessel_r_password=args.vessel_password,
+        vessel_r_database=args.database,
+        vessel_r_allow_no_auth=args.vessel_allow_no_auth,
+        vessel_r_limit=args.vessel_limit,
+        vessel_r_max_node_reads=args.vessel_max_node_reads,
+        vessel_r_max_raw_original_material_reads=(
+            args.vessel_max_raw_original_material_reads
+        ),
+        previous_turn_capsules=previous_turn_capsules,
+        recent_raw_conversation=recent_raw_conversation,
+        live_trace=args.live_trace,
+    )
+
+
+def _run_codex_sdk_turn_from_args(
+    args: argparse.Namespace,
+    *,
+    user_input: str,
+    turn_id: str | None = None,
+    export_dir: str | None = None,
+    previous_turn_capsules: list | None = None,
+    recent_raw_conversation: list | None = None,
+) -> dict[str, object]:
+    return run_codex_sdk_user_turn(
+        user_input=user_input,
+        turn_id=turn_id,
+        model_id=args.model_id,
+        reasoning_effort=args.reasoning_effort,
+        codex_bin=args.codex_bin,
+        export_dir=export_dir if export_dir is not None else args.export,
+        max_tool_calls=args.max_tool_calls,
+        search_top_k=args.search_top_k,
+        max_query_attempts=args.max_query_attempts,
+        max_query_candidates=args.max_query_candidates,
+        max_read_doc_calls=args.max_read_doc_calls,
+        max_input_chars=args.max_input_chars,
+        max_document_context_chars=args.max_document_context_chars,
+        include_data_records=args.pretty or turn_id is not None,
+        force_l_route=args.force_l,
+        force_vessel_r_route=args.force_vessel_r_route,
+        same_turn_l_reroute_enabled=args.same_turn_l_reroute,
+        max_l_runs_per_turn=args.max_l_runs_per_turn,
+        enable_r_route_experimental=args.enable_r_route_experimental,
+        enable_vessel_r_route=args.enable_vessel_r_route,
+        vessel_r_uri=args.vessel_uri,
+        vessel_r_user=args.vessel_user,
+        vessel_r_password=args.vessel_password,
+        vessel_r_database=args.database,
+        vessel_r_allow_no_auth=args.vessel_allow_no_auth,
+        vessel_r_limit=args.vessel_limit,
+        vessel_r_max_node_reads=args.vessel_max_node_reads,
+        vessel_r_max_raw_original_material_reads=(
+            args.vessel_max_raw_original_material_reads
+        ),
+        previous_turn_capsules=previous_turn_capsules,
+        recent_raw_conversation=recent_raw_conversation,
+        live_trace=args.live_trace,
+    )
+
+
+def _run_hybrid_turn_from_args(
+    args: argparse.Namespace,
+    *,
+    user_input: str,
+    turn_id: str | None = None,
+    export_dir: str | None = None,
+    previous_turn_capsules: list | None = None,
+    recent_raw_conversation: list | None = None,
+) -> dict[str, object]:
+    return run_qwen_codex_hybrid_user_turn(
+        user_input=user_input,
+        turn_id=turn_id,
+        qwen_endpoint=args.endpoint,
+        qwen_model_id=args.qwen_model_id,
+        qwen_timeout_seconds=args.qwen_timeout,
+        codex_model_id=args.codex_model_id,
+        codex_reasoning_effort=args.codex_reasoning_effort,
+        codex_bin=args.codex_bin,
+        export_dir=export_dir if export_dir is not None else args.export,
+        max_tool_calls=args.max_tool_calls,
+        search_top_k=args.search_top_k,
+        max_query_attempts=args.max_query_attempts,
+        max_query_candidates=args.max_query_candidates,
+        max_read_doc_calls=args.max_read_doc_calls,
+        max_input_chars=args.max_input_chars,
+        max_document_context_chars=args.max_document_context_chars,
+        include_data_records=args.pretty or turn_id is not None,
+        force_l_route=args.force_l,
+        force_vessel_r_route=args.force_vessel_r_route,
+        same_turn_l_reroute_enabled=args.same_turn_l_reroute,
+        max_l_runs_per_turn=args.max_l_runs_per_turn,
+        enable_r_route_experimental=args.enable_r_route_experimental,
+        enable_vessel_r_route=args.enable_vessel_r_route,
+        vessel_r_uri=args.vessel_uri,
+        vessel_r_user=args.vessel_user,
+        vessel_r_password=args.vessel_password,
+        vessel_r_database=args.database,
+        vessel_r_allow_no_auth=args.vessel_allow_no_auth,
+        vessel_r_limit=args.vessel_limit,
+        vessel_r_max_node_reads=args.vessel_max_node_reads,
+        vessel_r_max_raw_original_material_reads=(
+            args.vessel_max_raw_original_material_reads
+        ),
+        previous_turn_capsules=previous_turn_capsules,
+        recent_raw_conversation=recent_raw_conversation,
+        live_trace=args.live_trace,
+    )
+
+
 def _run_qwen_chat(args: argparse.Namespace) -> None:
     # 대화형 모드다. 사용자가 /exit 또는 /quit을 입력할 때까지 반복한다.
     # 세션 안 raw conversation과 capsule을 다음 턴의 ZeroState로 다시 주입한다.
@@ -872,6 +1160,150 @@ def _run_qwen_chat(args: argparse.Namespace) -> None:
             recent_raw_conversation=session_memory.recent_raw_conversation,
             previous_turn_capsules=session_memory.previous_turn_capsules,
             live_trace=args.live_trace,
+        )
+        attach_chat_session_snapshot(
+            result=result,
+            session_memory=session_memory,
+            current_turn_id=current_turn_id,
+        )
+        print(render_pretty_turn(result, user_input=user_input))
+        print("")
+        store_chat_turn_result(
+            session_memory=session_memory,
+            current_turn_id=current_turn_id,
+            user_input=user_input,
+            result=result,
+        )
+
+
+def _run_openai_chat(args: argparse.Namespace) -> None:
+    """외부 API 비교용 대화 모드. 세션 기억 규칙은 qwen-chat과 같다."""
+
+    print("SongRyeon openai-chat")
+    print("외부 API 호출마다 과금될 수 있습니다. 종료: /exit 또는 /quit")
+    print("")
+
+    session_memory = ChatSessionMemory()
+    while True:
+        try:
+            user_input = input("나> ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("")
+            print("송련> 종료")
+            return
+        if not user_input:
+            continue
+        if user_input in {"/exit", "/quit"}:
+            print("송련> 종료")
+            return
+
+        export_dir = _chat_export_dir(args.export, session_memory.turn_index)
+        current_turn_id = current_chat_turn_id(session_memory)
+        print("송련> 외부 API로 처리 중...")
+        result = _run_openai_turn_from_args(
+            args,
+            user_input=user_input,
+            turn_id=current_turn_id,
+            export_dir=export_dir,
+            previous_turn_capsules=session_memory.previous_turn_capsules,
+            recent_raw_conversation=session_memory.recent_raw_conversation,
+        )
+        attach_chat_session_snapshot(
+            result=result,
+            session_memory=session_memory,
+            current_turn_id=current_turn_id,
+        )
+        print(render_pretty_turn(result, user_input=user_input))
+        print("")
+        store_chat_turn_result(
+            session_memory=session_memory,
+            current_turn_id=current_turn_id,
+            user_input=user_input,
+            result=result,
+        )
+
+
+def _run_codex_sdk_chat(args: argparse.Namespace) -> None:
+    """ChatGPT 구독 사용량을 쓰는 명시적 비교 대화 모드."""
+
+    print("SongRyeon codex-sdk-chat")
+    print("각 송련 노드가 별도 Codex turn을 사용합니다. 종료: /exit 또는 /quit")
+    print("")
+
+    session_memory = ChatSessionMemory()
+    while True:
+        try:
+            user_input = input("나> ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("")
+            print("송련> 종료")
+            return
+        if not user_input:
+            continue
+        if user_input in {"/exit", "/quit"}:
+            print("송련> 종료")
+            return
+
+        export_dir = _chat_export_dir(args.export, session_memory.turn_index)
+        current_turn_id = current_chat_turn_id(session_memory)
+        print("송련> Codex SDK로 처리 중...")
+        result = _run_codex_sdk_turn_from_args(
+            args,
+            user_input=user_input,
+            turn_id=current_turn_id,
+            export_dir=export_dir,
+            previous_turn_capsules=session_memory.previous_turn_capsules,
+            recent_raw_conversation=session_memory.recent_raw_conversation,
+        )
+        attach_chat_session_snapshot(
+            result=result,
+            session_memory=session_memory,
+            current_turn_id=current_turn_id,
+        )
+        print(render_pretty_turn(result, user_input=user_input))
+        print("")
+        store_chat_turn_result(
+            session_memory=session_memory,
+            current_turn_id=current_turn_id,
+            user_input=user_input,
+            result=result,
+        )
+
+
+def _run_hybrid_chat(args: argparse.Namespace) -> None:
+    """Qwen 작업 노드와 Codex 판단 노드를 함께 쓰는 대화 모드."""
+
+    print("SongRyeon hybrid-chat")
+    print(
+        f"작업={args.qwen_model_id} / 판단={args.codex_model_id} / "
+        "종료: /exit 또는 /quit"
+    )
+    print("")
+
+    session_memory = ChatSessionMemory()
+    while True:
+        try:
+            user_input = input("나> ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("")
+            print("송련> 종료")
+            return
+        if not user_input:
+            continue
+        if user_input in {"/exit", "/quit"}:
+            print("송련> 종료")
+            return
+
+        export_dir = _chat_export_dir(args.export, session_memory.turn_index)
+        current_turn_id = current_chat_turn_id(session_memory)
+        print("송련> Qwen 작업 + Codex 판단으로 처리 중...")
+        result = _run_hybrid_turn_from_args(
+            args,
+            user_input=user_input,
+            turn_id=current_turn_id,
+            export_dir=export_dir,
+            previous_turn_capsules=session_memory.previous_turn_capsules,
+            recent_raw_conversation=session_memory.recent_raw_conversation,
         )
         attach_chat_session_snapshot(
             result=result,

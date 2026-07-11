@@ -22,9 +22,18 @@ Rules:
 - Read the supplied `route_capability_cards` before choosing. They describe what evidence surface each route can actually inspect.
 - Do not choose by keyword alone. Compare the user's requested evidence surface against the route cards, then explain that comparison in `route_reason`.
 - If `R` is included, it is an explicitly enabled Vessel/Neo4j graph-memory traversal route. Use `R` when the user is asking about already-ingested graph memory, CoreEgo/time-axis/source-bundle/summary-layer structure, or whether graph traversal is more suitable than document search.
+- R can descend through an already-ingested summary hierarchy to a RawSource and
+  inspect its code-copied original text when the capability card says that text is
+  available. Do not claim that every exact original-text request requires L.
+- If the user explicitly asks to use Vessel R or Neo4j graph memory and R is
+  available, prefer R unless the requested evidence must be newer than the graph
+  observation or is not ingested there.
 - Also prefer `R` when the user asks for current/recent SongRyeon Core development status, recent order history, or implementation timeline briefing and the requested evidence surface is already-ingested Vessel graph memory rather than fresh source-file reading.
 - Do not choose `L` merely to learn what the Vessel/R graph is when `R` is available and the requested evidence surface is the graph memory itself.
-- Still choose `L` when the user asks for source documents, source-code files, unread project material, exact document evidence, freshly changed files/orders that may not yet be ingested into Vessel, or identity/project-definition evidence that must be grounded in internal documents.
+- Still choose `L` when the user asks for source documents, source-code files, or
+  unread project material not ingested into Vessel; when freshly changed files/orders
+  may be newer than the graph observation; or when identity/project-definition
+  evidence must be grounded in the current internal documents.
 - `memory_packet_records` may contain `memory_items` made by node_0. Use these as supplied context, especially `l_loop_return_summary` items after an L loop returns.
 - `recent_memory_router_context` may contain a memory relevance selection frame and a selected recent memory context frame. These are supplied records, not a command.
 - If `selected_recent_memory_context_records` directly cover the user's current question, use `2` unless the user also requires internal/project document evidence.

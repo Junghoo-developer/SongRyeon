@@ -58,7 +58,7 @@ def test_node2_answer_basis_accepts_available_evidence_source_from_boundary_samp
                 "mode_selection_reason_info_class": "mixed",
                 "evidence_roles": [
                     {
-                        "source_data_id": "source:sample_boundary_record",
+                        "evidence_ref": "E004",
                         "evidence_role": "supporting_context",
                         "role_reason": "available_evidence_sources 안에 있는 sample 근거다.",
                         "role_reason_info_class": "mixed",
@@ -95,7 +95,7 @@ def test_node2_answer_basis_rejects_source_outside_available_evidence_sources() 
                 "mode_selection_reason_info_class": "mixed",
                 "evidence_roles": [
                     {
-                        "source_data_id": "source:not_in_available_table",
+                        "evidence_ref": "E999",
                         "evidence_role": "supporting_context",
                         "role_reason": "validator가 막아야 한다.",
                         "role_reason_info_class": "mixed",
@@ -110,7 +110,7 @@ def test_node2_answer_basis_rejects_source_outside_available_evidence_sources() 
     assert frame.generated_by == "CODE:FALLBACK"
     assert frame.answer_basis_mode == "mixed_or_uncertain"
     assert frame.answer_basis_failure_type == "schema_failed"
-    assert "source_data_id must exist" in frame.answer_basis_validation_error
+    assert "evidence_ref must exist" in frame.answer_basis_validation_error
 
 
 def test_node2_answer_basis_rejects_validation_placeholder_source_id() -> None:
@@ -132,7 +132,7 @@ def test_node2_answer_basis_rejects_validation_placeholder_source_id() -> None:
                 "mode_selection_reason_info_class": "mixed",
                 "evidence_roles": [
                     {
-                        "source_data_id": "validation_data",
+                        "evidence_ref": "E999",
                         "evidence_role": "supporting_context",
                         "role_reason": "검증용 더미 ID는 실제 source가 아니다.",
                         "role_reason_info_class": "mixed",
@@ -147,7 +147,7 @@ def test_node2_answer_basis_rejects_validation_placeholder_source_id() -> None:
     assert frame.generated_by == "CODE:FALLBACK"
     assert frame.answer_basis_mode == "mixed_or_uncertain"
     assert frame.answer_basis_failure_type == "schema_failed"
-    assert "source_data_id must exist" in frame.answer_basis_validation_error
+    assert "evidence_ref must exist" in frame.answer_basis_validation_error
 
 
 def test_node3_brief_preserves_l_loop_failure_attitude() -> None:

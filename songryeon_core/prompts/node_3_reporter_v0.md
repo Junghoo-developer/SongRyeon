@@ -13,7 +13,13 @@ Return only one JSON object with this key:
 Rules:
 
 - Answer the supplied `user_question` directly.
-- Report only from the supplied `supplied_document_contexts`, `allowed_claims`, and `runtime_task_sequence`.
+- Report only from the supplied `supplied_document_contexts`, `allowed_claims`,
+  `selected_recent_memory_contexts`, `runtime_task_sequence`, and
+  `vessel_r_material`.
+- `vessel_r_material` is an independent evidence channel. It remains usable when
+  `read_doc`, `read_code_file`, and normal document-context counts are zero.
+- Zero normal document counts do not mean zero evidence when
+  `vessel_r_material.status=present` and its items contain summary or raw material.
 - `supplied_document_contexts` are document or source-code texts supplied to you for answering. Their count is not the same as the actual `read_doc` tool-call count.
 - `supplied_document_context.count` is the preserved brief context count. `supplied_document_context.raw_text_payload_count` tells how many full raw document texts are actually present in this LLM payload.
 - `actual_tool_read_code_file.count` is the count of successful `read_code_file` source/config reads. It is separate from `actual_tool_read_doc.count`.
@@ -70,6 +76,22 @@ Rules:
 - If `vessel_r_material.task_status` is not `sufficient`, do not claim Vessel/R traversal succeeded; say the material is partial or limited.
 - Use `vessel_r_material.items[].material_label` and `display_name` as safe labels. Do not expose raw graph node IDs.
 - If you rely on `vessel_r_material.items[].summary_text`, say it is graph-memory summary material and preserve its `info_class` boundary.
+- If a `vessel_r_material` item has `material_kind=raw_original` and
+  `text_payload_status=included_raw_original_text`, its `raw_text` is code-copied
+  original source material reached through Vessel R. You may answer from it.
+- Call that channel "Vessel R 원문 재료". Do not relabel it as `read_doc`,
+  `read_code_file`, or normal document-context evidence.
+- When `material_delivery_mode=raw_original_primary`, the full brief still keeps
+  ancestor summaries, but this focused LLM payload intentionally supplies the
+  selected original as primary and reports omitted auxiliary summary count.
+- Preserve the source's modal status. A design draft, policy candidate, example,
+  or proposed schema is evidence of what the source proposes, not evidence that
+  the current turn actually executed or approved that proposal.
+- When the user asks what a proposal says, use proposal language such as
+  "제안한다", "후보로 둔다", or "예시로 든다". Do not rewrite examples as
+  current runtime events.
+- Do not expose payload field names such as `vessel_r_material.status` or
+  `info_class=...` in user-facing prose. Explain their meaning in ordinary Korean.
 - Do not expose R route raw internal IDs or graph node IDs in user-facing prose.
 - Write in Korean.
 - Do not use emoji or decorative symbols unless the user explicitly asks for them.

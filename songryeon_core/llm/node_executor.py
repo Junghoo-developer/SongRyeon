@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import asdict, dataclass
 from typing import Callable
 
@@ -11,6 +13,8 @@ from songryeon_core.llm.json_validation import JSONValidationResult, parse_json_
 
 
 PayloadValidator = Callable[[dict[str, object]], None]
+
+INPUT_PAYLOAD_PREVIEW_JSON_CHAR_LIMIT = 12000
 
 
 @dataclass
@@ -71,6 +75,7 @@ class LLMNodeExecutor:
                     turn_id=turn_id,
                     node_id=node_id,
                     prompt_ref=prompt_ref or f"inline:{node_id}",
+                    input_payload=input_payload,
                     input_ref=input_ref or [],
                     source_data_ids=source_data_ids or [],
                     result=result,
@@ -138,6 +143,7 @@ class LLMNodeExecutor:
         turn_id: str,
         node_id: str,
         prompt_ref: str,
+        input_payload: dict[str, object],
         input_ref: list[str],
         source_data_ids: list[str],
         result: LLMNodeExecutionResult,
@@ -152,6 +158,7 @@ class LLMNodeExecutor:
             parse_status = "not_checked"
             validation_status = "not_checked"
 
+        input_payload_audit = self._build_input_payload_audit(input_payload)
         frame = LLMCallFrame(
             call_id=call_data_id,
             turn_id=turn_id,
@@ -168,6 +175,11 @@ class LLMNodeExecutor:
             error_message=result.validation.error or "",
             source_trace_ids=input_ref,
             source_data_ids=source_data_ids,
+            input_payload_audit_status=input_payload_audit["input_payload_audit_status"],
+            input_payload_sha256=input_payload_audit["input_payload_sha256"],
+            input_payload_json_char_count=input_payload_audit["input_payload_json_char_count"],
+            input_payload_top_level_keys=input_payload_audit["input_payload_top_level_keys"],
+            input_payload_preview_json=input_payload_audit["input_payload_preview_json"],
         )
         validate_llm_call_frame(frame)
         event = trace_store.create_event(
@@ -188,3 +200,20 @@ class LLMNodeExecutor:
             payload=asdict(frame),
         )
         return event.event_id, call_data_id
+
+    def _build_input_payload_audit(self, input_payload: dict[str, object]) -> dict[str, object]:
+        """LLM에 넘긴 입력 봉투를 사후 감사할 수 있게 작은 절대정보로 줄인다."""
+
+        payload_json = json.dumps(
+            input_payload,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            default=str,
+        )
+        return {
+            "input_payload_audit_status": "recorded",
+            "input_payload_sha256": hashlib.sha256(payload_json.encode("utf-8")).hexdigest(),
+            "input_payload_json_char_count": len(payload_json),
+            "input_payload_top_level_keys": sorted(input_payload.keys()),
+            "input_payload_preview_json": payload_json[:INPUT_PAYLOAD_PREVIEW_JSON_CHAR_LIMIT],
+        }

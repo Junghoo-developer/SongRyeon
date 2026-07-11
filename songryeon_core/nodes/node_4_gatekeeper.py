@@ -281,6 +281,15 @@ def _grounding_count_violations(
         return ["grounding_block_missing_or_not_first_line"]
 
     violations: list[str] = []
+    grounding_heading_count = sum(
+        1
+        for line in rendered_markdown.splitlines()
+        if line.strip() in {"근거 기준:", "**근거 기준:**"}
+    )
+    if grounding_heading_count != 1:
+        violations.append(
+            f"grounding_block_heading_count:{grounding_heading_count}_expected_1"
+        )
     for label, expected_count in expected_counts.items():
         actual_count = _grounding_count(rendered_markdown, label)
         if actual_count is None:
@@ -436,7 +445,29 @@ def _claims_vessel_r_success(rendered_markdown: str) -> bool:
         r"graph\s*memory\s*(?:traversal|탐색).{0,24}(?:succeeded|success|성공|충분)",
         r"그래프\s*기억\s*탐색.{0,24}(?:성공|충분)",
     ]
-    return any(re.search(pattern, rendered_markdown, flags=re.IGNORECASE) for pattern in patterns)
+    for pattern in patterns:
+        for match in re.finditer(pattern, rendered_markdown, flags=re.IGNORECASE):
+            if _vessel_r_success_match_is_negated(
+                rendered_markdown,
+                start=match.start(),
+                end=match.end(),
+            ):
+                continue
+            return True
+    return False
+
+
+def _vessel_r_success_match_is_negated(text: str, *, start: int, end: int) -> bool:
+    """성공/충분을 부정하는 안전 문장을 성공 주장으로 오탐하지 않게 한다."""
+
+    window = text[max(0, start - 32) : min(len(text), end + 48)]
+    negation_patterns = [
+        r"(?:성공|충분).{0,24}(?:단정하지\s*않|단정할\s*수\s*없|아니|않|못|제한|부분)",
+        r"(?:성공|충분).{0,12}으로\s*단정하지\s*않",
+        r"(?:not|no|never|without|cannot|can't|do not|does not).{0,32}(?:success|succeeded|sufficient)",
+        r"(?:success|succeeded|sufficient).{0,32}(?:not|no|never|without|cannot|can't|limited|partial)",
+    ]
+    return any(re.search(pattern, window, flags=re.IGNORECASE) for pattern in negation_patterns)
 
 
 def _claims_vessel_r_as_document_evidence(rendered_markdown: str) -> bool:
@@ -499,11 +530,13 @@ def _line_mentions_vessel_r_status(line: str) -> bool:
 
 
 def _assigned_status_names_in_line(line: str) -> list[str]:
+    """기계적으로 명시된 상태 대입만 읽고 자연어 의미는 node_4 LLM에 맡긴다."""
+
     lowered = line.lower()
     status_names: list[str] = []
     for pattern in [
-        r"(?:material_status|task_status|status|task)[`'\"]?\s*(?:=|:|은|는|이|가|->)\s*`?([a-z_]+)`?",
-        r"상태[`'\"]?\s*(?:=|:|은|는|이|가|->)\s*`?([a-z_]+)`?",
+        r"(?:material_status|task_status|status|task)[`'\"]?\s*(?:=|:|->)\s*`?([a-z_]+)`?",
+        r"상태[`'\"]?\s*(?:=|:|->)\s*`?([a-z_]+)`?",
     ]:
         for match in re.finditer(pattern, lowered):
             name = match.group(1)

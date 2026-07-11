@@ -26,6 +26,12 @@ R_LOOP_VESSEL_SUMMARY_CHILD_EXPANSION_POLICY_ID = (
     "R_LOOP_VESSEL_SUMMARY_CHILD_EXPANSION_V0"
 )
 R_LOOP_VESSEL_SUMMARY_CHILD_EXPANSION_MAX_DEPTH = 2
+R_LOOP_VESSEL_SOURCE_LEAF_RAW_RESOLUTION_POLICY_ID = (
+    "R_LOOP_VESSEL_SOURCE_LEAF_EXACT_RAW_RESOLUTION_V0"
+)
+R_LOOP_VESSEL_SOURCE_TEXT_RESOLUTION_POLICY_ID = (
+    "R_LOOP_VESSEL_EXACT_SOURCE_TEXT_RESOLUTION_V0"
+)
 R_LOOP_VESSEL_READ_PACKET_STATUSES = {
     "passed",
     "empty",
@@ -51,6 +57,10 @@ class RLoopVesselEntryCandidateRecord:
     source_summary_count: int | None
     source_graph_node_ids: list[str]
     parent_graph_node_ids: list[str]
+    raw_original_text_status: str
+    raw_original_text_data_ids: list[str]
+    raw_original_text_char_count: int
+    raw_original_text_materials: list[dict[str, object]]
 
 
 @dataclass(frozen=True)
@@ -104,6 +114,15 @@ class RLoopVesselReadPacketFrame:
     exact_child_expanded_entry_count: int
     exact_child_expanded_node_ids: list[str]
     exact_child_expansion_truncated: bool
+    source_leaf_raw_resolution_policy_id: str
+    source_leaf_raw_target_node_ids: list[str]
+    source_leaf_raw_resolved_node_ids: list[str]
+    source_leaf_raw_appended_node_ids: list[str]
+    source_leaf_raw_missing_node_ids: list[str]
+    source_text_resolution_policy_id: str
+    source_text_target_data_ids: list[str]
+    source_text_resolved_data_ids: list[str]
+    source_text_missing_data_ids: list[str]
     summary_count_by_data_kind: dict[str, int]
     summary_count_by_depth: dict[str, int]
     entry_candidate_records: list[dict[str, object]]
@@ -185,6 +204,8 @@ def build_r_loop_vessel_read_packet_from_neo4j(
                     total_summary_scanned_count,
                     expanded_entry_records,
                     expanded_summary_records,
+                    source_leaf_raw_resolution,
+                    source_text_resolution,
                 ) = session.execute_read(
                     _execute_read_packet,
                     SONGRYEON_GRAPH_NAMESPACE,
@@ -230,6 +251,21 @@ def build_r_loop_vessel_read_packet_from_neo4j(
         summary_child_expansion_truncated=(
             expanded_summary_records.summary_child_expansion_truncated
         ),
+        source_leaf_raw_target_node_ids=(
+            source_leaf_raw_resolution.target_node_ids
+        ),
+        source_leaf_raw_resolved_node_ids=(
+            source_leaf_raw_resolution.resolved_node_ids
+        ),
+        source_leaf_raw_appended_node_ids=(
+            source_leaf_raw_resolution.appended_node_ids
+        ),
+        source_leaf_raw_missing_node_ids=(
+            source_leaf_raw_resolution.missing_node_ids
+        ),
+        source_text_target_data_ids=source_text_resolution.target_data_ids,
+        source_text_resolved_data_ids=source_text_resolution.resolved_data_ids,
+        source_text_missing_data_ids=source_text_resolution.missing_data_ids,
     )
 
 
@@ -305,6 +341,23 @@ class _SummaryExpansion:
     summary_child_expansion_truncated: bool
 
 
+@dataclass(frozen=True)
+class _SourceLeafRawResolution:
+    records: list[object]
+    target_node_ids: list[str]
+    resolved_node_ids: list[str]
+    appended_node_ids: list[str]
+    missing_node_ids: list[str]
+
+
+@dataclass(frozen=True)
+class _SourceTextResolution:
+    target_data_ids: list[str]
+    resolved_data_ids: list[str]
+    missing_data_ids: list[str]
+    materials_by_raw_node_id: dict[str, list[dict[str, object]]]
+
+
 def _make_packet(
     *,
     base: _PacketBase,
@@ -320,12 +373,26 @@ def _make_packet(
     base_summary_candidate_count: int | None = None,
     summary_child_expanded_node_ids: list[str] | None = None,
     summary_child_expansion_truncated: bool = False,
+    source_leaf_raw_target_node_ids: list[str] | None = None,
+    source_leaf_raw_resolved_node_ids: list[str] | None = None,
+    source_leaf_raw_appended_node_ids: list[str] | None = None,
+    source_leaf_raw_missing_node_ids: list[str] | None = None,
+    source_text_target_data_ids: list[str] | None = None,
+    source_text_resolved_data_ids: list[str] | None = None,
+    source_text_missing_data_ids: list[str] | None = None,
 ) -> RLoopVesselReadPacketFrame:
     entry_payloads = [asdict(candidate) for candidate in entry_candidates]
     summary_payloads = [asdict(candidate) for candidate in active_summary_candidates]
     active_summary_count = len(active_summary_candidates)
     expanded_node_ids = exact_child_expanded_node_ids or []
     expanded_summary_node_ids = summary_child_expanded_node_ids or []
+    raw_target_node_ids = source_leaf_raw_target_node_ids or []
+    raw_resolved_node_ids = source_leaf_raw_resolved_node_ids or []
+    raw_appended_node_ids = source_leaf_raw_appended_node_ids or []
+    raw_missing_node_ids = source_leaf_raw_missing_node_ids or []
+    source_text_target_ids = source_text_target_data_ids or []
+    source_text_resolved_ids = source_text_resolved_data_ids or []
+    source_text_missing_ids = source_text_missing_data_ids or []
     skipped_summary_count = (
         None
         if total_summary_scanned_count is None
@@ -397,6 +464,17 @@ def _make_packet(
         exact_child_expanded_entry_count=len(expanded_node_ids),
         exact_child_expanded_node_ids=expanded_node_ids,
         exact_child_expansion_truncated=exact_child_expansion_truncated,
+        source_leaf_raw_resolution_policy_id=(
+            R_LOOP_VESSEL_SOURCE_LEAF_RAW_RESOLUTION_POLICY_ID
+        ),
+        source_leaf_raw_target_node_ids=raw_target_node_ids,
+        source_leaf_raw_resolved_node_ids=raw_resolved_node_ids,
+        source_leaf_raw_appended_node_ids=raw_appended_node_ids,
+        source_leaf_raw_missing_node_ids=raw_missing_node_ids,
+        source_text_resolution_policy_id=R_LOOP_VESSEL_SOURCE_TEXT_RESOLUTION_POLICY_ID,
+        source_text_target_data_ids=source_text_target_ids,
+        source_text_resolved_data_ids=source_text_resolved_ids,
+        source_text_missing_data_ids=source_text_missing_ids,
         summary_count_by_data_kind=_count_summaries_by_data_kind(active_summary_candidates),
         summary_count_by_depth=_count_summaries_by_depth(active_summary_candidates),
         entry_candidate_records=entry_payloads,
@@ -418,6 +496,13 @@ def _make_packet(
             ),
             summary_child_expanded_node_ids=expanded_summary_node_ids,
             summary_child_expansion_truncated=summary_child_expansion_truncated,
+            source_leaf_raw_target_node_ids=raw_target_node_ids,
+            source_leaf_raw_resolved_node_ids=raw_resolved_node_ids,
+            source_leaf_raw_appended_node_ids=raw_appended_node_ids,
+            source_leaf_raw_missing_node_ids=raw_missing_node_ids,
+            source_text_target_data_ids=source_text_target_ids,
+            source_text_resolved_data_ids=source_text_resolved_ids,
+            source_text_missing_data_ids=source_text_missing_ids,
         ),
         source_data_ids=source_data_ids,
         source_trace_ids=source_trace_ids,
@@ -436,17 +521,11 @@ def _execute_read_packet(
     int,
     _EntryExpansion,
     _SummaryExpansion,
+    _SourceLeafRawResolution,
+    _SourceTextResolution,
 ]:
     entry_records = _read_entry_records(tx, graph_namespace)
     summary_records = _read_summary_records(tx, graph_namespace)
-    expanded_entry_records = _expand_entry_records_by_exact_children(
-        entry_records=entry_records,
-        limit=limit,
-    )
-    entry_candidates = [
-        _entry_candidate_from_record(record)
-        for record in expanded_entry_records.records
-    ]
     active_summary_candidates_all = [
         _summary_candidate_from_record(record)
         for record in summary_records
@@ -461,13 +540,211 @@ def _execute_read_packet(
         all_candidates=active_summary_candidates_all,
         limit=limit,
     )
+    expanded_entry_records = _expand_entry_records_by_exact_children(
+        entry_records=entry_records,
+        limit=limit,
+    )
+    source_leaf_raw_resolution = _materialize_source_leaf_raw_records(
+        entry_records=entry_records,
+        expanded_entry_records=expanded_entry_records,
+        summary_candidates=summary_expansion.candidates,
+    )
+    source_text_resolution = _resolve_raw_source_text_materials(
+        tx=tx,
+        graph_namespace=graph_namespace,
+        entry_records=source_leaf_raw_resolution.records,
+    )
+    entry_candidates = [
+        _entry_candidate_from_record(
+            record,
+            source_text_materials_by_raw_node_id=(
+                source_text_resolution.materials_by_raw_node_id
+            ),
+        )
+        for record in source_leaf_raw_resolution.records
+    ]
     return (
         entry_candidates,
         summary_expansion.candidates,
         len(summary_records),
         expanded_entry_records,
         summary_expansion,
+        source_leaf_raw_resolution,
+        source_text_resolution,
     )
+
+
+def _materialize_source_leaf_raw_records(
+    *,
+    entry_records: list[object],
+    expanded_entry_records: _EntryExpansion,
+    summary_candidates: list[RLoopVesselSummaryCandidateRecord],
+) -> _SourceLeafRawResolution:
+    """Copy exact RawSource records named by visible source-leaf summaries.
+
+    This is coordinate resolution, not relevance selection. The IDs already
+    exist in the summary records; code only checks whether the corresponding
+    Neo4j entry record was loaded and makes that exact record available to R.
+    """
+
+    target_node_ids = _source_leaf_raw_target_ids(summary_candidates)
+    all_records_by_id = {
+        candidate_id: record
+        for record in entry_records
+        for candidate_id in [_optional_record_str(record, "candidate_node_id")]
+        if candidate_id
+    }
+    records = list(expanded_entry_records.records)
+    selected_ids = {
+        candidate_id
+        for record in records
+        for candidate_id in [_optional_record_str(record, "candidate_node_id")]
+        if candidate_id
+    }
+    resolved_node_ids: list[str] = []
+    appended_node_ids: list[str] = []
+    missing_node_ids: list[str] = []
+
+    for target_node_id in target_node_ids:
+        target_record = all_records_by_id.get(target_node_id)
+        if target_record is None:
+            missing_node_ids.append(target_node_id)
+            continue
+        resolved_node_ids.append(target_node_id)
+        if target_node_id in selected_ids:
+            continue
+        records.append(target_record)
+        selected_ids.add(target_node_id)
+        appended_node_ids.append(target_node_id)
+
+    return _SourceLeafRawResolution(
+        records=records,
+        target_node_ids=target_node_ids,
+        resolved_node_ids=resolved_node_ids,
+        appended_node_ids=appended_node_ids,
+        missing_node_ids=missing_node_ids,
+    )
+
+
+def _source_leaf_raw_target_ids(
+    candidates: list[RLoopVesselSummaryCandidateRecord],
+) -> list[str]:
+    values: list[str] = []
+    for candidate in candidates:
+        if candidate.data_kind != "source_leaf_summary":
+            continue
+        values.extend(
+            source_id
+            for source_id in candidate.source_graph_node_ids
+            if source_id.startswith("graph:raw_source:")
+        )
+        values.extend(
+            source_id
+            for source_id in candidate.source_data_ids
+            if source_id.startswith("graph:raw_source:")
+        )
+        if (
+            candidate.target_graph_node_id is not None
+            and candidate.target_graph_node_id.startswith("graph:raw_source:")
+        ):
+            values.append(candidate.target_graph_node_id)
+    return _unique_strings(values)
+
+
+def _resolve_raw_source_text_materials(
+    *,
+    tx: object,
+    graph_namespace: str,
+    entry_records: list[object],
+) -> _SourceTextResolution:
+    source_text_ids_by_raw_node_id: dict[str, list[str]] = {}
+    target_data_ids: list[str] = []
+    for record in entry_records:
+        candidate_node_id = _optional_record_str(record, "candidate_node_id")
+        if not candidate_node_id or not candidate_node_id.startswith("graph:raw_source:"):
+            continue
+        source_text_ids = [
+            source_id
+            for source_id in _list_strings(_payload(record).get("source_data_ids"))
+            if source_id.startswith("source_text:")
+        ]
+        source_text_ids_by_raw_node_id[candidate_node_id] = source_text_ids
+        target_data_ids.extend(source_text_ids)
+    target_data_ids = _unique_strings(target_data_ids)
+
+    source_text_records = _read_exact_source_text_records(
+        tx=tx,
+        graph_namespace=graph_namespace,
+        source_text_data_ids=target_data_ids,
+    )
+    materials_by_data_id: dict[str, dict[str, object]] = {}
+    for record in source_text_records:
+        source_text_data_id = _optional_record_str(record, "source_text_data_id")
+        if not source_text_data_id:
+            continue
+        payload = _payload(record)
+        text = _text(payload.get("text"))
+        materials_by_data_id[source_text_data_id] = {
+            "source_text_data_id": source_text_data_id,
+            "text": text,
+            "text_char_count": len(text),
+            "path": _text(payload.get("path")) or None,
+            "source_kind": _text(payload.get("source_kind")) or None,
+            "generated_by": _text(payload.get("generated_by")) or None,
+            "info_class": _text(payload.get("info_class")) or None,
+            "semantic_judgement_status": (
+                _text(payload.get("semantic_judgement_status")) or None
+            ),
+        }
+
+    materials_by_raw_node_id: dict[str, list[dict[str, object]]] = {}
+    for raw_node_id, source_text_ids in source_text_ids_by_raw_node_id.items():
+        materials_by_raw_node_id[raw_node_id] = [
+            materials_by_data_id[source_text_id]
+            for source_text_id in source_text_ids
+            if source_text_id in materials_by_data_id
+        ]
+
+    resolved_data_ids = [
+        source_text_data_id
+        for source_text_data_id in target_data_ids
+        if source_text_data_id in materials_by_data_id
+    ]
+    missing_data_ids = [
+        source_text_data_id
+        for source_text_data_id in target_data_ids
+        if source_text_data_id not in materials_by_data_id
+    ]
+    return _SourceTextResolution(
+        target_data_ids=target_data_ids,
+        resolved_data_ids=resolved_data_ids,
+        missing_data_ids=missing_data_ids,
+        materials_by_raw_node_id=materials_by_raw_node_id,
+    )
+
+
+def _read_exact_source_text_records(
+    *,
+    tx: object,
+    graph_namespace: str,
+    source_text_data_ids: list[str],
+) -> list[object]:
+    if not source_text_data_ids:
+        return []
+    result = tx.run(
+        """
+        MATCH (source:GraphMemorySource {graph_namespace: $graph_namespace})
+        WHERE source.data_id IN $source_text_data_ids
+          AND source.data_id STARTS WITH "source_text:"
+        RETURN
+          source.data_id AS source_text_data_id,
+          source.payload_json AS payload_json
+        ORDER BY source.data_id
+        """,
+        graph_namespace=graph_namespace,
+        source_text_data_ids=source_text_data_ids,
+    )
+    return _records(result)
 
 
 def _expand_entry_records_by_exact_children(
@@ -651,12 +928,34 @@ def _read_summary_records(tx: object, graph_namespace: str) -> list[object]:
     return _records(result)
 
 
-def _entry_candidate_from_record(record: object) -> RLoopVesselEntryCandidateRecord:
+def _entry_candidate_from_record(
+    record: object,
+    *,
+    source_text_materials_by_raw_node_id: dict[
+        str, list[dict[str, object]]
+    ] | None = None,
+) -> RLoopVesselEntryCandidateRecord:
     payload = _payload(record)
     candidate_id = _require_record_str(record, "candidate_node_id")
+    candidate_kind = _entry_candidate_kind(record, payload)
+    raw_text_materials = list(
+        (source_text_materials_by_raw_node_id or {}).get(candidate_id, [])
+    )
+    raw_text_data_ids = [
+        str(material["source_text_data_id"])
+        for material in raw_text_materials
+        if isinstance(material.get("source_text_data_id"), str)
+    ]
+    raw_text_char_count = sum(
+        int(material.get("text_char_count") or 0)
+        for material in raw_text_materials
+    )
+    raw_text_status = "not_applicable"
+    if candidate_kind == "raw_source":
+        raw_text_status = "available" if raw_text_char_count > 0 else "missing"
     return RLoopVesselEntryCandidateRecord(
         candidate_node_id=candidate_id,
-        candidate_kind=_entry_candidate_kind(record, payload),
+        candidate_kind=candidate_kind,
         display_name=_require_record_str(record, "display_name"),
         node_kind=_optional_record_str(record, "node_kind")
         or _text(payload.get("node_kind"))
@@ -677,6 +976,10 @@ def _entry_candidate_from_record(record: object) -> RLoopVesselEntryCandidateRec
         source_summary_count=_optional_int(payload.get("source_summary_count")),
         source_graph_node_ids=_list_strings(payload.get("source_graph_node_ids")),
         parent_graph_node_ids=_record_list_strings(record, "parent_graph_node_ids"),
+        raw_original_text_status=raw_text_status,
+        raw_original_text_data_ids=raw_text_data_ids,
+        raw_original_text_char_count=raw_text_char_count,
+        raw_original_text_materials=raw_text_materials,
     )
 
 
@@ -902,6 +1205,13 @@ def _build_packet_lines(
     base_summary_candidate_count: int,
     summary_child_expanded_node_ids: list[str],
     summary_child_expansion_truncated: bool,
+    source_leaf_raw_target_node_ids: list[str],
+    source_leaf_raw_resolved_node_ids: list[str],
+    source_leaf_raw_appended_node_ids: list[str],
+    source_leaf_raw_missing_node_ids: list[str],
+    source_text_target_data_ids: list[str],
+    source_text_resolved_data_ids: list[str],
+    source_text_missing_data_ids: list[str],
 ) -> list[str]:
     lines = [
         f"R loop Vessel entry candidates: {len(entry_candidates)}",
@@ -914,6 +1224,15 @@ def _build_packet_lines(
         "R loop summary child expansion: "
         f"{len(summary_child_expanded_node_ids)}"
         f" / truncated={str(summary_child_expansion_truncated).lower()}",
+        "R loop source-leaf exact RawSource resolution: "
+        f"targets={len(source_leaf_raw_target_node_ids)}"
+        f" / resolved={len(source_leaf_raw_resolved_node_ids)}"
+        f" / appended={len(source_leaf_raw_appended_node_ids)}"
+        f" / missing={len(source_leaf_raw_missing_node_ids)}",
+        "R loop exact source-text resolution: "
+        f"targets={len(source_text_target_data_ids)}"
+        f" / resolved={len(source_text_resolved_data_ids)}"
+        f" / missing={len(source_text_missing_data_ids)}",
     ]
     if entry_candidates:
         lines.append("Entry candidates")
@@ -980,12 +1299,64 @@ def _validate_packet(packet: RLoopVesselReadPacketFrame) -> None:
         raise ValueError("RLoopVesselReadPacketFrame summary child expansion count mismatch")
     if packet.exact_child_expansion_policy_id != R_LOOP_VESSEL_EXACT_CHILD_EXPANSION_POLICY_ID:
         raise ValueError("RLoopVesselReadPacketFrame exact child expansion policy is invalid")
+    if (
+        packet.source_leaf_raw_resolution_policy_id
+        != R_LOOP_VESSEL_SOURCE_LEAF_RAW_RESOLUTION_POLICY_ID
+    ):
+        raise ValueError("RLoopVesselReadPacketFrame RawSource resolution policy is invalid")
+    if (
+        packet.source_text_resolution_policy_id
+        != R_LOOP_VESSEL_SOURCE_TEXT_RESOLUTION_POLICY_ID
+    ):
+        raise ValueError("RLoopVesselReadPacketFrame source-text resolution policy is invalid")
     if packet.base_entry_candidate_count < 0:
         raise ValueError("RLoopVesselReadPacketFrame base_entry_candidate_count is invalid")
     if packet.exact_child_expanded_entry_count != len(packet.exact_child_expanded_node_ids):
         raise ValueError("RLoopVesselReadPacketFrame exact child expansion count mismatch")
     if packet.entry_candidate_count < packet.base_entry_candidate_count:
         raise ValueError("RLoopVesselReadPacketFrame entry count is below base count")
+    entry_candidate_ids = {
+        candidate_id
+        for record in packet.entry_candidate_records
+        for candidate_id in [record.get("candidate_node_id")]
+        if isinstance(candidate_id, str)
+    }
+    target_ids = set(packet.source_leaf_raw_target_node_ids)
+    resolved_ids = set(packet.source_leaf_raw_resolved_node_ids)
+    appended_ids = set(packet.source_leaf_raw_appended_node_ids)
+    missing_ids = set(packet.source_leaf_raw_missing_node_ids)
+    if resolved_ids | missing_ids != target_ids or resolved_ids & missing_ids:
+        raise ValueError("RLoopVesselReadPacketFrame RawSource resolution partition is invalid")
+    if not resolved_ids.issubset(entry_candidate_ids):
+        raise ValueError("resolved RawSource IDs must be present in entry candidates")
+    if not appended_ids.issubset(resolved_ids):
+        raise ValueError("appended RawSource IDs must be resolved")
+    if missing_ids & entry_candidate_ids:
+        raise ValueError("missing RawSource IDs must not be present in entry candidates")
+    if any(not node_id.startswith("graph:raw_source:") for node_id in target_ids):
+        raise ValueError("RawSource resolution IDs must use graph:raw_source coordinates")
+    source_text_target_ids = set(packet.source_text_target_data_ids)
+    source_text_resolved_ids = set(packet.source_text_resolved_data_ids)
+    source_text_missing_ids = set(packet.source_text_missing_data_ids)
+    if (
+        source_text_resolved_ids | source_text_missing_ids != source_text_target_ids
+        or source_text_resolved_ids & source_text_missing_ids
+    ):
+        raise ValueError("RLoopVesselReadPacketFrame source-text partition is invalid")
+    if any(not data_id.startswith("source_text:") for data_id in source_text_target_ids):
+        raise ValueError("source-text resolution IDs must use source_text coordinates")
+    for record in packet.entry_candidate_records:
+        status = record.get("raw_original_text_status")
+        if status not in {"available", "missing", "not_applicable"}:
+            raise ValueError("entry candidate raw_original_text_status is invalid")
+        materials = record.get("raw_original_text_materials")
+        if not isinstance(materials, list):
+            raise TypeError("entry candidate raw_original_text_materials must be a list")
+        char_count = record.get("raw_original_text_char_count")
+        if not isinstance(char_count, int) or char_count < 0:
+            raise ValueError("entry candidate raw_original_text_char_count is invalid")
+        if status == "available" and char_count < 1:
+            raise ValueError("available raw original text requires non-empty material")
     if packet.read_status == "passed":
         if packet.entry_candidate_count + packet.summary_candidate_count < 1:
             raise ValueError("passed RLoopVesselReadPacketFrame must include candidates")

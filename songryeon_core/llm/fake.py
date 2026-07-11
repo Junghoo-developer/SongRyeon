@@ -452,18 +452,19 @@ class SongRyeonAllNodesFakeLLMAdapter:
 
     def _node_2_answer_basis_payload(self, request: LLMRequest) -> dict[str, object]:
         user_question = str(request.input_payload.get("user_question") or "")
-        source_data_ids = request.input_payload.get("source_data_ids")
-        if not isinstance(source_data_ids, list):
-            source_data_ids = []
-        source_ids = [item for item in source_data_ids if isinstance(item, str) and item]
-        primary_source = source_ids[0] if source_ids else "not_supplied"
-        document_source = next(
+        available_sources = request.input_payload.get("available_evidence_sources")
+        if not isinstance(available_sources, list):
+            available_sources = []
+        source_rows = [item for item in available_sources if isinstance(item, dict)]
+        primary_ref = str(source_rows[0].get("evidence_ref") or "") if source_rows else ""
+        document_ref = next(
             (
-                source_id
-                for source_id in source_ids
-                if "boundary" in source_id or "handoff" in source_id or "L3" in source_id
+                str(source.get("evidence_ref") or "")
+                for source in source_rows
+                if source.get("source_kind")
+                in {"metainfo_boundary", "node2_handoff", "l3_result"}
             ),
-            primary_source,
+            primary_ref,
         )
         if any(
             keyword in user_question
@@ -490,13 +491,13 @@ class SongRyeonAllNodesFakeLLMAdapter:
             "mode_selection_reason_info_class": "mixed",
             "evidence_roles": [
                 {
-                    "source_data_id": document_source,
+                    "evidence_ref": document_ref,
                     "evidence_role": "primary_answer_basis",
                     "role_reason": "fake adapter가 supplied source bundle 안에서 대표 근거 역할을 부여했다.",
                     "role_reason_info_class": "mixed",
                 }
             ]
-            if source_ids
+            if document_ref
             else [],
         }
 

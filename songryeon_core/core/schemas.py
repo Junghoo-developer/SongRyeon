@@ -1322,7 +1322,7 @@ def _validate_node2_evidence_role(
             raise ValueError(f"Node2EvidenceRole.{field_name} must not be empty")
     if role.evidence_role not in EVIDENCE_ROLES:
         raise ValueError(f"unknown evidence_role: {role.evidence_role}")
-    if role.role_reason_info_class not in ANSWER_BASIS_INFO_CLASSES:
+    if role.role_reason_info_class not in {"relative", "mixed"}:
         raise ValueError(
             f"unknown Node2EvidenceRole.role_reason_info_class: {role.role_reason_info_class}"
         )
@@ -1420,6 +1420,7 @@ LLM_CALL_FRAME_SCHEMA_VERSION = "0.1"
 LLM_CALL_PARSE_STATUSES = {"passed", "failed", "not_checked"}
 LLM_CALL_VALIDATION_STATUSES = {"passed", "failed", "not_checked"}
 LLM_CALL_FAILURE_TYPES = {"none", "parse_failed", "schema_failed", "adapter_failed"}
+LLM_CALL_INPUT_PAYLOAD_AUDIT_STATUSES = {"not_recorded", "recorded"}
 
 
 @dataclass
@@ -1456,6 +1457,16 @@ class LLMCallFrame:
     source_trace_ids: list[str] = field(default_factory=list)
     # 절대 정보: 이 호출의 입력 근거 data ID 목록.
     source_data_ids: list[str] = field(default_factory=list)
+    # 절대 정보: LLM 입력 payload 감사 스냅샷 기록 여부.
+    input_payload_audit_status: str = "not_recorded"
+    # 절대 정보: 정규화된 입력 payload JSON의 SHA-256. 원문 전체를 저장하지 않아도 동일 입력인지 확인한다.
+    input_payload_sha256: str | None = None
+    # 절대 정보: 정규화된 입력 payload JSON의 문자 수.
+    input_payload_json_char_count: int = 0
+    # 절대 정보: 입력 payload 최상위 key 목록. 어떤 봉투가 들어갔는지 빠르게 확인한다.
+    input_payload_top_level_keys: list[str] = field(default_factory=list)
+    # 절대 정보: 입력 payload JSON 앞부분. 대형 문서 폭탄을 피하기 위해 실행기가 길이를 제한한다.
+    input_payload_preview_json: str = ""
     # 절대 정보: 적용된 스키마 이름.
     schema_name: str = LLM_CALL_FRAME_SCHEMA_NAME
     # 절대 정보: 적용된 스키마 버전.
@@ -1492,10 +1503,26 @@ def validate_llm_call_frame(frame: LLMCallFrame) -> None:
         raise ValueError(f"unknown LLM validation_status: {frame.validation_status}")
     if frame.failure_type not in LLM_CALL_FAILURE_TYPES:
         raise ValueError(f"unknown LLM failure_type: {frame.failure_type}")
+    if frame.input_payload_audit_status not in LLM_CALL_INPUT_PAYLOAD_AUDIT_STATUSES:
+        raise ValueError(f"unknown LLM input_payload_audit_status: {frame.input_payload_audit_status}")
     if not isinstance(frame.retry_count, int):
         raise TypeError("LLMCallFrame.retry_count must be an integer")
     if frame.retry_count < 0:
         raise ValueError("LLMCallFrame.retry_count must not be negative")
+    if not isinstance(frame.input_payload_json_char_count, int):
+        raise TypeError("LLMCallFrame.input_payload_json_char_count must be an integer")
+    if frame.input_payload_json_char_count < 0:
+        raise ValueError("LLMCallFrame.input_payload_json_char_count must not be negative")
+    if frame.input_payload_audit_status == "recorded":
+        if not frame.input_payload_sha256:
+            raise ValueError("LLMCallFrame.input_payload_sha256 must be set when input payload audit is recorded")
+        if len(frame.input_payload_sha256) != 64:
+            raise ValueError("LLMCallFrame.input_payload_sha256 must be a SHA-256 hex digest")
+        if frame.input_payload_json_char_count <= 0:
+            raise ValueError("LLMCallFrame.input_payload_json_char_count must be positive when recorded")
+    else:
+        if frame.input_payload_sha256 is not None:
+            raise ValueError("LLMCallFrame.input_payload_sha256 must be None when input payload audit is not recorded")
 
     for trace_id in frame.source_trace_ids:
         if not trace_id:
@@ -1503,6 +1530,9 @@ def validate_llm_call_frame(frame: LLMCallFrame) -> None:
     for data_id in frame.source_data_ids:
         if not data_id:
             raise ValueError("LLMCallFrame.source_data_ids must not contain empty values")
+    for key in frame.input_payload_top_level_keys:
+        if not key:
+            raise ValueError("LLMCallFrame.input_payload_top_level_keys must not contain empty values")
 
 
 @dataclass
@@ -2226,6 +2256,9 @@ class Node3VesselRMaterialItem:
     # 이미 graph memory에 저장된 요약 text. code가 새 요약을 만들지 않는다.
     summary_text: str = ""
     summary_text_char_count: int = 0
+    # RawSource에서 code가 그대로 복사한 원문. 요약문과 섞지 않는다.
+    raw_text: str = ""
+    raw_text_char_count: int = 0
     text_payload_status: str = "metadata_only"
     source_data_ids: list[str] = field(default_factory=list)
 
@@ -2844,7 +2877,11 @@ def _validate_node3_vessel_r_material_item(item: Node3VesselRMaterialItem) -> No
         raise ValueError(f"unknown Node3VesselRMaterialItem.material_kind: {item.material_kind}")
     if item.info_class not in {"absolute", "relative", "mixed"}:
         raise ValueError(f"unknown Node3VesselRMaterialItem.info_class: {item.info_class}")
-    if item.text_payload_status not in {"included_summary_text", "metadata_only"}:
+    if item.text_payload_status not in {
+        "included_summary_text",
+        "included_raw_original_text",
+        "metadata_only",
+    }:
         raise ValueError(
             "unknown Node3VesselRMaterialItem.text_payload_status: "
             f"{item.text_payload_status}"
@@ -2854,6 +2891,7 @@ def _validate_node3_vessel_r_material_item(item: Node3VesselRMaterialItem) -> No
         "source_leaf_count": item.source_leaf_count,
         "source_summary_count": item.source_summary_count,
         "summary_text_char_count": item.summary_text_char_count,
+        "raw_text_char_count": item.raw_text_char_count,
     }.items():
         if not isinstance(value, int):
             raise TypeError(f"Node3VesselRMaterialItem.{field_name} must be an integer")
@@ -2861,8 +2899,19 @@ def _validate_node3_vessel_r_material_item(item: Node3VesselRMaterialItem) -> No
             raise ValueError(f"Node3VesselRMaterialItem.{field_name} must not be negative")
     if item.text_payload_status == "included_summary_text" and not item.summary_text:
         raise ValueError("included_summary_text requires summary_text")
-    if item.text_payload_status == "metadata_only" and item.summary_text:
-        raise ValueError("metadata_only item must not contain summary_text")
+    if item.text_payload_status == "included_raw_original_text":
+        if item.material_kind != "raw_original" or not item.raw_text:
+            raise ValueError(
+                "included_raw_original_text requires raw_original material with raw_text"
+            )
+    if item.text_payload_status == "included_summary_text" and item.raw_text:
+        raise ValueError("included_summary_text item must not contain raw_text")
+    if item.text_payload_status == "included_raw_original_text" and item.summary_text:
+        raise ValueError("included_raw_original_text item must not contain summary_text")
+    if item.text_payload_status == "metadata_only" and (
+        item.summary_text or item.raw_text
+    ):
+        raise ValueError("metadata_only item must not contain text")
     if item.graph_node_id not in item.source_data_ids:
         raise ValueError("Node3VesselRMaterialItem.source_data_ids must include graph_node_id")
 

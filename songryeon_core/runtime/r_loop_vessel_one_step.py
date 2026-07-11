@@ -305,6 +305,10 @@ def run_local_r_loop_vessel_traverse(
         "raw_original_material_seen_count": (
             run.result_frame.raw_original_material_seen_count
         ),
+        "raw_original_node_selected_count": (
+            run.result_frame.raw_original_node_selected_count
+        ),
+        "raw_original_text_read_count": run.result_frame.raw_original_text_read_count,
         "max_raw_original_material_count": (
             run.result_frame.max_raw_original_material_count
         ),
@@ -430,7 +434,11 @@ def render_r_loop_vessel_traverse_text(result: dict[str, object]) -> str:
         f"edges={result.get('turn_activity_graph_link_edge_count')}",
         f"terminal_material_seen_count: {result.get('terminal_material_seen_count')}",
         f"min_terminal_material_count: {result.get('min_terminal_material_count')}",
-        f"raw_original_material_seen_count: {result.get('raw_original_material_seen_count')}",
+        "raw_original_node_selected_count: "
+        f"{result.get('raw_original_node_selected_count')}",
+        f"raw_original_text_read_count: {result.get('raw_original_text_read_count')}",
+        "raw_original_material_seen_count(legacy_node_count): "
+        f"{result.get('raw_original_material_seen_count')}",
         f"max_raw_original_material_count: {result.get('max_raw_original_material_count')}",
         f"raw_original_read_cap_reached: {result.get('raw_original_read_cap_reached')}",
         f"early_stop_guard_trigger_count: {result.get('early_stop_guard_trigger_count')}",

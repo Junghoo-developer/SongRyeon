@@ -74,6 +74,8 @@ def test_r_vessel_traverse_stops_after_five_raw_original_reads() -> None:
 
     assert result.result_frame.traverse_status == "completed"
     assert result.result_frame.raw_original_material_seen_count == 5
+    assert result.result_frame.raw_original_node_selected_count == 5
+    assert result.result_frame.raw_original_text_read_count == 0
     assert result.result_frame.max_raw_original_material_count == (
         R_TRAVERSE_MAX_RAW_ORIGINAL_MATERIAL_READS
     )
@@ -121,6 +123,8 @@ def test_summary_layer_material_does_not_count_as_raw_original_read() -> None:
     )
 
     assert result.result_frame.raw_original_material_seen_count == 0
+    assert result.result_frame.raw_original_node_selected_count == 0
+    assert result.result_frame.raw_original_text_read_count == 0
     assert result.result_frame.raw_original_read_cap_reached is False
 
 

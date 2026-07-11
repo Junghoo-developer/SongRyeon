@@ -44,7 +44,7 @@ def test_node2_answer_basis_absolute_first_fixture() -> None:
             ],
             "mode_selection_reason": "runtime count 확인 요청이므로 코드/trace 값 중심으로 답해야 한다.",
             "mode_selection_reason_info_class": "mixed",
-            "evidence_roles": [_role("source:runtime", "primary_answer_basis")],
+            "evidence_roles": [_role("E001", "primary_answer_basis")],
         },
         user_question="몇 개 읽었어?",
     )
@@ -62,7 +62,7 @@ def test_node2_answer_basis_relative_allowed_fixture() -> None:
             "basis_reason_codes": ["user_asked_for_interpretation"],
             "mode_selection_reason": "사용자가 구조 의견을 요청했으므로 해석과 조언이 허용된다.",
             "mode_selection_reason_info_class": "mixed",
-            "evidence_roles": [_role("source:runtime", "supporting_context")],
+            "evidence_roles": [_role("E001", "supporting_context")],
         },
         user_question="이 구조 어때?",
     )
@@ -80,8 +80,8 @@ def test_node2_answer_basis_mixed_or_uncertain_fixture() -> None:
             "mode_selection_reason": "최근 대화와 실행 기록 source bundle을 함께 봐야 하므로 한계를 표시해야 한다.",
             "mode_selection_reason_info_class": "mixed",
             "evidence_roles": [
-                _role("source:runtime", "supporting_context"),
-                _role("source:memory", "primary_answer_basis"),
+                _role("E001", "supporting_context"),
+                _role("E002", "primary_answer_basis"),
             ],
         },
         user_question="오늘 전체 흐름 정리해줘.",
@@ -124,7 +124,7 @@ def test_node3_brief_receives_answer_basis_without_raw_id_leak_in_llm_payload() 
             "basis_reason_codes": ["code_verified_fact_required"],
             "mode_selection_reason": "확인 가능한 실행 값 중심으로 답해야 한다.",
             "mode_selection_reason_info_class": "mixed",
-            "evidence_roles": [_role("source:runtime", "primary_answer_basis")],
+            "evidence_roles": [_role("E001", "primary_answer_basis")],
         },
         user_question="route가 뭐야?",
     )
@@ -213,9 +213,9 @@ def _stores() -> tuple[TraceStore, DataStore, str]:
     return trace_store, data_store, seed_event.event_id
 
 
-def _role(source_data_id: str, evidence_role: str) -> dict[str, object]:
+def _role(evidence_ref: str, evidence_role: str) -> dict[str, object]:
     return {
-        "source_data_id": source_data_id,
+        "evidence_ref": evidence_ref,
         "evidence_role": evidence_role,
         "role_reason": "테스트 fixture가 지정한 역할이다.",
         "role_reason_info_class": "mixed",

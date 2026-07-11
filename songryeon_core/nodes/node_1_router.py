@@ -138,14 +138,15 @@ def route_next_with_llm(
     prompt = Path(prompt_ref).read_text(encoding="utf-8")
     allowed_routes = ["L", "2"]
     route_meanings = {
-        "L": "source document/code/artifact lookup loop for unread or source-grounded evidence",
+        "L": "fresh disk/source document/code/artifact lookup for evidence that is not ingested or whose current file state must be verified",
         "2": "direct metainfo boundary and final reporting when supplied context is enough",
     }
     if allow_r_route_experimental:
         allowed_routes.append("R")
         route_meanings["R"] = (
             "explicitly enabled Vessel/Neo4j graph-memory traversal route for already-ingested "
-            "graph memory, CoreEgo/time-axis/source-bundle/summary-layer structure, and graph-vs-document-search comparisons"
+            "graph memory, CoreEgo/time-axis/source-bundle/summary-layer structure, and available "
+            "RawSource original text copied into the graph read packet"
         )
     input_payload = {
         "user_input": user_input,
@@ -233,11 +234,12 @@ def _route_capability_cards(
         {
             "route": "L",
             "role_label": "source_lookup_loop",
-            "plain_korean": "문서/코드/아티팩트 원문을 새로 찾거나 읽어야 할 때 쓰는 길.",
+            "plain_korean": "그래프에 아직 없거나 최신 디스크 상태를 다시 확인해야 하는 문서/코드/아티팩트 원문을 찾을 때 쓰는 길.",
             "best_for": [
                 "internal document lookup",
                 "source-code or artifact inspection",
-                "questions requiring unread project documents or exact source evidence",
+                "questions requiring source evidence not already ingested into Vessel",
+                "questions requiring verification of the latest disk state after graph ingestion",
                 "identity/project-definition questions that must be grounded in internal documents",
             ],
             "not_for": [
@@ -282,12 +284,13 @@ def _route_capability_cards(
                 "role_label": "vessel_graph_memory_traversal_loop",
                 "plain_korean": (
                     "이미 Vessel/Neo4j 그래프에 적재된 기억 구조를 CoreEgo/time axis/source bundle/"
-                    "summary layer 방향으로 탐색할 때 쓰는 길."
+                    "summary layer 방향으로 탐색하고, 적재된 RawSource 원문이 있으면 그 원문까지 내려가는 길."
                 ),
                 "availability": "only when R is included in allowed_routes",
                 "best_for": [
                     "already-ingested Vessel or Neo4j graph memory",
                     "CoreEgo, Time Axis, Time Bundle, Source Kind Bundle, Raw Source, or SummaryGraphNode traversal",
+                    "exact original text of an already-ingested RawSource when raw_original_text_status is available",
                     "current or recent SongRyeon Core development-status briefing from already-ingested Vessel graph memory",
                     "recent order history or implementation timeline briefing when the user wants the project state reconstructed from graph memory",
                     "questions comparing graph memory traversal against document search",
@@ -296,7 +299,8 @@ def _route_capability_cards(
                 "not_for": [
                     "source documents/code that have not been ingested into Vessel graph memory",
                     "freshly changed source files or order documents that must be read from disk because they may not be ingested yet",
-                    "requests that explicitly demand fresh document search or exact source-file reading",
+                    "requests that explicitly demand current disk state newer than the graph observation",
+                    "RawSource records whose original text is missing from the Vessel read packet",
                     "recent conversation memory that selected context already covers",
                 ],
                 "evidence_surface": [
@@ -304,8 +308,15 @@ def _route_capability_cards(
                     "R1 graph search goal",
                     "R2 graph node/surface selection",
                     "R3 graph inspection",
+                    "code-copied RawSource original text when available",
                     "Vessel R return packet",
                 ],
+                "raw_source_original_text_access": (
+                    "available only for already-ingested RawSource records whose code-resolved original text status is available"
+                ),
+                "freshness_boundary": (
+                    "R reads the observed graph version; choose L when the user requires a newer on-disk version or an un-ingested source"
+                ),
                 "expected_next_0_mode": R_ROUTE_EXPERIMENTAL_NEXT_0_MODE,
                 "policy_flag": R_ROUTE_EXPERIMENTAL_POLICY_FLAG,
             }
