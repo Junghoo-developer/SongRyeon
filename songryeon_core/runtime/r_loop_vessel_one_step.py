@@ -314,6 +314,15 @@ def run_local_r_loop_vessel_traverse(
         ),
         "raw_original_read_cap_reached": run.result_frame.raw_original_read_cap_reached,
         "early_stop_guard_trigger_count": run.result_frame.early_stop_guard_trigger_count,
+        "required_material_level": run.result_frame.required_material_level,
+        "required_material_count": run.result_frame.required_material_count,
+        "evidence_contract_observed_count": (
+            run.result_frame.evidence_contract_observed_count
+        ),
+        "evidence_contract_status": run.result_frame.evidence_contract_status,
+        "evidence_contract_material_node_ids": (
+            run.result_frame.evidence_contract_material_node_ids
+        ),
         "candidate_surface_frame_ids": run.result_frame.candidate_surface_frame_ids,
         "graph_traversal_candidate_surface_frame_ids": (
             run.result_frame.graph_traversal_candidate_surface_frame_ids
@@ -369,6 +378,11 @@ def render_r_loop_vessel_one_step_text(result: dict[str, object]) -> str:
         f"sufficiency_status: {result.get('sufficiency_status')}",
         f"continuation_status: {result.get('continuation_status')}",
         f"r_loop_task_status: {result.get('r_loop_task_status')}",
+        "R1 evidence contract: "
+        f"level={result.get('required_material_level')} / "
+        f"required={result.get('required_material_count')} / "
+        f"observed={result.get('evidence_contract_observed_count')} / "
+        f"status={result.get('evidence_contract_status')}",
         f"hierarchy_child_candidate_count: {result.get('hierarchy_child_candidate_count')}",
     ]
     child_ids = result.get("hierarchy_child_candidate_node_ids")
@@ -392,7 +406,11 @@ def render_r_loop_vessel_one_step_text(result: dict[str, object]) -> str:
     if isinstance(r1, dict):
         lines.append("")
         lines.append(f"R1 goal: {r1.get('graph_search_goal')}")
-        lines.append(f"R1 granularity: {r1.get('required_information_granularity')}")
+        lines.append(
+            "R1 required material: "
+            f"{r1.get('required_material_level')} x "
+            f"{r1.get('required_material_count')}"
+        )
     r2 = result.get("r2_selection_frame")
     if isinstance(r2, dict):
         lines.append("")

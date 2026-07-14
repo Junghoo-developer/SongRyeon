@@ -42,13 +42,20 @@ def test_vessel_r_gate_runs_live_r_and_returns_material_to_node3() -> None:
     assert result["vessel_r_task_status"] == "sufficient"
     assert result["vessel_r_return_packet_status"] == "available"
     assert result["vessel_r_node3_material_ready"] is True
-    assert result["vessel_r_close_route_id"] == "route:2"
+    assert result["vessel_r_close_route_id"] == "R:run:0001:return:route:2"
     assert "R:Vessel_R1_R2_R3_traverse" in result["route2_handoff_path"]
     assert result["node3_brief_status"] == "ready"
     assert result["node3_vessel_r_material_status"] == "present"
     assert result["node3_vessel_r_material_count"] == 4
     assert result["turn_activity_graph_link_r_vessel_ledger_count"] == 1
     assert result["node4_gate_status"] == "pass"
+    route_payload = next(
+        record["payload"]
+        for record in result["data_records"]
+        if record["data_id"] == "route:R"
+    )
+    assert route_payload["route_execution_mode"] == "vessel_live"
+    assert route_payload["expected_next_0_mode"] == "vessel_r_read_packet"
     assert "Vessel R" in str(result["report"])
     assert "문서 읽기 도구 근거가 아니라" in str(result["report"])
 
@@ -69,6 +76,8 @@ def test_force_vessel_r_route_bypasses_node1_llm_and_runs_vessel_r() -> None:
     assert route_payload["llm_routing_status"] == "not_run"
     assert route_payload["route_rule_id"] == "force_vessel_r_route_policy"
     assert route_payload["policy_flag"] == "force_vessel_r_route"
+    assert route_payload["route_execution_mode"] == "vessel_live"
+    assert route_payload["expected_next_0_mode"] == "vessel_r_read_packet"
     task_payload = next(
         record["payload"]
         for record in result["data_records"]
@@ -98,7 +107,7 @@ def test_vessel_r_read_failure_still_closes_to_node2_safely() -> None:
     assert result["vessel_r_traverse_status"] == "failed"
     assert result["vessel_r_return_packet_status"] == "failed"
     assert result["vessel_r_node3_material_ready"] is False
-    assert result["vessel_r_close_route_id"] == "route:2"
+    assert result["vessel_r_close_route_id"] == "R:run:0001:return:route:2"
     assert result["node3_vessel_r_material_status"] == "failed"
     assert result["node4_gate_status"] == "pass"
     assert "완료 상태로 단정하지 않고" in str(result["report"])

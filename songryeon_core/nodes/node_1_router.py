@@ -6,9 +6,13 @@ from pathlib import Path
 from songryeon_core.core.data_store import DataStore
 from songryeon_core.core.schemas import (
     MemoryPacketFrom0,
-    R_ROUTE_EXPERIMENTAL_NEXT_0_MODE,
+    R_ROUTE_CAPSULE_SKELETON_EXECUTION_MODE,
+    R_ROUTE_CAPSULE_SKELETON_NEXT_0_MODE,
+    R_ROUTE_EXECUTION_MODES,
     R_ROUTE_EXPERIMENTAL_POLICY_FLAG,
     R_ROUTE_FORCE_VESSEL_POLICY_FLAG,
+    R_ROUTE_VESSEL_LIVE_EXECUTION_MODE,
+    R_ROUTE_VESSEL_LIVE_NEXT_0_MODE,
     RoutingDecision,
     RoutingDecisionFrame,
     validate_routing_decision_frame,
@@ -70,7 +74,8 @@ def route_next(
 
     if force_vessel_r_route:
         route = "R"
-        next_0_mode = R_ROUTE_EXPERIMENTAL_NEXT_0_MODE
+        next_0_mode = R_ROUTE_VESSEL_LIVE_NEXT_0_MODE
+        route_execution_mode = R_ROUTE_VESSEL_LIVE_EXECUTION_MODE
         reason = "CODE_STATUS:force_vessel_r_route_policy"
         route_source = "CODE:POLICY_STUB"
         route_rule_id = "force_vessel_r_route_policy"
@@ -79,6 +84,7 @@ def route_next(
     elif force_l_route:
         route = "L"
         next_0_mode = "targeted_memory_supply"
+        route_execution_mode = None
         reason = "CODE_STATUS:force_l_route_policy"
         route_source = "CODE:POLICY_STUB"
         route_rule_id = "force_l_route_policy"
@@ -87,6 +93,7 @@ def route_next(
     elif _should_route_to_l(user_input):
         route = "L"
         next_0_mode = "targeted_memory_supply"
+        route_execution_mode = None
         reason = "CODE_STATUS:l_route_keyword_match"
         route_source = "CODE:RULE_STUB"
         route_rule_id = "l_route_keyword_match"
@@ -95,6 +102,7 @@ def route_next(
     else:
         route = "2"
         next_0_mode = "final_trace_for_2"
+        route_execution_mode = None
         reason = "CODE_STATUS:default_route_to_node_2"
         route_source = "CODE:RULE_STUB"
         route_rule_id = "default_route_to_node_2"
@@ -108,6 +116,7 @@ def route_next(
         route_source=route_source,
         required_schema=schema_registry.binding_for(target_node),
         expected_next_0_mode=next_0_mode,
+        route_execution_mode=route_execution_mode,
         route_rule_id=route_rule_id,
         matched_keywords=matched_keywords,
         policy_flag=policy_flag,
@@ -126,6 +135,9 @@ def route_next_with_llm(
     input_ref: list[str],
     source_data_ids: list[str],
     allow_r_route_experimental: bool = False,
+    r_execution_mode: str | None = None,
+    route_context: str = "entry",
+    r_return_context: dict[str, object] | None = None,
     max_retries: int = 0,
 ) -> RoutingDecision:
     """LLM으로 1번 라우팅을 수행한다.
@@ -136,6 +148,14 @@ def route_next_with_llm(
 
     prompt_ref = "songryeon_core/prompts/node_1_router_v0.md"
     prompt = Path(prompt_ref).read_text(encoding="utf-8")
+    resolved_r_execution_mode = _resolve_r_execution_mode(
+        allow_r_route_experimental=allow_r_route_experimental,
+        r_execution_mode=r_execution_mode,
+    )
+    if route_context not in {"entry", "l_return", "r_return"}:
+        raise ValueError(f"unknown node_1 route_context: {route_context}")
+    if route_context == "r_return" and r_return_context is None:
+        raise ValueError("node_1 r_return route requires r_return_context")
     allowed_routes = ["L", "2"]
     route_meanings = {
         "L": "fresh disk/source document/code/artifact lookup for evidence that is not ingested or whose current file state must be verified",
@@ -143,13 +163,11 @@ def route_next_with_llm(
     }
     if allow_r_route_experimental:
         allowed_routes.append("R")
-        route_meanings["R"] = (
-            "explicitly enabled Vessel/Neo4j graph-memory traversal route for already-ingested "
-            "graph memory, CoreEgo/time-axis/source-bundle/summary-layer structure, and available "
-            "RawSource original text copied into the graph read packet"
-        )
+        route_meanings["R"] = _r_route_meaning(resolved_r_execution_mode)
     input_payload = {
         "user_input": user_input,
+        "route_context": route_context,
+        "r_return_context": r_return_context,
         "memory_packet": {
             "target": memory_packet.target,
             "trace_evidence_ids": memory_packet.trace_evidence_ids,
@@ -167,6 +185,7 @@ def route_next_with_llm(
         "route_meanings": route_meanings,
         "route_capability_cards": _route_capability_cards(
             allow_r_route_experimental=allow_r_route_experimental,
+            r_execution_mode=resolved_r_execution_mode,
         ),
         "route_selection_policy": {
             "policy_id": "NODE1_ROUTE_EVIDENCE_SURFACE_COMPARISON_V0",
@@ -182,7 +201,10 @@ def route_next_with_llm(
             "R": {
                 "enabled": allow_r_route_experimental,
                 "policy_flag": R_ROUTE_EXPERIMENTAL_POLICY_FLAG,
-                "expected_next_0_mode": R_ROUTE_EXPERIMENTAL_NEXT_0_MODE,
+                "r_execution_mode": resolved_r_execution_mode,
+                "expected_next_0_mode": _r_expected_next_0_mode(
+                    resolved_r_execution_mode
+                ),
             }
         },
         "source_data_ids": source_data_ids,
@@ -201,6 +223,7 @@ def route_next_with_llm(
         payload_validator=lambda payload: _validate_llm_routing_payload(
             payload,
             allow_r_route_experimental=allow_r_route_experimental,
+            r_execution_mode=resolved_r_execution_mode,
         ),
     )
     if llm_result.failure_type != "none" or llm_result.validation.payload is None:
@@ -217,12 +240,14 @@ def route_next_with_llm(
         llm_trace_event_id=llm_result.trace_event_id,
         llm_call_data_id=llm_result.call_data_id,
         allow_r_route_experimental=allow_r_route_experimental,
+        r_execution_mode=resolved_r_execution_mode,
     )
 
 
 def _route_capability_cards(
     *,
     allow_r_route_experimental: bool,
+    r_execution_mode: str | None = None,
 ) -> list[dict[str, object]]:
     """node_1에게 각 route가 보는 근거 표면을 명시적으로 알려준다.
 
@@ -230,6 +255,10 @@ def _route_capability_cards(
     선택 가능한 길들의 사용 목적을 적어 LLM router가 스스로 비교하게 한다.
     """
 
+    resolved_r_execution_mode = _resolve_r_execution_mode(
+        allow_r_route_experimental=allow_r_route_experimental,
+        r_execution_mode=r_execution_mode,
+    )
     cards: list[dict[str, object]] = [
         {
             "route": "L",
@@ -259,7 +288,10 @@ def _route_capability_cards(
         {
             "route": "2",
             "role_label": "direct_report_boundary",
-            "plain_korean": "이미 공급된 기억/근거만으로 답할 수 있을 때 바로 보고 단계로 가는 길.",
+            "plain_korean": (
+                "이미 공급된 기억/근거만으로 답할 수 있을 때, node_2가 그 재료를 분류하고 "
+                "답변 자세를 정해 node_3 보고 단계로 넘기는 종착 정리 길."
+            ),
             "best_for": [
                 "selected recent memory context directly covers the question",
                 "no additional source lookup or graph traversal is needed",
@@ -274,12 +306,28 @@ def _route_capability_cards(
                 "selected recent memory context",
                 "already supplied runtime frames",
             ],
+            "node_2_capabilities": [
+                "classify supplied absolute, relative, and mixed information",
+                "select answer-basis posture",
+                "assemble the node_3 input brief",
+            ],
+            "node_2_non_capabilities": [
+                "does not fetch new document, code, or Vessel graph evidence",
+                "does not reroute insufficient material back to L or R",
+                "does not itself block node_3 execution when its recorded status is insufficient",
+            ],
+            "selection_precondition": (
+                "Choose route 2 only when the evidence needed for the answer is already supplied; "
+                "node_2 does not repair a mistaken route choice."
+            ),
+            "report_blocking_authority": "none_in_current_runtime",
+            "recovery_capability": "none_in_current_runtime",
             "expected_next_0_mode": "final_trace_for_2",
         },
     ]
     if allow_r_route_experimental:
-        cards.append(
-            {
+        if resolved_r_execution_mode == R_ROUTE_VESSEL_LIVE_EXECUTION_MODE:
+            cards.append({
                 "route": "R",
                 "role_label": "vessel_graph_memory_traversal_loop",
                 "plain_korean": (
@@ -287,6 +335,7 @@ def _route_capability_cards(
                     "summary layer 방향으로 탐색하고, 적재된 RawSource 원문이 있으면 그 원문까지 내려가는 길."
                 ),
                 "availability": "only when R is included in allowed_routes",
+                "r_execution_mode": R_ROUTE_VESSEL_LIVE_EXECUTION_MODE,
                 "best_for": [
                     "already-ingested Vessel or Neo4j graph memory",
                     "CoreEgo, Time Axis, Time Bundle, Source Kind Bundle, Raw Source, or SummaryGraphNode traversal",
@@ -317,11 +366,80 @@ def _route_capability_cards(
                 "freshness_boundary": (
                     "R reads the observed graph version; choose L when the user requires a newer on-disk version or an un-ingested source"
                 ),
-                "expected_next_0_mode": R_ROUTE_EXPERIMENTAL_NEXT_0_MODE,
+                "expected_next_0_mode": R_ROUTE_VESSEL_LIVE_NEXT_0_MODE,
                 "policy_flag": R_ROUTE_EXPERIMENTAL_POLICY_FLAG,
-            }
-        )
+            })
+        else:
+            cards.append({
+                "route": "R",
+                "role_label": "capsule_graph_memory_skeleton",
+                "plain_korean": (
+                    "최근 TurnStateCapsule을 코드가 만든 작은 시간축 그래프에서 확인하는 "
+                    "결정론적 실험 길. Neo4j Vessel이나 R1/R2/R3 현장 탐색은 실행하지 않는다."
+                ),
+                "availability": "only when experimental capsule R is included in allowed_routes",
+                "r_execution_mode": R_ROUTE_CAPSULE_SKELETON_EXECUTION_MODE,
+                "best_for": [
+                    "testing the capsule-derived R route handoff and trace shape",
+                    "inspecting the small graph snapshot built from previous turn capsules",
+                ],
+                "not_for": [
+                    "Neo4j Vessel traversal",
+                    "CoreEgo source-summary hierarchy traversal",
+                    "RawSource original-text retrieval",
+                    "project source evidence not present in previous turn capsules",
+                ],
+                "evidence_surface": [
+                    "previous TurnStateCapsules",
+                    "code-built capsule graph snapshot",
+                    "deterministic R dry-run skeleton frames",
+                ],
+                "raw_source_original_text_access": "not_available",
+                "freshness_boundary": (
+                    "This mode only sees supplied previous-turn capsules and is not a source-file "
+                    "or Neo4j Vessel reader."
+                ),
+                "expected_next_0_mode": R_ROUTE_CAPSULE_SKELETON_NEXT_0_MODE,
+                "policy_flag": R_ROUTE_EXPERIMENTAL_POLICY_FLAG,
+            })
     return cards
+
+
+def _resolve_r_execution_mode(
+    *,
+    allow_r_route_experimental: bool,
+    r_execution_mode: str | None,
+) -> str | None:
+    """R gate와 실제 구현 종류를 하나의 절대 모드로 정렬한다."""
+
+    if not allow_r_route_experimental:
+        if r_execution_mode is not None:
+            raise ValueError("r_execution_mode requires allow_r_route_experimental")
+        return None
+    resolved = r_execution_mode or R_ROUTE_CAPSULE_SKELETON_EXECUTION_MODE
+    if resolved not in R_ROUTE_EXECUTION_MODES:
+        raise ValueError(f"unknown r_execution_mode: {resolved}")
+    return resolved
+
+
+def _r_expected_next_0_mode(r_execution_mode: str | None) -> str | None:
+    if r_execution_mode == R_ROUTE_VESSEL_LIVE_EXECUTION_MODE:
+        return R_ROUTE_VESSEL_LIVE_NEXT_0_MODE
+    if r_execution_mode == R_ROUTE_CAPSULE_SKELETON_EXECUTION_MODE:
+        return R_ROUTE_CAPSULE_SKELETON_NEXT_0_MODE
+    return None
+
+
+def _r_route_meaning(r_execution_mode: str | None) -> str:
+    if r_execution_mode == R_ROUTE_VESSEL_LIVE_EXECUTION_MODE:
+        return (
+            "explicitly enabled Vessel/Neo4j graph-memory traversal route for already-ingested "
+            "graph memory and available RawSource original text"
+        )
+    return (
+        "experimental deterministic graph skeleton built only from supplied previous-turn capsules; "
+        "it does not inspect Neo4j Vessel or project RawSource records"
+    )
 
 
 def route_next_with_llm_or_policy_fallback(
@@ -341,6 +459,9 @@ def route_next_with_llm_or_policy_fallback(
     fallback_policy: str = ROUTER_FALLBACK_POLICY_DEV_SMOKE,
     fallback_allowed_by_runtime_policy: bool = True,
     allow_r_route_experimental: bool = False,
+    r_execution_mode: str | None = None,
+    route_context: str = "entry",
+    r_return_context: dict[str, object] | None = None,
     max_retries: int = 0,
 ) -> RoutingDecision:
     """LLM router 실패와 code fallback 결정을 분리해서 보존한다."""
@@ -357,6 +478,9 @@ def route_next_with_llm_or_policy_fallback(
             input_ref=input_ref,
             source_data_ids=source_data_ids,
             allow_r_route_experimental=allow_r_route_experimental,
+            r_execution_mode=r_execution_mode,
+            route_context=route_context,
+            r_return_context=r_return_context,
             max_retries=max_retries,
         )
     except Node1RouterLLMFailure as exc:
@@ -387,10 +511,11 @@ def record_routing(
     source_data_ids: list[str] | None = None,
     id_namespace: LRunIds | None = None,
     route_context: str = "entry",
+    route_data_id: str | None = None,
 ) -> str:
     """RoutingDecision이 만들어졌다는 사실을 trace로 기록한다."""
 
-    route_id = (
+    route_id = route_data_id or (
         id_namespace.return_route_decision_id(decision.route)
         if id_namespace is not None and route_context == "l_return"
         else id_namespace.route_decision_id(decision.route)
@@ -412,6 +537,8 @@ def record_routing(
             route=decision.route,
             route_reason=decision.route_reason,
             expected_next_0_mode=decision.expected_next_0_mode,
+            route_execution_mode=decision.route_execution_mode,
+            route_context=route_context,
             route_source=decision.route_source,
             llm_routing_status=decision.llm_routing_status,
             llm_call_data_id=decision.llm_call_data_id,
@@ -538,6 +665,7 @@ def _validate_llm_routing_payload(
     payload: dict[str, object],
     *,
     allow_r_route_experimental: bool = False,
+    r_execution_mode: str | None = None,
 ) -> None:
     _routing_decision_from_llm_payload(
         payload=payload,
@@ -546,6 +674,7 @@ def _validate_llm_routing_payload(
         llm_trace_event_id="validation_trace",
         llm_call_data_id="validation_call",
         allow_r_route_experimental=allow_r_route_experimental,
+        r_execution_mode=r_execution_mode,
     )
 
 
@@ -557,7 +686,12 @@ def _routing_decision_from_llm_payload(
     llm_trace_event_id: str | None,
     llm_call_data_id: str | None,
     allow_r_route_experimental: bool = False,
+    r_execution_mode: str | None = None,
 ) -> RoutingDecision:
+    resolved_r_execution_mode = _resolve_r_execution_mode(
+        allow_r_route_experimental=allow_r_route_experimental,
+        r_execution_mode=r_execution_mode,
+    )
     route = str(payload.get("route") or "").strip()
     allowed_routes = {"L", "2"}
     if allow_r_route_experimental:
@@ -577,7 +711,7 @@ def _routing_decision_from_llm_payload(
     if route == "L":
         expected_for_route = "targeted_memory_supply"
     elif route == "R":
-        expected_for_route = R_ROUTE_EXPERIMENTAL_NEXT_0_MODE
+        expected_for_route = _r_expected_next_0_mode(resolved_r_execution_mode)
     else:
         expected_for_route = "final_trace_for_2"
     if not expected_next_0_mode or expected_next_0_mode != expected_for_route:
@@ -594,6 +728,7 @@ def _routing_decision_from_llm_payload(
         route_source=f"LLM:{model_id}",
         required_schema=schema_registry.binding_for(target_node) if schema_registry is not None else None,
         expected_next_0_mode=expected_next_0_mode,
+        route_execution_mode=resolved_r_execution_mode if route == "R" else None,
         route_rule_id="llm_router",
         matched_keywords=[],
         policy_flag=(

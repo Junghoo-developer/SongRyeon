@@ -19,7 +19,10 @@ from songryeon_core.tools.document_context_pack import (
 
 
 def test_node1_r_card_exposes_ingested_rawsource_original_text_boundary() -> None:
-    cards = _route_capability_cards(allow_r_route_experimental=True)
+    cards = _route_capability_cards(
+        allow_r_route_experimental=True,
+        r_execution_mode="vessel_live",
+    )
     by_route = {str(card["route"]): card for card in cards}
 
     r_card = by_route["R"]

@@ -122,6 +122,38 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
                 )
             )
 
+    r_run_frames = _payloads_with_type(result, "node_output:r_top_level_run_frame")
+    if r_run_frames:
+        lines.append(
+            "- R 전체 실행 구분: "
+            f"actual_r_runs={len(r_run_frames)} / "
+            f"same_turn_r_reroute_enabled={result.get('same_turn_r_reroute_enabled', False)} / "
+            f"max={result.get('effective_max_r_runs_per_turn', 2)}"
+        )
+        for frame in r_run_frames:
+            lines.append(
+                "  - "
+                f"run={frame.get('run_index', '?')} / "
+                f"status={frame.get('run_status', 'unknown')} / "
+                f"memory={frame.get('source_return_memory_frame_id', 'unknown')}"
+            )
+
+    r_reroute_controller_frames = _payloads_with_type(
+        result,
+        "node_output:same_turn_r_reroute_controller_frame",
+    )
+    if r_reroute_controller_frames:
+        lines.append("- R same-turn reroute controller:")
+        for frame in r_reroute_controller_frames:
+            lines.append(
+                "  - "
+                f"run={frame.get('current_run_index', '?')} / "
+                f"node1_route={frame.get('node1_route', 'unknown')} / "
+                f"decision={frame.get('controller_decision', 'unknown')} / "
+                f"allowed={frame.get('same_turn_rerun_allowed', False)}"
+            )
+            lines.append(f"    reason: {frame.get('decision_reason', '')}")
+
     memory_packets = _payloads_with_type(result, "node_output:memory_packet")
     if memory_packets:
         lines.append("- 0 기억 공급 [CODE:RULE_STUB | LLM_SUMMARY=not_run]:")
@@ -300,6 +332,16 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
                     ),
                 )
             )
+
+    r1_goal_frames = _payloads_with_type(result, "node_output:R1_graph_goal_frame")
+    if r1_goal_frames:
+        latest_r1 = r1_goal_frames[-1]
+        lines.append(
+            "- R1 evidence contract: "
+            f"level={latest_r1.get('required_material_level', 'unknown')} / "
+            f"required={latest_r1.get('required_material_count', 0)} / "
+            f"mode={latest_r1.get('evidence_contract_mode', 'unknown')}"
+        )
 
     r_candidate_surfaces = _payloads_with_type(
         result,
@@ -1001,6 +1043,13 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
             f"/ candidates={frame.get('search_candidate_count', 0)}"
         )
         lines.append(
+            "  - acquisition: "
+            f"status={frame.get('evidence_acquisition_status', 'unknown')} "
+            f"/ original_materials={frame.get('original_material_count', 0)} "
+            "/ requirement="
+            f"{frame.get('original_material_requirement_status', 'unknown')}"
+        )
+        lines.append(
             "  - budget: "
             f"stop={frame.get('budget_stop_reason', 'unknown')} "
             f"/ remaining_tool={frame.get('remaining_tool_calls', 0)} "
@@ -1092,6 +1141,14 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
             f"LLM_SEMANTIC={achievement.get('llm_semantic_judgement_status', 'not_run')}]: "
             f"{achievement.get('achievement_status', 'unknown')} / "
             f"{achievement.get('controller_decision', 'unknown')}"
+        )
+        lines.append(
+            "- L3 근거 확보 절대상태: "
+            f"{achievement.get('evidence_acquisition_status', 'unknown')} / "
+            f"candidates={achievement.get('candidate_count', 0)} / "
+            f"original_materials={achievement.get('original_material_count', 0)} / "
+            "requirement="
+            f"{achievement.get('original_material_requirement_status', 'unknown')}"
         )
         macro_status = achievement.get("macro_achievement_status")
         macro_reason = achievement.get("macro_achievement_reason")
@@ -1286,6 +1343,22 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
         reason = answer_basis.get("mode_selection_reason")
         if isinstance(reason, str) and reason:
             lines.append(f"  - mode_selection_reason: {reason}")
+        task_contract_status = answer_basis.get("task_contract_status")
+        if isinstance(task_contract_status, str) and task_contract_status:
+            lines.append(
+                "  - answer task contract: "
+                f"status={task_contract_status} / "
+                f"evidence={answer_basis.get('evidence_requirement', 'not_recorded')}"
+            )
+        user_task_summary = answer_basis.get("user_task_summary")
+        if isinstance(user_task_summary, str) and user_task_summary:
+            lines.append(f"  - user_task_summary: {_short_display_text(user_task_summary)}")
+        fulfillment_requirements = answer_basis.get("fulfillment_requirements")
+        if isinstance(fulfillment_requirements, list) and fulfillment_requirements:
+            lines.append(
+                "  - fulfillment_requirements: "
+                f"{[_short_display_text(str(item)) for item in fulfillment_requirements[:3]]}"
+            )
         failure_type = answer_basis.get("answer_basis_failure_type")
         if isinstance(failure_type, str) and failure_type and failure_type != "none":
             lines.append(f"  - failure_type: {failure_type}")
@@ -1314,7 +1387,8 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
                 if not isinstance(role, dict):
                     continue
                 role_summary.append(
-                    f"{role.get('evidence_role', 'unknown')}:{role.get('source_data_id', '')}"
+                    f"{role.get('evidence_role', 'unknown')}:"
+                    f"{role.get('source_label') or role.get('source_kind') or '공급 재료'}"
                 )
             if role_summary:
                 lines.append(f"  - evidence_roles: {role_summary}")
@@ -1488,6 +1562,8 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
                 "  - L loop result in brief: "
                 f"task={node3_brief.get('l_loop_task_status', 'unknown')} / "
                 f"failure={node3_brief.get('l_loop_failure_level', 'unknown')} / "
+                f"acquisition={node3_brief.get('l_evidence_acquisition_status', 'unknown')} / "
+                f"originals={node3_brief.get('l_original_material_count', 0)} / "
                 f"semantic={node3_brief.get('l3_semantic_goal_match_status', 'unknown')} / "
                 f"remaining_query={node3_brief.get('remaining_query_attempts', 0)} / "
                 f"hint={l_loop_attitude_hint}"
@@ -1526,6 +1602,14 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
                 f"mode={answer_basis_mode} / "
                 f"reason_codes={node3_brief.get('basis_reason_codes', [])} / "
                 f"generated_by={node3_brief.get('answer_basis_generated_by', '')}"
+            )
+        task_contract_status = node3_brief.get("answer_task_contract_status")
+        if isinstance(task_contract_status, str) and task_contract_status:
+            lines.append(
+                "  - answer task in brief: "
+                f"status={task_contract_status} / "
+                f"evidence={node3_brief.get('evidence_requirement', 'not_recorded')} / "
+                f"task={_short_display_text(str(node3_brief.get('user_task_summary') or ''))}"
             )
         lines.extend(
             _metainfo_lines(
@@ -1582,6 +1666,18 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
         reason = node4_gate.get("reason")
         if isinstance(reason, str) and reason:
             lines.append(f"  - reason: {reason}")
+        lines.append(
+            "  - task/body checks: "
+            f"task={node4_gate.get('task_fulfillment_status', 'not_checkable')} / "
+            "grounding_consistency="
+            f"{node4_gate.get('grounding_consistency_status', 'not_checkable')}"
+        )
+        task_failure_reasons = node4_gate.get("task_failure_reasons")
+        if isinstance(task_failure_reasons, list) and task_failure_reasons:
+            lines.append(
+                "    task_failure_reasons: "
+                f"{[_short_display_text(str(item)) for item in task_failure_reasons[:3]]}"
+            )
         checked_count = _list_count(node4_gate.get("checked_claims"))
         unsupported_count = _list_count(node4_gate.get("unsupported_claims"))
         contradiction_count = _list_count(node4_gate.get("contradictions"))
@@ -1995,6 +2091,7 @@ def _learning_absolute_audit_lines(result: dict[str, object]) -> list[str]:
         "  - L/R 실행: "
         f"L_runs={_list_count(_payloads_with_type(result, 'node_output:L_loop_run_frame'))} / "
         f"L_blocked_reroute={_blocked_same_turn_l_reroute_request_count(result)} / "
+        f"R_runs={_record_count_with_type(result, 'node_output:r_top_level_run_frame')} / "
         f"R_handoff_status={latest_r_handoff.get('packet_status', 'not_recorded')} / "
         f"R_entry_nodes={_list_count(latest_r_handoff.get('available_entry_node_ids'))} / "
         f"R_vessel_ledgers={_list_count(latest_activity_link.get('r_vessel_activity_ledger_data_ids'))}"

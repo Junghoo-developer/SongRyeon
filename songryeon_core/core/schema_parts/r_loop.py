@@ -10,7 +10,7 @@ from songryeon_core.core.schema_parts.graph_memory import GRAPH_MEMORY_NODE_KIND
 
 
 R1_GRAPH_GOAL_FRAME_SCHEMA_NAME = "R1GraphGoalFrame"
-R1_GRAPH_GOAL_FRAME_SCHEMA_VERSION = "0.1"
+R1_GRAPH_GOAL_FRAME_SCHEMA_VERSION = "0.2"
 R_LOOP_BUDGET_FRAME_SCHEMA_NAME = "RLoopBudgetFrame"
 R_LOOP_BUDGET_FRAME_SCHEMA_VERSION = "0.1"
 R2_GRAPH_NODE_SELECTION_FRAME_SCHEMA_NAME = "R2GraphNodeSelectionFrame"
@@ -56,6 +56,11 @@ R_LOOP_TASK_STATUSES = {"not_run", "sufficient", "partial", "failed"}
 R_LOOP_INFO_CLASSES = {"relative", "mixed"}
 R_LOOP_SEMANTIC_STATUSES = {"not_run", "ran", "failed"}
 R_GRAPH_CANDIDATE_RELATIONS = {"child", "next", "previous"}
+R1_REQUIRED_MATERIAL_LEVELS = {"overview", "source_summary", "raw_original"}
+R1_EVIDENCE_CONTRACT_MODES = {
+    "evidence_contract_v0",
+    "legacy_minimum_budget_compatibility",
+}
 
 
 @dataclass
@@ -73,6 +78,9 @@ class R1GraphGoalFrame:
     min_traversal_depth: int = 0
     min_node_reads: int = 0
     min_terminal_material_count: int = 0
+    required_material_level: str = "overview"
+    required_material_count: int = 0
+    evidence_contract_mode: str = "legacy_minimum_budget_compatibility"
     user_question_anchor_id: str = ""
     source_data_ids: list[str] = field(default_factory=list)
     source_trace_ids: list[str] = field(default_factory=list)
@@ -253,7 +261,18 @@ def validate_r1_graph_goal_frame(frame: R1GraphGoalFrame) -> None:
             "min_traversal_depth": frame.min_traversal_depth,
             "min_node_reads": frame.min_node_reads,
             "min_terminal_material_count": frame.min_terminal_material_count,
+            "required_material_count": frame.required_material_count,
         },
+    )
+    _validate_member(
+        "R1GraphGoalFrame.required_material_level",
+        frame.required_material_level,
+        R1_REQUIRED_MATERIAL_LEVELS,
+    )
+    _validate_member(
+        "R1GraphGoalFrame.evidence_contract_mode",
+        frame.evidence_contract_mode,
+        R1_EVIDENCE_CONTRACT_MODES,
     )
     if frame.min_traversal_depth > frame.max_traversal_depth:
         raise ValueError("R1GraphGoalFrame.min_traversal_depth must not exceed max")
@@ -261,6 +280,16 @@ def validate_r1_graph_goal_frame(frame: R1GraphGoalFrame) -> None:
         raise ValueError("R1GraphGoalFrame.min_node_reads must not exceed max")
     if frame.min_terminal_material_count > frame.max_node_reads:
         raise ValueError("R1GraphGoalFrame.min_terminal_material_count must not exceed max_node_reads")
+    if frame.required_material_count > frame.max_node_reads:
+        raise ValueError("R1GraphGoalFrame.required_material_count must not exceed max_node_reads")
+    if (
+        frame.evidence_contract_mode == "evidence_contract_v0"
+        and frame.required_material_level in {"source_summary", "raw_original"}
+        and frame.required_material_count < 1
+    ):
+        raise ValueError(
+            "R1GraphGoalFrame detailed material contracts require at least one material"
+        )
     _validate_string_list("R1GraphGoalFrame.source_data_ids", frame.source_data_ids)
     _validate_string_list("R1GraphGoalFrame.source_trace_ids", frame.source_trace_ids)
     _validate_no_duplicates("R1GraphGoalFrame.source_data_ids", frame.source_data_ids)

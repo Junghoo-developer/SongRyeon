@@ -5,6 +5,7 @@ import json
 import pytest
 
 from songryeon_core.core.schemas import (
+    R_ROUTE_CAPSULE_SKELETON_EXECUTION_MODE,
     R_ROUTE_EXPERIMENTAL_NEXT_0_MODE,
     R_ROUTE_EXPERIMENTAL_POLICY_FLAG,
     RoutingDecisionFrame,
@@ -44,6 +45,7 @@ def test_route_r_frame_requires_policy_flag_llm_source_and_r_handoff_mode() -> N
         route="R",
         route_reason="graph memory traversal looks useful",
         expected_next_0_mode=R_ROUTE_EXPERIMENTAL_NEXT_0_MODE,
+        route_execution_mode=R_ROUTE_CAPSULE_SKELETON_EXECUTION_MODE,
         route_source="LLM:r-route-fake",
         llm_routing_status="ran",
         route_rule_id="llm_router",
@@ -57,6 +59,7 @@ def test_route_r_frame_requires_policy_flag_llm_source_and_r_handoff_mode() -> N
         route="R",
         route_reason="graph memory traversal looks useful",
         expected_next_0_mode=R_ROUTE_EXPERIMENTAL_NEXT_0_MODE,
+        route_execution_mode=R_ROUTE_CAPSULE_SKELETON_EXECUTION_MODE,
         route_source="LLM:r-route-fake",
         llm_routing_status="ran",
         route_rule_id="llm_router",

@@ -110,6 +110,9 @@ class RoutingDecision:
     required_schema: SchemaBinding | None = None
     # 라우팅 직후 0번이 어떤 모드로 호출되어야 하는지.
     expected_next_0_mode: str = ""
+    # 절대 정보: route=R일 때 실제로 열릴 R 구현 종류.
+    # Vessel/Neo4j 현장 탐색과 capsule 기반 실험 skeleton을 섞어 부르지 않기 위해 남긴다.
+    route_execution_mode: str | None = None
     # 절대 정보: 코드 스텁이 사용한 라우팅 규칙 ID.
     route_rule_id: str = ""
     # 절대 정보: 키워드 규칙이 감지한 문자열 목록.

@@ -6,7 +6,10 @@ from songryeon_core.nodes.node_1_router import _route_capability_cards
 
 
 def test_node1_r_card_names_recent_development_status_as_graph_memory_surface() -> None:
-    cards = _route_capability_cards(allow_r_route_experimental=True)
+    cards = _route_capability_cards(
+        allow_r_route_experimental=True,
+        r_execution_mode="vessel_live",
+    )
     by_route = {card["route"]: card for card in cards}
 
     r_card = by_route["R"]
@@ -20,7 +23,10 @@ def test_node1_r_card_names_recent_development_status_as_graph_memory_surface() 
 
 
 def test_node1_l_card_separates_fresh_lookup_from_ingested_status_briefing() -> None:
-    cards = _route_capability_cards(allow_r_route_experimental=True)
+    cards = _route_capability_cards(
+        allow_r_route_experimental=True,
+        r_execution_mode="vessel_live",
+    )
     by_route = {card["route"]: card for card in cards}
 
     l_card = by_route["L"]

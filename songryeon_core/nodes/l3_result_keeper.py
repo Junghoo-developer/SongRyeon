@@ -571,32 +571,59 @@ def _build_achievement_frame(
         preserved_frame=preserved_frame,
         data_store=data_store,
     )
+    actual_read_doc_count = len(goal_match["read_doc_ids"])
+    actual_read_code_file_count = len(goal_match["read_code_file_paths"])
+    original_material_count = actual_read_doc_count + actual_read_code_file_count
+    evidence_acquisition_status = _evidence_acquisition_status(
+        candidate_count=candidate_count,
+        original_material_count=original_material_count,
+    )
+    required_count_value = l1_goal.get("minimum_read_documents")
+    original_material_required_count = (
+        required_count_value
+        if isinstance(required_count_value, int)
+        and not isinstance(required_count_value, bool)
+        and required_count_value >= 0
+        else 0
+    )
+    original_material_requirement_status = _original_material_requirement_status(
+        required_count=original_material_required_count,
+        original_material_count=original_material_count,
+    )
 
     if controller_decision == "stop_failed":
         achievement_status = "failed"
-    elif controller_decision == "stop_success" and candidate_count > 0:
+    elif controller_decision == "stop_success" and original_material_count > 0:
         achievement_status = "achieved"
-    elif candidate_count > 0:
+    elif candidate_count > 0 or original_material_count > 0:
         achievement_status = "partial"
     else:
         achievement_status = "failed"
 
     if achievement_status == "achieved":
-        reason = "CODE_STATUS:preserved_candidates_and_controller_stop_success"
+        reason = "CODE_STATUS:original_material_acquired_and_controller_stop_success"
     elif achievement_status == "partial":
-        reason = "CODE_STATUS:preserved_candidates_without_controller_stop_success"
+        reason = (
+            "CODE_STATUS:candidates_only_without_original_material"
+            if evidence_acquisition_status == "candidates_only"
+            else "CODE_STATUS:original_material_acquired_without_controller_stop_success"
+        )
     else:
         reason = "CODE_STATUS:no_preserved_candidates_or_controller_stop_failed"
 
     macro_status = achievement_status
     if achievement_status == "achieved":
-        macro_reason = "CODE_STATUS:macro_operation_candidate_count_positive_and_stop_success"
+        macro_reason = "CODE_STATUS:macro_operation_original_material_and_stop_success"
     elif achievement_status == "partial":
-        macro_reason = "CODE_STATUS:macro_operation_candidate_count_positive_without_stop_success"
+        macro_reason = (
+            "CODE_STATUS:macro_operation_candidates_only"
+            if evidence_acquisition_status == "candidates_only"
+            else "CODE_STATUS:macro_operation_original_material_without_stop_success"
+        )
     else:
         macro_reason = "CODE_STATUS:macro_operation_no_candidates_or_stop_failed"
 
-    if has_query_frame and candidate_count > 0:
+    if has_query_frame and (candidate_count > 0 or original_material_count > 0):
         micro_status = "achieved"
         micro_reason = "CODE_STATUS:micro_operation_query_frame_and_candidates_present"
     elif has_query_frame:
@@ -686,12 +713,17 @@ def _build_achievement_frame(
         requested_doc_hint=str(goal_match["requested_doc_hint"]),
         read_doc_ids=list(goal_match["read_doc_ids"]),
         read_code_file_paths=list(goal_match["read_code_file_paths"]),
-        actual_read_code_file_count=len(goal_match["read_code_file_paths"]),
+        actual_read_code_file_count=actual_read_code_file_count,
         search_result_doc_ids=list(goal_match["search_result_doc_ids"]),
         goal_match_status=str(goal_match["goal_match_status"]),
         goal_match_reason=str(goal_match["goal_match_reason"]),
         semantic_goal_match_status="not_run",
         semantic_goal_match_reason="CODE_STATUS:llm_semantic_goal_match_not_run",
+        actual_read_doc_count=actual_read_doc_count,
+        original_material_count=original_material_count,
+        evidence_acquisition_status=evidence_acquisition_status,
+        original_material_required_count=original_material_required_count,
+        original_material_requirement_status=original_material_requirement_status,
     )
 
 
@@ -745,6 +777,11 @@ def _build_llm_achievement_frame(
             "has_read_document_material": bool(read_doc_ids),
             "has_read_code_material": bool(read_code_file_paths),
             "has_search_candidates": bool(search_result_doc_ids),
+            "evidence_acquisition_status": operation_frame.evidence_acquisition_status,
+            "original_material_count": operation_frame.original_material_count,
+            "original_material_requirement_status": (
+                operation_frame.original_material_requirement_status
+            ),
         },
         "specific_document_request": _l3_specific_request_semantic_payload(goal_match),
         "read_document_previews": [
@@ -1339,10 +1376,39 @@ def _read_doc_ids_from_data_store(data_store: DataStore | None) -> list[str]:
         payload = record.payload
         if not isinstance(payload, dict):
             continue
+        text = payload.get("text")
+        if not isinstance(text, str) or not text.strip():
+            continue
         doc_id = payload.get("doc_id")
         if isinstance(doc_id, str) and doc_id:
             doc_ids.append(doc_id)
     return _unique_strings(doc_ids)
+
+
+def _evidence_acquisition_status(
+    *,
+    candidate_count: int,
+    original_material_count: int,
+) -> str:
+    """후보 존재와 실제 비어 있지 않은 원문 존재를 절대 count로만 구분한다."""
+
+    if original_material_count > 0:
+        return "original_material_acquired"
+    if candidate_count > 0:
+        return "candidates_only"
+    return "none"
+
+
+def _original_material_requirement_status(
+    *,
+    required_count: int,
+    original_material_count: int,
+) -> str:
+    if required_count <= 0:
+        return "not_required"
+    if original_material_count >= required_count:
+        return "satisfied"
+    return "unsatisfied"
 
 
 def _read_code_file_paths_from_data_store(data_store: DataStore | None) -> list[str]:

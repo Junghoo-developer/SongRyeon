@@ -29,6 +29,8 @@ Rules:
 - Use only the supplied user query, L1 goals, code operation status, preserved candidate previews,
   read document previews, and read code file previews.
 - Treat `code_operation_status` as code-owned operational state. You may only downgrade its semantic usefulness through `semantic_goal_match_status`; you do not rewrite it.
+- `code_operation_status.evidence_acquisition_status=candidates_only` means code found search candidates but no non-empty original document/code text was acquired. Never describe that state as original material read or operationally achieved.
+- `original_material_acquired` confirms only that non-empty original text exists in tool records. It does not prove that the text is relevant or sufficient for the user's request.
 - Do not rename source-code evidence into `read_doc` evidence; keep both evidence channels separate.
 - Do not say "read", "viewed", "analyzed", or "relationship analysis completed" for search candidates whose document text was not in `read_document_previews`.
 - The L loop may have a wide search/read budget. Do not treat an old minimum such as two read documents as automatically sufficient when the user explicitly asks for broad coverage, "as many as possible", or several named ORDER/document identifiers.

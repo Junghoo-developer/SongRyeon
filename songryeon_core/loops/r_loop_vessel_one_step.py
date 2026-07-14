@@ -88,6 +88,13 @@ R_INFORMATION_GRANULARITY_ENUM_VALUES = [
     "high_summary",
     "unknown",
 ]
+R1_REQUIRED_MATERIAL_LEVEL_VALUES = [
+    "overview",
+    "source_summary",
+    "raw_original",
+]
+R1_EVIDENCE_CONTRACT_MODE = "evidence_contract_v0"
+R1_LEGACY_MINIMUM_BUDGET_MODE = "legacy_minimum_budget_compatibility"
 R3_SUFFICIENCY_STATUS_VALUES = ["sufficient", "insufficient", "unknown"]
 R3_GRANULARITY_PROBLEM_STATUS_VALUES = ["none", "needs_lower_granularity", "unknown"]
 R3_BRANCH_PROBLEM_STATUS_VALUES = ["none", "wrong_branch", "unknown"]
@@ -166,6 +173,11 @@ class RLoopVesselTraverseResultFrame:
     source_data_ids: list[str]
     source_trace_ids: list[str]
     failure_payload_summary: dict[str, object] | None = None
+    required_material_level: str = "overview"
+    required_material_count: int = 0
+    evidence_contract_observed_count: int = 0
+    evidence_contract_status: str = "not_applicable"
+    evidence_contract_material_node_ids: list[str] = field(default_factory=list)
     generated_by: str = R_LOOP_VESSEL_TRAVERSE_GENERATOR
     info_class: str = "absolute"
     semantic_judgement_status: str = "not_run"
@@ -312,9 +324,8 @@ class RLoopVesselOneStepFakeLLMAdapter:
                 "user_question_anchor_id": _r1_anchor_id_from_input_payload(
                     request.input_payload
                 ),
-                "required_information_granularity": "low_summary",
-                "allowed_summary_depth": 1,
-                "stop_condition": "Stop after one selected candidate inspection.",
+                "required_material_level": "overview",
+                "required_material_count": 0,
             }
         elif "R2 Vessel Node Selector" in request.prompt:
             available_surfaces = request.input_payload.get("available_surface_refs")
@@ -422,9 +433,8 @@ class RLoopVesselTraverseFakeLLMAdapter:
                 "user_question_anchor_id": _r1_anchor_id_from_input_payload(
                     request.input_payload
                 ),
-                "required_information_granularity": "low_summary",
-                "allowed_summary_depth": 1,
-                "stop_condition": "Stop when a selected summary is sufficient or traversal budget ends.",
+                "required_material_level": "overview",
+                "required_material_count": 1,
             }
         elif "R2 Vessel Node Selector" in request.prompt:
             surface_ref, node_ref, expected_source_kind = _first_visible_ref(
@@ -862,6 +872,30 @@ def run_r_loop_vessel_one_step(
         budget=budget,
         source_trace_ids=_unique_strings([*source_trace_ids, *trace_event_ids]),
     )
+    one_step_evidence_material_ids = _updated_evidence_contract_material_ids(
+        r1=r1,
+        selected_graph_node_id=r2.selected_graph_node_id,
+        selected_record=selected_record,
+        existing_node_ids=[],
+    )
+    evidence_contract_override = _evidence_contract_continuation_override_status(
+        r1=r1,
+        continuation=continuation,
+        graph_surface=graph_traversal_candidate_surface,
+        observed_count=len(one_step_evidence_material_ids),
+    )
+    if evidence_contract_override is not None:
+        continuation = _evidence_contract_continuation_frame(
+            frame_id=continuation.frame_id,
+            r3=r3,
+            budget=budget,
+            override_status=(
+                "stop_budget_exhausted"
+                if evidence_contract_override == "continue_deeper"
+                else evidence_contract_override
+            ),
+            source_trace_ids=_unique_strings([*source_trace_ids, *trace_event_ids]),
+        )
     validate_r_loop_continuation_frame(continuation)
     _record_frame(
         trace_store=trace_store,
@@ -963,10 +997,17 @@ def run_r_loop_vessel_traverse(
     max_context_tokens: int = R_TRAVERSE_MAX_CONTEXT_TOKENS,
     max_raw_original_material_reads: int = R_TRAVERSE_MAX_RAW_ORIGINAL_MATERIAL_READS,
     start_handoff_packet_id: str | None = None,
+    prior_top_level_r_run_context: dict[str, object] | None = None,
 ) -> RLoopVesselTraverseRun:
     frame_label = _safe_frame_label(frame_label)
     source_trace_ids = _unique_strings([*(input_ref or []), *read_packet.source_trace_ids])
-    base_source_data_ids = _unique_strings([read_packet.packet_id, start_handoff_packet_id])
+    prior_run_memory_frame_id = _optional_payload_text(
+        prior_top_level_r_run_context,
+        "frame_id",
+    )
+    base_source_data_ids = _unique_strings(
+        [read_packet.packet_id, start_handoff_packet_id, prior_run_memory_frame_id]
+    )
     result_frame_id = _traverse_result_frame_id(frame_label)
     if read_packet.read_status != "passed":
         return _record_traverse_failure_result(
@@ -1015,6 +1056,7 @@ def run_r_loop_vessel_traverse(
     raw_original_node_selected_count = 0
     raw_original_text_read_count = 0
     raw_original_read_cap_reached = False
+    evidence_contract_material_node_ids: list[str] = []
     early_stop_guard_trigger_count = 0
 
     r1_result = executor.run(
@@ -1028,6 +1070,7 @@ def run_r_loop_vessel_traverse(
             max_branch_switches=max_branch_switches,
             max_node_reads=max_node_reads,
             max_context_tokens=max_context_tokens,
+            prior_top_level_r_run_context=prior_top_level_r_run_context,
         ),
         trace_store=trace_store,
         data_store=data_store,
@@ -1133,6 +1176,7 @@ def run_r_loop_vessel_traverse(
             if step_index > 1
             else "core_ego_direct_entry_candidates_only",
             previous_step_memory_packet=previous_step_memory_packet,
+            prior_top_level_r_run_context=prior_top_level_r_run_context,
         )
         for attempt_result in r2_attempt_results:
             _append_llm_refs(attempt_result, llm_call_data_ids, trace_event_ids)
@@ -1252,6 +1296,7 @@ def run_r_loop_vessel_traverse(
             r2=r2,
             selected_record=selected_record,
             previous_step_memory_packet=previous_step_memory_packet,
+            prior_top_level_r_run_context=prior_top_level_r_run_context,
             trace_store=trace_store,
             data_store=data_store,
             turn_id=turn_id,
@@ -1320,6 +1365,12 @@ def run_r_loop_vessel_traverse(
             )
         if selected_has_raw_original_text:
             raw_original_text_read_count += 1
+        evidence_contract_material_node_ids = _updated_evidence_contract_material_ids(
+            r1=r1,
+            selected_graph_node_id=r2.selected_graph_node_id,
+            selected_record=selected_record,
+            existing_node_ids=evidence_contract_material_node_ids,
+        )
         _record_frame(
             trace_store=trace_store,
             data_store=data_store,
@@ -1376,7 +1427,22 @@ def run_r_loop_vessel_traverse(
             budget=final_budget,
             source_trace_ids=_unique_strings([*source_trace_ids, *trace_event_ids]),
         )
-        if _should_force_deeper_for_terminal_material(
+        evidence_contract_override = _evidence_contract_continuation_override_status(
+            r1=r1,
+            continuation=final_continuation,
+            graph_surface=graph_surface,
+            observed_count=len(evidence_contract_material_node_ids),
+        )
+        if evidence_contract_override is not None:
+            final_continuation = _evidence_contract_continuation_frame(
+                frame_id=final_continuation.frame_id,
+                r3=r3,
+                budget=final_budget,
+                override_status=evidence_contract_override,
+                source_trace_ids=_unique_strings([*source_trace_ids, *trace_event_ids]),
+            )
+            early_stop_guard_trigger_count += 1
+        if evidence_contract_override is None and _should_force_deeper_for_terminal_material(
             continuation=final_continuation,
             graph_surface=graph_surface,
             terminal_material_seen_count=terminal_material_seen_count,
@@ -1389,7 +1455,7 @@ def run_r_loop_vessel_traverse(
                 source_trace_ids=_unique_strings([*source_trace_ids, *trace_event_ids]),
             )
             early_stop_guard_trigger_count += 1
-        if _should_force_deeper_for_minimum_budget(
+        if evidence_contract_override is None and _should_force_deeper_for_minimum_budget(
             continuation=final_continuation,
             graph_surface=graph_surface,
             budget=final_budget,
@@ -1590,6 +1656,7 @@ def run_r_loop_vessel_traverse(
         max_raw_original_material_count=max_raw_original_material_reads,
         raw_original_read_cap_reached=raw_original_read_cap_reached,
         early_stop_guard_trigger_count=early_stop_guard_trigger_count,
+        evidence_contract_material_node_ids=evidence_contract_material_node_ids,
     )
     _record_traverse_result_frame(
         trace_store,
@@ -1626,10 +1693,11 @@ def _r1_input_payload(
     max_branch_switches: int = R_ONE_STEP_MAX_BRANCH_SWITCHES,
     max_node_reads: int = R_ONE_STEP_MAX_NODE_READS,
     max_context_tokens: int = R_ONE_STEP_MAX_CONTEXT_TOKENS,
+    prior_top_level_r_run_context: dict[str, object] | None = None,
 ) -> dict[str, object]:
     # R1 is a goal setter. Candidate text belongs to R2/R3, not to R1.
     anchor_id = _user_question_anchor_id(user_question)
-    return {
+    payload = {
         "user_question": user_question,
         "user_question_anchor": {
             "anchor_id": anchor_id,
@@ -1649,26 +1717,26 @@ def _r1_input_payload(
             "max_context_tokens": max_context_tokens,
         },
         "hierarchy_primer": _r1_hierarchy_primer(read_packet),
-        "minimum_budget_contract": {
+        "evidence_contract": {
             "purpose": (
-                "R1 may set minimum traversal requirements so R3 cannot stop "
-                "at a high navigation layer before enough graph material is inspected."
+                "R1 states the evidence level and unique material count required before "
+                "R3 may finish with stop_sufficient. Code owns traversal mechanics."
             ),
-            "output_fields": [
-                "min_traversal_depth",
-                "min_node_reads",
-                "min_terminal_material_count",
-            ],
+            "output_fields": ["required_material_level", "required_material_count"],
+            "allowed_material_levels": list(R1_REQUIRED_MATERIAL_LEVEL_VALUES),
             "bounds": {
-                "min_traversal_depth": f"0..{max_traversal_depth}",
-                "min_node_reads": f"0..{max_node_reads}",
-                "min_terminal_material_count": f"0..{max_node_reads}",
+                "overview_count": f"0..{max_node_reads}",
+                "source_summary_count": f"1..{max_node_reads}",
+                "raw_original_count": (
+                    f"1..{min(max_node_reads, R_TRAVERSE_MAX_RAW_ORIGINAL_MATERIAL_READS)}"
+                ),
             },
             "meaning": {
-                "min_traversal_depth": "Minimum graph levels that should be inspected before accepting stop_sufficient.",
-                "min_node_reads": "Minimum selected/inspected graph nodes before accepting stop_sufficient.",
-                "min_terminal_material_count": "Minimum terminal material nodes, such as summary/raw material, before accepting stop_sufficient.",
+                "overview": "A text-bearing summary or a more detailed material.",
+                "source_summary": "A source_leaf_summary or a more detailed raw original.",
+                "raw_original": "A RawSource or RawCapsule with actual original text present.",
             },
+            "counting_policy": "Count unique graph node IDs only.",
         },
         "candidate_text_visibility_policy": (
             "R1 does not receive candidate IDs, summary text, or summary previews. "
@@ -1677,6 +1745,18 @@ def _r1_input_payload(
         ),
         "source_data_ids": [read_packet.packet_id],
     }
+    if prior_top_level_r_run_context is not None:
+        payload["prior_top_level_r_run_memory"] = _prior_top_level_r_run_llm_view(
+            prior_top_level_r_run_context
+        )
+        prior_frame_id = _optional_payload_text(
+            prior_top_level_r_run_context,
+            "frame_id",
+        )
+        payload["source_data_ids"] = _unique_strings(
+            [read_packet.packet_id, prior_frame_id]
+        )
+    return payload
 
 
 def _r1_hierarchy_primer(read_packet: RLoopVesselReadPacketFrame) -> dict[str, object]:
@@ -1725,6 +1805,186 @@ def _r1_hierarchy_primer(read_packet: RLoopVesselReadPacketFrame) -> dict[str, o
             "summary_count_by_data_kind": read_packet.summary_count_by_data_kind,
         },
     }
+
+
+def _prior_top_level_r_run_llm_view(
+    context: dict[str, object],
+) -> dict[str, object]:
+    """이전 R 전체 실행의 상태와 count만 LLM에 보여주는 안전한 기억판."""
+
+    selected_ids = _payload_string_list(context, "selected_graph_node_ids")
+    inspected_ids = _payload_string_list(context, "inspected_graph_node_ids")
+    material_ids = _payload_string_list(
+        context,
+        "evidence_contract_material_node_ids",
+    )
+    return {
+        "memory_status": "available",
+        "run_index": _payload_optional_int(context, "run_index", default=0),
+        "return_status": _optional_payload_text(context, "return_status"),
+        "traverse_status": _optional_payload_text(context, "traverse_status"),
+        "r_loop_task_status": _optional_payload_text(context, "r_loop_task_status"),
+        "failure_stage": _optional_payload_text(context, "failure_stage"),
+        "failure_type": _optional_payload_text(context, "failure_type"),
+        "failure_reason": _optional_payload_text(context, "failure_reason"),
+        "required_material_level": _optional_payload_text(
+            context,
+            "required_material_level",
+        ),
+        "required_material_count": _payload_optional_int(
+            context,
+            "required_material_count",
+            default=0,
+        ),
+        "evidence_contract_observed_count": _payload_optional_int(
+            context,
+            "evidence_contract_observed_count",
+            default=0,
+        ),
+        "evidence_contract_status": _optional_payload_text(
+            context,
+            "evidence_contract_status",
+        ),
+        "prior_selected_graph_node_count": len(selected_ids),
+        "prior_inspected_graph_node_count": len(inspected_ids),
+        "prior_evidence_material_count": len(material_ids),
+        "terminal_material_seen_count": _payload_optional_int(
+            context,
+            "terminal_material_seen_count",
+            default=0,
+        ),
+        "raw_original_material_seen_count": _payload_optional_int(
+            context,
+            "raw_original_material_seen_count",
+            default=0,
+        ),
+        "raw_original_text_read_count": _payload_optional_int(
+            context,
+            "raw_original_text_read_count",
+            default=0,
+        ),
+        "interpretation_boundary": (
+            "These are code-copied prior-run facts. They do not choose the next route or candidate."
+        ),
+    }
+
+
+def _annotate_prior_top_level_r_seen_candidates(
+    *,
+    selection_ref_map: dict[str, object],
+    prior_top_level_r_run_context: dict[str, object] | None,
+) -> None:
+    """현재 공식 후보표에 이전 R run에서 본 적이 있는지만 절대 표지로 붙인다."""
+
+    if prior_top_level_r_run_context is None:
+        return
+    selected_ids = set(
+        _payload_string_list(prior_top_level_r_run_context, "selected_graph_node_ids")
+    )
+    inspected_ids = set(
+        _payload_string_list(prior_top_level_r_run_context, "inspected_graph_node_ids")
+    )
+    node_ref_map = selection_ref_map.get("node_ref_to_graph_node_id")
+    if not isinstance(node_ref_map, dict):
+        return
+
+    def annotate(row: dict[str, object]) -> None:
+        node_ref = row.get("node_ref")
+        graph_node_id = node_ref_map.get(node_ref) if isinstance(node_ref, str) else None
+        was_selected = isinstance(graph_node_id, str) and graph_node_id in selected_ids
+        was_inspected = isinstance(graph_node_id, str) and graph_node_id in inspected_ids
+        row["seen_in_prior_top_level_r_run"] = was_selected or was_inspected
+        row["prior_run_seen_role"] = (
+            "selected_and_inspected"
+            if was_selected and was_inspected
+            else "selected"
+            if was_selected
+            else "inspected"
+            if was_inspected
+            else "not_seen"
+        )
+
+    official_table = selection_ref_map.get("official_selection_table")
+    if isinstance(official_table, dict):
+        candidate_rows = official_table.get("candidate_rows")
+        if isinstance(candidate_rows, list):
+            for row in candidate_rows:
+                if isinstance(row, dict):
+                    annotate(row)
+        surface_rows = official_table.get("surface_rows")
+        if isinstance(surface_rows, list) and isinstance(candidate_rows, list):
+            for surface_row in surface_rows:
+                if not isinstance(surface_row, dict):
+                    continue
+                surface_ref = surface_row.get("surface_ref")
+                surface_row["prior_run_seen_candidate_count"] = sum(
+                    1
+                    for row in candidate_rows
+                    if isinstance(row, dict)
+                    and row.get("surface_ref") == surface_ref
+                    and row.get("seen_in_prior_top_level_r_run") is True
+                )
+
+    candidate_records = selection_ref_map.get("candidate_records_by_surface_ref")
+    if isinstance(candidate_records, dict):
+        for records in candidate_records.values():
+            if not isinstance(records, list):
+                continue
+            for row in records:
+                if isinstance(row, dict):
+                    annotate(row)
+
+
+def _add_prior_top_level_r_run_to_r3_payload(
+    *,
+    payload: dict[str, object],
+    selected_record: dict[str, object],
+    prior_top_level_r_run_context: dict[str, object] | None,
+) -> None:
+    if prior_top_level_r_run_context is None:
+        return
+    selected_id = _record_node_id(selected_record)
+    prior_selected_ids = set(
+        _payload_string_list(prior_top_level_r_run_context, "selected_graph_node_ids")
+    )
+    prior_inspected_ids = set(
+        _payload_string_list(prior_top_level_r_run_context, "inspected_graph_node_ids")
+    )
+    payload["prior_top_level_r_run_memory"] = _prior_top_level_r_run_llm_view(
+        prior_top_level_r_run_context
+    )
+    payload["selected_seen_in_prior_top_level_r_run"] = (
+        selected_id in prior_selected_ids or selected_id in prior_inspected_ids
+    )
+    payload["selected_prior_run_seen_role"] = (
+        "selected_and_inspected"
+        if selected_id in prior_selected_ids and selected_id in prior_inspected_ids
+        else "selected"
+        if selected_id in prior_selected_ids
+        else "inspected"
+        if selected_id in prior_inspected_ids
+        else "not_seen"
+    )
+
+
+def _optional_payload_text(
+    payload: dict[str, object] | None,
+    field_name: str,
+) -> str | None:
+    if payload is None:
+        return None
+    value = payload.get(field_name)
+    return value if isinstance(value, str) and value else None
+
+
+def _payload_string_list(
+    payload: dict[str, object],
+    field_name: str,
+) -> list[str]:
+    value = payload.get(field_name)
+    if not isinstance(value, list):
+        return []
+    return _unique_strings([item for item in value if isinstance(item, str)])
 
 
 def _r2_continuation_work_order(
@@ -1800,8 +2060,13 @@ def _r2_input_payload(
     current_graph_node_id: str = "graph:core_ego:root",
     traversal_policy: str = "core_ego_direct_entry_candidates_only",
     previous_step_memory_packet: RLoopVesselStepMemoryPacketFrame | None = None,
+    prior_top_level_r_run_context: dict[str, object] | None = None,
 ) -> dict[str, object]:
     selection_ref_map = _r2_selection_ref_map(read_packet, candidate_layer_surface)
+    _annotate_prior_top_level_r_seen_candidates(
+        selection_ref_map=selection_ref_map,
+        prior_top_level_r_run_context=prior_top_level_r_run_context,
+    )
     payload = {
         "official_selection_table": selection_ref_map["official_selection_table"],
         "continuation_work_order": _r2_continuation_work_order(
@@ -1846,6 +2111,16 @@ def _r2_input_payload(
                 previous_step_memory_packet.packet_id,
             ]
         )
+    if prior_top_level_r_run_context is not None:
+        payload["prior_top_level_r_run_memory"] = _prior_top_level_r_run_llm_view(
+            prior_top_level_r_run_context
+        )
+        payload["source_data_ids"] = _unique_strings(
+            [
+                *payload["source_data_ids"],  # type: ignore[list-item]
+                _optional_payload_text(prior_top_level_r_run_context, "frame_id"),
+            ]
+        )
     return payload
 
 
@@ -1865,6 +2140,7 @@ def _run_r2_with_schema_repair(
     current_graph_node_id: str = "graph:core_ego:root",
     traversal_policy: str = "core_ego_direct_entry_candidates_only",
     previous_step_memory_packet: RLoopVesselStepMemoryPacketFrame | None = None,
+    prior_top_level_r_run_context: dict[str, object] | None = None,
 ) -> tuple[LLMNodeExecutionResult, list[LLMNodeExecutionResult]]:
     base_payload = _r2_input_payload(
         user_question=user_question,
@@ -1875,6 +2151,7 @@ def _run_r2_with_schema_repair(
         current_graph_node_id=current_graph_node_id,
         traversal_policy=traversal_policy,
         previous_step_memory_packet=previous_step_memory_packet,
+        prior_top_level_r_run_context=prior_top_level_r_run_context,
     )
     effective_source_data_ids = _unique_strings(
         [
@@ -1882,6 +2159,7 @@ def _run_r2_with_schema_repair(
             previous_step_memory_packet.packet_id
             if previous_step_memory_packet is not None
             else None,
+            _optional_payload_text(prior_top_level_r_run_context, "frame_id"),
         ]
     )
 
@@ -2124,6 +2402,7 @@ def _r3_input_payload(
     r2: R2GraphNodeSelectionFrame,
     selected_record: dict[str, object],
     previous_step_memory_packet: RLoopVesselStepMemoryPacketFrame | None = None,
+    prior_top_level_r_run_context: dict[str, object] | None = None,
 ) -> dict[str, object]:
     structural_status_values = _r3_allowed_status_values_for_selected_record(
         selected_record
@@ -2154,6 +2433,11 @@ def _r3_input_payload(
             payload["previous_r_step_memory_packet"] = (
                 _r_step_memory_raw_material_llm_view(previous_step_memory_packet)
             )
+        _add_prior_top_level_r_run_to_r3_payload(
+            payload=payload,
+            selected_record=selected_record,
+            prior_top_level_r_run_context=prior_top_level_r_run_context,
+        )
         return payload
     payload = {
         "user_question": user_question,
@@ -2199,35 +2483,52 @@ def _r3_input_payload(
                 previous_step_memory_packet.packet_id,
             ]
         )
+    _add_prior_top_level_r_run_to_r3_payload(
+        payload=payload,
+        selected_record=selected_record,
+        prior_top_level_r_run_context=prior_top_level_r_run_context,
+    )
     return payload
 
 
 def _r1_goal_llm_view(r1: R1GraphGoalFrame) -> dict[str, object]:
-    return {
+    payload: dict[str, object] = {
         "frame_id": r1.frame_id,
         "graph_search_goal": r1.graph_search_goal,
-        "required_information_granularity": r1.required_information_granularity,
-        "allowed_summary_depth": r1.allowed_summary_depth,
+        "required_material_level": r1.required_material_level,
+        "required_material_count": r1.required_material_count,
+        "evidence_contract_mode": r1.evidence_contract_mode,
         "max_traversal_depth": r1.max_traversal_depth,
         "max_branch_switches": r1.max_branch_switches,
         "max_node_reads": r1.max_node_reads,
         "max_context_tokens": r1.max_context_tokens,
-        "min_traversal_depth": r1.min_traversal_depth,
-        "min_node_reads": r1.min_node_reads,
-        "min_terminal_material_count": r1.min_terminal_material_count,
-        "stop_condition": r1.stop_condition,
         "user_question_anchor_id": r1.user_question_anchor_id,
         "generated_by": r1.generated_by,
         "info_class": r1.info_class,
         "semantic_judgement_status": r1.semantic_judgement_status,
     }
+    if r1.evidence_contract_mode == R1_LEGACY_MINIMUM_BUDGET_MODE:
+        payload.update(
+            {
+                "required_information_granularity": (
+                    r1.required_information_granularity
+                ),
+                "allowed_summary_depth": r1.allowed_summary_depth,
+                "min_traversal_depth": r1.min_traversal_depth,
+                "min_node_reads": r1.min_node_reads,
+                "min_terminal_material_count": r1.min_terminal_material_count,
+                "stop_condition": r1.stop_condition,
+            }
+        )
+    return payload
 
 
 def _r1_raw_material_goal_llm_view(r1: R1GraphGoalFrame) -> dict[str, object]:
     return {
         "graph_search_goal": r1.graph_search_goal,
-        "required_information_granularity": r1.required_information_granularity,
-        "stop_condition": r1.stop_condition,
+        "required_material_level": r1.required_material_level,
+        "required_material_count": r1.required_material_count,
+        "evidence_contract_mode": r1.evidence_contract_mode,
     }
 
 
@@ -2294,6 +2595,7 @@ def _run_r3_with_schema_repair(
     input_ref: list[str],
     source_data_ids: list[str],
     previous_step_memory_packet: RLoopVesselStepMemoryPacketFrame | None = None,
+    prior_top_level_r_run_context: dict[str, object] | None = None,
 ) -> tuple[LLMNodeExecutionResult, list[LLMNodeExecutionResult]]:
     base_payload = _r3_input_payload(
         user_question=user_question,
@@ -2301,6 +2603,7 @@ def _run_r3_with_schema_repair(
         r2=r2,
         selected_record=selected_record,
         previous_step_memory_packet=previous_step_memory_packet,
+        prior_top_level_r_run_context=prior_top_level_r_run_context,
     )
     effective_source_data_ids = _unique_strings(
         [
@@ -2308,6 +2611,7 @@ def _run_r3_with_schema_repair(
             previous_step_memory_packet.packet_id
             if previous_step_memory_packet is not None
             else None,
+            _optional_payload_text(prior_top_level_r_run_context, "frame_id"),
         ]
     )
     first_result = executor.run(
@@ -2518,8 +2822,67 @@ def _validate_r1_payload(
     max_traversal_depth: int,
     max_node_reads: int,
 ) -> None:
+    if not _payload_text(payload, "graph_search_goal"):
+        raise ValueError("R1 graph_search_goal must not be empty")
+    uses_evidence_contract = _r1_payload_uses_evidence_contract(payload)
+    if uses_evidence_contract:
+        _validate_r1_evidence_contract_payload(
+            payload,
+            max_node_reads=max_node_reads,
+        )
+    else:
+        _validate_legacy_r1_minimum_budget_payload(
+            payload,
+            read_packet=read_packet,
+            max_traversal_depth=max_traversal_depth,
+            max_node_reads=max_node_reads,
+        )
+    expected_anchor_id = _user_question_anchor_id(user_question)
+    if _payload_text(payload, "user_question_anchor_id") != expected_anchor_id:
+        raise ValueError("R1 user_question_anchor_id must copy the supplied user question anchor")
+
+
+def _r1_payload_uses_evidence_contract(payload: dict[str, object]) -> bool:
+    has_level = "required_material_level" in payload
+    has_count = "required_material_count" in payload
+    if has_level != has_count:
+        raise ValueError(
+            "R1 evidence contract requires both required_material_level and required_material_count"
+        )
+    return has_level and has_count
+
+
+def _validate_r1_evidence_contract_payload(
+    payload: dict[str, object],
+    *,
+    max_node_reads: int,
+) -> None:
+    level = _payload_text(payload, "required_material_level")
+    if level not in set(R1_REQUIRED_MATERIAL_LEVEL_VALUES):
+        raise ValueError("R1 required_material_level is invalid")
+    count = _payload_int(payload, "required_material_count")
+    if count < 0:
+        raise ValueError("R1 required_material_count must not be negative")
+    if count > max_node_reads:
+        raise ValueError("R1 required_material_count must not exceed node read max")
+    if level in {"source_summary", "raw_original"} and count < 1:
+        raise ValueError("R1 detailed material contract requires at least one material")
+    if (
+        level == "raw_original"
+        and count > R_TRAVERSE_MAX_RAW_ORIGINAL_MATERIAL_READS
+    ):
+        raise ValueError("R1 raw_original count must not exceed raw original read cap")
+
+
+def _validate_legacy_r1_minimum_budget_payload(
+    payload: dict[str, object],
+    *,
+    read_packet: RLoopVesselReadPacketFrame,
+    max_traversal_depth: int,
+    max_node_reads: int,
+) -> None:
     granularity = _payload_text(payload, "required_information_granularity")
-    if granularity not in {"raw", "low_summary", "medium_summary", "high_summary", "unknown"}:
+    if granularity not in set(R_INFORMATION_GRANULARITY_ENUM_VALUES):
         raise ValueError("R1 required_information_granularity is invalid")
     allowed_depth = _payload_int(payload, "allowed_summary_depth")
     if allowed_depth < 0:
@@ -2527,13 +2890,23 @@ def _validate_r1_payload(
     max_seen_depth = _max_summary_depth(read_packet)
     if max_seen_depth is not None and allowed_depth > max_seen_depth:
         raise ValueError("R1 allowed_summary_depth must not exceed supplied summary depth")
-    if not _payload_text(payload, "graph_search_goal"):
-        raise ValueError("R1 graph_search_goal must not be empty")
     if not _payload_text(payload, "stop_condition"):
         raise ValueError("R1 stop_condition must not be empty")
-    min_traversal_depth = _payload_int(payload, "min_traversal_depth")
-    min_node_reads = _payload_int(payload, "min_node_reads")
-    min_terminal_material_count = _payload_int(payload, "min_terminal_material_count")
+    min_traversal_depth = _payload_optional_int(
+        payload,
+        "min_traversal_depth",
+        default=0,
+    )
+    min_node_reads = _payload_optional_int(payload, "min_node_reads", default=0)
+    min_terminal_material_count = _payload_optional_int(
+        payload,
+        "min_terminal_material_count",
+        default=(
+            R_TRAVERSE_MIN_TERMINAL_MATERIAL_READS
+            if max_node_reads > R_ONE_STEP_MAX_NODE_READS
+            else 0
+        ),
+    )
     if min_traversal_depth < 0:
         raise ValueError("R1 min_traversal_depth must not be negative")
     if min_node_reads < 0:
@@ -2546,9 +2919,6 @@ def _validate_r1_payload(
         raise ValueError("R1 min_node_reads must not exceed node read max")
     if min_terminal_material_count > max_node_reads:
         raise ValueError("R1 min_terminal_material_count must not exceed node read max")
-    expected_anchor_id = _user_question_anchor_id(user_question)
-    if _payload_text(payload, "user_question_anchor_id") != expected_anchor_id:
-        raise ValueError("R1 user_question_anchor_id must copy the supplied user question anchor")
 
 
 def _validate_r2_payload(
@@ -2759,37 +3129,68 @@ def _r1_frame_from_payload(
     max_node_reads: int = R_ONE_STEP_MAX_NODE_READS,
     max_context_tokens: int = R_ONE_STEP_MAX_CONTEXT_TOKENS,
 ) -> R1GraphGoalFrame:
+    uses_evidence_contract = _r1_payload_uses_evidence_contract(payload)
     default_min_terminal_material = (
         R_TRAVERSE_MIN_TERMINAL_MATERIAL_READS
         if max_node_reads > R_ONE_STEP_MAX_NODE_READS
         else 0
     )
+    if uses_evidence_contract:
+        required_material_level = _payload_text(payload, "required_material_level")
+        required_material_count = _payload_int(payload, "required_material_count")
+        required_information_granularity = _legacy_granularity_for_material_level(
+            required_material_level
+        )
+        allowed_summary_depth = _max_summary_depth(read_packet) or 0
+        stop_condition = (
+            "Stop only when the R1 evidence contract and R3 semantic sufficiency are both satisfied."
+        )
+        min_traversal_depth = 0
+        min_node_reads = 0
+        min_terminal_material_count = 0
+        evidence_contract_mode = R1_EVIDENCE_CONTRACT_MODE
+    else:
+        required_material_level = "overview"
+        required_material_count = 0
+        required_information_granularity = _payload_text(
+            payload,
+            "required_information_granularity",
+        )
+        allowed_summary_depth = _payload_int(payload, "allowed_summary_depth")
+        stop_condition = _payload_text(payload, "stop_condition")
+        min_traversal_depth = _payload_optional_int(
+            payload,
+            "min_traversal_depth",
+            default=0,
+        )
+        min_node_reads = _payload_optional_int(
+            payload,
+            "min_node_reads",
+            default=0,
+        )
+        min_terminal_material_count = _payload_optional_int(
+            payload,
+            "min_terminal_material_count",
+            default=default_min_terminal_material,
+        )
+        evidence_contract_mode = R1_LEGACY_MINIMUM_BUDGET_MODE
     frame = R1GraphGoalFrame(
         frame_id=f"R1:{frame_label}:vessel_goal_frame",
         graph_search_goal=_payload_text(payload, "graph_search_goal"),
-        required_information_granularity=_payload_text(payload, "required_information_granularity"),
-        allowed_summary_depth=_payload_int(payload, "allowed_summary_depth"),
+        required_information_granularity=required_information_granularity,
+        allowed_summary_depth=allowed_summary_depth,
         max_traversal_depth=max_traversal_depth,
         max_branch_switches=max_branch_switches,
         max_node_reads=max_node_reads,
         max_context_tokens=max_context_tokens,
-        stop_condition=_payload_text(payload, "stop_condition"),
+        stop_condition=stop_condition,
         source_graph_guide_packet_id=read_packet.packet_id,
-        min_traversal_depth=_payload_optional_int(
-            payload,
-            "min_traversal_depth",
-            default=0,
-        ),
-        min_node_reads=_payload_optional_int(
-            payload,
-            "min_node_reads",
-            default=0,
-        ),
-        min_terminal_material_count=_payload_optional_int(
-            payload,
-            "min_terminal_material_count",
-            default=default_min_terminal_material,
-        ),
+        min_traversal_depth=min_traversal_depth,
+        min_node_reads=min_node_reads,
+        min_terminal_material_count=min_terminal_material_count,
+        required_material_level=required_material_level,
+        required_material_count=required_material_count,
+        evidence_contract_mode=evidence_contract_mode,
         user_question_anchor_id=_payload_text(payload, "user_question_anchor_id"),
         source_data_ids=_unique_strings([read_packet.packet_id, llm_call_data_id]),
         source_trace_ids=source_trace_ids,
@@ -2799,6 +3200,14 @@ def _r1_frame_from_payload(
     )
     validate_r1_graph_goal_frame(frame)
     return frame
+
+
+def _legacy_granularity_for_material_level(required_material_level: str) -> str:
+    return {
+        "overview": "high_summary",
+        "source_summary": "low_summary",
+        "raw_original": "raw",
+    }[required_material_level]
 
 
 def _budget_frame(*, r1: R1GraphGoalFrame, frame_label: str) -> RLoopBudgetFrame:
@@ -2879,6 +3288,95 @@ def _should_force_deeper_for_terminal_material(
     if continuation.remaining_context_tokens <= 0:
         return False
     return True
+
+
+def _evidence_contract_continuation_override_status(
+    *,
+    r1: R1GraphGoalFrame,
+    continuation: RLoopContinuationFrame,
+    graph_surface: RGraphTraversalCandidateSurfaceFrame,
+    observed_count: int,
+) -> str | None:
+    if r1.evidence_contract_mode != R1_EVIDENCE_CONTRACT_MODE:
+        return None
+    if continuation.continuation_status != "stop_sufficient":
+        return None
+    if _r1_evidence_contract_status(r1, observed_count=observed_count) == "satisfied":
+        return None
+    if graph_surface.candidate_count <= 0:
+        return "stop_no_actionable_path"
+    if (
+        continuation.remaining_node_reads <= 0
+        or continuation.remaining_traversal_depth <= 0
+        or continuation.remaining_context_tokens <= 0
+    ):
+        return "stop_budget_exhausted"
+    return "continue_deeper"
+
+
+def _evidence_contract_continuation_frame(
+    *,
+    frame_id: str,
+    r3: R3GraphInspectionFrame,
+    budget: RLoopBudgetFrame,
+    override_status: str,
+    source_trace_ids: list[str],
+) -> RLoopContinuationFrame:
+    reason_by_status = {
+        "continue_deeper": "CODE_STATUS:r_loop_evidence_contract_not_satisfied",
+        "stop_no_actionable_path": (
+            "CODE_STATUS:r_loop_evidence_contract_unmet_no_actionable_path"
+        ),
+        "stop_budget_exhausted": (
+            "CODE_STATUS:r_loop_evidence_contract_unmet_budget_exhausted"
+        ),
+    }
+    if override_status not in reason_by_status:
+        raise ValueError("unknown evidence contract continuation override")
+    remaining_traversal_depth = max(
+        budget.max_traversal_depth - budget.used_traversal_depth,
+        0,
+    )
+    remaining_branch_switches = max(
+        budget.max_branch_switches - budget.used_branch_switches,
+        0,
+    )
+    remaining_node_reads = max(budget.max_node_reads - budget.used_node_reads, 0)
+    remaining_context_tokens = max(
+        budget.max_context_tokens - budget.used_context_tokens,
+        0,
+    )
+    frame = RLoopContinuationFrame(
+        frame_id=frame_id,
+        source_r3_inspection_frame_id=r3.frame_id,
+        source_budget_frame_id=budget.frame_id,
+        continuation_status=override_status,
+        continuation_reason_code=reason_by_status[override_status],
+        next_target_node=(
+            "R2" if override_status == "continue_deeper" else "return_summary"
+        ),
+        remaining_traversal_depth=remaining_traversal_depth,
+        remaining_branch_switches=remaining_branch_switches,
+        remaining_node_reads=remaining_node_reads,
+        remaining_context_tokens=remaining_context_tokens,
+        source_data_ids=_unique_strings(
+            [
+                r3.frame_id,
+                budget.frame_id,
+                *r3.source_data_ids,
+                *budget.source_data_ids,
+            ]
+        ),
+        source_trace_ids=_unique_strings(
+            [
+                *source_trace_ids,
+                *r3.source_trace_ids,
+                *budget.source_trace_ids,
+            ]
+        ),
+    )
+    validate_r_loop_continuation_frame(frame)
+    return frame
 
 
 def _terminal_material_guard_continuation_frame(
@@ -3766,6 +4264,7 @@ def _traverse_result_frame(
     max_raw_original_material_count: int = R_TRAVERSE_MAX_RAW_ORIGINAL_MATERIAL_READS,
     raw_original_read_cap_reached: bool = False,
     early_stop_guard_trigger_count: int = 0,
+    evidence_contract_material_node_ids: list[str] | None = None,
 ) -> RLoopVesselTraverseResultFrame:
     candidate_layer_surfaces = list(candidate_layer_surfaces or [])
     graph_surfaces = list(graph_surfaces or [])
@@ -3778,6 +4277,13 @@ def _traverse_result_frame(
     )
     inspected_ids = _path_strings([r3.inspected_graph_node_id for r3 in r3_inspections])
     final_r3 = r3_inspections[-1] if r3_inspections else None
+    contract_material_ids = _unique_strings(
+        evidence_contract_material_node_ids or []
+    )
+    evidence_contract_status = _r1_evidence_contract_status(
+        r1,
+        observed_count=len(contract_material_ids),
+    )
     frame = RLoopVesselTraverseResultFrame(
         frame_id=frame_id,
         created_at=created_at,
@@ -3838,6 +4344,15 @@ def _traverse_result_frame(
         ),
         source_trace_ids=_unique_strings(source_trace_ids or []),
         failure_payload_summary=failure_payload_summary,
+        required_material_level=(
+            r1.required_material_level if r1 is not None else "overview"
+        ),
+        required_material_count=(
+            r1.required_material_count if r1 is not None else 0
+        ),
+        evidence_contract_observed_count=len(contract_material_ids),
+        evidence_contract_status=evidence_contract_status,
+        evidence_contract_material_node_ids=contract_material_ids,
     )
     _validate_traverse_result_frame(frame)
     return frame
@@ -4155,6 +4670,8 @@ def _validate_traverse_result_frame(frame: RLoopVesselTraverseResultFrame) -> No
         "raw_original_material_seen_count": frame.raw_original_material_seen_count,
         "max_raw_original_material_count": frame.max_raw_original_material_count,
         "early_stop_guard_trigger_count": frame.early_stop_guard_trigger_count,
+        "required_material_count": frame.required_material_count,
+        "evidence_contract_observed_count": frame.evidence_contract_observed_count,
     }.items():
         if not isinstance(value, int):
             raise TypeError(f"RLoopVesselTraverseResultFrame.{field_name} must be an integer")
@@ -4170,6 +4687,18 @@ def _validate_traverse_result_frame(frame: RLoopVesselTraverseResultFrame) -> No
         raise ValueError("raw text reads must not exceed selected RawSource nodes")
     if not isinstance(frame.raw_original_read_cap_reached, bool):
         raise TypeError("RLoopVesselTraverseResultFrame.raw_original_read_cap_reached must be bool")
+    if frame.required_material_level not in set(R1_REQUIRED_MATERIAL_LEVEL_VALUES):
+        raise ValueError("RLoopVesselTraverseResultFrame required material level is invalid")
+    if frame.evidence_contract_status not in {"satisfied", "unmet", "not_applicable"}:
+        raise ValueError("RLoopVesselTraverseResultFrame evidence contract status is invalid")
+    if frame.evidence_contract_observed_count != len(
+        frame.evidence_contract_material_node_ids
+    ):
+        raise ValueError("RLoopVesselTraverseResultFrame evidence contract count mismatch")
+    if len(frame.evidence_contract_material_node_ids) != len(
+        set(frame.evidence_contract_material_node_ids)
+    ):
+        raise ValueError("RLoopVesselTraverseResultFrame evidence material IDs must be unique")
 
 
 def _candidate_layer_surface_frame(
@@ -4931,6 +5460,71 @@ def _is_terminal_material_record(record: dict[str, object]) -> bool:
     candidate_kind = record.get("candidate_kind")
     terminal_kinds = {"raw_source", "raw_capsule"}
     return node_kind in terminal_kinds or candidate_kind in terminal_kinds
+
+
+def _summary_record_has_text(record: dict[str, object]) -> bool:
+    if not isinstance(record.get("summary_node_id"), str):
+        return False
+    summary_text = record.get("summary_text")
+    if isinstance(summary_text, str) and summary_text.strip():
+        return True
+    summary_text_char_count = record.get("summary_text_char_count")
+    return isinstance(summary_text_char_count, int) and summary_text_char_count > 0
+
+
+def _record_satisfies_required_material_level(
+    record: dict[str, object],
+    *,
+    required_material_level: str,
+) -> bool:
+    """구조 필드와 실제 text 존재 여부만으로 근거 계약 충족 여부를 센다."""
+
+    if required_material_level == "raw_original":
+        return _has_raw_original_text_material(record)
+    if required_material_level == "source_summary":
+        return (
+            _has_raw_original_text_material(record)
+            or (
+                record.get("data_kind") == "source_leaf_summary"
+                and _summary_record_has_text(record)
+            )
+        )
+    if required_material_level == "overview":
+        return _summary_record_has_text(record) or _has_raw_original_text_material(
+            record
+        )
+    raise ValueError(f"unknown R1 required material level: {required_material_level}")
+
+
+def _updated_evidence_contract_material_ids(
+    *,
+    r1: R1GraphGoalFrame,
+    selected_graph_node_id: str | None,
+    selected_record: dict[str, object],
+    existing_node_ids: list[str],
+) -> list[str]:
+    if r1.evidence_contract_mode != R1_EVIDENCE_CONTRACT_MODE:
+        return list(existing_node_ids)
+    if not selected_graph_node_id:
+        return list(existing_node_ids)
+    if not _record_satisfies_required_material_level(
+        selected_record,
+        required_material_level=r1.required_material_level,
+    ):
+        return list(existing_node_ids)
+    return _unique_strings([*existing_node_ids, selected_graph_node_id])
+
+
+def _r1_evidence_contract_status(
+    r1: R1GraphGoalFrame | None,
+    *,
+    observed_count: int,
+) -> str:
+    if r1 is None or r1.evidence_contract_mode != R1_EVIDENCE_CONTRACT_MODE:
+        return "not_applicable"
+    if observed_count >= r1.required_material_count:
+        return "satisfied"
+    return "unmet"
 
 
 def _is_raw_original_material_record(record: dict[str, object]) -> bool:

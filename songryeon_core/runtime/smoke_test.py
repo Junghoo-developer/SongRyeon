@@ -267,6 +267,12 @@ def run_smoke_tests() -> dict[str, object]:
         "tool_choice": tool_smoke["tool_choice"],
         "l_loop_control_count": l_loop_control_smoke["control_count"],
         "l_loop_final_decision": l_loop_control_smoke["final_decision"],
+        "l_evidence_acquisition_status": l_loop_control_smoke[
+            "evidence_acquisition_status"
+        ],
+        "l_original_material_count": l_loop_control_smoke[
+            "original_material_count"
+        ],
         "l_loop_return_summary_status": return_summary_smoke["task_status"],
         "l_loop_return_summary_route_hint": return_summary_smoke["route_hint"],
         "l_loop_activity_ledger_outputs": l_activity_ledger_smoke["output_count"],
@@ -3758,6 +3764,11 @@ def _check_l_loop_controller(records: dict[str, object]) -> dict[str, object]:
         raise AssertionError("L3 achievement payload must be a dict")
     if achievement.get("controller_decision") != "stop_success":
         raise AssertionError("L3 achievement did not reflect final controller decision")
+    if achievement.get("evidence_acquisition_status") != "original_material_acquired":
+        raise AssertionError("L3 achievement did not distinguish acquired original material")
+    original_material_count = achievement.get("original_material_count")
+    if not isinstance(original_material_count, int) or original_material_count < 1:
+        raise AssertionError("L3 original material count must be positive in baseline smoke")
     if achievement.get("final_control_data_id") != control_ids[-1]:
         raise AssertionError("L3 achievement did not reference final control frame")
 
@@ -3765,6 +3776,8 @@ def _check_l_loop_controller(records: dict[str, object]) -> dict[str, object]:
         "control_count": len(controls),
         "final_decision": controls[-1]["decision"],
         "read_doc_used": True,
+        "evidence_acquisition_status": achievement["evidence_acquisition_status"],
+        "original_material_count": original_material_count,
     }
 
 
@@ -6002,6 +6015,9 @@ class CountMismatchReporterFakeAdapter(SongRyeonAllNodesFakeLLMAdapter):
         return {
             "gate_status": "pass",
             "reason": "fake node_4 would pass unless code guard overrides it",
+            "task_fulfillment_status": "fulfilled",
+            "grounding_consistency_status": "consistent",
+            "task_failure_reasons": [],
             "checked_claims": [],
             "unsupported_claims": [],
             "contradictions": [],

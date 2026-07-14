@@ -59,6 +59,10 @@ from songryeon_core.runtime.user_turn import (
     run_qwen_user_turn,
 )
 from songryeon_core.runtime.live_trace import make_live_trace_sink
+from songryeon_core.runtime.local_launcher import (
+    load_local_env,
+    resolve_main_cli_args,
+)
 from songryeon_core.runtime.chat_session import (
     ChatSessionMemory,
     attach_chat_session_snapshot,
@@ -83,6 +87,10 @@ def main() -> None:
     # 사용자가 `python main.py qwen-chat`처럼 명령을 치면 여기서 명령을 해석하고
     # 실제 작업은 runtime/nodes/tools 모듈에 넘긴다.
     _configure_stdio()
+    # 간편 실행에서는 PowerShell 스크립트를 점으로 불러오지 않아도 되도록
+    # 프로젝트 루트의 Git 비추적 .env를 Python이 직접 읽는다.
+    load_local_env(Path(__file__).resolve().parent / ".env")
+    cli_args, default_launch = resolve_main_cli_args(sys.argv[1:])
 
     # argparse는 "터미널 명령어를 파이썬 함수 호출로 바꾸는 장치"라고 보면 된다.
     # subparser 하나가 CLI 명령 하나에 대응한다.
@@ -94,6 +102,8 @@ def main() -> None:
     dry_run_parser.add_argument("--export", default=None)
     dry_run_parser.add_argument("--same-turn-l-reroute", action="store_true")
     dry_run_parser.add_argument("--max-l-runs-per-turn", type=int, default=1)
+    dry_run_parser.add_argument("--same-turn-r-reroute", action="store_true")
+    dry_run_parser.add_argument("--max-r-runs-per-turn", type=int, default=2)
     dry_run_parser.add_argument("--live-trace", action="store_true")
 
     # search-docs는 L루프 전체를 돌리지 않고 문서 검색 도구만 직접 확인할 때 쓴다.
@@ -472,7 +482,8 @@ def main() -> None:
     night_token_layer_parser.add_argument("--database", default=None)
     night_token_layer_parser.add_argument("--allow-no-auth", action="store_true")
 
-    args = parser.parse_args()
+    args = parser.parse_args(cli_args)
+    args.default_launch = default_launch
 
     # 여기부터는 실제 실행 분기다.
     # args.command 값에 따라 위에서 등록한 명령이 runtime 함수로 연결된다.
@@ -481,6 +492,8 @@ def main() -> None:
             export_dir=args.export,
             same_turn_l_reroute_enabled=args.same_turn_l_reroute,
             max_l_runs_per_turn=args.max_l_runs_per_turn,
+            same_turn_r_reroute_enabled=args.same_turn_r_reroute,
+            max_r_runs_per_turn=args.max_r_runs_per_turn,
             live_trace_sink=make_live_trace_sink(enabled=args.live_trace),
         )
         print("DRY_RUN_OK")
@@ -567,6 +580,8 @@ def main() -> None:
             force_vessel_r_route=args.force_vessel_r_route,
             same_turn_l_reroute_enabled=args.same_turn_l_reroute,
             max_l_runs_per_turn=args.max_l_runs_per_turn,
+            same_turn_r_reroute_enabled=args.same_turn_r_reroute,
+            max_r_runs_per_turn=args.max_r_runs_per_turn,
             enable_r_route_experimental=args.enable_r_route_experimental,
             enable_vessel_r_route=args.enable_vessel_r_route,
             vessel_r_uri=args.vessel_uri,
@@ -604,6 +619,8 @@ def main() -> None:
             force_vessel_r_route=args.force_vessel_r_route,
             same_turn_l_reroute_enabled=args.same_turn_l_reroute,
             max_l_runs_per_turn=args.max_l_runs_per_turn,
+            same_turn_r_reroute_enabled=args.same_turn_r_reroute,
+            max_r_runs_per_turn=args.max_r_runs_per_turn,
             enable_r_route_experimental=args.enable_r_route_experimental,
             enable_vessel_r_route=args.enable_vessel_r_route,
             vessel_r_uri=args.vessel_uri,
@@ -899,6 +916,8 @@ def _add_turn_runtime_args(parser: argparse.ArgumentParser, *, include_qwen_args
     parser.add_argument("--force-vessel-r-route", action="store_true")
     parser.add_argument("--same-turn-l-reroute", action="store_true")
     parser.add_argument("--max-l-runs-per-turn", type=int, default=1)
+    parser.add_argument("--same-turn-r-reroute", action="store_true")
+    parser.add_argument("--max-r-runs-per-turn", type=int, default=2)
     parser.add_argument("--enable-r-route-experimental", action="store_true")
     parser.add_argument("--enable-vessel-r-route", action="store_true")
     parser.add_argument("--vessel-uri", default=None)
@@ -984,6 +1003,8 @@ def _run_openai_turn_from_args(
         force_vessel_r_route=args.force_vessel_r_route,
         same_turn_l_reroute_enabled=args.same_turn_l_reroute,
         max_l_runs_per_turn=args.max_l_runs_per_turn,
+        same_turn_r_reroute_enabled=args.same_turn_r_reroute,
+        max_r_runs_per_turn=args.max_r_runs_per_turn,
         enable_r_route_experimental=args.enable_r_route_experimental,
         enable_vessel_r_route=args.enable_vessel_r_route,
         vessel_r_uri=args.vessel_uri,
@@ -1030,6 +1051,8 @@ def _run_codex_sdk_turn_from_args(
         force_vessel_r_route=args.force_vessel_r_route,
         same_turn_l_reroute_enabled=args.same_turn_l_reroute,
         max_l_runs_per_turn=args.max_l_runs_per_turn,
+        same_turn_r_reroute_enabled=args.same_turn_r_reroute,
+        max_r_runs_per_turn=args.max_r_runs_per_turn,
         enable_r_route_experimental=args.enable_r_route_experimental,
         enable_vessel_r_route=args.enable_vessel_r_route,
         vessel_r_uri=args.vessel_uri,
@@ -1079,6 +1102,8 @@ def _run_hybrid_turn_from_args(
         force_vessel_r_route=args.force_vessel_r_route,
         same_turn_l_reroute_enabled=args.same_turn_l_reroute,
         max_l_runs_per_turn=args.max_l_runs_per_turn,
+        same_turn_r_reroute_enabled=args.same_turn_r_reroute,
+        max_r_runs_per_turn=args.max_r_runs_per_turn,
         enable_r_route_experimental=args.enable_r_route_experimental,
         enable_vessel_r_route=args.enable_vessel_r_route,
         vessel_r_uri=args.vessel_uri,
@@ -1104,6 +1129,14 @@ def _run_qwen_chat(args: argparse.Namespace) -> None:
     #H llm의 시야를 다루는 관점과는 달리, 송련은 본점의 헌법 문서에 명시돼 있듯 주요 구성 요소 중 하나가 데이터이기에, 코드랑 시스템은 노드별로 분산하여 배분되는 기억과 무관하게 통합적으로 관리할 체계가 필요하다.
     #H 장기기억과 DB는 본점의 노하우를 참조하면 시간 절약 및 효율적인 관리가 가능하다.
     print("SongRyeon qwen-chat")
+    if getattr(args, "default_launch", False):
+        vessel_status = "켜짐" if args.enable_vessel_r_route else "꺼짐"
+        trace_status = "켜짐" if args.live_trace else "꺼짐"
+        print(
+            "간편 실행: "
+            f"Qwen / Vessel R={vessel_status} / 실시간 진행={trace_status} / "
+            f"timeout={args.timeout}초"
+        )
     print("종료하려면 /exit 또는 /quit 입력")
     print("")
 
@@ -1145,6 +1178,8 @@ def _run_qwen_chat(args: argparse.Namespace) -> None:
             force_vessel_r_route=args.force_vessel_r_route,
             same_turn_l_reroute_enabled=args.same_turn_l_reroute,
             max_l_runs_per_turn=args.max_l_runs_per_turn,
+            same_turn_r_reroute_enabled=args.same_turn_r_reroute,
+            max_r_runs_per_turn=args.max_r_runs_per_turn,
             enable_r_route_experimental=args.enable_r_route_experimental,
             enable_vessel_r_route=args.enable_vessel_r_route,
             vessel_r_uri=args.vessel_uri,
@@ -1356,6 +1391,10 @@ def _summary(result: dict[str, object]) -> dict[str, object]:
         "same_turn_l_reroute_enabled": result.get("same_turn_l_reroute_enabled"),
         "max_l_runs_per_turn": result.get("max_l_runs_per_turn"),
         "effective_max_l_runs_per_turn": result.get("effective_max_l_runs_per_turn"),
+        "same_turn_r_reroute_enabled": result.get("same_turn_r_reroute_enabled"),
+        "max_r_runs_per_turn": result.get("max_r_runs_per_turn"),
+        "effective_max_r_runs_per_turn": result.get("effective_max_r_runs_per_turn"),
+        "vessel_r_run_count": result.get("vessel_r_run_count"),
         "same_turn_rerun_allowed": result.get("same_turn_rerun_allowed"),
         "rerun_block_reason": result.get("rerun_block_reason"),
         "planned_next_step": result.get("planned_next_step"),

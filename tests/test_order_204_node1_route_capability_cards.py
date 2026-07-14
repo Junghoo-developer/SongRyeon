@@ -24,6 +24,7 @@ def test_node1_receives_route_capability_cards_when_vessel_r_is_enabled() -> Non
         input_ref=[],
         source_data_ids=[],
         allow_r_route_experimental=True,
+        r_execution_mode="vessel_live",
     )
 
     assert decision.route == "R"
@@ -33,7 +34,8 @@ def test_node1_receives_route_capability_cards_when_vessel_r_is_enabled() -> Non
     assert isinstance(cards, list)
     by_route = {card["route"]: card for card in cards if isinstance(card, dict)}
     assert set(by_route) == {"L", "2", "R"}
-    assert by_route["R"]["expected_next_0_mode"] == "r_loop_graph_guide_handoff"
+    assert by_route["R"]["r_execution_mode"] == "vessel_live"
+    assert by_route["R"]["expected_next_0_mode"] == "vessel_r_read_packet"
     assert by_route["R"]["policy_flag"] == "enable_r_route_experimental"
     assert by_route["R"]["role_label"] == "vessel_graph_memory_traversal_loop"
     assert "Vessel read packet" in by_route["R"]["evidence_surface"]
@@ -76,7 +78,7 @@ def test_node1_prompt_names_l_and_r_evidence_surface_difference() -> None:
     text = __import__("pathlib").Path(prompt).read_text(encoding="utf-8")
 
     assert "route_capability_cards" in text
-    assert "Vessel/Neo4j graph-memory traversal route" in text
+    assert "r_execution_mode=vessel_live" in text
     assert "Do not choose by keyword alone" in text
     assert "Still choose `L`" in text
 

@@ -58,7 +58,11 @@ def test_r_vessel_traverse_descends_from_core_ego_to_summary() -> None:
     assert result.result_frame.final_continuation_status == "stop_sufficient"
     assert result.result_frame.r_loop_task_status == "sufficient"
     assert result.result_frame.terminal_material_seen_count == 1
-    assert result.result_frame.min_terminal_material_count == 1
+    assert result.result_frame.min_terminal_material_count == 0
+    assert result.result_frame.required_material_level == "overview"
+    assert result.result_frame.required_material_count == 1
+    assert result.result_frame.evidence_contract_observed_count == 1
+    assert result.result_frame.evidence_contract_status == "satisfied"
     assert result.result_frame.early_stop_guard_trigger_count == 0
     assert len(result.candidate_layer_surfaces) == 4
     assert len(result.graph_traversal_candidate_surfaces) == 4

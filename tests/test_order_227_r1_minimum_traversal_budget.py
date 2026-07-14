@@ -26,7 +26,7 @@ from tests.test_order_184_r_vessel_multi_step_traversal import (
 )
 
 
-def test_r1_payload_contains_hierarchy_primer_and_minimum_budget_contract() -> None:
+def test_r1_payload_contains_hierarchy_primer_and_evidence_contract() -> None:
     trace_store, data_store, packet_event_id, packet = _record_packet()
     adapter = R1MinimumBudgetAdapter(min_node_reads=1)
 
@@ -45,11 +45,11 @@ def test_r1_payload_contains_hierarchy_primer_and_minimum_budget_contract() -> N
     assert adapter.r1_payload["hierarchy_primer"]["visibility"] == (
         "structure_only_without_candidate_ids_or_content"
     )
-    assert adapter.r1_payload["minimum_budget_contract"]["output_fields"] == [
-        "min_traversal_depth",
-        "min_node_reads",
-        "min_terminal_material_count",
+    assert adapter.r1_payload["evidence_contract"]["output_fields"] == [
+        "required_material_level",
+        "required_material_count",
     ]
+    assert "minimum_budget_contract" not in adapter.r1_payload
 
 
 def test_r1_minimum_node_reads_prevents_premature_r3_stop() -> None:
@@ -69,6 +69,9 @@ def test_r1_minimum_node_reads_prevents_premature_r3_stop() -> None:
 
     assert result.result_frame.traverse_status == "completed"
     assert result.r1_goal is not None
+    assert result.r1_goal.evidence_contract_mode == (
+        "legacy_minimum_budget_compatibility"
+    )
     assert result.r1_goal.min_node_reads == 3
     assert result.final_budget is not None
     assert result.final_budget.min_node_reads == 3

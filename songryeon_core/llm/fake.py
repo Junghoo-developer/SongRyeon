@@ -350,6 +350,7 @@ class SongRyeonAllNodesFakeLLMAdapter:
         if not isinstance(allowed_routes, list):
             allowed_routes = []
         r_route_allowed = "R" in allowed_routes
+        route_context = str(request.input_payload.get("route_context") or "entry")
         graph_memory_requested = any(
             keyword in user_input
             for keyword in ("Vessel", "vessel", "그래프", "graph", "Neo4j", "R루프")
@@ -362,6 +363,10 @@ class SongRyeonAllNodesFakeLLMAdapter:
         memory_lookup_requested = any(keyword in user_input for keyword in ("기억", "방금", "이전"))
         if r_route_allowed and graph_memory_requested:
             route = "R"
+        elif route_context == "r_return":
+            # R 복귀 smoke에서는 R이 더 이상 허용되지 않으면 기존 근거를 보고 단계로 넘긴다.
+            # 실제 의미 선택은 현장 LLM 몫이고, 이 분기는 테스트 adapter의 결정론만 보장한다.
+            route = "2"
         elif _is_release_intro_request(user_input):
             # 배포 첫 실행용 질문은 "문서 검색 능력"을 시험하는 게 아니다.
             # 그래서 fake adapter에서는 L루프를 태우지 않고 바로 보고 경로로 닫는다.
@@ -457,12 +462,38 @@ class SongRyeonAllNodesFakeLLMAdapter:
             available_sources = []
         source_rows = [item for item in available_sources if isinstance(item, dict)]
         primary_ref = str(source_rows[0].get("evidence_ref") or "") if source_rows else ""
-        document_ref = next(
+        answer_ready_ref = next(
+            (
+                str(source.get("evidence_ref") or "")
+                for source in source_rows
+                if source.get("material_channel") == "answer_ready"
+            ),
+            "",
+        )
+        vessel_status_ref = next(
             (
                 str(source.get("evidence_ref") or "")
                 for source in source_rows
                 if source.get("source_kind")
-                in {"metainfo_boundary", "node2_handoff", "l3_result"}
+                in {"vessel_r_return_packet", "r_loop_return_summary"}
+            ),
+            "",
+        )
+        document_ref = answer_ready_ref or vessel_status_ref or next(
+            (
+                str(source.get("evidence_ref") or "")
+                for source in source_rows
+                if source.get("source_kind")
+                in {
+                    "l3_document_summary",
+                    "read_document",
+                    "read_code_file",
+                    "document_context_pack",
+                    "vessel_r_material",
+                    "l3_result",
+                    "metainfo_boundary",
+                    "node2_handoff",
+                }
             ),
             primary_ref,
         )
@@ -475,7 +506,16 @@ class SongRyeonAllNodesFakeLLMAdapter:
             reason = "사용자 요청이 count, route, trace, 문서 원문처럼 확인 가능한 값 중심 답변을 요구한다."
         elif any(
             keyword in user_question
-            for keyword in ("어때", "좋을까", "아이디어", "브레인스토밍", "설명해", "개선")
+            for keyword in (
+                "어때",
+                "좋을까",
+                "아이디어",
+                "브레인스토밍",
+                "설명해",
+                "개선",
+                "안녕",
+                "부탁",
+            )
         ):
             mode = "relative_allowed"
             reason_codes = ["user_asked_for_interpretation"]
@@ -489,6 +529,13 @@ class SongRyeonAllNodesFakeLLMAdapter:
             "basis_reason_codes": reason_codes,
             "mode_selection_reason": reason,
             "mode_selection_reason_info_class": "mixed",
+            "user_task_summary": user_question,
+            "fulfillment_requirements": ["사용자 질문의 명시적 요청을 직접 수행한다."],
+            "evidence_requirement": (
+                "not_required"
+                if any(keyword in user_question for keyword in ("안녕", "부탁"))
+                else "required"
+            ),
             "evidence_roles": [
                 {
                     "evidence_ref": document_ref,
@@ -512,6 +559,12 @@ class SongRyeonAllNodesFakeLLMAdapter:
         vessel_r_material = request.input_payload.get("vessel_r_material")
         if not isinstance(vessel_r_material, dict):
             vessel_r_material = {}
+        l3_summary_bundle = request.input_payload.get("l3_document_summaries")
+        if not isinstance(l3_summary_bundle, dict):
+            l3_summary_bundle = {}
+        l3_summary_items = l3_summary_bundle.get("items")
+        if not isinstance(l3_summary_items, list):
+            l3_summary_items = []
         l_loop_result = request.input_payload.get("l_loop_result")
         if not isinstance(l_loop_result, dict):
             l_loop_result = {}
@@ -524,7 +577,19 @@ class SongRyeonAllNodesFakeLLMAdapter:
         read_count = int(request.input_payload.get("available_document_extract_count") or 0)
         search_candidate_count = int(request.input_payload.get("available_search_candidate_document_count") or 0)
         runtime_task_count = int(request.input_payload.get("available_runtime_task_count") or 0)
-        if isinstance(selected_contexts, list) and selected_contexts:
+        task_contract = request.input_payload.get("task_contract")
+        if not isinstance(task_contract, dict):
+            task_contract = {}
+        evidence_requirement = str(
+            task_contract.get("evidence_requirement") or "not_recorded"
+        )
+        if evidence_requirement == "not_required":
+            body_markdown = (
+                "안녕, 오늘도 잘 부탁해."
+                if "안녕" in user_question
+                else "요청한 근거 비의존 작업을 직접 수행했어."
+            )
+        elif isinstance(selected_contexts, list) and selected_contexts:
             # 최근 기억 context는 코드가 복사한 이전 대화 원문이다.
             # fake adapter는 그 원문 안에 테스트 암호가 실제로 있는 경우만 답하게 한다.
             first_context = selected_contexts[0] if isinstance(selected_contexts[0], dict) else {}
@@ -582,6 +647,24 @@ class SongRyeonAllNodesFakeLLMAdapter:
                     "그래서 이번 데모에서는 그래프 기억 탐색 결과를 완료 상태로 단정하지 않고, "
                     f"상태만 제한적으로 보고할게. R 탐색 상태 표기: {task_status}."
                 )
+        elif l3_summary_items:
+            first_summary = (
+                l3_summary_items[0]
+                if isinstance(l3_summary_items[0], dict)
+                else {}
+            )
+            document_name = str(
+                first_summary.get("document_name") or "L3 문서 요약"
+            )
+            summary_text = str(
+                first_summary.get("task_relevant_summary")
+                or first_summary.get("plain_document_summary")
+                or ""
+            ).strip()
+            body_markdown = (
+                f"`{document_name}`에 대응하는 L3 요약 재료를 사용했어.\n\n"
+                f"{summary_text}{l_loop_limit_note}"
+            )
         elif isinstance(extracts, list) and extracts:
             first = extracts[0] if isinstance(extracts[0], dict) else {}
             doc_id = first.get("document_name") or first.get("doc_id") or "읽은 문서"
@@ -605,6 +688,12 @@ class SongRyeonAllNodesFakeLLMAdapter:
         l_loop_result = brief.get("l_loop_result") if isinstance(brief, dict) else {}
         if not isinstance(l_loop_result, dict):
             l_loop_result = {}
+        task_contract = brief.get("task_contract") if isinstance(brief, dict) else {}
+        if not isinstance(task_contract, dict):
+            task_contract = {}
+        evidence_requirement = str(
+            task_contract.get("evidence_requirement") or "not_recorded"
+        )
         if (
             str(l_loop_result.get("attitude_hint") or "")
             in {"l_loop_budget_exhausted", "l_loop_partial_or_failed"}
@@ -617,14 +706,31 @@ class SongRyeonAllNodesFakeLLMAdapter:
                 "unsupported_claims": ["L 검색 목표가 성공"],
                 "contradictions": ["l_loop_failure_hidden_as_success"],
                 "revision_targets": ["L 검색 목표 실패/예산소진 신호와 공급 자료 사용 범위를 분리해 말한다."],
+                "task_fulfillment_status": "partial",
+                "grounding_consistency_status": "contradiction",
+                "task_failure_reasons": ["L 실패 상태와 성공 표현이 충돌한다."],
             }
+        task_fulfillment_status = "fulfilled"
+        task_failure_reasons: list[str] = []
+        if evidence_requirement == "not_required" and "근거가 더 필요" in rendered_markdown:
+            task_fulfillment_status = "not_fulfilled"
+            task_failure_reasons.append("근거 비의존 과업을 문서 부족으로 거절했다.")
         return {
-            "gate_status": "pass",
+            "gate_status": (
+                "pass" if task_fulfillment_status == "fulfilled" else "needs_revision"
+            ),
             "reason": "보고문이 제공된 node3_input_brief 범위 안에서 작성되었다.",
             "checked_claims": ["document_extract_grounding"],
             "unsupported_claims": [],
             "contradictions": [],
-            "revision_targets": [],
+            "revision_targets": (
+                []
+                if task_fulfillment_status == "fulfilled"
+                else ["사용자 과업을 직접 수행한다."]
+            ),
+            "task_fulfillment_status": task_fulfillment_status,
+            "grounding_consistency_status": "consistent",
+            "task_failure_reasons": task_failure_reasons,
         }
 
 

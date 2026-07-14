@@ -13,8 +13,10 @@ from songryeon_core.core.graph_memory import (
 from songryeon_core.core.turn_activity_graph_links import record_turn_activity_graph_links
 from songryeon_core.core.schemas import (
     Node2InputFrame,
-    R_ROUTE_EXPERIMENTAL_NEXT_0_MODE,
+    R_ROUTE_CAPSULE_SKELETON_EXECUTION_MODE,
+    R_ROUTE_CAPSULE_SKELETON_NEXT_0_MODE,
     R_ROUTE_EXPERIMENTAL_POLICY_FLAG,
+    R_ROUTE_VESSEL_LIVE_EXECUTION_MODE,
     TurnOutcomeFrame,
     TurnStateCapsule,
     ZeroState,
@@ -43,6 +45,15 @@ from songryeon_core.runtime.same_turn_l_reroute import (
     SameTurnLRerouteDecision,
     SameTurnLReroutePolicy,
     run_same_turn_l_reroute_controller,
+)
+from songryeon_core.runtime.same_turn_r_reroute import (
+    RTopLevelRunMemoryFrame,
+    SameTurnRRerouteDecision,
+    SameTurnRReroutePolicy,
+    r_live_batch_id,
+    r_return_route_data_id,
+    record_r_top_level_run_memory,
+    run_same_turn_r_reroute_controller,
 )
 from songryeon_core.runtime.r_loop_vessel_live_route import (
     VesselRLiveRouteRun,
@@ -138,6 +149,8 @@ def run_dry_turn(
     force_vessel_r_route: bool = False,
     same_turn_l_reroute_enabled: bool = False,
     max_l_runs_per_turn: int = 1,
+    same_turn_r_reroute_enabled: bool = False,
+    max_r_runs_per_turn: int = 2,
     allow_node_1_router_fallback: bool = True,
     node_1_router_fallback_policy: str = ROUTER_FALLBACK_POLICY_DEV_SMOKE,
     previous_turn_capsules: list[TurnStateCapsule] | None = None,
@@ -208,14 +221,25 @@ def run_dry_turn(
     r_loop_dry_run_result = None
     vessel_r_route_status = "not_run"
     vessel_r_route_run: VesselRLiveRouteRun | None = None
+    vessel_r_route_runs: list[VesselRLiveRouteRun] = []
     vessel_r_trace_event_ids: list[str] = []
     vessel_r_output_data_ids: list[str] = []
     vessel_r_close_route_id: str | None = None
+    r_top_level_run_memory_frames: list[RTopLevelRunMemoryFrame] = []
+    r_top_level_run_memory_data_ids: list[str] = []
+    r_top_level_run_frame_data_ids: list[str] = []
+    r_reroute_controller_data_ids: list[str] = []
+    final_r_reroute_controller: SameTurnRRerouteDecision | None = None
     policy = SameTurnLReroutePolicy(
         enabled=same_turn_l_reroute_enabled,
         max_l_runs_per_turn=max_l_runs_per_turn,
     )
     policy.effective_max_l_runs_per_turn
+    r_reroute_policy = SameTurnRReroutePolicy(
+        enabled=same_turn_r_reroute_enabled,
+        max_r_runs_per_turn=max_r_runs_per_turn,
+    )
+    r_reroute_policy.effective_max_r_runs_per_turn
 
     # 1. 사용자 입력 trace 기록.
     user_event = trace_store.create_event(
@@ -364,6 +388,13 @@ def run_dry_turn(
             allow_r_route_experimental=(
                 enable_r_route_experimental or effective_enable_vessel_r_route
             ),
+            r_execution_mode=(
+                R_ROUTE_VESSEL_LIVE_EXECUTION_MODE
+                if effective_enable_vessel_r_route
+                else R_ROUTE_CAPSULE_SKELETON_EXECUTION_MODE
+                if enable_r_route_experimental
+                else None
+            ),
         )
     else:
         decision = route_next(
@@ -437,116 +468,292 @@ def run_dry_turn(
     if decision.route == "R":
         if effective_enable_vessel_r_route:
             vessel_r_route_status = "selected"
-            enter_loop(unified_state, "R")
-            vessel_r_route_run = record_vessel_r_live_route(
-                trace_store=trace_store,
-                data_store=data_store,
-                turn_id=turn_id,
-                user_question=user_input,
-                batch_id=f"{turn_id}_vessel_r_live",
-                adapter=vessel_r_adapter,
-                uri=vessel_r_uri,
-                user=vessel_r_user,
-                password=vessel_r_password,
-                database=vessel_r_database,
-                allow_no_auth=vessel_r_allow_no_auth,
-                limit=vessel_r_limit,
-                max_node_reads=vessel_r_max_node_reads,
-                max_raw_original_material_reads=(
-                    vessel_r_max_raw_original_material_reads
-                ),
-                input_ref=[route_trace_id],
-                driver_factory_for_test=vessel_r_driver_factory_for_test,
-            )
-            exit_loop(unified_state, "R")
-            vessel_r_trace_event_ids = list(vessel_r_route_run.trace_event_ids)
-            vessel_r_output_data_ids = list(vessel_r_route_run.output_data_ids)
-            append_movement(
-                node_id="node_0",
-                mode="vessel_r_read_packet",
-                input_trace_ids=[route_trace_id],
-                output_trace_ids=[vessel_r_route_run.read_packet_trace_id],
-                input_data_ids=[route_data_id],
-                output_data_ids=[vessel_r_route_run.read_packet_id],
-            )
-            append_movement(
-                node_id="node_0",
-                mode="vessel_r_start_handoff",
-                input_trace_ids=[vessel_r_route_run.read_packet_trace_id],
-                output_trace_ids=[vessel_r_route_run.start_handoff_trace_id],
-                input_data_ids=[vessel_r_route_run.read_packet_id],
-                output_data_ids=[vessel_r_route_run.start_handoff_packet_id],
-            )
-            append_movement(
-                node_id="R",
-                node_type="loop",
-                mode="vessel_r_live_traverse",
-                input_trace_ids=[vessel_r_route_run.start_handoff_trace_id],
-                output_trace_ids=vessel_r_route_run.traverse_run.trace_event_ids,
-                input_data_ids=[vessel_r_route_run.start_handoff_packet_id],
-                output_data_ids=vessel_r_route_run.traverse_run.output_data_ids,
-            )
-            append_movement(
-                node_id="node_0",
-                mode="vessel_r_activity_ledger",
-                input_trace_ids=vessel_r_route_run.traverse_run.trace_event_ids,
-                output_trace_ids=[vessel_r_route_run.activity_ledger_trace_id],
-                input_data_ids=vessel_r_route_run.traverse_run.output_data_ids,
-                output_data_ids=[vessel_r_route_run.activity_ledger_id],
-            )
-            append_movement(
-                node_id="node_0",
-                mode="vessel_r_return_packet",
-                input_trace_ids=[vessel_r_route_run.activity_ledger_trace_id],
-                output_trace_ids=[vessel_r_route_run.return_packet_trace_id],
-                input_data_ids=[vessel_r_route_run.activity_ledger_id],
-                output_data_ids=[vessel_r_route_run.return_packet_id],
-            )
-            append_movement(
-                node_id="graph_memory",
-                node_type="code",
-                mode="vessel_r_turn_activity_graph_link",
-                input_trace_ids=[vessel_r_route_run.activity_ledger_trace_id],
-                output_trace_ids=[
-                    vessel_r_route_run.turn_activity_graph_link_trace_id
-                ],
-                input_data_ids=[vessel_r_route_run.activity_ledger_id],
-                output_data_ids=[vessel_r_route_run.turn_activity_graph_link_id],
-            )
-            close_decision = route_next(
-                user_input="보고",
-                memory_packet=packet_for_1,
-                schema_registry=schema_registry,
-            )
-            r_close_input_ref = _unique_strings(
-                [route_trace_id, *vessel_r_route_run.trace_event_ids]
-            )
-            r_close_source_data_ids = _unique_strings(
-                [route_data_id, *vessel_r_route_run.output_data_ids]
-            )
-            r_close_trace_id = record_routing(
-                trace_store=trace_store,
-                data_store=data_store,
-                turn_id=turn_id,
-                decision=close_decision,
-                input_ref=r_close_input_ref,
-                source_data_ids=r_close_source_data_ids,
-            )
-            vessel_r_close_route_id = f"route:{close_decision.route}"
-            route_data_ids.append(vessel_r_close_route_id)
-            set_current_route(unified_state, close_decision.route)
-            set_active_schema(unified_state, close_decision.required_schema)
-            append_movement(
-                node_id="node_1",
-                mode="routing_after_vessel_r_return",
-                input_trace_ids=r_close_input_ref,
-                output_trace_ids=[r_close_trace_id],
-                input_data_ids=r_close_source_data_ids,
-                output_data_ids=[vessel_r_close_route_id],
-            )
-            route2_trace_id = r_close_trace_id
-            route2_data_id = vessel_r_close_route_id
-            decision = close_decision
+            current_r_run_index = 1
+            prior_r_run_memory: RTopLevelRunMemoryFrame | None = None
+            current_r_input_trace_ids = [route_trace_id]
+            current_r_source_data_ids = [route_data_id]
+
+            while decision.route == "R":
+                batch_id = r_live_batch_id(
+                    turn_id=turn_id,
+                    run_index=current_r_run_index,
+                )
+                enter_loop(unified_state, "R")
+                vessel_r_route_run = record_vessel_r_live_route(
+                    trace_store=trace_store,
+                    data_store=data_store,
+                    turn_id=turn_id,
+                    user_question=user_input,
+                    batch_id=batch_id,
+                    adapter=vessel_r_adapter,
+                    uri=vessel_r_uri,
+                    user=vessel_r_user,
+                    password=vessel_r_password,
+                    database=vessel_r_database,
+                    allow_no_auth=vessel_r_allow_no_auth,
+                    limit=vessel_r_limit,
+                    max_node_reads=vessel_r_max_node_reads,
+                    max_raw_original_material_reads=(
+                        vessel_r_max_raw_original_material_reads
+                    ),
+                    prior_top_level_r_run_context=(
+                        asdict(prior_r_run_memory)
+                        if prior_r_run_memory is not None
+                        else None
+                    ),
+                    input_ref=current_r_input_trace_ids,
+                    driver_factory_for_test=vessel_r_driver_factory_for_test,
+                )
+                exit_loop(unified_state, "R")
+                vessel_r_route_runs.append(vessel_r_route_run)
+                vessel_r_trace_event_ids = _unique_strings(
+                    [
+                        *vessel_r_trace_event_ids,
+                        *vessel_r_route_run.trace_event_ids,
+                    ]
+                )
+                vessel_r_output_data_ids = _unique_strings(
+                    [
+                        *vessel_r_output_data_ids,
+                        *vessel_r_route_run.output_data_ids,
+                    ]
+                )
+                append_movement(
+                    node_id="node_0",
+                    mode="vessel_r_read_packet",
+                    input_trace_ids=current_r_input_trace_ids,
+                    output_trace_ids=[vessel_r_route_run.read_packet_trace_id],
+                    input_data_ids=current_r_source_data_ids,
+                    output_data_ids=[vessel_r_route_run.read_packet_id],
+                )
+                append_movement(
+                    node_id="node_0",
+                    mode="vessel_r_start_handoff",
+                    input_trace_ids=[vessel_r_route_run.read_packet_trace_id],
+                    output_trace_ids=[vessel_r_route_run.start_handoff_trace_id],
+                    input_data_ids=[vessel_r_route_run.read_packet_id],
+                    output_data_ids=[vessel_r_route_run.start_handoff_packet_id],
+                )
+                append_movement(
+                    node_id="R",
+                    node_type="loop",
+                    mode="vessel_r_live_traverse",
+                    input_trace_ids=[vessel_r_route_run.start_handoff_trace_id],
+                    output_trace_ids=vessel_r_route_run.traverse_run.trace_event_ids,
+                    input_data_ids=[vessel_r_route_run.start_handoff_packet_id],
+                    output_data_ids=vessel_r_route_run.traverse_run.output_data_ids,
+                )
+                append_movement(
+                    node_id="node_0",
+                    mode="vessel_r_activity_ledger",
+                    input_trace_ids=vessel_r_route_run.traverse_run.trace_event_ids,
+                    output_trace_ids=[vessel_r_route_run.activity_ledger_trace_id],
+                    input_data_ids=vessel_r_route_run.traverse_run.output_data_ids,
+                    output_data_ids=[vessel_r_route_run.activity_ledger_id],
+                )
+                append_movement(
+                    node_id="node_0",
+                    mode="vessel_r_return_packet",
+                    input_trace_ids=[vessel_r_route_run.activity_ledger_trace_id],
+                    output_trace_ids=[vessel_r_route_run.return_packet_trace_id],
+                    input_data_ids=[vessel_r_route_run.activity_ledger_id],
+                    output_data_ids=[vessel_r_route_run.return_packet_id],
+                )
+                append_movement(
+                    node_id="graph_memory",
+                    node_type="code",
+                    mode="vessel_r_turn_activity_graph_link",
+                    input_trace_ids=[vessel_r_route_run.activity_ledger_trace_id],
+                    output_trace_ids=[
+                        vessel_r_route_run.turn_activity_graph_link_trace_id
+                    ],
+                    input_data_ids=[vessel_r_route_run.activity_ledger_id],
+                    output_data_ids=[vessel_r_route_run.turn_activity_graph_link_id],
+                )
+
+                recorded_r_memory = record_r_top_level_run_memory(
+                    trace_store=trace_store,
+                    data_store=data_store,
+                    turn_id=turn_id,
+                    run_index=current_r_run_index,
+                    batch_id=batch_id,
+                    return_packet_id=vessel_r_route_run.return_packet_id,
+                    activity_ledger_frame_id=vessel_r_route_run.activity_ledger_id,
+                    traverse_result_frame_id=(
+                        vessel_r_route_run.traverse_run.result_frame.frame_id
+                    ),
+                    prior_run_memory_frame_id=(
+                        prior_r_run_memory.frame_id
+                        if prior_r_run_memory is not None
+                        else None
+                    ),
+                    source_trace_ids=vessel_r_route_run.trace_event_ids,
+                    source_data_ids=vessel_r_route_run.output_data_ids,
+                )
+                r_top_level_run_memory_frames.append(recorded_r_memory.memory_frame)
+                r_top_level_run_memory_data_ids.append(
+                    recorded_r_memory.memory_frame.frame_id
+                )
+                r_top_level_run_frame_data_ids.append(
+                    recorded_r_memory.run_frame.frame_id
+                )
+                append_movement(
+                    node_id="node_0",
+                    mode="r_top_level_return_memory",
+                    input_trace_ids=vessel_r_route_run.trace_event_ids,
+                    output_trace_ids=[recorded_r_memory.trace_event_id],
+                    input_data_ids=vessel_r_route_run.output_data_ids,
+                    output_data_ids=recorded_r_memory.data_ids,
+                )
+
+                r_close_input_ref = _unique_strings(
+                    [
+                        *current_r_input_trace_ids,
+                        *vessel_r_route_run.trace_event_ids,
+                        recorded_r_memory.trace_event_id,
+                    ]
+                )
+                r_close_source_data_ids = _unique_strings(
+                    [
+                        node0_pre_data_id,
+                        *current_r_source_data_ids,
+                        *vessel_r_route_run.output_data_ids,
+                        *recorded_r_memory.data_ids,
+                    ]
+                )
+                can_offer_another_r = (
+                    r_reroute_policy.enabled
+                    and current_r_run_index
+                    < r_reroute_policy.effective_max_r_runs_per_turn
+                )
+                if node_1_router_adapter is not None:
+                    close_decision = route_next_with_llm_or_policy_fallback(
+                        user_input=user_input,
+                        memory_packet=packet_for_1,
+                        schema_registry=schema_registry,
+                        adapter=node_1_router_adapter,
+                        trace_store=trace_store,
+                        data_store=data_store,
+                        turn_id=turn_id,
+                        input_ref=r_close_input_ref,
+                        source_data_ids=r_close_source_data_ids,
+                        fallback_user_input="보고",
+                        fallback_policy=node_1_router_fallback_policy,
+                        fallback_allowed_by_runtime_policy=(
+                            allow_node_1_router_fallback
+                        ),
+                        allow_r_route_experimental=can_offer_another_r,
+                        r_execution_mode=(
+                            R_ROUTE_VESSEL_LIVE_EXECUTION_MODE
+                            if can_offer_another_r
+                            else None
+                        ),
+                        route_context="r_return",
+                        r_return_context=asdict(recorded_r_memory.memory_frame),
+                    )
+                else:
+                    close_decision = route_next(
+                        user_input="보고",
+                        memory_packet=packet_for_1,
+                        schema_registry=schema_registry,
+                    )
+                vessel_r_close_route_id = r_return_route_data_id(
+                    run_index=current_r_run_index,
+                    route=close_decision.route,
+                )
+                r_close_trace_id = record_routing(
+                    trace_store=trace_store,
+                    data_store=data_store,
+                    turn_id=turn_id,
+                    decision=close_decision,
+                    input_ref=r_close_input_ref,
+                    source_data_ids=r_close_source_data_ids,
+                    route_context="r_return",
+                    route_data_id=vessel_r_close_route_id,
+                )
+                route_data_ids.append(vessel_r_close_route_id)
+                set_current_route(unified_state, close_decision.route)
+                set_active_schema(unified_state, close_decision.required_schema)
+                append_movement(
+                    node_id="node_1",
+                    mode="routing_after_vessel_r_return",
+                    input_trace_ids=r_close_input_ref,
+                    output_trace_ids=[r_close_trace_id],
+                    input_data_ids=r_close_source_data_ids,
+                    output_data_ids=[vessel_r_close_route_id],
+                )
+
+                (
+                    r_controller_trace_id,
+                    r_controller_data_id,
+                    final_r_reroute_controller,
+                ) = run_same_turn_r_reroute_controller(
+                    trace_store=trace_store,
+                    data_store=data_store,
+                    turn_id=turn_id,
+                    current_run_index=current_r_run_index,
+                    policy=r_reroute_policy,
+                    node1_route=close_decision.route,
+                    node1_route_data_id=vessel_r_close_route_id,
+                    run_memory_frame_id=recorded_r_memory.memory_frame.frame_id,
+                    source_trace_ids=[
+                        recorded_r_memory.trace_event_id,
+                        r_close_trace_id,
+                    ],
+                    source_data_ids=[
+                        *recorded_r_memory.data_ids,
+                        vessel_r_close_route_id,
+                    ],
+                )
+                r_reroute_controller_data_ids.append(r_controller_data_id)
+                append_movement(
+                    node_id="R_reroute_controller",
+                    node_type="code",
+                    mode="same_turn_r_reroute_policy",
+                    input_trace_ids=[
+                        recorded_r_memory.trace_event_id,
+                        r_close_trace_id,
+                    ],
+                    output_trace_ids=[r_controller_trace_id],
+                    input_data_ids=[
+                        recorded_r_memory.memory_frame.frame_id,
+                        vessel_r_close_route_id,
+                    ],
+                    output_data_ids=[r_controller_data_id],
+                )
+
+                if final_r_reroute_controller.same_turn_rerun_allowed:
+                    prior_r_run_memory = recorded_r_memory.memory_frame
+                    current_r_run_index += 1
+                    current_r_input_trace_ids = _unique_strings(
+                        [
+                            recorded_r_memory.trace_event_id,
+                            r_close_trace_id,
+                            r_controller_trace_id,
+                        ]
+                    )
+                    current_r_source_data_ids = _unique_strings(
+                        [
+                            *recorded_r_memory.data_ids,
+                            vessel_r_close_route_id,
+                            r_controller_data_id,
+                        ]
+                    )
+                    decision = close_decision
+                    continue
+
+                if close_decision.route == "R":
+                    raise RuntimeError(
+                        "node_1 selected R but same-turn R controller did not allow the next run"
+                    )
+                decision = close_decision
+                if close_decision.route == "2":
+                    route2_trace_id = r_close_trace_id
+                    route2_data_id = vessel_r_close_route_id
+                elif close_decision.route == "L":
+                    route_trace_id = r_close_trace_id
+                    route_data_id = vessel_r_close_route_id
+                break
         else:
             r_route_experimental_status = "selected"
             r_graph_build = build_graph_memory_snapshot_from_capsules(
@@ -594,7 +801,7 @@ def run_dry_turn(
             r_route_experimental_handoff_packet_id = r_route_handoff_data_id
             append_movement(
                 node_id="node_0",
-                mode=R_ROUTE_EXPERIMENTAL_NEXT_0_MODE,
+                mode=R_ROUTE_CAPSULE_SKELETON_NEXT_0_MODE,
                 input_trace_ids=[r_graph_trace_id],
                 output_trace_ids=[r_route_handoff_trace_id],
                 input_data_ids=r_route_experimental_graph_data_ids,
@@ -1031,6 +1238,9 @@ def run_dry_turn(
             r_route_experimental_handoff_packet_id,
             *r_route_experimental_output_data_ids,
             *vessel_r_output_data_ids,
+            *r_top_level_run_memory_data_ids,
+            *r_top_level_run_frame_data_ids,
+            *r_reroute_controller_data_ids,
             node0_final_data_id,
             outcome_id,
         ]
@@ -1498,6 +1708,32 @@ def run_dry_turn(
         "r_route_experimental_graph_data_ids": r_route_experimental_graph_data_ids,
         "vessel_r_route_enabled": effective_enable_vessel_r_route,
         "vessel_r_route_status": vessel_r_route_status,
+        "vessel_r_run_count": len(vessel_r_route_runs),
+        "vessel_r_run_frame_ids": r_top_level_run_frame_data_ids,
+        "vessel_r_top_level_memory_frame_ids": (
+            r_top_level_run_memory_data_ids
+        ),
+        "same_turn_r_reroute_enabled": same_turn_r_reroute_enabled,
+        "max_r_runs_per_turn": max_r_runs_per_turn,
+        "effective_max_r_runs_per_turn": (
+            r_reroute_policy.effective_max_r_runs_per_turn
+        ),
+        "r_reroute_controller_data_ids": r_reroute_controller_data_ids,
+        "r_reroute_controller_decision": (
+            final_r_reroute_controller.controller_decision
+            if final_r_reroute_controller is not None
+            else None
+        ),
+        "r_reroute_controller_reason": (
+            final_r_reroute_controller.decision_reason
+            if final_r_reroute_controller is not None
+            else None
+        ),
+        "same_turn_r_rerun_allowed": (
+            final_r_reroute_controller.same_turn_rerun_allowed
+            if final_r_reroute_controller is not None
+            else False
+        ),
         "vessel_r_policy_flag": (
             "force_vessel_r_route"
             if force_vessel_r_route
@@ -1793,6 +2029,24 @@ def run_dry_turn(
             "basis_reason_codes",
             data_type="node_output:node2_answer_basis_frame",
         ),
+        "node2_answer_task_contract_status": _read_payload_text(
+            data_store,
+            "node_2:answer_basis_frame",
+            "task_contract_status",
+            data_type="node_output:node2_answer_basis_frame",
+        ),
+        "node2_answer_task_summary": _read_payload_text(
+            data_store,
+            "node_2:answer_basis_frame",
+            "user_task_summary",
+            data_type="node_output:node2_answer_basis_frame",
+        ),
+        "node2_answer_evidence_requirement": _read_payload_text(
+            data_store,
+            "node_2:answer_basis_frame",
+            "evidence_requirement",
+            data_type="node_output:node2_answer_basis_frame",
+        ),
         "node2_answer_basis_semantic_judgement_status": _read_payload_text(
             data_store,
             "node_2:answer_basis_frame",
@@ -1851,6 +2105,18 @@ def run_dry_turn(
             data_store,
             "node_4:gatekeeper_frame",
             "gate_status",
+            data_type="node_output:node4_gatekeeper_frame",
+        ),
+        "node4_task_fulfillment_status": _read_payload_text(
+            data_store,
+            "node_4:gatekeeper_frame",
+            "task_fulfillment_status",
+            data_type="node_output:node4_gatekeeper_frame",
+        ),
+        "node4_grounding_consistency_status": _read_payload_text(
+            data_store,
+            "node_4:gatekeeper_frame",
+            "grounding_consistency_status",
             data_type="node_output:node4_gatekeeper_frame",
         ),
         "node4_recent_memory_guard_status": _read_payload_text(

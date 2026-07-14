@@ -163,7 +163,7 @@ def build_default_schema_registry() -> SchemaRegistry:
             ),
             SchemaRecord(
                 schema_name="Node2AnswerBasisFrame",
-                version="0.1",
+                version="0.2",
                 target_node="node_2_answer_basis",
                 required=True,
                 fields=[
@@ -173,6 +173,10 @@ def build_default_schema_registry() -> SchemaRegistry:
                     "basis_reason_codes",
                     "mode_selection_reason",
                     "mode_selection_reason_info_class",
+                    "task_contract_status",
+                    "user_task_summary",
+                    "fulfillment_requirements",
+                    "evidence_requirement",
                     "evidence_roles",
                     "generated_by",
                     "info_class",
@@ -418,7 +422,7 @@ def build_default_schema_registry() -> SchemaRegistry:
             ),
             SchemaRecord(
                 schema_name="LLoopReturnSummaryFrame",
-                version="0.1",
+                version="0.2",
                 target_node="node_0",
                 required=True,
                 fields=[
@@ -430,7 +434,11 @@ def build_default_schema_registry() -> SchemaRegistry:
                     "evidence_requirement_kind",
                     "required_min_read_documents",
                     "actual_read_doc_count",
+                    "actual_read_code_file_count",
                     "search_candidate_count",
+                    "evidence_acquisition_status",
+                    "original_material_count",
+                    "original_material_requirement_status",
                     "final_continuation_status",
                     "budget_stop_reason",
                     "remaining_tool_calls",
@@ -483,7 +491,7 @@ def build_default_schema_registry() -> SchemaRegistry:
             ),
             SchemaRecord(
                 schema_name="L3AchievementFrame",
-                version="0.1",
+                version="0.2",
                 target_node="L3_achievement",
                 required=True,
                 fields=[
@@ -494,6 +502,12 @@ def build_default_schema_registry() -> SchemaRegistry:
                     "target_goal_data_id",
                     "preserved_info_frame_id",
                     "candidate_count",
+                    "actual_read_doc_count",
+                    "actual_read_code_file_count",
+                    "original_material_count",
+                    "evidence_acquisition_status",
+                    "original_material_required_count",
+                    "original_material_requirement_status",
                     "evidence_trace_ids",
                     "evidence_data_ids",
                     "source_trace_ids",

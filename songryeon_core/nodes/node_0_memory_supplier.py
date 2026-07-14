@@ -955,8 +955,6 @@ def build_l_loop_return_summary_frame(
             ),
         ]
     )
-    if not read_doc_ids:
-        read_doc_ids = _string_list(budget_payload.get("read_doc_ids"))
     read_code_file_paths = _unique_strings(
         [
             *_string_list(l3_payload.get("read_code_file_paths")),
@@ -973,6 +971,21 @@ def build_l_loop_return_summary_frame(
     search_candidate_count = len(search_result_doc_ids)
     if search_candidate_count == 0:
         search_candidate_count = _int(l3_payload, "candidate_count")
+    original_material_count = actual_read_doc_count + actual_read_code_file_count
+    evidence_acquisition_status = (
+        "original_material_acquired"
+        if original_material_count > 0
+        else "candidates_only"
+        if search_candidate_count > 0
+        else "none"
+    )
+    original_material_requirement_status = (
+        "not_required"
+        if required_min_read_documents == 0
+        else "satisfied"
+        if original_material_count >= required_min_read_documents
+        else "unsatisfied"
+    )
 
     l_loop_task_status = _text(l3_payload, "achievement_status", fallback="unknown")
     l3_goal_match_status = _text(l3_payload, "goal_match_status", fallback="not_applicable")
@@ -1036,6 +1049,11 @@ def build_l_loop_return_summary_frame(
         l3_semantic_goal_match_status=l3_semantic_goal_match_status,
         recommended_next_route_for_node1=route_hint,
         route_hint_reason=route_hint_reason,
+        evidence_acquisition_status=evidence_acquisition_status,
+        original_material_count=original_material_count,
+        original_material_requirement_status=(
+            original_material_requirement_status
+        ),
         read_doc_ids=read_doc_ids,
         read_code_file_paths=read_code_file_paths,
         search_result_doc_ids=search_result_doc_ids,
@@ -1069,7 +1087,11 @@ def build_l_loop_return_summary_items(frame: LLoopReturnSummaryFrame) -> list[Me
                 f"required_min_read_documents={frame.required_min_read_documents};"
                 f"actual_read_doc_count={frame.actual_read_doc_count};"
                 f"actual_read_code_file_count={frame.actual_read_code_file_count};"
-                f"search_candidate_count={frame.search_candidate_count}"
+                f"search_candidate_count={frame.search_candidate_count};"
+                f"evidence_acquisition_status={frame.evidence_acquisition_status};"
+                f"original_material_count={frame.original_material_count};"
+                "original_material_requirement_status="
+                f"{frame.original_material_requirement_status}"
             ),
             source_data_ids=source_data_ids,
         ),

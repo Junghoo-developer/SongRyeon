@@ -24,6 +24,7 @@ desktop.ini
 .env
 .env.*
 *.local
+!.env.example
 
 # Large or disposable runtime exports
 Administrative_Reform_1/05_Execution_Records/runtime_runs/

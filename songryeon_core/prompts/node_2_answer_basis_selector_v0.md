@@ -10,6 +10,9 @@ Choose how node_3 should speak in the final answer. Return only one JSON object:
   "basis_reason_codes": ["multi_source_bundle"],
   "mode_selection_reason": "short Korean reason for the mode choice",
   "mode_selection_reason_info_class": "mixed",
+  "user_task_summary": "사용자가 최종 답변에서 요구한 행동을 한 문장으로 요약",
+  "fulfillment_requirements": ["최종 답변이 반드시 수행해야 할 조건"],
+  "evidence_requirement": "required",
   "evidence_roles": [
     {
       "evidence_ref": "E001",
@@ -26,6 +29,12 @@ Allowed `answer_basis_mode` values are exactly:
 - `absolute_first`
 - `relative_allowed`
 - `mixed_or_uncertain`
+
+Allowed `evidence_requirement` values are exactly:
+
+- `not_required`: 인사, 문장 변환, 창작, 브레인스토밍처럼 외부 사실 근거 없이 사용자 지시를 수행할 수 있음
+- `optional`: 공급 근거가 도움이 되지만 없어도 사용자 지시의 핵심 행동을 수행할 수 있음
+- `required`: 문서 내용, 코드 사실, 과거 대화, runtime 상태처럼 공급 근거 없이는 답할 수 없음
 
 Allowed `basis_reason_codes`:
 
@@ -75,8 +84,26 @@ Mode guidance:
 
 - Use `absolute_first` when the user asks for count, route, schema validation, smoke result, document wording, trace/data fact, file existence, or code/tool-verified state.
 - Use `relative_allowed` when the user asks for interpretation, structure critique, advice, explanation for beginners, brainstorming, wording improvement, or next-goal suggestions.
+- Use `relative_allowed` with `evidence_requirement=not_required` for greetings, rewriting, formatting, creative wording, and other requests whose requested action does not assert external facts.
 - Use `mixed_or_uncertain` when the answer needs a bundle of sources, recent conversation plus execution record, partial evidence, unclear source mapping, or an explicit uncertainty boundary.
 - If uncertain between modes, choose `mixed_or_uncertain`.
+- `mixed_or_uncertain` is not an automatic refusal mode. It means uncertainty must be exposed for claims that depend on evidence.
+
+Task contract guidance:
+
+- `user_task_summary` describes what the final response must do, not what internal nodes did.
+- `fulfillment_requirements` must be concrete enough for node_4 to check against the final answer.
+- Preserve explicit format constraints such as "한 문장", "목록", "비교", or "핵심 설명".
+- Do not replace the user's requested action with a runtime-status report.
+
+Material catalog guidance:
+
+- Read `answer_material_catalog` before choosing `evidence_roles`.
+- Prefer `material_channel=answer_ready` as primary answer material when it directly supports the task.
+- `material_channel=status` is for limits and success/partial/failure state.
+- `material_channel=process` explains how work was performed. Use it as primary only when the user asks about search, routing, execution order, or audit process itself.
+- An L2 query plan is a search-process record, not the content answer for a document-summary request.
+- A runtime task sequence is a process ledger, not a default answer substitute.
 
 Rules:
 
@@ -93,4 +120,5 @@ Rules:
 - In schema repair mode, preserve valid semantic choices from `failed_payload` and fix only the reported schema contract failure.
 - Every object in `evidence_roles` must contain all four fields: `evidence_ref`, `evidence_role`, `role_reason`, and `role_reason_info_class`.
 - Schema repair does not authorize an unlisted evidence ref. Choose only from `available_evidence_sources`.
+- Always return all three task-contract fields: `user_task_summary`, `fulfillment_requirements`, and `evidence_requirement`.
 - Do not expose raw internal IDs in prose intended for the user. This JSON is internal, but keep reasons short and avoid unnecessary ID copying.

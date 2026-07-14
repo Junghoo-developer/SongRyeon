@@ -967,6 +967,8 @@ class RoutingDecisionFrame:
     route: str
     route_reason: str
     expected_next_0_mode: str
+    route_execution_mode: str | None = None
+    route_context: str = "entry"
     route_source: str = "CODE:RULE_STUB"
     llm_routing_status: str = "not_run"
     llm_call_data_id: str | None = None
@@ -987,12 +989,21 @@ class RoutingDecisionFrame:
     source_trace_ids: list[str] = field(default_factory=list)
     source_data_ids: list[str] = field(default_factory=list)
     schema_name: str = "RoutingDecisionFrame"
-    schema_version: str = "0.2"
+    schema_version: str = "0.4"
 
 
 R_ROUTE_EXPERIMENTAL_POLICY_FLAG = "enable_r_route_experimental"
 R_ROUTE_FORCE_VESSEL_POLICY_FLAG = "force_vessel_r_route"
-R_ROUTE_EXPERIMENTAL_NEXT_0_MODE = "r_loop_graph_guide_handoff"
+R_ROUTE_CAPSULE_SKELETON_EXECUTION_MODE = "capsule_skeleton"
+R_ROUTE_VESSEL_LIVE_EXECUTION_MODE = "vessel_live"
+R_ROUTE_EXECUTION_MODES = {
+    R_ROUTE_CAPSULE_SKELETON_EXECUTION_MODE,
+    R_ROUTE_VESSEL_LIVE_EXECUTION_MODE,
+}
+R_ROUTE_CAPSULE_SKELETON_NEXT_0_MODE = "r_loop_graph_guide_handoff"
+R_ROUTE_VESSEL_LIVE_NEXT_0_MODE = "vessel_r_read_packet"
+# 과거 experimental R 이름은 capsule skeleton 경로의 호환 별칭으로 유지한다.
+R_ROUTE_EXPERIMENTAL_NEXT_0_MODE = R_ROUTE_CAPSULE_SKELETON_NEXT_0_MODE
 
 
 def validate_routing_decision_frame(frame: RoutingDecisionFrame) -> None:
@@ -1015,8 +1026,17 @@ def validate_routing_decision_frame(frame: RoutingDecisionFrame) -> None:
             R_ROUTE_FORCE_VESSEL_POLICY_FLAG,
         }:
             raise ValueError("RoutingDecisionFrame route=R requires an explicit R policy flag")
-        if frame.expected_next_0_mode != R_ROUTE_EXPERIMENTAL_NEXT_0_MODE:
-            raise ValueError("RoutingDecisionFrame route=R requires R graph handoff mode")
+        if frame.route_execution_mode not in R_ROUTE_EXECUTION_MODES:
+            raise ValueError("RoutingDecisionFrame route=R requires a valid route_execution_mode")
+        expected_r_mode = (
+            R_ROUTE_VESSEL_LIVE_NEXT_0_MODE
+            if frame.route_execution_mode == R_ROUTE_VESSEL_LIVE_EXECUTION_MODE
+            else R_ROUTE_CAPSULE_SKELETON_NEXT_0_MODE
+        )
+        if frame.expected_next_0_mode != expected_r_mode:
+            raise ValueError(
+                "RoutingDecisionFrame route=R expected_next_0_mode does not match route_execution_mode"
+            )
         if frame.policy_flag == R_ROUTE_EXPERIMENTAL_POLICY_FLAG:
             if not frame.route_source.startswith("LLM:"):
                 raise ValueError("RoutingDecisionFrame route=R must be selected by node_1 LLM")
@@ -1033,8 +1053,12 @@ def validate_routing_decision_frame(frame: RoutingDecisionFrame) -> None:
                 raise ValueError("forced route=R requires force_vessel_r_route_policy")
     elif frame.route not in {"L", "2"}:
         raise ValueError(f"unknown route: {frame.route}")
+    elif frame.route_execution_mode is not None:
+        raise ValueError("non-R RoutingDecisionFrame must not set route_execution_mode")
     if frame.llm_routing_status not in {"not_run", "ran", "failed"}:
         raise ValueError(f"unknown llm_routing_status: {frame.llm_routing_status}")
+    if frame.route_context not in {"entry", "l_return", "r_return"}:
+        raise ValueError(f"unknown RoutingDecisionFrame.route_context: {frame.route_context}")
     if frame.route_confidence is not None:
         if not isinstance(frame.route_confidence, (int, float)):
             raise TypeError("RoutingDecisionFrame.route_confidence must be numeric")
@@ -1146,7 +1170,7 @@ def validate_node2_boundary_review_frame(frame: Node2BoundaryReviewFrame) -> Non
 
 
 NODE2_ANSWER_BASIS_FRAME_SCHEMA_NAME = "Node2AnswerBasisFrame"
-NODE2_ANSWER_BASIS_FRAME_SCHEMA_VERSION = "0.1"
+NODE2_ANSWER_BASIS_FRAME_SCHEMA_VERSION = "0.2"
 ANSWER_BASIS_MODES = {
     "absolute_first",
     "relative_allowed",
@@ -1183,6 +1207,13 @@ ANSWER_BASIS_FAILURE_TYPES = {
     "adapter_failed",
 }
 ANSWER_BASIS_PAYLOAD_PARSE_STATUSES = {"passed", "failed", "not_checked"}
+ANSWER_TASK_CONTRACT_STATUSES = {"not_recorded", "recorded", "failed"}
+ANSWER_EVIDENCE_REQUIREMENTS = {
+    "not_recorded",
+    "not_required",
+    "optional",
+    "required",
+}
 
 
 @dataclass
@@ -1193,6 +1224,11 @@ class Node2EvidenceRole:
     evidence_role: str
     role_reason: str = ""
     role_reason_info_class: str = "mixed"
+    # 아래 세 필드는 evidence_ref가 가리킨 code-owned source table에서 복사된다.
+    # node_2 LLM이 직접 만들거나 바꾸는 의미 정보가 아니다.
+    source_label: str = ""
+    source_kind: str = ""
+    material_channel: str = ""
 
 
 @dataclass
@@ -1205,6 +1241,11 @@ class Node2AnswerBasisFrame:
     basis_reason_codes: list[str]
     mode_selection_reason: str
     mode_selection_reason_info_class: str
+    # node_2 LLM이 사용자 질문을 어떤 과업으로 이해했는지 드러내는 상대/혼합 정보.
+    task_contract_status: str = "not_recorded"
+    user_task_summary: str = ""
+    fulfillment_requirements: list[str] = field(default_factory=list)
+    evidence_requirement: str = "not_recorded"
     evidence_roles: list[Node2EvidenceRole] = field(default_factory=list)
     generated_by: str = "LLM:NODE_2"
     info_class: str = "mixed"
@@ -1267,6 +1308,29 @@ def validate_node2_answer_basis_frame(frame: Node2AnswerBasisFrame) -> None:
             "unknown Node2AnswerBasisFrame.answer_basis_payload_parse_status: "
             f"{frame.answer_basis_payload_parse_status}"
         )
+    if frame.task_contract_status not in ANSWER_TASK_CONTRACT_STATUSES:
+        raise ValueError(
+            "unknown Node2AnswerBasisFrame.task_contract_status: "
+            f"{frame.task_contract_status}"
+        )
+    if frame.evidence_requirement not in ANSWER_EVIDENCE_REQUIREMENTS:
+        raise ValueError(
+            "unknown Node2AnswerBasisFrame.evidence_requirement: "
+            f"{frame.evidence_requirement}"
+        )
+    if frame.task_contract_status == "recorded":
+        if not frame.user_task_summary.strip():
+            raise ValueError("recorded task contract requires user_task_summary")
+        if not frame.fulfillment_requirements:
+            raise ValueError("recorded task contract requires fulfillment_requirements")
+        if frame.evidence_requirement == "not_recorded":
+            raise ValueError("recorded task contract requires evidence_requirement")
+    if frame.task_contract_status == "failed" and frame.semantic_judgement_status != "failed":
+        raise ValueError("failed task contract requires failed semantic judgement")
+    _validate_string_list(
+        "Node2AnswerBasisFrame.fulfillment_requirements",
+        frame.fulfillment_requirements,
+    )
     if not isinstance(frame.answer_basis_raw_text_present, bool):
         raise TypeError("Node2AnswerBasisFrame.answer_basis_raw_text_present must be bool")
     if frame.answer_basis_llm_call_data_id is not None and not frame.answer_basis_llm_call_data_id:
@@ -1331,8 +1395,19 @@ def _validate_node2_evidence_role(
 
 
 NODE4_GATEKEEPER_FRAME_SCHEMA_NAME = "Node4GatekeeperFrame"
-NODE4_GATEKEEPER_FRAME_SCHEMA_VERSION = "0.1"
+NODE4_GATEKEEPER_FRAME_SCHEMA_VERSION = "0.2"
 NODE4_GATE_STATUSES = {"pass", "needs_revision", "failed"}
+NODE4_TASK_FULFILLMENT_STATUSES = {
+    "fulfilled",
+    "partial",
+    "not_fulfilled",
+    "not_checkable",
+}
+NODE4_GROUNDING_CONSISTENCY_STATUSES = {
+    "consistent",
+    "contradiction",
+    "not_checkable",
+}
 
 
 @dataclass
@@ -1351,6 +1426,9 @@ class Node4GatekeeperFrame:
     unsupported_claims: list[str] = field(default_factory=list)
     contradictions: list[str] = field(default_factory=list)
     revision_targets: list[str] = field(default_factory=list)
+    task_fulfillment_status: str = "not_checkable"
+    grounding_consistency_status: str = "not_checkable"
+    task_failure_reasons: list[str] = field(default_factory=list)
     recent_memory_guard_status: str = "not_run"
     recent_memory_guard_reason_codes: list[str] = field(default_factory=list)
     recent_memory_claim_count: int = 0
@@ -1386,6 +1464,19 @@ def validate_node4_gatekeeper_frame(frame: Node4GatekeeperFrame) -> None:
         raise ValueError(f"unknown Node4GatekeeperFrame schema_version: {frame.schema_version}")
     if frame.gate_status not in NODE4_GATE_STATUSES:
         raise ValueError(f"unknown Node4 gate_status: {frame.gate_status}")
+    if frame.task_fulfillment_status not in NODE4_TASK_FULFILLMENT_STATUSES:
+        raise ValueError(
+            "unknown Node4 task_fulfillment_status: "
+            f"{frame.task_fulfillment_status}"
+        )
+    if (
+        frame.grounding_consistency_status
+        not in NODE4_GROUNDING_CONSISTENCY_STATUSES
+    ):
+        raise ValueError(
+            "unknown Node4 grounding_consistency_status: "
+            f"{frame.grounding_consistency_status}"
+        )
     if frame.recent_memory_guard_status not in {"not_run", "pass", "needs_revision"}:
         raise ValueError(
             f"unknown Node4 recent_memory_guard_status: {frame.recent_memory_guard_status}"
@@ -1406,6 +1497,10 @@ def validate_node4_gatekeeper_frame(frame: Node4GatekeeperFrame) -> None:
     _validate_string_list(
         "Node4GatekeeperFrame.recent_memory_revision_targets",
         frame.recent_memory_revision_targets,
+    )
+    _validate_string_list(
+        "Node4GatekeeperFrame.task_failure_reasons",
+        frame.task_failure_reasons,
     )
     for trace_id in frame.source_trace_ids:
         if not trace_id:
@@ -2039,7 +2134,7 @@ def validate_node2_handoff_frame(frame: Node2HandoffFrame) -> None:
 
 
 NODE3_INPUT_BRIEF_FRAME_SCHEMA_NAME = "Node3InputBriefFrame"
-NODE3_INPUT_BRIEF_FRAME_SCHEMA_VERSION = "0.1"
+NODE3_INPUT_BRIEF_FRAME_SCHEMA_VERSION = "0.2"
 NODE3_INPUT_BRIEF_STATUSES = {"ready", "insufficient"}
 NODE3_DOCUMENT_CONTEXT_PACK_STATUSES = {
     "not_recorded",
@@ -2392,6 +2487,10 @@ class Node3InputBriefFrame:
     l_loop_failure_level: str = "none"
     l3_goal_match_status: str = "not_run"
     l3_semantic_goal_match_status: str = "not_run"
+    # 절대 정보: L이 후보만 확보했는지 비어 있지 않은 원문까지 확보했는지 구분한다.
+    l_evidence_acquisition_status: str = "not_recorded"
+    l_original_material_count: int = 0
+    l_original_material_requirement_status: str = "not_recorded"
     remaining_query_attempts: int = 0
     remaining_read_doc_calls: int = 0
     l_loop_result_attitude_hint: str = "not_recorded"
@@ -2400,6 +2499,10 @@ class Node3InputBriefFrame:
     basis_reason_codes: list[str] = field(default_factory=lambda: ["llm_mode_selection_failed"])
     mode_selection_reason: str = "CODE_STATUS:node2_answer_basis_mode_selection_failed"
     mode_selection_reason_info_class: str = "absolute_status"
+    answer_task_contract_status: str = "not_recorded"
+    user_task_summary: str = ""
+    fulfillment_requirements: list[str] = field(default_factory=list)
+    evidence_requirement: str = "not_recorded"
     evidence_roles: list[Node2EvidenceRole] = field(default_factory=list)
     answer_basis_generated_by: str = "CODE:FALLBACK"
     answer_basis_info_class: str = "absolute_status"
@@ -2683,9 +2786,26 @@ def _validate_node3_l_loop_result_fields(frame: Node3InputBriefFrame) -> None:
             "unknown Node3InputBriefFrame.l3_semantic_goal_match_status: "
             f"{frame.l3_semantic_goal_match_status}"
         )
+    if frame.l_evidence_acquisition_status not in {
+        "not_recorded",
+        *L_EVIDENCE_ACQUISITION_STATUSES,
+    }:
+        raise ValueError(
+            "unknown Node3InputBriefFrame.l_evidence_acquisition_status: "
+            f"{frame.l_evidence_acquisition_status}"
+        )
+    if frame.l_original_material_requirement_status not in {
+        "not_recorded",
+        *L_ORIGINAL_MATERIAL_REQUIREMENT_STATUSES,
+    }:
+        raise ValueError(
+            "unknown Node3InputBriefFrame.l_original_material_requirement_status: "
+            f"{frame.l_original_material_requirement_status}"
+        )
     for field_name, value in {
         "remaining_query_attempts": frame.remaining_query_attempts,
         "remaining_read_doc_calls": frame.remaining_read_doc_calls,
+        "l_original_material_count": frame.l_original_material_count,
     }.items():
         if not isinstance(value, int):
             raise TypeError(f"Node3InputBriefFrame.{field_name} must be an integer")
@@ -3172,6 +3292,31 @@ def _validate_node3_answer_basis_fields(frame: Node3InputBriefFrame) -> None:
             "unknown Node3InputBriefFrame.mode_selection_reason_info_class: "
             f"{frame.mode_selection_reason_info_class}"
         )
+    if frame.answer_task_contract_status not in ANSWER_TASK_CONTRACT_STATUSES:
+        raise ValueError(
+            "unknown Node3InputBriefFrame.answer_task_contract_status: "
+            f"{frame.answer_task_contract_status}"
+        )
+    if frame.evidence_requirement not in ANSWER_EVIDENCE_REQUIREMENTS:
+        raise ValueError(
+            "unknown Node3InputBriefFrame.evidence_requirement: "
+            f"{frame.evidence_requirement}"
+        )
+    if frame.answer_task_contract_status == "recorded":
+        if not frame.user_task_summary.strip():
+            raise ValueError("recorded node_3 task contract requires user_task_summary")
+        if not frame.fulfillment_requirements:
+            raise ValueError(
+                "recorded node_3 task contract requires fulfillment_requirements"
+            )
+        if frame.evidence_requirement == "not_recorded":
+            raise ValueError(
+                "recorded node_3 task contract requires evidence_requirement"
+            )
+    _validate_string_list(
+        "Node3InputBriefFrame.fulfillment_requirements",
+        frame.fulfillment_requirements,
+    )
     if not frame.answer_basis_generated_by:
         raise ValueError("Node3InputBriefFrame.answer_basis_generated_by must not be empty")
     if frame.answer_basis_info_class not in ANSWER_BASIS_INFO_CLASSES:
@@ -5121,7 +5266,17 @@ L_LOOP_CONTROL_FRAME_SCHEMA_VERSION = "0.1"
 L_LOOP_CONTINUATION_FRAME_SCHEMA_NAME = "LLoopContinuationFrame"
 L_LOOP_CONTINUATION_FRAME_SCHEMA_VERSION = "0.1"
 L_LOOP_RETURN_SUMMARY_FRAME_SCHEMA_NAME = "LLoopReturnSummaryFrame"
-L_LOOP_RETURN_SUMMARY_FRAME_SCHEMA_VERSION = "0.1"
+L_LOOP_RETURN_SUMMARY_FRAME_SCHEMA_VERSION = "0.2"
+L_EVIDENCE_ACQUISITION_STATUSES = {
+    "none",
+    "candidates_only",
+    "original_material_acquired",
+}
+L_ORIGINAL_MATERIAL_REQUIREMENT_STATUSES = {
+    "not_required",
+    "satisfied",
+    "unsatisfied",
+}
 L_LOOP_CONTROL_DECISIONS = {
     "continue_search",
     "continue_read_artifact",
@@ -5129,6 +5284,7 @@ L_LOOP_CONTROL_DECISIONS = {
     "list_code_files",
     "read_code_file",
     "read_document",
+    "stop_candidate_only",
     "stop_success",
     "stop_failed",
 }
@@ -5423,6 +5579,12 @@ class LLoopReturnSummaryFrame:
     recommended_next_route_for_node1: str
     # 절대/정책 설명: route hint를 만든 코드 조건 라벨.
     route_hint_reason: str
+    # 절대 정보: 후보와 비어 있지 않은 원문 확보 상태를 분리한 코드 상태.
+    evidence_acquisition_status: str = "none"
+    # 절대 정보: 비어 있지 않은 read_doc/read_artifact/read_code_file 원문 수.
+    original_material_count: int = 0
+    # 절대 정보: L1 최소 원문 요구량과 실제 원문 수를 코드가 대조한 상태.
+    original_material_requirement_status: str = "not_required"
     # 절대 정보: 실제 읽은 문서 ID 목록.
     read_doc_ids: list[str] = field(default_factory=list)
     # 절대 정보: 실제 read_code_file로 읽은 source/config 파일 경로 목록.
@@ -5457,6 +5619,8 @@ def validate_l_loop_return_summary_frame(frame: LLoopReturnSummaryFrame) -> None
         "l3_semantic_goal_match_status": frame.l3_semantic_goal_match_status,
         "recommended_next_route_for_node1": frame.recommended_next_route_for_node1,
         "route_hint_reason": frame.route_hint_reason,
+        "evidence_acquisition_status": frame.evidence_acquisition_status,
+        "original_material_requirement_status": frame.original_material_requirement_status,
         "schema_name": frame.schema_name,
         "schema_version": frame.schema_version,
     }
@@ -5488,6 +5652,19 @@ def validate_l_loop_return_summary_frame(frame: LLoopReturnSummaryFrame) -> None
         raise ValueError(
             f"unknown L loop return route hint: {frame.recommended_next_route_for_node1}"
         )
+    if frame.evidence_acquisition_status not in L_EVIDENCE_ACQUISITION_STATUSES:
+        raise ValueError(
+            "unknown L loop evidence_acquisition_status: "
+            f"{frame.evidence_acquisition_status}"
+        )
+    if (
+        frame.original_material_requirement_status
+        not in L_ORIGINAL_MATERIAL_REQUIREMENT_STATUSES
+    ):
+        raise ValueError(
+            "unknown L loop original_material_requirement_status: "
+            f"{frame.original_material_requirement_status}"
+        )
 
     for field_name, value in {
         "required_min_read_documents": frame.required_min_read_documents,
@@ -5497,6 +5674,7 @@ def validate_l_loop_return_summary_frame(frame: LLoopReturnSummaryFrame) -> None
         "remaining_read_doc_calls": frame.remaining_read_doc_calls,
         "remaining_query_attempts": frame.remaining_query_attempts,
         "actual_read_code_file_count": frame.actual_read_code_file_count,
+        "original_material_count": frame.original_material_count,
     }.items():
         if not isinstance(value, int):
             raise TypeError(f"LLoopReturnSummaryFrame.{field_name} must be an integer")
@@ -5509,6 +5687,34 @@ def validate_l_loop_return_summary_frame(frame: LLoopReturnSummaryFrame) -> None
     if frame.actual_read_code_file_count != len(frame.read_code_file_paths):
         raise ValueError(
             "LLoopReturnSummaryFrame.actual_read_code_file_count must mirror read_code_file_paths length"
+        )
+    if frame.original_material_count != (
+        frame.actual_read_doc_count + frame.actual_read_code_file_count
+    ):
+        raise ValueError(
+            "LLoopReturnSummaryFrame.original_material_count must mirror actual original counts"
+        )
+    expected_acquisition_status = (
+        "original_material_acquired"
+        if frame.original_material_count > 0
+        else "candidates_only"
+        if frame.search_candidate_count > 0
+        else "none"
+    )
+    if frame.evidence_acquisition_status != expected_acquisition_status:
+        raise ValueError(
+            "LLoopReturnSummaryFrame.evidence_acquisition_status does not match counts"
+        )
+    expected_requirement_status = (
+        "not_required"
+        if frame.required_min_read_documents == 0
+        else "satisfied"
+        if frame.original_material_count >= frame.required_min_read_documents
+        else "unsatisfied"
+    )
+    if frame.original_material_requirement_status != expected_requirement_status:
+        raise ValueError(
+            "LLoopReturnSummaryFrame.original_material_requirement_status does not match counts"
         )
     for file_path in frame.read_code_file_paths:
         if not file_path:
@@ -5615,7 +5821,7 @@ L3_PRESERVED_INFO_FRAME_SCHEMA_NAME = "L3PreservedInfoFrame"
 L3_PRESERVED_INFO_FRAME_SCHEMA_VERSION = "0.1"
 L3_JUDGEMENT_STATUSES = {"not_judged"}
 L3_ACHIEVEMENT_FRAME_SCHEMA_NAME = "L3AchievementFrame"
-L3_ACHIEVEMENT_FRAME_SCHEMA_VERSION = "0.1"
+L3_ACHIEVEMENT_FRAME_SCHEMA_VERSION = "0.2"
 L3_ACHIEVEMENT_STATUSES = {"achieved", "partial", "failed"}
 L3_GOAL_MATCH_STATUSES = {"matched", "partial", "missing", "not_applicable"}
 L3_SEMANTIC_GOAL_MATCH_STATUSES = {"matched", "partial", "missing", "not_run"}
@@ -5804,6 +6010,16 @@ class L3AchievementFrame:
     goal_match_reason: str = "CODE_STATUS:no_specific_doc_hint_detected"
     semantic_goal_match_status: str = "not_run"
     semantic_goal_match_reason: str = "CODE_STATUS:llm_semantic_goal_match_not_run"
+    # 절대 정보: 실제 비어 있지 않은 read_doc/read_artifact 원문 수.
+    actual_read_doc_count: int = 0
+    # 절대 정보: 문서+코드 원문 수. 검색 후보 수와 섞지 않는다.
+    original_material_count: int = 0
+    # 절대 정보: none/candidates_only/original_material_acquired 중 하나.
+    evidence_acquisition_status: str = "none"
+    # 절대 정보: L1이 선언한 최소 원문 수.
+    original_material_required_count: int = 0
+    # 절대 정보: L1 요구량과 실제 원문 수를 비교한 상태.
+    original_material_requirement_status: str = "not_required"
     # 절대 정보: 적용된 스키마 이름.
     schema_name: str = L3_ACHIEVEMENT_FRAME_SCHEMA_NAME
     # 절대 정보: 적용된 스키마 버전.
@@ -5841,6 +6057,19 @@ def validate_l3_achievement_frame(frame: L3AchievementFrame) -> None:
         raise ValueError(f"unknown L3 semantic_goal_match_status: {frame.semantic_goal_match_status}")
     if frame.semantic_goal_match_status != "not_run" and not frame.semantic_goal_match_reason:
         raise ValueError("L3AchievementFrame.semantic_goal_match_reason must not be empty when semantic match ran")
+    if frame.evidence_acquisition_status not in L_EVIDENCE_ACQUISITION_STATUSES:
+        raise ValueError(
+            "unknown L3 evidence_acquisition_status: "
+            f"{frame.evidence_acquisition_status}"
+        )
+    if (
+        frame.original_material_requirement_status
+        not in L_ORIGINAL_MATERIAL_REQUIREMENT_STATUSES
+    ):
+        raise ValueError(
+            "unknown L3 original_material_requirement_status: "
+            f"{frame.original_material_requirement_status}"
+        )
     for field_name, status in {
         "macro_achievement_status": frame.macro_achievement_status,
         "micro_achievement_status": frame.micro_achievement_status,
@@ -5858,6 +6087,38 @@ def validate_l3_achievement_frame(frame: L3AchievementFrame) -> None:
     if frame.actual_read_code_file_count != len(frame.read_code_file_paths):
         raise ValueError(
             "L3AchievementFrame.actual_read_code_file_count must mirror read_code_file_paths length"
+        )
+    if frame.actual_read_doc_count != len(frame.read_doc_ids):
+        raise ValueError(
+            "L3AchievementFrame.actual_read_doc_count must mirror read_doc_ids length"
+        )
+    if frame.original_material_count != (
+        frame.actual_read_doc_count + frame.actual_read_code_file_count
+    ):
+        raise ValueError(
+            "L3AchievementFrame.original_material_count must mirror actual original counts"
+        )
+    expected_acquisition_status = (
+        "original_material_acquired"
+        if frame.original_material_count > 0
+        else "candidates_only"
+        if frame.candidate_count > 0
+        else "none"
+    )
+    if frame.evidence_acquisition_status != expected_acquisition_status:
+        raise ValueError("L3AchievementFrame.evidence_acquisition_status does not match counts")
+    if frame.original_material_required_count < 0:
+        raise ValueError("L3AchievementFrame.original_material_required_count must not be negative")
+    expected_requirement_status = (
+        "not_required"
+        if frame.original_material_required_count == 0
+        else "satisfied"
+        if frame.original_material_count >= frame.original_material_required_count
+        else "unsatisfied"
+    )
+    if frame.original_material_requirement_status != expected_requirement_status:
+        raise ValueError(
+            "L3AchievementFrame.original_material_requirement_status does not match counts"
         )
 
     for doc_id in frame.read_doc_ids:

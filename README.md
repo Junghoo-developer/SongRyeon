@@ -93,6 +93,16 @@ SongRyeon Core is my small, local-first attempt to make those questions visible 
 
 ## Current Demo Path
 
+After creating a local `.env`, the normal interactive start is now one command:
+
+```powershell
+python main.py
+```
+
+With complete Neo4j values, the launcher automatically enables the experimental Vessel R
+route. Without them, it starts Qwen chat without Vessel R. The existing advanced commands
+remain available for audits and development.
+
 Start with the no-model path:
 
 ```powershell

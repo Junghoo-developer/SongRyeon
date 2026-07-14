@@ -712,6 +712,20 @@ def record_node3_input_brief(
             "l3_semantic_goal_match_status",
             fallback="not_run",
         ),
+        l_evidence_acquisition_status=_text(
+            l_loop_return_summary,
+            "evidence_acquisition_status",
+            fallback="not_recorded",
+        ),
+        l_original_material_count=_int(
+            l_loop_return_summary,
+            "original_material_count",
+        ),
+        l_original_material_requirement_status=_text(
+            l_loop_return_summary,
+            "original_material_requirement_status",
+            fallback="not_recorded",
+        ),
         remaining_query_attempts=_int(l_loop_return_summary, "remaining_query_attempts"),
         remaining_read_doc_calls=_int(l_loop_return_summary, "remaining_read_doc_calls"),
         l_loop_result_attitude_hint=_l_loop_result_attitude_hint(l_loop_return_summary),
@@ -731,6 +745,26 @@ def record_node3_input_brief(
             answer_basis_frame.mode_selection_reason_info_class
             if answer_basis_frame is not None
             else "absolute_status"
+        ),
+        answer_task_contract_status=(
+            answer_basis_frame.task_contract_status
+            if answer_basis_frame is not None
+            else "failed"
+        ),
+        user_task_summary=(
+            answer_basis_frame.user_task_summary
+            if answer_basis_frame is not None
+            else ""
+        ),
+        fulfillment_requirements=(
+            list(answer_basis_frame.fulfillment_requirements)
+            if answer_basis_frame is not None
+            else []
+        ),
+        evidence_requirement=(
+            answer_basis_frame.evidence_requirement
+            if answer_basis_frame is not None
+            else "not_recorded"
         ),
         evidence_roles=(
             list(answer_basis_frame.evidence_roles)
@@ -1311,6 +1345,8 @@ def _safe_vessel_r_display_name(display_name: str, *, fallback_label: str) -> st
 def node3_brief_llm_payload(frame: Node3InputBriefFrame) -> dict[str, object]:
     """내부 ID를 제거한 node_3 LLM용 payload를 만든다."""
 
+    if frame.answer_task_contract_status == "recorded":
+        return _node3_task_focused_llm_payload(frame)
     if _node3_uses_vessel_r_focused_payload(frame):
         return _node3_vessel_r_focused_llm_payload(frame)
 
@@ -1527,6 +1563,10 @@ def node3_brief_llm_payload(frame: Node3InputBriefFrame) -> dict[str, object]:
             "basis_reason_codes": list(frame.basis_reason_codes),
             "mode_selection_reason": frame.mode_selection_reason,
             "mode_selection_reason_info_class": frame.mode_selection_reason_info_class,
+            "task_contract_status": frame.answer_task_contract_status,
+            "user_task_summary": frame.user_task_summary,
+            "fulfillment_requirements": list(frame.fulfillment_requirements),
+            "evidence_requirement": frame.evidence_requirement,
             "generated_by": frame.answer_basis_generated_by,
             "info_class": frame.answer_basis_info_class,
             "semantic_judgement_status": frame.answer_basis_semantic_judgement_status,
@@ -1540,6 +1580,11 @@ def node3_brief_llm_payload(frame: Node3InputBriefFrame) -> dict[str, object]:
             "failure_level": frame.l_loop_failure_level,
             "l3_goal_match_status": frame.l3_goal_match_status,
             "l3_semantic_goal_match_status": frame.l3_semantic_goal_match_status,
+            "evidence_acquisition_status": frame.l_evidence_acquisition_status,
+            "original_material_count": frame.l_original_material_count,
+            "original_material_requirement_status": (
+                frame.l_original_material_requirement_status
+            ),
             "remaining_query_attempts": frame.remaining_query_attempts,
             "remaining_read_doc_calls": frame.remaining_read_doc_calls,
             "attitude_hint": frame.l_loop_result_attitude_hint,
@@ -1578,6 +1623,362 @@ def node3_brief_llm_payload(frame: Node3InputBriefFrame) -> dict[str, object]:
         "reporting_rules": list(frame.reporting_rules),
         "insufficiency_reasons": list(frame.insufficiency_reasons),
     }
+
+
+def _node3_task_focused_llm_payload(
+    frame: Node3InputBriefFrame,
+) -> dict[str, object]:
+    """node_2가 고른 과업과 재료만 앞세우고 전체 감사 장부는 brief에 남긴다."""
+
+    selected_roles = [
+        role
+        for role in frame.evidence_roles
+        if role.evidence_role in {"primary_answer_basis", "supporting_context"}
+    ]
+    selected_source_ids = {role.source_data_id for role in selected_roles}
+    selected_source_kinds = {
+        role.source_kind
+        for role in selected_roles
+        if role.source_kind
+    }
+    evidence_not_required = frame.evidence_requirement == "not_required"
+
+    selected_document_payloads = []
+    selected_summary_payloads = []
+    selected_source_code_outlines = []
+    selected_recent_memory_contexts = []
+    selected_vessel_material: dict[str, object] = {
+        "status": "not_selected",
+        "boundary": "Vessel R material was not selected as answer evidence by node_2.",
+    }
+    if not evidence_not_required:
+        selected_document_payloads = _node3_selected_raw_document_payloads(
+            frame,
+            selected_source_ids=selected_source_ids,
+            selected_source_kinds=selected_source_kinds,
+        )
+        selected_summary_payloads = _node3_selected_l3_summary_payloads(
+            frame,
+            selected_source_ids=selected_source_ids,
+            selected_source_kinds=selected_source_kinds,
+        )
+        selected_source_code_outlines = _node3_selected_source_code_outline_payloads(
+            frame,
+            selected_source_ids=selected_source_ids,
+            selected_source_kinds=selected_source_kinds,
+        )
+        if "selected_recent_memory_context" in selected_source_kinds:
+            selected_recent_memory_contexts = _node3_selected_recent_memory_payloads(frame)
+        if selected_source_kinds.intersection(
+            {"vessel_r_material", "vessel_r_return_packet", "r_loop_return_summary"}
+        ):
+            selected_vessel_material = _node3_vessel_r_material_llm_payload(
+                frame.vessel_r_material
+            )
+
+    include_document_ledger = (
+        not evidence_not_required
+        and "document_material_packet" in selected_source_kinds
+    )
+    include_runtime_tasks = (
+        not evidence_not_required
+        and bool(
+            selected_source_kinds.intersection(
+                {"runtime_task_sequence", "node2_handoff", "route"}
+            )
+        )
+    )
+    include_search_process = (
+        not evidence_not_required
+        and bool(
+            selected_source_kinds.intersection(
+                {"l2_query_plan", "document_material_packet"}
+            )
+        )
+    )
+    selected_allowed_claims = [
+        {
+            "kind": claim.kind,
+            "text": claim.text,
+            "info_class": claim.info_class,
+            "source_mode": claim.source_mode,
+            "claim_alignment": claim.claim_alignment,
+        }
+        for claim in frame.allowed_claims
+        if claim.source_data_id in selected_source_ids
+    ]
+
+    payload: dict[str, object] = {
+        "user_question": frame.user_question,
+        "task_contract": {
+            "status": frame.answer_task_contract_status,
+            "user_task_summary": frame.user_task_summary,
+            "fulfillment_requirements": list(frame.fulfillment_requirements),
+            "evidence_requirement": frame.evidence_requirement,
+            "boundary": (
+                "This contract is node_2 LLM judgement. The original user_question remains the absolute copied request."
+            ),
+        },
+        "response_priority": [
+            "Perform the user task first.",
+            "Use selected answer material for evidence-dependent claims.",
+            "Preserve supplied L/R limitations.",
+            "Do not substitute runtime inventory for the requested answer.",
+        ],
+        "brief_status": frame.brief_status,
+        "absolute_grounding_facts": {
+            "actual_tool_read_doc_count": frame.actual_tool_read_doc_count,
+            "actual_tool_read_code_file_count": frame.actual_tool_read_code_file_count,
+            "supplied_document_context_count": frame.supplied_document_context_count,
+            "source_code_outline_count": len(frame.source_code_outlines),
+            "llm_raw_document_text_count": len(selected_document_payloads),
+            "llm_l3_summary_context_count": len(selected_summary_payloads),
+            "final_search_candidate_count": frame.final_search_candidate_count,
+            "accumulated_search_candidate_count": frame.accumulated_search_candidate_count,
+            "runtime_task_count": len(frame.runtime_tasks),
+            "boundary": "CODE-owned counts. The final grounding block is assembled separately by CODE.",
+        },
+        "answer_basis": {
+            "answer_basis_mode": frame.answer_basis_mode,
+            "basis_reason_codes": list(frame.basis_reason_codes),
+            "mode_selection_reason": frame.mode_selection_reason,
+            "generated_by": frame.answer_basis_generated_by,
+            "info_class": frame.answer_basis_info_class,
+            "semantic_judgement_status": frame.answer_basis_semantic_judgement_status,
+            "evidence_requirement": frame.evidence_requirement,
+            "evidence_roles": [
+                _node3_evidence_role_llm_payload(role)
+                for role in selected_roles
+            ],
+        },
+        "focus_policy": {
+            "payload_mode": "task_focused",
+            "selected_evidence_count": len(selected_roles),
+            "selected_answer_material_count": (
+                len(selected_document_payloads)
+                + len(selected_summary_payloads)
+                + len(selected_source_code_outlines)
+                + len(selected_recent_memory_contexts)
+                + (
+                    len(selected_vessel_material.get("items", []))
+                    if isinstance(selected_vessel_material.get("items"), list)
+                    else 0
+                )
+            ),
+            "full_ledgers_preserved_outside_llm_payload": True,
+            "reporting_rules_omitted_as_prompt_owned": True,
+            "runtime_task_sequence_selected": include_runtime_tasks,
+            "document_material_ledger_selected": include_document_ledger,
+        },
+        "material_delivery_policy": _node3_material_delivery_policy_llm_payload(frame),
+        "supplied_document_contexts": selected_document_payloads,
+        "read_documents": [
+            {**document, "legacy_alias": "supplied_document_context"}
+            for document in selected_document_payloads
+        ],
+        "l3_document_summaries": {
+            "count": len(selected_summary_payloads),
+            "items": selected_summary_payloads,
+            "boundary": "Only node_2-selected L3 summary material is included.",
+        },
+        "source_code_outlines": {
+            "count": len(selected_source_code_outlines),
+            "items": selected_source_code_outlines,
+        },
+        "selected_recent_memory_contexts": selected_recent_memory_contexts,
+        "vessel_r_material": selected_vessel_material,
+        "allowed_claims": selected_allowed_claims,
+        "l_loop_result": {
+            "task_status": frame.l_loop_task_status,
+            "failure_level": frame.l_loop_failure_level,
+            "l3_goal_match_status": frame.l3_goal_match_status,
+            "l3_semantic_goal_match_status": frame.l3_semantic_goal_match_status,
+            "evidence_acquisition_status": frame.l_evidence_acquisition_status,
+            "original_material_count": frame.l_original_material_count,
+            "original_material_requirement_status": (
+                frame.l_original_material_requirement_status
+            ),
+            "attitude_hint": frame.l_loop_result_attitude_hint,
+        },
+        "r_loop_result": _node3_r_loop_result_llm_payload(
+            frame.r_loop_result_material
+        ),
+        "insufficiency_reasons": list(frame.insufficiency_reasons),
+        "reporter_identity_boundary": (
+            "Speak as SongRyeon's final respondent, not as an internal node."
+        ),
+    }
+    if include_document_ledger:
+        payload["document_material_packet"] = _node3_document_material_packet_payload(
+            frame
+        )
+    if include_search_process:
+        payload["search_candidate_scope"] = _node3_search_candidate_scope_payload(
+            frame
+        )
+    if include_runtime_tasks:
+        payload["runtime_task_sequence"] = _node3_runtime_task_sequence_payload(frame)
+    return payload
+
+
+def _node3_selected_raw_document_payloads(
+    frame: Node3InputBriefFrame,
+    *,
+    selected_source_ids: set[str],
+    selected_source_kinds: set[str],
+) -> list[dict[str, object]]:
+    if frame.raw_document_policy == "omit_raw_text_from_llm_payload":
+        return []
+    include_pack = "document_context_pack" in selected_source_kinds
+    include_all_read = "l3_result" in selected_source_kinds
+    return [
+        {
+            "document_name": document.document_name,
+            "char_count": document.char_count,
+            "text": document.text,
+            "text_payload_status": "included",
+        }
+        for document in frame.read_documents
+        if include_pack
+        or include_all_read
+        or document.source_data_id in selected_source_ids
+    ]
+
+
+def _node3_selected_l3_summary_payloads(
+    frame: Node3InputBriefFrame,
+    *,
+    selected_source_ids: set[str],
+    selected_source_kinds: set[str],
+) -> list[dict[str, object]]:
+    include_all = "l3_result" in selected_source_kinds
+    return [
+        {
+            "document_name": summary.document_name,
+            "source_char_count": summary.source_char_count,
+            "summary_status": summary.summary_status,
+            "plain_document_summary": summary.plain_document_summary,
+            "plain_summary_info_class": summary.plain_summary_info_class,
+            "plain_summary_source_mode": summary.plain_summary_source_mode,
+            "plain_summary_claim_alignment": summary.plain_summary_claim_alignment,
+            "task_relevant_summary": summary.task_relevant_summary,
+            "task_relevant_summary_info_class": (
+                summary.task_relevant_summary_info_class
+            ),
+            "task_relevant_summary_source_mode": (
+                summary.task_relevant_summary_source_mode
+            ),
+            "task_relevant_summary_claim_alignment": (
+                summary.task_relevant_summary_claim_alignment
+            ),
+            "summary_limit_note": summary.summary_limit_note,
+            "generated_by": summary.generated_by,
+            "semantic_judgement_status": summary.semantic_judgement_status,
+        }
+        for summary in frame.l3_document_summaries
+        if include_all or summary.source_data_id in selected_source_ids
+    ]
+
+
+def _node3_selected_source_code_outline_payloads(
+    frame: Node3InputBriefFrame,
+    *,
+    selected_source_ids: set[str],
+    selected_source_kinds: set[str],
+) -> list[dict[str, object]]:
+    if not selected_source_kinds.intersection({"read_code_file", "l3_result"}):
+        return []
+    payloads = _node3_source_code_outline_payloads(frame)
+    if "l3_result" in selected_source_kinds:
+        return payloads
+    allowed_paths = {
+        outline.file_path
+        for outline in frame.source_code_outlines
+        if outline.source_data_id in selected_source_ids
+    }
+    return [
+        payload
+        for payload in payloads
+        if str(payload.get("file_path") or "") in allowed_paths
+    ]
+
+
+def _node3_selected_recent_memory_payloads(
+    frame: Node3InputBriefFrame,
+) -> list[dict[str, object]]:
+    return [
+        {
+            "raw_user_text": context.raw_user_text,
+            "raw_assistant_text": context.raw_assistant_text,
+            "raw_user_text_chars": context.raw_user_text_chars,
+            "raw_assistant_text_chars": context.raw_assistant_text_chars,
+            "raw_user_text_truncated": context.raw_user_text_truncated,
+            "raw_assistant_text_truncated": context.raw_assistant_text_truncated,
+            "selection_status": context.selection_status,
+            "selection_info_class": context.selection_info_class,
+            "selection_reason": context.selection_reason,
+            "selection_reason_generated_by": context.selection_reason_generated_by,
+        }
+        for context in frame.selected_recent_memory_contexts
+    ]
+
+
+def _node3_document_material_packet_payload(
+    frame: Node3InputBriefFrame,
+) -> dict[str, object]:
+    return {
+        "status": "present" if frame.document_material_packet_frame_id else "not_recorded",
+        "item_count": len(frame.document_material_items),
+        "unread_candidate_count": sum(
+            1 for item in frame.document_material_items if item.was_unread_candidate
+        ),
+        "items": [
+            {
+                "document_name": item.document_name,
+                "source_roles": list(item.source_roles),
+                "was_search_candidate": item.was_search_candidate,
+                "was_actual_tool_read_doc": item.was_actual_tool_read_doc,
+                "was_supplied_document_context": item.was_supplied_document_context,
+                "was_excluded_document_context": item.was_excluded_document_context,
+                "was_unread_candidate": item.was_unread_candidate,
+            }
+            for item in frame.document_material_items
+        ],
+        "boundary": "Selected process ledger; it is not semantic document content.",
+    }
+
+
+def _node3_search_candidate_scope_payload(
+    frame: Node3InputBriefFrame,
+) -> dict[str, object]:
+    return {
+        "final_search_candidate": {
+            "count": frame.final_search_candidate_count,
+            "document_names": list(frame.final_search_candidate_documents),
+        },
+        "accumulated_search_candidate": {
+            "count": frame.accumulated_search_candidate_count,
+            "document_names": list(frame.accumulated_search_candidate_documents),
+        },
+        "boundary": "Selected search-process material; candidates are not original reads.",
+    }
+
+
+def _node3_runtime_task_sequence_payload(
+    frame: Node3InputBriefFrame,
+) -> list[dict[str, object]]:
+    return [
+        {
+            "step_index": task.step_index,
+            "node": task.node_label,
+            "mode": task.mode,
+            "status": task.status,
+            "model": task.model_label,
+            "evidence_trace_count": task.evidence_trace_count,
+            "evidence_data_count": task.evidence_data_count,
+        }
+        for task in frame.runtime_tasks
+    ]
 
 
 def _node3_uses_vessel_r_focused_payload(frame: Node3InputBriefFrame) -> bool:
@@ -1844,7 +2245,9 @@ def _node3_source_code_outline_payloads(
 
 def _node3_evidence_role_llm_payload(role: Node2EvidenceRole) -> dict[str, object]:
     return {
-        "source_label": _safe_evidence_source_label(role.source_data_id),
+        "source_label": role.source_label or _safe_evidence_source_label(role.source_data_id),
+        "source_kind": role.source_kind or "legacy_unclassified_source",
+        "material_channel": role.material_channel or "legacy_unclassified",
         "evidence_role": role.evidence_role,
         "role_reason": role.role_reason,
         "role_reason_info_class": role.role_reason_info_class,

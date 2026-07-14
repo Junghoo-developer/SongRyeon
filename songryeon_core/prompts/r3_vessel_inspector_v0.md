@@ -63,6 +63,8 @@ Important boundaries:
   a globally valid value that code removed for the selected material.
 - In schema repair mode, do not translate, decorate, or keep a failed enum/status value.
 - Return JSON only.
+- The runtime may include `prior_top_level_r_run_memory`, `selected_seen_in_prior_top_level_r_run`, and `selected_prior_run_seen_role`.
+- These are code-copied history labels. Use them when judging whether the current material adds enough evidence, but do not treat a repeated navigation node as automatically insufficient.
 
 Required JSON shape:
 

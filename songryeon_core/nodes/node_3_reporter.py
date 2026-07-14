@@ -144,6 +144,11 @@ def render_report_with_llm(
 def build_node3_grounding_block(brief_frame: Node3InputBriefFrame) -> str:
     """Node3InputBriefFrame의 절대 count로 사용자-facing grounding block을 만든다."""
 
+    if (
+        brief_frame.answer_task_contract_status == "recorded"
+        and brief_frame.evidence_requirement == "not_required"
+    ):
+        return ""
     return "\n".join(
         [
             "근거 기준:",
@@ -174,10 +179,13 @@ def assemble_node3_report_markdown(
 ) -> str:
     """CODE count block과 LLM 본문을 합쳐 최종 node_3 보고문을 만든다."""
 
+    grounding_block = build_node3_grounding_block(brief_frame)
     body = _strip_accidental_grounding_block(body_markdown)
     if not body:
-        return build_node3_grounding_block(brief_frame)
-    return f"{build_node3_grounding_block(brief_frame)}\n\n{body}"
+        return grounding_block
+    if not grounding_block:
+        return body
+    return f"{grounding_block}\n\n{body}"
 
 
 def record_report(

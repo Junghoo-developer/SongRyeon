@@ -403,6 +403,7 @@ def run_l_loop(
     executed_queries: list[str] = []
     read_doc_ids: set[str] = set()
     read_doc_id_list: list[str] = []
+    original_read_doc_id_list: list[str] = []
     cache_status_records = []
     current_query = query_text
     tool_call_count = 0
@@ -828,6 +829,9 @@ def run_l_loop(
             if artifact_match_status == "unique" and artifact_doc_id:
                 read_doc_ids.add(artifact_doc_id)
                 read_doc_id_list.append(artifact_doc_id)
+                artifact_text = artifact_payload.get("text")
+                if isinstance(artifact_text, str) and artifact_text.strip():
+                    original_read_doc_id_list.append(artifact_doc_id)
                 completed_budget_trace_id, completed_budget_data_id = record_budget(
                     stop_reason="completed",
                     reason="CODE_STATUS:read_artifact_unique_document_extract_recorded",
@@ -1115,6 +1119,14 @@ def run_l_loop(
                     id_namespace=run_ids,
                     doc_id=candidate_doc_id,
                 )
+                read_payload = (
+                    read_result.payload
+                    if isinstance(read_result.payload, dict)
+                    else {}
+                )
+                read_text = read_payload.get("text")
+                if isinstance(read_text, str) and read_text.strip():
+                    original_read_doc_id_list.append(candidate_doc_id)
                 tool_call_count += 1
                 tool_call_trace_ids.append(read_result.trace_event_id)
                 tool_result_data_ids.append(read_result.data_ref.data_id)
@@ -1144,7 +1156,8 @@ def run_l_loop(
                     ],
                 )
 
-            if not read_doc_id_list:
+            candidate_only_without_original = not original_read_doc_id_list
+            if candidate_only_without_original:
                 no_read_trace_id, no_read_id = _record_l_loop_budget_failure(
                     trace_store=trace_store,
                     data_store=data_store,
@@ -1159,37 +1172,53 @@ def run_l_loop(
                 )
                 failure_trace_ids.append(no_read_trace_id)
                 failure_signal_data_ids.append(no_read_id)
-                record_budget(
+                final_budget_trace_id, final_budget_data_id = record_budget(
                     stop_reason="low_yield_stop",
                     reason="CODE_STATUS:no_candidate_document_read",
-                    condition_flags=["no_candidate_document_read"],
+                    condition_flags=[
+                        "candidate_count_positive",
+                        "no_candidate_document_read",
+                        "candidates_only",
+                    ],
                     source_trace_ids=[no_read_trace_id],
                     source_data_ids=[no_read_id],
                 )
-
-            completed_budget_trace_id, completed_budget_data_id = record_budget(
-                stop_reason="completed",
-                reason="CODE_STATUS:l3_input_evidence_available",
-                condition_flags=["completed", "candidate_count_positive"],
-                source_trace_ids=[
-                    *control_trace_ids,
-                    *tool_call_trace_ids,
-                    *distillation_trace_ids,
-                    *budget_trace_ids,
-                ],
-                source_data_ids=[
-                    *control_data_ids,
-                    *tool_distillation_data_ids,
-                    *tool_budget_data_ids,
-                ],
-            )
+            else:
+                final_budget_trace_id, final_budget_data_id = record_budget(
+                    stop_reason="completed",
+                    reason="CODE_STATUS:l3_original_material_available",
+                    condition_flags=[
+                        "completed",
+                        "candidate_count_positive",
+                        "original_material_acquired",
+                    ],
+                    source_trace_ids=[
+                        *control_trace_ids,
+                        *tool_call_trace_ids,
+                        *distillation_trace_ids,
+                        *budget_trace_ids,
+                    ],
+                    source_data_ids=[
+                        *control_data_ids,
+                        *tool_distillation_data_ids,
+                        *tool_budget_data_ids,
+                    ],
+                )
             stop_control_trace_id, stop_control_data_id = _record_l_loop_control(
                 trace_store=trace_store,
                 data_store=data_store,
                 turn_id=turn_id,
                 iteration_index=next_iteration_index,
-                decision="stop_success",
-                reason="CODE_STATUS:stop_success_candidates_preserved",
+                decision=(
+                    "stop_candidate_only"
+                    if candidate_only_without_original
+                    else "stop_success"
+                ),
+                reason=(
+                    "CODE_STATUS:stop_candidate_only_without_original_material"
+                    if candidate_only_without_original
+                    else "CODE_STATUS:stop_success_original_material_acquired"
+                ),
                 max_iterations=max_iterations,
                 max_tool_calls=max_tool_calls,
                 tool_call_count=tool_call_count,
@@ -1199,7 +1228,7 @@ def run_l_loop(
                         *tool_call_trace_ids,
                         *distillation_trace_ids,
                         *budget_trace_ids,
-                        completed_budget_trace_id,
+                        final_budget_trace_id,
                     ]
                 ),
                 source_data_ids=_unique_strings(
@@ -1207,7 +1236,7 @@ def run_l_loop(
                         *control_data_ids,
                         *tool_distillation_data_ids,
                         *tool_budget_data_ids,
-                        completed_budget_data_id,
+                        final_budget_data_id,
                     ]
                 ),
                 id_namespace=run_ids,
@@ -1215,7 +1244,11 @@ def run_l_loop(
             control_trace_ids.append(stop_control_trace_id)
             control_data_ids.append(stop_control_data_id)
             final_control_data_id = stop_control_data_id
-            final_control_decision = "stop_success"
+            final_control_decision = (
+                "stop_candidate_only"
+                if candidate_only_without_original
+                else "stop_success"
+            )
             break
 
         refined_query = _refine_search_query(current_query, attempt_count=len(used_queries) + 1)

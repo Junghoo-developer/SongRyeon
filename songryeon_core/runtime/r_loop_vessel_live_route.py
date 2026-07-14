@@ -76,6 +76,7 @@ def record_vessel_r_live_route(
     limit: int = 50,
     max_node_reads: int = 6,
     max_raw_original_material_reads: int = 5,
+    prior_top_level_r_run_context: dict[str, object] | None = None,
     input_ref: list[str] | None = None,
     driver_factory_for_test: Any | None = None,
 ) -> VesselRLiveRouteRun:
@@ -142,6 +143,7 @@ def record_vessel_r_live_route(
         max_node_reads=max_node_reads,
         max_raw_original_material_reads=max_raw_original_material_reads,
         start_handoff_packet_id=start_handoff.packet.packet_id,
+        prior_top_level_r_run_context=prior_top_level_r_run_context,
     )
 
     # 4단계: R이 실제로 어떤 node들을 골랐고 읽었는지 장부로 남긴다.
@@ -178,6 +180,9 @@ def record_vessel_r_live_route(
             l_loop_activity_ledger_data_ids=[],
             r_graph_access_ledger_data_ids=[],
             r_vessel_activity_ledger_data_ids=[activity_ledger_id],
+            frame_id=(
+                f"graph:turn_activity_graph_link:{turn_id}:vessel_r:{batch_id}"
+            ),
         )
     )
 

@@ -25,6 +25,8 @@ from songryeon_core.loops.l_loop_namespace import LRunIds
 
 NODE2_ANSWER_BASIS_FRAME_DATA_ID = "node_2:answer_basis_frame"
 NODE2_ANSWER_BASIS_SCHEMA_REPAIR_MAX_ATTEMPTS = 1
+ANSWER_MATERIAL_CATALOG_MAX_ITEMS = 48
+ANSWER_MATERIAL_PREVIEW_MAX_CHARS = 700
 
 
 def build_metainfo_boundary(
@@ -331,6 +333,9 @@ def run_node2_answer_basis_selection(
     available_evidence_sources = _answer_basis_available_evidence_sources(
         boundary=boundary,
         base_source_data_ids=base_source_data_ids,
+        data_store=data_store,
+        turn_id=turn_id,
+        handoff_frame_id=handoff_frame_id,
     )
     evidence_source_id_by_ref = {
         str(source["evidence_ref"]): str(source["source_data_id"])
@@ -339,6 +344,10 @@ def run_node2_answer_basis_selection(
     evidence_ref_by_source_id = {
         source_data_id: evidence_ref
         for evidence_ref, source_data_id in evidence_source_id_by_ref.items()
+    }
+    evidence_source_metadata_by_ref = {
+        str(source["evidence_ref"]): source
+        for source in available_evidence_sources
     }
     allowed_answer_basis_source_data_ids = _unique_strings(
         [
@@ -397,8 +406,21 @@ def run_node2_answer_basis_selection(
                 "evidence_ref": source["evidence_ref"],
                 "source_label": source["source_label"],
                 "source_kind": source["source_kind"],
+                "material_channel": source.get("material_channel", "generic"),
+                "material_preview": source.get("material_preview", ""),
             }
             for source in available_evidence_sources
+        ],
+        "answer_material_catalog": [
+            {
+                "evidence_ref": source["evidence_ref"],
+                "source_label": source["source_label"],
+                "source_kind": source["source_kind"],
+                "material_channel": source.get("material_channel", "generic"),
+                "material_preview": source.get("material_preview", ""),
+            }
+            for source in available_evidence_sources
+            if source.get("material_channel") != "generic"
         ],
         "answer_basis_modes": [
             "absolute_first",
@@ -427,6 +449,11 @@ def run_node2_answer_basis_selection(
             "not_supplied",
         ],
         "role_reason_info_class_values": ["relative", "mixed"],
+        "evidence_requirement_values": [
+            "not_required",
+            "optional",
+            "required",
+        ],
     }
     executor = LLMNodeExecutor(adapter)
     first_result = executor.run(
@@ -442,6 +469,7 @@ def run_node2_answer_basis_selection(
         payload_validator=lambda payload: _validate_answer_basis_payload(
             payload,
             evidence_source_id_by_ref=evidence_source_id_by_ref,
+            evidence_source_metadata_by_ref=evidence_source_metadata_by_ref,
         ),
     )
     attempt_results = [first_result]
@@ -467,6 +495,7 @@ def run_node2_answer_basis_selection(
             payload_validator=lambda payload: _validate_answer_basis_payload(
                 payload,
                 evidence_source_id_by_ref=evidence_source_id_by_ref,
+                evidence_source_metadata_by_ref=evidence_source_metadata_by_ref,
             ),
         )
         attempt_results.append(llm_result)
@@ -485,6 +514,12 @@ def run_node2_answer_basis_selection(
     )
     if llm_result.failure_type == "none" and llm_result.validation.payload is not None:
         payload = llm_result.validation.payload
+        (
+            task_contract_status,
+            user_task_summary,
+            fulfillment_requirements,
+            evidence_requirement,
+        ) = _answer_task_contract_fields(payload)
         frame = Node2AnswerBasisFrame(
             frame_id=frame_id,
             turn_id=turn_id,
@@ -494,9 +529,14 @@ def run_node2_answer_basis_selection(
             mode_selection_reason_info_class=str(
                 payload.get("mode_selection_reason_info_class") or "mixed"
             ).strip(),
+            task_contract_status=task_contract_status,
+            user_task_summary=user_task_summary,
+            fulfillment_requirements=fulfillment_requirements,
+            evidence_requirement=evidence_requirement,
             evidence_roles=_evidence_roles_from_payload(
                 payload.get("evidence_roles"),
                 evidence_source_id_by_ref=evidence_source_id_by_ref,
+                evidence_source_metadata_by_ref=evidence_source_metadata_by_ref,
             ),
             generated_by=f"LLM:{llm_result.model_id}",
             info_class=str(payload.get("mode_selection_reason_info_class") or "mixed").strip(),
@@ -546,26 +586,303 @@ def _answer_basis_available_evidence_sources(
     *,
     boundary: MetainfoBoundary,
     base_source_data_ids: list[str],
-) -> list[dict[str, str]]:
+    data_store: DataStore,
+    turn_id: str,
+    handoff_frame_id: str,
+) -> list[dict[str, object]]:
     """answer-basis LLM이 evidence role로 고를 수 있는 source ID 표를 만든다."""
 
+    catalog_metadata = _answer_material_catalog_metadata(
+        data_store=data_store,
+        turn_id=turn_id,
+        handoff_frame_id=handoff_frame_id,
+    )
     candidate_ids = _unique_strings(
         [
             *base_source_data_ids,
             *(ref.data_id for ref in boundary.absolute_info[:16]),
             *(ref.source_data_id for ref in boundary.relative_info[:12]),
             *(ref.source_data_id for ref in boundary.mixed_info[:12]),
+            *(str(item["source_data_id"]) for item in catalog_metadata),
         ]
     )
+    metadata_by_source_id = {
+        str(item["source_data_id"]): item
+        for item in catalog_metadata
+    }
     return [
+        _answer_basis_source_row(
+            evidence_ref=f"E{index:03d}",
+            source_data_id=source_data_id,
+            metadata=metadata_by_source_id.get(source_data_id),
+        )
+        for index, source_data_id in enumerate(candidate_ids, start=1)
+    ]
+
+
+def _answer_material_catalog_metadata(
+    *,
+    data_store: DataStore,
+    turn_id: str,
+    handoff_frame_id: str,
+) -> list[dict[str, object]]:
+    """최종 답변 재료와 작업 과정 장부를 record type 기준으로 분리한다."""
+
+    rows: list[dict[str, object]] = []
+    for record in data_store.list_records():
+        payload = record.payload if isinstance(record.payload, dict) else {}
+        payload_turn_id = str(payload.get("turn_id") or "").strip()
+        if payload_turn_id and payload_turn_id != turn_id:
+            continue
+        metadata = _answer_material_record_metadata(
+            data_id=record.data_id,
+            data_type=record.data_type,
+            payload=payload,
+        )
+        if metadata is not None:
+            rows.append(metadata)
+
+    # runtime task sequence 자체는 node_3 brief 조립 시 만들어진다. 여기서는 이미 존재하는
+    # handoff frame을 그 과정 장부의 source anchor로 사용하고 새 의미 record를 만들지 않는다.
+    rows.append(
         {
-            "evidence_ref": f"E{index:03d}",
+            "source_data_id": handoff_frame_id,
+            "source_label": "현재 턴 실행 과정 장부",
+            "source_kind": "runtime_task_sequence",
+            "material_channel": "process",
+            "material_preview": (
+                "node_3 brief 생성 시점까지의 node/mode/status 실행 순서 자료. "
+                "사용자가 실행 과정 자체를 물을 때만 답변 재료로 고른다."
+            ),
+        }
+    )
+    channel_order = {"answer_ready": 0, "status": 1, "process": 2}
+    rows.sort(key=lambda item: channel_order.get(str(item["material_channel"]), 9))
+    return rows[:ANSWER_MATERIAL_CATALOG_MAX_ITEMS]
+
+
+def _answer_material_record_metadata(
+    *,
+    data_id: str,
+    data_type: str,
+    payload: dict[str, object],
+) -> dict[str, object] | None:
+    if data_type == "node_output:L3_per_document_summary_frame":
+        document_name = str(payload.get("source_document_name") or "문서").strip()
+        preview = _catalog_preview(
+            payload.get("task_relevant_summary"),
+            payload.get("plain_document_summary"),
+        )
+        return _catalog_row(
+            data_id=data_id,
+            label=f"L3 문서 요약: {document_name}",
+            kind="l3_document_summary",
+            channel="answer_ready",
+            preview=preview,
+        )
+    if data_type in {"tool_result:read_doc", "tool_result:read_artifact"}:
+        document_name = str(
+            payload.get("doc_id") or payload.get("document_name") or "읽은 문서"
+        ).strip()
+        return _catalog_row(
+            data_id=data_id,
+            label=f"읽은 문서 원문: {document_name}",
+            kind="read_document",
+            channel="answer_ready",
+            preview=_catalog_preview(payload.get("text")),
+        )
+    if data_type == "tool_result:read_code_file":
+        file_path = str(payload.get("file_path") or "읽은 코드 파일").strip()
+        return _catalog_row(
+            data_id=data_id,
+            label=f"읽은 코드 원문: {file_path}",
+            kind="read_code_file",
+            channel="answer_ready",
+            preview=_catalog_preview(payload.get("text")),
+        )
+    if data_type == "node_output:selected_recent_memory_context_frame":
+        items = payload.get("items") if isinstance(payload.get("items"), list) else []
+        if not items:
+            return None
+        copied_text: list[object] = []
+        for item in items[:2]:
+            if isinstance(item, dict):
+                copied_text.extend(
+                    [item.get("raw_user_text"), item.get("raw_assistant_text")]
+                )
+        return _catalog_row(
+            data_id=data_id,
+            label="선택된 최근 대화 원문",
+            kind="selected_recent_memory_context",
+            channel="answer_ready",
+            preview=_catalog_preview(*copied_text),
+        )
+    if data_type == "r_loop:vessel_step_memory_packet":
+        candidate_records = (
+            payload.get("visible_child_candidate_records")
+            if isinstance(payload.get("visible_child_candidate_records"), list)
+            else []
+        )
+        summary_previews = [
+            item.get("summary_text_preview")
+            for item in candidate_records[:6]
+            if isinstance(item, dict) and item.get("summary_text_preview")
+        ]
+        return _catalog_row(
+            data_id=data_id,
+            label=f"Vessel R 단계 재료 {payload.get('step_index', '')}".strip(),
+            kind="vessel_r_material",
+            channel="answer_ready",
+            preview=_catalog_preview(
+                payload.get("selected_node_kind"),
+                payload.get("r3_sufficiency_status"),
+                *summary_previews,
+            ),
+        )
+    if data_type == "node_output:l_loop_return_summary_frame":
+        return _catalog_row(
+            data_id=data_id,
+            label="L loop 최종 상태",
+            kind="l_loop_return_summary",
+            channel="status",
+            preview=_catalog_preview(
+                f"task={payload.get('l_loop_task_status')}",
+                f"acquisition={payload.get('evidence_acquisition_status')}",
+                f"originals={payload.get('original_material_count')}",
+                f"semantic={payload.get('l3_semantic_goal_match_status')}",
+            ),
+        )
+    if data_type == "node_output:R_loop_return_summary_frame":
+        return _catalog_row(
+            data_id=data_id,
+            label="R loop 최종 상태",
+            kind="r_loop_return_summary",
+            channel="status",
+            preview=_catalog_preview(
+                f"task={payload.get('r_loop_task_status')}",
+                f"continuation={payload.get('continuation_status')}",
+                f"budget={payload.get('budget_status')}",
+            ),
+        )
+    if data_type == "r_loop:vessel_return_packet":
+        return _catalog_row(
+            data_id=data_id,
+            label="Vessel R 반환 상태",
+            kind="vessel_r_return_packet",
+            channel="status",
+            preview=_catalog_preview(
+                f"return={payload.get('return_status')}",
+                f"task={payload.get('r_loop_task_status')}",
+                f"summaries={payload.get('summary_material_count')}",
+                f"raw_originals={payload.get('raw_original_material_count')}",
+            ),
+        )
+    if data_type == "node_output:document_context_pack_frame":
+        included = (
+            payload.get("included_documents")
+            if isinstance(payload.get("included_documents"), list)
+            else []
+        )
+        document_names = [
+            item.get("document_name")
+            for item in included[:10]
+            if isinstance(item, dict)
+        ]
+        return _catalog_row(
+            data_id=data_id,
+            label="node_3 공급 문서 context 묶음",
+            kind="document_context_pack",
+            channel="status",
+            preview=_catalog_preview(*document_names),
+        )
+    if data_type == "node_output:node0_document_material_packet_frame":
+        return _catalog_row(
+            data_id=data_id,
+            label="문서 후보/read/supplied/excluded 장부",
+            kind="document_material_packet",
+            channel="process",
+            preview=_catalog_preview(
+                f"candidates={payload.get('search_candidate_count')}",
+                f"read={payload.get('actual_tool_read_doc_count')}",
+                f"supplied={payload.get('supplied_document_context_count')}",
+                f"unread={payload.get('unread_candidate_count')}",
+            ),
+        )
+    if data_type in {
+        "node_output:L2_query_plan_frame",
+        "node_output:L2_revision_query_plan_frame",
+    }:
+        candidates = (
+            payload.get("candidates")
+            if isinstance(payload.get("candidates"), list)
+            else []
+        )
+        purposes = [
+            item.get("purpose")
+            for item in candidates[:6]
+            if isinstance(item, dict)
+        ]
+        return _catalog_row(
+            data_id=data_id,
+            label="L2 검색 계획",
+            kind="l2_query_plan",
+            channel="process",
+            preview=_catalog_preview(*purposes),
+        )
+    return None
+
+
+def _catalog_row(
+    *,
+    data_id: str,
+    label: str,
+    kind: str,
+    channel: str,
+    preview: str,
+) -> dict[str, object]:
+    return {
+        "source_data_id": data_id,
+        "source_label": label,
+        "source_kind": kind,
+        "material_channel": channel,
+        "material_preview": preview,
+    }
+
+
+def _catalog_preview(*values: object) -> str:
+    compact = " | ".join(
+        " ".join(str(value).split())
+        for value in values
+        if value is not None and str(value).strip()
+    )
+    if len(compact) <= ANSWER_MATERIAL_PREVIEW_MAX_CHARS:
+        return compact
+    return f"{compact[: ANSWER_MATERIAL_PREVIEW_MAX_CHARS - 3]}..."
+
+
+def _answer_basis_source_row(
+    *,
+    evidence_ref: str,
+    source_data_id: str,
+    metadata: dict[str, object] | None,
+) -> dict[str, object]:
+    if metadata is None:
+        return {
+            "evidence_ref": evidence_ref,
             "source_data_id": source_data_id,
             "source_label": _answer_basis_source_label(source_data_id),
             "source_kind": _answer_basis_source_kind(source_data_id),
+            "material_channel": _answer_basis_material_channel(source_data_id),
+            "material_preview": "",
         }
-        for index, source_data_id in enumerate(candidate_ids, start=1)
-    ]
+    return {
+        "evidence_ref": evidence_ref,
+        "source_data_id": source_data_id,
+        "source_label": str(metadata.get("source_label") or "공급된 근거 자료"),
+        "source_kind": str(metadata.get("source_kind") or "supplied_source"),
+        "material_channel": str(metadata.get("material_channel") or "generic"),
+        "material_preview": str(metadata.get("material_preview") or ""),
+    }
 
 
 def _answer_basis_absolute_samples(
@@ -659,8 +976,14 @@ def _answer_basis_source_kind(source_data_id: str) -> str:
         return "document_material_packet"
     if "document_context_pack" in source_data_id:
         return "document_context_pack"
+    if source_data_id.startswith("L2:"):
+        return "l2_query_plan"
     if "L3" in source_data_id or "achievement" in source_data_id or "preserved" in source_data_id:
         return "l3_result"
+    if "vessel" in source_data_id or source_data_id.startswith("R:"):
+        return "vessel_r_material"
+    if "task_ledger" in source_data_id:
+        return "runtime_task_sequence"
     if "route" in source_data_id:
         return "route"
     if "boundary" in source_data_id:
@@ -670,6 +993,26 @@ def _answer_basis_source_kind(source_data_id: str) -> str:
     if "node2_input" in source_data_id:
         return "node2_input"
     return "supplied_source"
+
+
+def _answer_basis_material_channel(source_data_id: str) -> str:
+    source_kind = _answer_basis_source_kind(source_data_id)
+    if source_kind in {
+        "read_document",
+        "read_code_file",
+    }:
+        return "answer_ready"
+    if source_kind in {"l_loop_return_summary"}:
+        return "status"
+    if source_kind in {
+        "l2_query_plan",
+        "document_material_packet",
+        "runtime_task_sequence",
+        "route",
+        "node2_handoff",
+    }:
+        return "process"
+    return "generic"
 
 
 def _fallback_answer_basis_frame(
@@ -693,6 +1036,10 @@ def _fallback_answer_basis_frame(
         basis_reason_codes=["llm_mode_selection_failed"],
         mode_selection_reason="CODE_STATUS:node2_answer_basis_mode_selection_failed",
         mode_selection_reason_info_class="absolute_status",
+        task_contract_status="failed",
+        user_task_summary="",
+        fulfillment_requirements=[],
+        evidence_requirement="not_recorded",
         evidence_roles=[],
         generated_by="CODE:FALLBACK",
         info_class="absolute_status",
@@ -757,11 +1104,19 @@ def _validate_answer_basis_payload(
     payload: dict[str, object],
     *,
     evidence_source_id_by_ref: dict[str, str],
+    evidence_source_metadata_by_ref: dict[str, dict[str, object]] | None = None,
 ) -> None:
     resolved_roles = _evidence_roles_from_payload(
         payload.get("evidence_roles"),
         evidence_source_id_by_ref=evidence_source_id_by_ref,
+        evidence_source_metadata_by_ref=evidence_source_metadata_by_ref,
     )
+    (
+        task_contract_status,
+        user_task_summary,
+        fulfillment_requirements,
+        evidence_requirement,
+    ) = _answer_task_contract_fields(payload)
     frame = Node2AnswerBasisFrame(
         frame_id="validation_answer_basis",
         turn_id="validation_turn",
@@ -771,6 +1126,10 @@ def _validate_answer_basis_payload(
         mode_selection_reason_info_class=str(
             payload.get("mode_selection_reason_info_class") or "mixed"
         ).strip(),
+        task_contract_status=task_contract_status,
+        user_task_summary=user_task_summary,
+        fulfillment_requirements=fulfillment_requirements,
+        evidence_requirement=evidence_requirement,
         evidence_roles=resolved_roles,
         generated_by="LLM:validation-model",
         info_class=str(payload.get("mode_selection_reason_info_class") or "mixed").strip(),
@@ -824,6 +1183,7 @@ def _evidence_roles_from_payload(
     value: object,
     *,
     evidence_source_id_by_ref: dict[str, str],
+    evidence_source_metadata_by_ref: dict[str, dict[str, object]] | None = None,
 ) -> list[Node2EvidenceRole]:
     if not isinstance(value, list):
         return []
@@ -838,6 +1198,7 @@ def _evidence_roles_from_payload(
         source_data_id = evidence_source_id_by_ref.get(evidence_ref)
         if source_data_id is None:
             raise ValueError("Node2 evidence_ref must exist in available_evidence_sources")
+        metadata = (evidence_source_metadata_by_ref or {}).get(evidence_ref, {})
         roles.append(
             Node2EvidenceRole(
                 source_data_id=source_data_id,
@@ -846,9 +1207,32 @@ def _evidence_roles_from_payload(
                 role_reason_info_class=str(
                     item.get("role_reason_info_class") or "mixed"
                 ).strip(),
+                source_label=str(metadata.get("source_label") or ""),
+                source_kind=str(metadata.get("source_kind") or ""),
+                material_channel=str(metadata.get("material_channel") or ""),
             )
         )
     return roles
+
+
+def _answer_task_contract_fields(
+    payload: dict[str, object],
+) -> tuple[str, str, list[str], str]:
+    """새 task contract field가 전혀 없으면 구형 adapter 입력으로 투명하게 기록한다."""
+
+    keys = {
+        "user_task_summary",
+        "fulfillment_requirements",
+        "evidence_requirement",
+    }
+    if not any(key in payload for key in keys):
+        return "not_recorded", "", [], "not_recorded"
+    return (
+        "recorded",
+        str(payload.get("user_task_summary") or "").strip(),
+        _string_list(payload.get("fulfillment_requirements")),
+        str(payload.get("evidence_requirement") or "").strip(),
+    )
 
 
 def _data_record_metadata_refs(

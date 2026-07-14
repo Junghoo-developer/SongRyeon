@@ -25,6 +25,14 @@ DOCUMENT_EVIDENCE_ROLE_CLAIM_MISMATCH = (
 VESSEL_R_MATERIAL_CLAIM_MISMATCH = (
     "CODE_STATUS:vessel_r_material_claim_mismatch"
 )
+NODE4_TASK_NOT_FULFILLED = "CODE_STATUS:node4_task_not_fulfilled"
+NODE4_TASK_CHECK_NOT_AVAILABLE = "CODE_STATUS:node4_task_check_not_available"
+NODE4_BODY_GROUNDING_CONTRADICTION = (
+    "CODE_STATUS:node4_body_grounding_contradiction"
+)
+NODE4_BODY_GROUNDING_CHECK_NOT_AVAILABLE = (
+    "CODE_STATUS:node4_body_grounding_check_not_available"
+)
 
 
 def run_node4_gatekeeper(
@@ -71,6 +79,10 @@ def run_node4_gatekeeper(
             "memory_selection_status": _memory_selection_status(brief_frame),
             "memory_selection_info_class": _memory_selection_info_class(brief_frame),
             "checks": [
+                "사용자 질문과 task contract의 핵심 행동을 실제 보고문이 수행했는지 확인한다.",
+                "runtime inventory가 사용자에게 요청받은 답변을 대신했는지 확인한다.",
+                "absolute_grounding_facts와 본문 일반 문장이 의미상 충돌하는지 확인한다.",
+                "evidence_requirement=not_required인데 문서 부재만으로 요청을 거절했는지 확인한다.",
                 "보고문이 node3_input_brief 밖의 사실을 단정했는지 확인한다.",
                 "보고문이 '근거 기준:' 블록으로 시작하고 count가 brief와 맞는지 확인한다.",
                 "검색 후보 문서를 읽은 문서처럼 말하는지 확인한다.",
@@ -98,6 +110,13 @@ def run_node4_gatekeeper(
         unsupported_claims = _string_list(payload.get("unsupported_claims"))
         contradictions = _string_list(payload.get("contradictions"))
         revision_targets = _string_list(payload.get("revision_targets"))
+        task_fulfillment_status = str(
+            payload.get("task_fulfillment_status") or "not_checkable"
+        ).strip()
+        grounding_consistency_status = str(
+            payload.get("grounding_consistency_status") or "not_checkable"
+        ).strip()
+        task_failure_reasons = _string_list(payload.get("task_failure_reasons"))
         llm_gate_status = "ran"
     else:
         # LLM gatekeeper가 깨져도 조용히 pass로 넘어가지 않는다.
@@ -108,7 +127,46 @@ def run_node4_gatekeeper(
         unsupported_claims = []
         contradictions = []
         revision_targets = [reason]
+        task_fulfillment_status = "not_checkable"
+        grounding_consistency_status = "not_checkable"
+        task_failure_reasons = [reason]
         llm_gate_status = "failed"
+
+    gate_generation_source = f"LLM:{llm_result.model_id}"
+    if brief_frame.answer_task_contract_status == "recorded":
+        task_policy_reasons: list[str] = []
+        if task_fulfillment_status in {"partial", "not_fulfilled"}:
+            task_policy_reasons.append(NODE4_TASK_NOT_FULFILLED)
+        elif task_fulfillment_status != "fulfilled":
+            task_policy_reasons.append(NODE4_TASK_CHECK_NOT_AVAILABLE)
+        if grounding_consistency_status == "contradiction":
+            task_policy_reasons.append(NODE4_BODY_GROUNDING_CONTRADICTION)
+        elif grounding_consistency_status != "consistent":
+            task_policy_reasons.append(NODE4_BODY_GROUNDING_CHECK_NOT_AVAILABLE)
+        if task_policy_reasons:
+            if gate_status == "pass":
+                gate_status = "needs_revision"
+            gate_generation_source = (
+                f"{gate_generation_source}+CODE:LLM_TASK_CHECK_POLICY"
+            )
+            for reason_code in task_policy_reasons:
+                reason = _append_reason(reason, reason_code)
+            checked_claims = _unique_strings(
+                [*checked_claims, "user_task_fulfillment", "body_grounding_consistency"]
+            )
+            task_failure_reasons = _unique_strings(
+                [*task_failure_reasons, *task_policy_reasons]
+            )
+            if NODE4_BODY_GROUNDING_CONTRADICTION in task_policy_reasons:
+                contradictions = _unique_strings(
+                    [*contradictions, NODE4_BODY_GROUNDING_CONTRADICTION]
+                )
+            revision_targets = _unique_strings(
+                [
+                    *revision_targets,
+                    "사용자 과업을 직접 수행하고 code grounding facts와 본문을 일치시킨다.",
+                ]
+            )
 
     # CODE 권한: 숫자 불일치 같은 절대 검사는 LLM 의미 판단을 기다리지 않고 차단한다.
     # 단, 이것은 의미 검사가 아니라 node3_input_brief와 보고문 첫 근거 블록의 산술 일치 검사다.
@@ -116,7 +174,6 @@ def run_node4_gatekeeper(
         rendered_markdown=rendered_markdown,
         brief_frame=brief_frame,
     )
-    gate_generation_source = f"LLM:{llm_result.model_id}"
     if code_count_violations:
         if gate_status == "pass":
             gate_status = "needs_revision"
@@ -227,6 +284,9 @@ def run_node4_gatekeeper(
         unsupported_claims=unsupported_claims,
         contradictions=contradictions,
         revision_targets=revision_targets,
+        task_fulfillment_status=task_fulfillment_status,
+        grounding_consistency_status=grounding_consistency_status,
+        task_failure_reasons=task_failure_reasons,
         recent_memory_guard_status=str(recent_memory_guard["status"]),
         recent_memory_guard_reason_codes=list(recent_memory_guard["reason_codes"]),
         recent_memory_claim_count=int(recent_memory_guard["claim_count"]),
@@ -267,6 +327,11 @@ def _grounding_count_violations(
 ) -> list[str]:
     """node_3 보고문 첫 근거 블록의 숫자가 brief의 절대 count와 맞는지 검사한다."""
 
+    if (
+        brief_frame.answer_task_contract_status == "recorded"
+        and brief_frame.evidence_requirement == "not_required"
+    ):
+        return []
     # 장기 과제: 현재는 한국어 고정 문구를 정규식으로 읽는 v0 가드다.
     # 장기적으로는 node_3가 ReportGroundingFrame 같은 구조화 출력을 함께 만들고,
     # node_4는 렌더링된 문장 대신 그 frame을 검사하는 쪽이 더 건강하다.
@@ -699,6 +764,13 @@ def _validate_gatekeeper_payload(payload: dict[str, object]) -> None:
         unsupported_claims=_string_list(payload.get("unsupported_claims")),
         contradictions=_string_list(payload.get("contradictions")),
         revision_targets=_string_list(payload.get("revision_targets")),
+        task_fulfillment_status=str(
+            payload.get("task_fulfillment_status") or "not_checkable"
+        ).strip(),
+        grounding_consistency_status=str(
+            payload.get("grounding_consistency_status") or "not_checkable"
+        ).strip(),
+        task_failure_reasons=_string_list(payload.get("task_failure_reasons")),
         source_trace_ids=["validation_trace"],
         source_data_ids=["validation_data"],
     )

@@ -32,9 +32,12 @@ def test_r1_prompt_preserves_explicit_raw_material_intent() -> None:
         encoding="utf-8"
     )
 
-    assert "deepest material level" in prompt
+    assert "evidence level" in prompt
     assert "original text, raw source, or RawSource" in prompt
-    assert '"required_information_granularity": "unknown"' in prompt
+    assert '"required_material_level": "overview"' in prompt
+    assert '"required_material_count": 1' in prompt
+    assert "use `raw_original`" in prompt
+    assert "Do not output `min_traversal_depth`" in prompt
 
 
 def test_node3_vessel_only_turn_uses_focused_payload() -> None:

@@ -93,6 +93,9 @@ Important boundaries:
 - `previous_r_step_memory_packet` is code-recorded traversal memory from node_0.
 - Use previous step memory only to remember the prior selected/inspected node, R3 signal, and promoted next candidates.
 - Previous step memory is not a selectable candidate list by itself.
+- The runtime may also include `prior_top_level_r_run_memory`, and official candidate rows may include `seen_in_prior_top_level_r_run` plus `prior_run_seen_role`.
+- Those fields are code-copied history from an earlier complete R run. They do not remove a candidate and do not make it automatically wrong.
+- Revisiting a navigation node can be necessary to reach a new branch. When multiple candidates fit the R1 goal, avoid stopping on the same previously inspected terminal material unless revisiting it is needed for the current evidence contract.
 - Even when previous step memory exists, `selected_surface_ref` and `selected_node_ref` must still be copied from the current runtime candidate surface.
 - Do not assume that leaf summaries are visible in the first R2 view.
 - If the visible candidate is an axis or bundle, choose the best entry point for the R3 inspection instead of inventing a deeper leaf node.
