@@ -2185,6 +2185,23 @@ class Node3BriefDocument:
 
 
 @dataclass
+class Node3CodeReadBoundary:
+    """node_3에게 원문 text와 함께 주는 read_code_file 절대 경계."""
+
+    file_path: str
+    requested_start_char: int
+    range_start_char: int
+    range_end_char_exclusive: int
+    returned_char_count: int
+    total_char_count: int
+    truncated: bool
+    truncated_before: bool
+    truncated_after: bool
+    read_status: str
+    source_data_id: str
+
+
+@dataclass
 class Node3ExcludedDocumentContext:
     """node_3에게 읽은 문서가 아니라는 경계와 함께 전달되는 제외 후보."""
 
@@ -2440,6 +2457,12 @@ class Node3InputBriefFrame:
     actual_tool_read_code_file_count: int = 0
     # 절대 정보: 실제 read_code_file 도구가 기록한 source/config 파일 경로 목록.
     actual_tool_read_code_file_paths: list[str] = field(default_factory=list)
+    # 절대 정보: read_code_file 호출별 path/range/truncation 장부.
+    code_read_boundaries: list[Node3CodeReadBoundary] = field(default_factory=list)
+    # 절대 정보: tool budget이 허용한 최대 read_code_file 호출 횟수.
+    max_read_code_file_calls: int = 0
+    # 절대 정보: 최신 tool budget 기준 남은 read_code_file 호출 횟수.
+    remaining_read_code_file_calls: int = 0
     # 절대 정보: node_3에게 본문 context로 공급된 문서 수.
     supplied_document_context_count: int = 0
     # 절대 정보: node_3에게 본문 context로 공급된 source-code context 수.
@@ -2595,6 +2618,12 @@ def validate_node3_input_brief_frame(frame: Node3InputBriefFrame) -> None:
         )
     for document in frame.read_documents:
         _validate_node3_brief_document(document)
+    for boundary in frame.code_read_boundaries:
+        _validate_node3_code_read_boundary(boundary)
+        if boundary.source_data_id not in frame.source_data_ids:
+            raise ValueError(
+                "Node3InputBriefFrame.source_data_ids must include code boundary source_data_id"
+            )
     for outline in frame.source_code_outlines:
         _validate_node3_source_code_outline(outline)
         if outline.source_data_id not in frame.source_data_ids:
@@ -2604,6 +2633,8 @@ def validate_node3_input_brief_frame(frame: Node3InputBriefFrame) -> None:
     for field_name, value in {
         "actual_tool_read_doc_count": frame.actual_tool_read_doc_count,
         "actual_tool_read_code_file_count": frame.actual_tool_read_code_file_count,
+        "max_read_code_file_calls": frame.max_read_code_file_calls,
+        "remaining_read_code_file_calls": frame.remaining_read_code_file_calls,
         "supplied_document_context_count": frame.supplied_document_context_count,
         "supplied_source_code_context_count": frame.supplied_source_code_context_count,
     }.items():
@@ -2623,6 +2654,10 @@ def validate_node3_input_brief_frame(frame: Node3InputBriefFrame) -> None:
     if frame.actual_tool_read_code_file_count != len(frame.actual_tool_read_code_file_paths):
         raise ValueError(
             "Node3InputBriefFrame.actual_tool_read_code_file_count must mirror actual_tool_read_code_file_paths length"
+        )
+    if frame.remaining_read_code_file_calls > frame.max_read_code_file_calls:
+        raise ValueError(
+            "Node3InputBriefFrame.remaining_read_code_file_calls must not exceed max_read_code_file_calls"
         )
     if frame.supplied_source_code_context_count > frame.supplied_document_context_count:
         raise ValueError(
@@ -2683,6 +2718,47 @@ def _validate_node3_brief_document(document: Node3BriefDocument) -> None:
         raise TypeError("Node3BriefDocument.char_count must be an integer")
     if document.char_count < 0:
         raise ValueError("Node3BriefDocument.char_count must not be negative")
+
+
+def _validate_node3_code_read_boundary(boundary: Node3CodeReadBoundary) -> None:
+    for field_name, value in {
+        "file_path": boundary.file_path,
+        "read_status": boundary.read_status,
+        "source_data_id": boundary.source_data_id,
+    }.items():
+        if not value:
+            raise ValueError(f"Node3CodeReadBoundary.{field_name} must not be empty")
+    numeric_fields = {
+        "requested_start_char": boundary.requested_start_char,
+        "range_start_char": boundary.range_start_char,
+        "range_end_char_exclusive": boundary.range_end_char_exclusive,
+        "returned_char_count": boundary.returned_char_count,
+        "total_char_count": boundary.total_char_count,
+    }
+    for field_name, value in numeric_fields.items():
+        if not isinstance(value, int) or isinstance(value, bool):
+            raise TypeError(f"Node3CodeReadBoundary.{field_name} must be an integer")
+        if value < 0:
+            raise ValueError(f"Node3CodeReadBoundary.{field_name} must not be negative")
+    if boundary.range_start_char > boundary.range_end_char_exclusive:
+        raise ValueError("Node3CodeReadBoundary range start must not exceed range end")
+    if boundary.range_end_char_exclusive > boundary.total_char_count:
+        raise ValueError("Node3CodeReadBoundary range end must not exceed total")
+    if boundary.returned_char_count != (
+        boundary.range_end_char_exclusive - boundary.range_start_char
+    ):
+        raise ValueError("Node3CodeReadBoundary returned count must mirror range")
+    for field_name, value in {
+        "truncated": boundary.truncated,
+        "truncated_before": boundary.truncated_before,
+        "truncated_after": boundary.truncated_after,
+    }.items():
+        if not isinstance(value, bool):
+            raise TypeError(f"Node3CodeReadBoundary.{field_name} must be a boolean")
+    if boundary.truncated != (
+        boundary.truncated_before or boundary.truncated_after
+    ):
+        raise ValueError("Node3CodeReadBoundary.truncated must mirror before/after")
 
 
 def _validate_node3_source_code_outline(outline: Node3SourceCodeOutline) -> None:
@@ -3994,6 +4070,7 @@ L2_REVISION_INPUT_FRAME_SCHEMA_VERSION = "0.1"
 L2_QUERY_SOURCES = {
     "user_input_fallback",
     "llm_query_plan",
+    "code_explicit_path_copy_fallback",
     "revision_llm_query_plan",
     "revision_fallback_query_plan",
 }
@@ -4021,7 +4098,14 @@ L2_REVISION_TARGET_TOOL_NAMES = {
     "read_code_file",
 }
 L2_QUERY_PLANNER_MODES = {"llm", "fallback", "revision_llm", "revision_fallback"}
-L2_REVISION_PREVIOUS_TOOL_NAMES = {"search_docs", "read_doc", "read_artifact"}
+L2_REVISION_PREVIOUS_TOOL_NAMES = {
+    "search_docs",
+    "read_doc",
+    "read_artifact",
+    "list_code_files",
+    "search_code",
+    "read_code_file",
+}
 L2_REVISION_L3_GOAL_STATUSES = {"achieved", "partial", "failed", "missing", "not_run"}
 L2_REVISION_GOAL_MATCH_STATUSES = {"matched", "partial", "missing", "not_applicable", "not_run"}
 L2_REVISION_SEMANTIC_GOAL_MATCH_STATUSES = {"matched", "partial", "missing", "not_run"}
@@ -4044,6 +4128,9 @@ class L2QueryFrame:
     query_mode: str
     # 절대 정보: 이 query frame이 대상으로 삼는 도구 이름.
     target_tool_name: str
+    # 절대 정보: read_code_file 실행 시 L2가 선택한 시작 문자 위치.
+    # 다른 도구와 일반 최초 L2 read에서는 0이어야 한다.
+    read_code_file_start_char: int = 0
     # 절대 정보: 적용된 스키마 이름.
     schema_name: str = L2_QUERY_FRAME_SCHEMA_NAME
     # 절대 정보: 적용된 스키마 버전.
@@ -4102,6 +4189,20 @@ def validate_l2_query_frame(frame: L2QueryFrame) -> None:
         raise ValueError("read_code_file L2 query must use code_file_read mode")
     if frame.query_mode == "code_file_read" and frame.target_tool_name != "read_code_file":
         raise ValueError("code_file_read mode must target read_code_file")
+    if not isinstance(frame.read_code_file_start_char, int) or isinstance(
+        frame.read_code_file_start_char,
+        bool,
+    ):
+        raise TypeError("L2QueryFrame.read_code_file_start_char must be an integer")
+    if frame.read_code_file_start_char < 0:
+        raise ValueError("L2QueryFrame.read_code_file_start_char must not be negative")
+    if frame.target_tool_name != "read_code_file" and frame.read_code_file_start_char != 0:
+        raise ValueError("non-read_code_file L2 query must use start_char=0")
+    if (
+        frame.query_source not in {"revision_llm_query_plan", "revision_fallback_query_plan"}
+        and frame.read_code_file_start_char != 0
+    ):
+        raise ValueError("initial L2 read_code_file query must use start_char=0")
 
     for trace_id in frame.source_trace_ids:
         if not trace_id:
@@ -4128,6 +4229,8 @@ class L2QueryPlanCandidate:
     priority: int
     # 절대 정보: 이 후보가 대상으로 삼는 도구.
     target_tool_name: str = "search_docs"
+    # 절대 정보: read_code_file 후보가 선택한 시작 문자 위치.
+    read_code_file_start_char: int = 0
     # 절대 정보: 이 후보 생성의 근거 DataStore record ID 목록.
     source_data_ids: list[str] = field(default_factory=list)
 
@@ -4223,6 +4326,19 @@ def _validate_l2_query_plan_candidate(
     )
     if candidate.target_tool_name not in allowed_target_tools:
         raise ValueError(f"unknown L2 target_tool_name: {candidate.target_tool_name}")
+    if not isinstance(candidate.read_code_file_start_char, int) or isinstance(
+        candidate.read_code_file_start_char,
+        bool,
+    ):
+        raise TypeError("L2QueryPlanCandidate.read_code_file_start_char must be an integer")
+    if candidate.read_code_file_start_char < 0:
+        raise ValueError("L2QueryPlanCandidate.read_code_file_start_char must not be negative")
+    if candidate.target_tool_name != "read_code_file" and candidate.read_code_file_start_char != 0:
+        raise ValueError("non-read_code_file L2 candidate must use start_char=0")
+    if planner_mode not in {"revision_llm", "revision_fallback"} and (
+        candidate.read_code_file_start_char != 0
+    ):
+        raise ValueError("initial L2 read_code_file candidate must use start_char=0")
     if not candidate.source_data_ids:
         raise ValueError("L2QueryPlanCandidate.source_data_ids must not be empty")
     for data_id in candidate.source_data_ids:
@@ -4276,6 +4392,14 @@ class L2RevisionInputFrame:
     remaining_query_attempts: int = 0
     # 절대 정보: 남은 문서 읽기 횟수.
     remaining_read_doc_calls: int = 0
+    # 절대 정보: 이미 실행한 read_code_file 호출별 경로/문자 구간 목록.
+    read_code_file_ranges: list[CodeReadRangeRecord] = field(default_factory=list)
+    # 절대 정보: code가 기존 range에서 계산한 아직 읽지 않은 연속 시작점 목록.
+    code_read_continuation_options: list[CodeReadContinuationOption] = field(
+        default_factory=list
+    )
+    # 절대 정보: code-read partition 예산에서 실제 호출 수를 뺀 남은 횟수.
+    remaining_read_code_file_calls: int = 0
     # 절대 정보: 이 revision 입력이 근거로 삼은 trace ID 목록.
     source_trace_ids: list[str] = field(default_factory=list)
     # 절대 정보: 이 revision 입력이 근거로 삼은 DataStore record ID 목록.
@@ -4331,6 +4455,7 @@ def validate_l2_revision_input_frame(frame: L2RevisionInputFrame) -> None:
         "remaining_tool_calls": frame.remaining_tool_calls,
         "remaining_query_attempts": frame.remaining_query_attempts,
         "remaining_read_doc_calls": frame.remaining_read_doc_calls,
+        "remaining_read_code_file_calls": frame.remaining_read_code_file_calls,
     }.items():
         if not isinstance(value, int):
             raise TypeError(f"L2RevisionInputFrame.{field_name} must be an integer")
@@ -4346,6 +4471,14 @@ def validate_l2_revision_input_frame(frame: L2RevisionInputFrame) -> None:
     for summary in frame.unread_candidate_summaries:
         if not summary:
             raise ValueError("L2RevisionInputFrame.unread_candidate_summaries must not contain empty values")
+    for code_range in frame.read_code_file_ranges:
+        validate_code_read_range_record(code_range)
+    for option in frame.code_read_continuation_options:
+        validate_code_read_continuation_option(option)
+        if option.source_tool_result_data_id not in frame.source_data_ids:
+            raise ValueError(
+                "L2RevisionInputFrame.source_data_ids must include continuation option source"
+            )
     for trace_id in frame.source_trace_ids:
         if not trace_id:
             raise ValueError("L2RevisionInputFrame.source_trace_ids must not contain empty values")
@@ -5111,6 +5244,123 @@ class ToolCacheStatusRecord:
 
 
 @dataclass
+class CodeReadRangeRecord:
+    """read_code_file 호출 하나가 실제로 반환한 문자 구간 장부."""
+
+    # 절대 정보: 이 구간을 만든 tool_result:read_code_file data_id.
+    tool_result_data_id: str
+    # 절대 정보: workspace 상대 코드 경로. 실패 시 요청에 사용한 경로.
+    file_path: str
+    # 절대 정보: 호출자가 요청한 시작 문자 위치.
+    requested_start_char: int
+    # 절대 정보: 실제 반환 구간 시작. 포함한다.
+    range_start_char: int
+    # 절대 정보: 실제 반환 구간 끝. 포함하지 않는다.
+    range_end_char_exclusive: int
+    # 절대 정보: 반환 text의 문자 수.
+    returned_char_count: int
+    # 절대 정보: 관측 당시 파일 전체 문자 수.
+    total_char_count: int
+    # 절대 정보: 읽은 구간 앞에 원문이 더 있는지.
+    truncated_before: bool
+    # 절대 정보: 읽은 구간 뒤에 원문이 더 있는지.
+    truncated_after: bool
+    # 절대 정보: tool 결과의 read_status.
+    read_status: str
+
+
+def validate_code_read_range_record(record: CodeReadRangeRecord) -> None:
+    """코드 읽기 구간이 tool payload의 절대 count 규칙과 맞는지 확인한다."""
+
+    for field_name, value in {
+        "tool_result_data_id": record.tool_result_data_id,
+        "file_path": record.file_path,
+        "read_status": record.read_status,
+    }.items():
+        if not value:
+            raise ValueError(f"CodeReadRangeRecord.{field_name} must not be empty")
+    numeric_fields = {
+        "requested_start_char": record.requested_start_char,
+        "range_start_char": record.range_start_char,
+        "range_end_char_exclusive": record.range_end_char_exclusive,
+        "returned_char_count": record.returned_char_count,
+        "total_char_count": record.total_char_count,
+    }
+    for field_name, value in numeric_fields.items():
+        if not isinstance(value, int) or isinstance(value, bool):
+            raise TypeError(f"CodeReadRangeRecord.{field_name} must be an integer")
+        if value < 0:
+            raise ValueError(f"CodeReadRangeRecord.{field_name} must not be negative")
+    if record.range_start_char > record.range_end_char_exclusive:
+        raise ValueError("CodeReadRangeRecord range start must not exceed range end")
+    if record.range_end_char_exclusive > record.total_char_count:
+        raise ValueError("CodeReadRangeRecord range end must not exceed total_char_count")
+    if record.returned_char_count != (
+        record.range_end_char_exclusive - record.range_start_char
+    ):
+        raise ValueError("CodeReadRangeRecord returned_char_count must mirror its range")
+    for field_name, value in {
+        "truncated_before": record.truncated_before,
+        "truncated_after": record.truncated_after,
+    }.items():
+        if not isinstance(value, bool):
+            raise TypeError(f"CodeReadRangeRecord.{field_name} must be a boolean")
+    if record.truncated_before != (record.range_start_char > 0):
+        raise ValueError("CodeReadRangeRecord.truncated_before must mirror range_start_char")
+    if record.truncated_after != (
+        record.range_end_char_exclusive < record.total_char_count
+    ):
+        raise ValueError("CodeReadRangeRecord.truncated_after must mirror range end")
+
+
+@dataclass
+class CodeReadContinuationOption:
+    """기존 code range에서 계산한 아직 실행하지 않은 연속 읽기 시작점."""
+
+    # 절대 정보: 이어 읽을 workspace 상대 경로.
+    file_path: str
+    # 절대 정보: 다음 read_code_file에 넣을 시작 문자 위치.
+    start_char: int
+    # 절대 정보: option을 만든 직전 range의 exclusive end. start_char와 같아야 한다.
+    previous_range_end_char_exclusive: int
+    # 절대 정보: 직전 read 관측 시점의 파일 전체 문자 수.
+    total_char_count: int
+    # 절대 정보: start_char 이후 남아 있던 문자 수.
+    remaining_char_count: int
+    # 절대 정보: option의 근거가 된 read_code_file tool result data ID.
+    source_tool_result_data_id: str
+
+
+def validate_code_read_continuation_option(option: CodeReadContinuationOption) -> None:
+    """Continuation option이 기존 문자 범위에서 계산 가능한 값인지 확인한다."""
+
+    for field_name, value in {
+        "file_path": option.file_path,
+        "source_tool_result_data_id": option.source_tool_result_data_id,
+    }.items():
+        if not value:
+            raise ValueError(f"CodeReadContinuationOption.{field_name} must not be empty")
+    for field_name, value in {
+        "start_char": option.start_char,
+        "previous_range_end_char_exclusive": (
+            option.previous_range_end_char_exclusive
+        ),
+        "total_char_count": option.total_char_count,
+        "remaining_char_count": option.remaining_char_count,
+    }.items():
+        if not isinstance(value, int) or isinstance(value, bool):
+            raise TypeError(f"CodeReadContinuationOption.{field_name} must be an integer")
+        if value < 0:
+            raise ValueError(f"CodeReadContinuationOption.{field_name} must not be negative")
+    if option.start_char != option.previous_range_end_char_exclusive:
+        raise ValueError("CodeReadContinuationOption start must equal previous range end")
+    if option.start_char >= option.total_char_count:
+        raise ValueError("CodeReadContinuationOption start must be before total_char_count")
+    if option.remaining_char_count != option.total_char_count - option.start_char:
+        raise ValueError("CodeReadContinuationOption remaining count must mirror total minus start")
+
+
+@dataclass
 class ToolUseBudgetFrame:
     """L루프 도구 사용 예산과 현재 사용량을 DataStore에 저장하는 프레임."""
 
@@ -5142,6 +5392,12 @@ class ToolUseBudgetFrame:
     read_doc_count: int
     # 절대 정보: 현재까지 distillation 기준으로 누적한 입력 크기.
     input_chars_used: int
+    # 절대 정보: tool scope partition이 허용한 최대 read_code_file 호출 횟수.
+    max_read_code_file_calls: int = 0
+    # 절대 정보: 현재까지 실행된 read_code_file 호출 횟수. 성공 여부와 무관하게 예산을 쓴다.
+    read_code_file_count: int = 0
+    # 절대 정보: 호출별 코드 경로/반환 문자 구간/truncation 장부.
+    read_code_file_ranges: list[CodeReadRangeRecord] = field(default_factory=list)
     # 절대 정보: 이미 실행한 query 목록.
     executed_queries: list[str] = field(default_factory=list)
     # 절대 정보: 이미 읽은 doc_id 목록.
@@ -5202,6 +5458,8 @@ def validate_tool_use_budget_frame(frame: ToolUseBudgetFrame) -> None:
         "query_count": frame.query_count,
         "read_doc_count": frame.read_doc_count,
         "input_chars_used": frame.input_chars_used,
+        "max_read_code_file_calls": frame.max_read_code_file_calls,
+        "read_code_file_count": frame.read_code_file_count,
         "duplicate_query_count": frame.duplicate_query_count,
         "duplicate_doc_count": frame.duplicate_doc_count,
     }
@@ -5230,6 +5488,14 @@ def validate_tool_use_budget_frame(frame: ToolUseBudgetFrame) -> None:
         raise ValueError("ToolUseBudgetFrame.max_query_candidates must mirror max_query_attempts")
     if frame.read_doc_count > frame.max_read_doc_calls:
         raise ValueError("ToolUseBudgetFrame.read_doc_count must not exceed max_read_doc_calls")
+    if frame.read_code_file_count > frame.max_read_code_file_calls:
+        raise ValueError(
+            "ToolUseBudgetFrame.read_code_file_count must not exceed max_read_code_file_calls"
+        )
+    if frame.read_code_file_count != len(frame.read_code_file_ranges):
+        raise ValueError(
+            "ToolUseBudgetFrame.read_code_file_count must mirror read_code_file_ranges length"
+        )
 
     for query in frame.executed_queries:
         if not query:
@@ -5237,6 +5503,8 @@ def validate_tool_use_budget_frame(frame: ToolUseBudgetFrame) -> None:
     for doc_id in frame.read_doc_ids:
         if not doc_id:
             raise ValueError("ToolUseBudgetFrame.read_doc_ids must not contain empty values")
+    for code_range in frame.read_code_file_ranges:
+        validate_code_read_range_record(code_range)
     for cache_status in frame.cache_statuses:
         _validate_tool_cache_status_record(cache_status)
     for trace_id in frame.source_trace_ids:
@@ -5454,6 +5722,14 @@ class LLoopContinuationFrame:
     read_doc_ids: list[str] = field(default_factory=list)
     # 절대 정보: 아직 읽지 않은 후보 문서 ID 목록.
     unread_candidate_doc_ids: list[str] = field(default_factory=list)
+    # 절대 정보: 현재까지 실행된 read_code_file 호출별 경로/문자 구간.
+    read_code_file_ranges: list[CodeReadRangeRecord] = field(default_factory=list)
+    # 절대 정보: 현재 range history에서 계산한 미열람 연속 시작점.
+    code_read_continuation_options: list[CodeReadContinuationOption] = field(
+        default_factory=list
+    )
+    # 절대 정보: 최신 budget 기준 남은 read_code_file 호출 횟수.
+    remaining_read_code_file_calls: int = 0
     # 절대 정보: 예산 상태 라벨. 예: within_budget, max_tool_calls_reached.
     tool_budget_status: str = "within_budget"
     # 절대 정보: 다음에 갈 대상. continue면 L2, stop이면 loop_return_summary.
@@ -5514,6 +5790,16 @@ def validate_l_loop_continuation_frame(frame: LLoopContinuationFrame) -> None:
         raise ValueError("stop continuation must not target L2")
     if frame.continuation_status == "continue" and frame.attempt_index >= frame.max_attempts:
         raise ValueError("continue continuation requires remaining attempts")
+    if not isinstance(frame.remaining_read_code_file_calls, int) or isinstance(
+        frame.remaining_read_code_file_calls, bool
+    ):
+        raise TypeError(
+            "LLoopContinuationFrame.remaining_read_code_file_calls must be an integer"
+        )
+    if frame.remaining_read_code_file_calls < 0:
+        raise ValueError(
+            "LLoopContinuationFrame.remaining_read_code_file_calls must not be negative"
+        )
 
     if frame.source_l3_achievement_id not in frame.source_data_ids:
         raise ValueError("LLoopContinuationFrame.source_data_ids must include source_l3_achievement_id")
@@ -5526,6 +5812,14 @@ def validate_l_loop_continuation_frame(frame: LLoopContinuationFrame) -> None:
     for doc_id in frame.unread_candidate_doc_ids:
         if not doc_id:
             raise ValueError("LLoopContinuationFrame.unread_candidate_doc_ids must not contain empty values")
+    for code_range in frame.read_code_file_ranges:
+        validate_code_read_range_record(code_range)
+    for option in frame.code_read_continuation_options:
+        validate_code_read_continuation_option(option)
+        if option.source_tool_result_data_id not in frame.source_data_ids:
+            raise ValueError(
+                "LLoopContinuationFrame.source_data_ids must include continuation option source"
+            )
     for trace_id in frame.source_trace_ids:
         if not trace_id:
             raise ValueError("LLoopContinuationFrame.source_trace_ids must not contain empty values")
@@ -5591,6 +5885,14 @@ class LLoopReturnSummaryFrame:
     read_code_file_paths: list[str] = field(default_factory=list)
     # 절대 정보: read_code_file 성공 기록 수. read_doc 수와 섞지 않는다.
     actual_read_code_file_count: int = 0
+    # 절대 정보: tool scope partition이 허용한 최대 read_code_file 호출 횟수.
+    max_read_code_file_calls: int = 0
+    # 절대 정보: 성공/실패를 포함한 실제 read_code_file 호출 횟수.
+    read_code_file_call_count: int = 0
+    # 절대 정보: 최신 tool budget 기준 남은 read_code_file 호출 횟수.
+    remaining_read_code_file_calls: int = 0
+    # 절대 정보: 호출별 code path/range/truncation 장부.
+    read_code_file_ranges: list[CodeReadRangeRecord] = field(default_factory=list)
     # 절대 정보: 검색 후보 문서 ID 목록.
     search_result_doc_ids: list[str] = field(default_factory=list)
     # 절대 정보: 입력 근거 trace ID 목록.
@@ -5674,6 +5976,9 @@ def validate_l_loop_return_summary_frame(frame: LLoopReturnSummaryFrame) -> None
         "remaining_read_doc_calls": frame.remaining_read_doc_calls,
         "remaining_query_attempts": frame.remaining_query_attempts,
         "actual_read_code_file_count": frame.actual_read_code_file_count,
+        "max_read_code_file_calls": frame.max_read_code_file_calls,
+        "read_code_file_call_count": frame.read_code_file_call_count,
+        "remaining_read_code_file_calls": frame.remaining_read_code_file_calls,
         "original_material_count": frame.original_material_count,
     }.items():
         if not isinstance(value, int):
@@ -5688,6 +5993,22 @@ def validate_l_loop_return_summary_frame(frame: LLoopReturnSummaryFrame) -> None
         raise ValueError(
             "LLoopReturnSummaryFrame.actual_read_code_file_count must mirror read_code_file_paths length"
         )
+    if frame.read_code_file_call_count != len(frame.read_code_file_ranges):
+        raise ValueError(
+            "LLoopReturnSummaryFrame.read_code_file_call_count must mirror range history"
+        )
+    if frame.read_code_file_call_count > frame.max_read_code_file_calls:
+        raise ValueError(
+            "LLoopReturnSummaryFrame.read_code_file_call_count must not exceed max"
+        )
+    if frame.remaining_read_code_file_calls != (
+        frame.max_read_code_file_calls - frame.read_code_file_call_count
+    ):
+        raise ValueError(
+            "LLoopReturnSummaryFrame.remaining_read_code_file_calls must mirror max minus used"
+        )
+    for code_range in frame.read_code_file_ranges:
+        validate_code_read_range_record(code_range)
     if frame.original_material_count != (
         frame.actual_read_doc_count + frame.actual_read_code_file_count
     ):

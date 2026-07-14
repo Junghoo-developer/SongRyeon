@@ -199,15 +199,16 @@ def build_document_tool_registry(
             ),
             ToolSpec(
                 name="read_code_file",
-                description="Workspace 안의 코드/설정 파일 하나를 읽기 전용으로 가져온다.",
+                description="Workspace 안의 코드/설정 파일에서 지정 문자 구간을 읽기 전용으로 가져온다.",
                 read_only=True,
                 output_data_type="tool_result:read_code_file",
-                function=lambda file_path, max_chars=12000: read_code_file(
+                function=lambda file_path, max_chars=12000, start_char=0: read_code_file(
                     root=codebase_root,
                     file_path=file_path,
                     max_chars=max_chars,
+                    start_char=start_char,
                 ),
-                input_fields=["file_path", "max_chars"],
+                input_fields=["file_path", "start_char", "max_chars"],
             ),
         ]
     )

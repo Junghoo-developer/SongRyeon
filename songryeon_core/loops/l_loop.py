@@ -6,6 +6,7 @@ from pathlib import Path
 from songryeon_core.core.data_store import DataStore
 from songryeon_core.core.failure_signal_store import record_failure_signal
 from songryeon_core.core.schemas import (
+    CodeReadRangeRecord,
     LLoopControlFrame,
     LLoopRunFrame,
     MemoryPacketFrom0,
@@ -40,6 +41,7 @@ from songryeon_core.nodes.l2_query_setter import (
     run_l2_revision_query_planner,
     run_l2_revision_query_setter,
     selected_query_from_plan,
+    selected_read_code_file_start_char_from_plan,
     selected_target_tool_from_plan,
 )
 from songryeon_core.nodes.l3_result_keeper import (
@@ -71,10 +73,12 @@ from songryeon_core.tools.document_context_pack import (
     record_document_context_pack_frame,
     record_explicit_artifact_reference_frame,
 )
+from songryeon_core.tools.code_tools import explicit_code_file_paths_from_text
 from songryeon_core.tools.tool_efficiency_policy import (
     cache_status_from_search_payload,
     distilled_input_size,
     make_cache_status_record,
+    make_code_read_range_record,
     record_duplicate_tool_use_signal,
     record_tool_use_budget_frame,
 )
@@ -236,7 +240,11 @@ def run_l_loop(
     budget_plan_trace_ids = [budget_plan_trace_id]
     budget_plan_data_ids = [budget_plan_data_id]
 
-    tool_registry = build_document_tool_registry(document_root)
+    codebase_root = Path.cwd()
+    tool_registry = build_document_tool_registry(
+        document_root,
+        code_root=codebase_root,
+    )
     tool_catalog_trace_id = record_tool_catalog(
         trace_store=trace_store,
         data_store=data_store,
@@ -281,9 +289,14 @@ def run_l_loop(
         budget_plan_trace_id=budget_plan_trace_id,
         id_namespace=run_ids,
     )
+    max_read_code_file_calls = tool_budget_partition_frame.code_read_budget
     scoped_available_tools = filter_available_tools_for_scope(
         available_tools,
         tool_scope_frame,
+    )
+    explicit_code_file_paths = explicit_code_file_paths_from_text(
+        root=codebase_root,
+        text=search_query,
     )
 
     query_text = search_query
@@ -298,6 +311,7 @@ def run_l_loop(
     query_plan_data_ids: list[str] = []
     l2_plan_trace_ids: list[str] = []
     selected_tool_name = _fallback_l2_tool_for_available_tools(scoped_available_tools)
+    selected_read_code_file_start_char = 0
     if l2_query_planner_adapter is not None:
         try:
             plan_event = run_l2_query_planner(
@@ -315,6 +329,7 @@ def run_l_loop(
                     tool_budget_partition_data_id,
                 ],
                 available_tools=scoped_available_tools,
+                available_explicit_code_file_paths=explicit_code_file_paths,
                 l_tool_scope=asdict(tool_scope_frame),
                 budget_partition=asdict(tool_budget_partition_frame),
                 query_plan_frame_data_id=l2_query_plan_data_id,
@@ -322,6 +337,9 @@ def run_l_loop(
             plan_record = data_store.require_record(l2_query_plan_data_id)
             query_text = selected_query_from_plan(plan_record.payload)
             selected_tool_name = selected_target_tool_from_plan(plan_record.payload)
+            selected_read_code_file_start_char = (
+                selected_read_code_file_start_char_from_plan(plan_record.payload)
+            )
             query_source = "llm_query_plan"
             query_source_data_ids = [
                 l1_goal_data_id,
@@ -335,9 +353,23 @@ def run_l_loop(
             query_plan_data_ids = [l2_query_plan_data_id]
             l2_plan_trace_ids = [plan_event.event_id]
         except Exception:
-            # LLM query plan 실패 시 기존 사용자 입력 fallback 검색을 유지한다.
-            query_text = search_query
-            query_source = "user_input_fallback"
+            # LLM이 read_code_file 경로 자리에 설명문을 쓰더라도 그대로 실행하지 않는다.
+            # 사용자 입력에 실제 workspace 경로가 정확히 하나 있었고 도구 범위가 허용할 때만
+            # code가 그 절대정보 문자열을 복사한다. 여러 경로 중 중요도를 고르지는 않는다.
+            selected_read_code_file_start_char = 0
+            if (
+                len(explicit_code_file_paths) == 1
+                and _tool_is_available(scoped_available_tools, "read_code_file")
+            ):
+                query_text = explicit_code_file_paths[0]
+                query_source = "code_explicit_path_copy_fallback"
+                selected_tool_name = "read_code_file"
+            else:
+                query_text = search_query
+                query_source = "user_input_fallback"
+                selected_tool_name = _fallback_l2_tool_for_available_tools(
+                    scoped_available_tools
+                )
 
     l2 = run_l2_query_setter(
         trace_store=trace_store,
@@ -347,6 +379,7 @@ def run_l_loop(
         query_text=query_text,
         query_source=query_source,
         target_tool_name=selected_tool_name,
+        read_code_file_start_char=selected_read_code_file_start_char,
         source_data_ids=query_source_data_ids,
         extra_input_trace_ids=query_extra_trace_ids,
         query_frame_data_id=l2_query_data_id,
@@ -404,6 +437,7 @@ def run_l_loop(
     read_doc_ids: set[str] = set()
     read_doc_id_list: list[str] = []
     original_read_doc_id_list: list[str] = []
+    read_code_file_ranges: list[CodeReadRangeRecord] = []
     cache_status_records = []
     current_query = query_text
     tool_call_count = 0
@@ -459,6 +493,8 @@ def run_l_loop(
             duplicate_query_count=duplicate_query_count,
             duplicate_doc_count=duplicate_doc_count,
             id_namespace=run_ids,
+            max_read_code_file_calls=max_read_code_file_calls,
+            read_code_file_ranges=read_code_file_ranges,
         )
         budget_sequence_index += 1
         budget_trace_ids.append(event_id)
@@ -717,6 +753,13 @@ def run_l_loop(
         next_iteration_index += 1
 
         if _is_code_inspection_tool(selected_tool_name):
+            if (
+                selected_tool_name == "read_code_file"
+                and len(read_code_file_ranges) >= max_read_code_file_calls
+            ):
+                raise ValueError(
+                    "L read_code_file requires remaining code-read budget"
+                )
             code_result = _run_code_inspection_tool(
                 tool_runner=tool_runner,
                 selected_tool_name=selected_tool_name,
@@ -726,10 +769,18 @@ def run_l_loop(
                 input_ref=[l2.event_id, tool_choice_trace_id, control_trace_id],
                 id_namespace=run_ids,
                 query_text=current_query,
+                read_code_file_start_char=selected_read_code_file_start_char,
             )
             tool_call_count += 1
             tool_call_trace_ids.append(code_result.trace_event_id)
             tool_result_data_ids.append(code_result.data_ref.data_id)
+            if selected_tool_name == "read_code_file":
+                read_code_file_ranges.append(
+                    make_code_read_range_record(
+                        tool_result_data_id=code_result.data_ref.data_id,
+                        payload=code_result.payload,
+                    )
+                )
             code_distillation = record_tool_result_distillation(
                 trace_store=trace_store,
                 data_store=data_store,
@@ -1446,6 +1497,7 @@ def run_l_loop(
                 max_tool_calls=max_tool_calls,
                 max_query_attempts=max_query_attempts,
                 max_read_doc_calls=max_read_doc_calls,
+                max_read_code_file_calls=max_read_code_file_calls,
                 max_input_chars=max_input_chars,
                 id_namespace=run_ids,
             )
@@ -1465,7 +1517,13 @@ def run_l_loop(
                 attempt_index=continuation_attempt_index,
                 revision_query_frame_data_id=revision_query_id,
                 revision_tool_source_trace_ids=revision_tool_result.source_trace_ids,
-                revision_tool_source_data_ids=revision_tool_result.source_data_ids,
+                revision_tool_source_data_ids=_unique_strings(
+                    [
+                        tool_scope_data_id,
+                        tool_budget_partition_data_id,
+                        *revision_tool_result.source_data_ids,
+                    ]
+                ),
                 user_query=search_query,
                 l1_goal_data_id=l1_goal_data_id,
                 adapter=l3_result_adapter,
@@ -1849,6 +1907,19 @@ def _fallback_l2_tool_for_available_tools(available_tools: list[dict[str, object
     return "search_docs"
 
 
+def _tool_is_available(
+    available_tools: list[dict[str, object]],
+    tool_name: str,
+) -> bool:
+    """현재 L tool scope가 특정 도구를 실제로 열었는지만 구조적으로 확인한다."""
+
+    return any(
+        isinstance(tool, dict)
+        and str(tool.get("tool_name") or tool.get("name")) == tool_name
+        for tool in available_tools
+    )
+
+
 def _run_code_inspection_tool(
     *,
     tool_runner: ToolRunner,
@@ -1859,6 +1930,7 @@ def _run_code_inspection_tool(
     input_ref: list[str],
     id_namespace: LRunIds,
     query_text: str,
+    read_code_file_start_char: int = 0,
 ) -> ToolRunResult:
     if selected_tool_name == "list_code_files":
         return tool_runner.run(
@@ -1888,6 +1960,7 @@ def _run_code_inspection_tool(
             input_ref=input_ref,
             id_namespace=id_namespace,
             file_path=query_text,
+            start_char=read_code_file_start_char,
         )
     raise ValueError(f"unsupported code inspection tool: {selected_tool_name}")
 

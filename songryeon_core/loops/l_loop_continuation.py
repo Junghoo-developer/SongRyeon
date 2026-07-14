@@ -3,11 +3,19 @@ from __future__ import annotations
 from dataclasses import asdict
 
 from songryeon_core.core.data_store import DataStore
-from songryeon_core.core.schemas import LLoopContinuationFrame, validate_l_loop_continuation_frame
+from songryeon_core.core.schemas import (
+    CodeReadRangeRecord,
+    LLoopContinuationFrame,
+    validate_code_read_range_record,
+    validate_l_loop_continuation_frame,
+)
 from songryeon_core.core.trace_store import TraceStore
 from songryeon_core.loops.l_loop_namespace import LRunIds
 from songryeon_core.nodes.l2_query_setter import L2_QUERY_FRAME_DATA_ID
 from songryeon_core.nodes.l3_result_keeper import L3_ACHIEVEMENT_FRAME_DATA_ID
+from songryeon_core.tools.tool_efficiency_policy import (
+    build_code_read_continuation_options,
+)
 
 
 L_LOOP_CONTINUATION_DATA_TYPE = "node_output:L_loop_continuation_frame"
@@ -64,6 +72,19 @@ def record_l_loop_continuation_decision(
         max_field="max_read_doc_calls",
         used_field="read_doc_count",
     )
+    read_code_file_ranges = _code_read_range_records(
+        budget_payload.get("read_code_file_ranges")
+        if isinstance(budget_payload, dict)
+        else None
+    )
+    remaining_read_code_file_calls = _remaining_budget(
+        budget_payload,
+        max_field="max_read_code_file_calls",
+        used_field="read_code_file_count",
+    )
+    code_read_continuation_options = build_code_read_continuation_options(
+        read_code_file_ranges
+    )
     tool_budget_status = _text(budget_payload, "stop_reason", fallback="within_budget")
 
     continuation_status, reason_code, next_target_node = _decide_continuation(
@@ -74,6 +95,8 @@ def record_l_loop_continuation_decision(
         remaining_query_attempts=remaining_query_attempts,
         remaining_read_doc_calls=remaining_read_doc_calls,
         unread_candidate_doc_ids=unread_candidate_doc_ids,
+        remaining_read_code_file_calls=remaining_read_code_file_calls,
+        code_read_continuation_option_count=len(code_read_continuation_options),
     )
 
     frame_id = (
@@ -87,6 +110,10 @@ def record_l_loop_continuation_decision(
             l3_achievement_data_id,
             l2_query_frame_data_id,
             budget_record.data_id if budget_record is not None else None,
+            *(
+                option.source_tool_result_data_id
+                for option in code_read_continuation_options
+            ),
         ]
     )
     frame = LLoopContinuationFrame(
@@ -101,6 +128,9 @@ def record_l_loop_continuation_decision(
         previous_query_text=previous_query_text,
         read_doc_ids=read_doc_ids,
         unread_candidate_doc_ids=unread_candidate_doc_ids,
+        read_code_file_ranges=read_code_file_ranges,
+        code_read_continuation_options=code_read_continuation_options,
+        remaining_read_code_file_calls=remaining_read_code_file_calls,
         tool_budget_status=tool_budget_status,
         next_target_node=next_target_node,
         source_trace_ids=_unique_strings(source_trace_ids or []),
@@ -136,6 +166,8 @@ def _decide_continuation(
     remaining_query_attempts: int,
     remaining_read_doc_calls: int,
     unread_candidate_doc_ids: list[str],
+    remaining_read_code_file_calls: int,
+    code_read_continuation_option_count: int,
 ) -> tuple[str, str, str]:
     """구조화된 status와 예산 숫자만 보고 continuation 상태를 정한다."""
 
@@ -165,6 +197,10 @@ def _decide_continuation(
         )
 
     has_read_budget_for_unread_candidates = remaining_read_doc_calls > 0 and bool(unread_candidate_doc_ids)
+    has_code_read_continuation = (
+        remaining_read_code_file_calls > 0
+        and code_read_continuation_option_count > 0
+    )
 
     # ORDER_122 이후 revision L2는 새 search_docs query 없이도 기존 unread candidate를
     # read_doc으로 고를 수 있다. 따라서 query budget이 0이어도 읽을 후보와 read budget이
@@ -174,6 +210,12 @@ def _decide_continuation(
             return (
                 "continue",
                 "CODE_STATUS:l3_not_achieved_read_unread_candidate_after_query_budget",
+                "L2",
+            )
+        if has_code_read_continuation:
+            return (
+                "continue",
+                "CODE_STATUS:l3_not_achieved_read_next_code_range_after_query_budget",
                 "L2",
             )
         return (
@@ -254,6 +296,50 @@ def _string_list(value: object) -> list[str]:
         if isinstance(item, str) and item and item not in result:
             result.append(item)
     return result
+
+
+def _code_read_range_records(value: object) -> list[CodeReadRangeRecord]:
+    if not isinstance(value, list):
+        return []
+    records: list[CodeReadRangeRecord] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        try:
+            record = CodeReadRangeRecord(
+                tool_result_data_id=_required_string(item, "tool_result_data_id"),
+                file_path=_required_string(item, "file_path"),
+                requested_start_char=_required_integer(item, "requested_start_char"),
+                range_start_char=_required_integer(item, "range_start_char"),
+                range_end_char_exclusive=_required_integer(
+                    item,
+                    "range_end_char_exclusive",
+                ),
+                returned_char_count=_required_integer(item, "returned_char_count"),
+                total_char_count=_required_integer(item, "total_char_count"),
+                truncated_before=item.get("truncated_before") is True,
+                truncated_after=item.get("truncated_after") is True,
+                read_status=_required_string(item, "read_status"),
+            )
+            validate_code_read_range_record(record)
+        except (TypeError, ValueError):
+            continue
+        records.append(record)
+    return records
+
+
+def _required_string(payload: dict[str, object], field_name: str) -> str:
+    value = payload.get(field_name)
+    if isinstance(value, str) and value:
+        return value
+    raise ValueError(f"{field_name} must be a non-empty string")
+
+
+def _required_integer(payload: dict[str, object], field_name: str) -> int:
+    value = payload.get(field_name)
+    if isinstance(value, int) and not isinstance(value, bool):
+        return value
+    raise ValueError(f"{field_name} must be an integer")
 
 
 def _unique_strings(values: list[str | None]) -> list[str]:

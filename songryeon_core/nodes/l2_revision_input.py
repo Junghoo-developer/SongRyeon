@@ -4,8 +4,10 @@ from dataclasses import asdict
 
 from songryeon_core.core.data_store import DataRecord, DataStore
 from songryeon_core.core.schemas import (
+    CodeReadRangeRecord,
     L2_REVISION_PREVIOUS_TOOL_NAMES,
     L2RevisionInputFrame,
+    validate_code_read_range_record,
     validate_l2_revision_input_frame,
 )
 from songryeon_core.core.trace_store import TraceStore
@@ -14,6 +16,9 @@ from songryeon_core.nodes.l1_goal_setter import L1_GOAL_FRAME_DATA_ID
 from songryeon_core.nodes.node_0_memory_supplier import (
     L3_CONTINUATION_SUMMARY_MODE,
     memory_packet_data_id,
+)
+from songryeon_core.tools.tool_efficiency_policy import (
+    build_code_read_continuation_options,
 )
 
 
@@ -97,6 +102,12 @@ def record_l2_revision_input_frame(
     latest_budget_payload = (
         _require_dict_payload(latest_budget_record) if latest_budget_record is not None else {}
     )
+    read_code_file_ranges = _code_read_range_records(
+        latest_budget_payload.get("read_code_file_ranges")
+    )
+    code_read_continuation_options = build_code_read_continuation_options(
+        read_code_file_ranges
+    )
 
     frame_id = l2_revision_input_data_id(
         attempt_index,
@@ -110,6 +121,7 @@ def record_l2_revision_input_frame(
             source_l3_id,
             resolved_memory_packet_id,
             latest_budget_record.data_id if latest_budget_record is not None else None,
+            *(item.tool_result_data_id for item in read_code_file_ranges),
         ]
     )
     source_trace_ids = _unique_strings(
@@ -169,6 +181,13 @@ def record_l2_revision_input_frame(
             latest_budget_payload,
             max_field="max_read_doc_calls",
             used_field="read_doc_count",
+        ),
+        read_code_file_ranges=read_code_file_ranges,
+        code_read_continuation_options=code_read_continuation_options,
+        remaining_read_code_file_calls=_remaining_budget(
+            latest_budget_payload,
+            max_field="max_read_code_file_calls",
+            used_field="read_code_file_count",
         ),
         source_trace_ids=source_trace_ids,
         source_data_ids=source_data_ids,
@@ -285,6 +304,38 @@ def _previous_tool_name(*, data_store: DataStore, l2_payload: dict[str, object])
     if target_tool_name in L2_REVISION_PREVIOUS_TOOL_NAMES:
         return target_tool_name
     return "search_docs"
+
+
+def _code_read_range_records(value: object) -> list[CodeReadRangeRecord]:
+    """최신 budget의 asdict payload를 검증된 code-read 장부 객체로 복원한다."""
+
+    if not isinstance(value, list):
+        return []
+    records: list[CodeReadRangeRecord] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        try:
+            record = CodeReadRangeRecord(
+                tool_result_data_id=_required_text(item, "tool_result_data_id"),
+                file_path=_required_text(item, "file_path"),
+                requested_start_char=_required_int(item, "requested_start_char"),
+                range_start_char=_required_int(item, "range_start_char"),
+                range_end_char_exclusive=_required_int(
+                    item,
+                    "range_end_char_exclusive",
+                ),
+                returned_char_count=_required_int(item, "returned_char_count"),
+                total_char_count=_required_int(item, "total_char_count"),
+                truncated_before=item.get("truncated_before") is True,
+                truncated_after=item.get("truncated_after") is True,
+                read_status=_required_text(item, "read_status"),
+            )
+            validate_code_read_range_record(record)
+        except (TypeError, ValueError):
+            continue
+        records.append(record)
+    return records
 
 
 def _search_preview_by_doc_id(data_store: DataStore) -> dict[str, str]:

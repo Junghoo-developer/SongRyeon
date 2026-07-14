@@ -61,6 +61,7 @@ def run_l2_query_setter(
     query_text: str,
     query_source: str = "user_input_fallback",
     target_tool_name: str = "search_docs",
+    read_code_file_start_char: int = 0,
     source_data_ids: list[str] | None = None,
     extra_input_trace_ids: list[str] | None = None,
     query_frame_data_id: str = L2_QUERY_FRAME_DATA_ID,
@@ -80,6 +81,7 @@ def run_l2_query_setter(
         query_source=query_source,
         query_mode=_query_mode_for_tool(target_tool_name),
         target_tool_name=target_tool_name,
+        read_code_file_start_char=read_code_file_start_char,
         source_trace_ids=input_ref,
         source_data_ids=source_data_ids or [],
     )
@@ -115,6 +117,7 @@ def run_l2_query_planner(
     adapter: LLMAdapter,
     source_data_ids: list[str],
     available_tools: list[dict[str, object]] | None = None,
+    available_explicit_code_file_paths: list[str] | None = None,
     l_tool_scope: dict[str, object] | None = None,
     budget_partition: dict[str, object] | None = None,
     max_retries: int = 0,
@@ -133,6 +136,9 @@ def run_l2_query_planner(
     attribution_source_data_ids = _l2_attribution_source_data_ids(source_data_ids)
     supplied_available_tools = available_tools or _default_l2_available_tools()
     allowed_target_tools = _allowed_l2_target_tools_from_available(supplied_available_tools)
+    supplied_explicit_code_paths = _unique_strings(
+        available_explicit_code_file_paths or []
+    )
     input_payload = {
         "user_input": user_input,
         "l1_goal": l1_goal,
@@ -144,6 +150,9 @@ def run_l2_query_planner(
         # 그래서 L2에게는 의미 판단용 목표와 별도로, 후보가 복사할 출처 ID만 공급한다.
         "attribution_source_data_ids": attribution_source_data_ids,
         "available_tools": supplied_available_tools,
+        # 절대정보: 사용자 입력에 문자 그대로 있었고 workspace에 실제 존재한 경로만 넣는다.
+        # L2는 이 목록 밖의 문자열을 read_code_file 경로로 만들 권한이 없다.
+        "available_explicit_code_file_paths": supplied_explicit_code_paths,
     }
     llm_result = LLMNodeExecutor(adapter).run(
         node_id="L2",
@@ -159,6 +168,7 @@ def run_l2_query_planner(
         payload_validator=lambda payload: _validate_l2_query_plan_payload(
             payload,
             allowed_target_tools=allowed_target_tools,
+            available_explicit_code_file_paths=supplied_explicit_code_paths,
         ),
     )
     if llm_result.failure_type != "none" or llm_result.validation.payload is None:
@@ -178,6 +188,10 @@ def run_l2_query_planner(
         source_data_ids=frame_source_data_ids,
         frame_id=query_plan_frame_data_id,
         allowed_target_tools=allowed_target_tools,
+    )
+    _validate_l2_initial_query_plan_against_explicit_code_paths(
+        frame,
+        available_explicit_code_file_paths=supplied_explicit_code_paths,
     )
     validate_l2_query_plan_frame(frame)
     event = trace_store.create_event(
@@ -341,6 +355,9 @@ def run_l2_revision_query_setter(
     attempt_index = _attempt_index_from_revision_plan_id(revision_query_plan_data_id)
     selected_query = selected_query_from_plan(plan_payload)
     selected_tool = selected_target_tool_from_plan(plan_payload)
+    selected_code_start_char = selected_read_code_file_start_char_from_plan(
+        plan_payload
+    )
     planner_mode = str(plan_payload.get("planner_mode") or "")
     query_source = (
         "revision_llm_query_plan"
@@ -370,6 +387,7 @@ def run_l2_revision_query_setter(
         query_source=query_source,
         query_mode=_query_mode_for_tool(selected_tool),
         target_tool_name=selected_tool,
+        read_code_file_start_char=selected_code_start_char,
         source_trace_ids=source_trace_ids,
         source_data_ids=source_data_ids,
     )
@@ -432,10 +450,32 @@ def selected_target_tool_from_plan(payload: object) -> str:
     raise ValueError("selected L2 query candidate target tool was not found")
 
 
+def selected_read_code_file_start_char_from_plan(payload: object) -> int:
+    """선택된 L2 후보의 구조화된 read_code_file 시작 위치를 꺼낸다."""
+
+    if not isinstance(payload, dict):
+        raise TypeError("L2 query plan payload must be a dict")
+    selected_candidate_id = payload.get("selected_candidate_id")
+    candidates = payload.get("candidates")
+    if not isinstance(selected_candidate_id, str) or not isinstance(candidates, list):
+        raise ValueError("L2 query plan payload is incomplete")
+    for candidate in candidates:
+        if not isinstance(candidate, dict):
+            continue
+        if candidate.get("candidate_id") != selected_candidate_id:
+            continue
+        value = candidate.get("read_code_file_start_char", 0)
+        if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+            raise ValueError("selected L2 read_code_file_start_char must be non-negative")
+        return value
+    raise ValueError("selected L2 query candidate start_char was not found")
+
+
 def _validate_l2_query_plan_payload(
     payload: dict[str, object],
     *,
     allowed_target_tools: set[str] | None = None,
+    available_explicit_code_file_paths: list[str] | None = None,
 ) -> None:
     """LLM raw payload가 L2QueryPlanFrame으로 바뀔 수 있는지 확인한다."""
 
@@ -445,6 +485,12 @@ def _validate_l2_query_plan_payload(
         source_trace_ids=["validation_trace"],
         source_data_ids=["validation_data"],
         allowed_target_tools=allowed_target_tools,
+    )
+    _validate_l2_initial_query_plan_against_explicit_code_paths(
+        frame,
+        available_explicit_code_file_paths=(
+            available_explicit_code_file_paths or []
+        ),
     )
     validate_l2_query_plan_frame(frame)
 
@@ -471,6 +517,23 @@ def _validate_l2_revision_query_plan_payload(
         revision_input=revision_input,
     )
     validate_l2_query_plan_frame(frame)
+
+
+def _validate_l2_initial_query_plan_against_explicit_code_paths(
+    frame: L2QueryPlanFrame,
+    *,
+    available_explicit_code_file_paths: list[str],
+) -> None:
+    """최초 read_code_file 후보가 code가 공급한 정확 경로 목록 안에 있는지 확인한다."""
+
+    allowed_paths = set(available_explicit_code_file_paths)
+    for candidate in frame.candidates:
+        if candidate.target_tool_name != "read_code_file":
+            continue
+        if candidate.query_text not in allowed_paths:
+            raise ValueError(
+                "L2 initial read_code_file candidate must use an available explicit code file path"
+            )
 
 
 def _build_query_plan_frame_from_payload(
@@ -520,6 +583,11 @@ def _build_query_plan_frame_from_payload(
                 expected_signal=str(raw_candidate.get("expected_signal") or ""),
                 priority=int(raw_candidate.get("priority") or len(candidates) + 1),
                 target_tool_name=target_tool_name,
+                read_code_file_start_char=_non_negative_int_field(
+                    raw_candidate,
+                    "read_code_file_start_char",
+                    default=0,
+                ),
                 source_data_ids=candidate_source_data_ids,
             )
         )
@@ -586,12 +654,17 @@ def _validate_l2_revision_query_plan_against_input(
     unread_doc_ids = _allowed_revision_read_doc_ids(revision_input)
     remaining_query_attempts = _int(revision_input.get("remaining_query_attempts"))
     remaining_read_doc_calls = _int(revision_input.get("remaining_read_doc_calls"))
+    remaining_read_code_file_calls = _int(
+        revision_input.get("remaining_read_code_file_calls")
+    )
+    allowed_code_continuations = _allowed_code_read_continuations(revision_input)
+    successful_code_paths = _successful_code_read_paths(revision_input)
 
     if remaining_query_attempts <= 0:
         for candidate in frame.candidates:
-            if candidate.target_tool_name != "read_doc":
+            if candidate.target_tool_name not in {"read_doc", "read_code_file"}:
                 raise ValueError(
-                    "L2 revision plan must target read_doc when remaining_query_attempts is 0"
+                    "L2 revision plan must target a direct read when remaining_query_attempts is 0"
                 )
 
     for candidate in frame.candidates:
@@ -604,6 +677,26 @@ def _validate_l2_revision_query_plan_against_input(
             raise ValueError("L2 revision search_docs candidate requires remaining query budget")
         elif candidate.target_tool_name == "read_artifact" and remaining_query_attempts <= 0:
             raise ValueError("L2 revision read_artifact candidate is not allowed after query budget exhaustion")
+        elif candidate.target_tool_name == "read_code_file":
+            if remaining_read_code_file_calls <= 0:
+                raise ValueError(
+                    "L2 revision read_code_file candidate requires remaining code-read budget"
+                )
+            selected_pair = (
+                candidate.query_text,
+                candidate.read_code_file_start_char,
+            )
+            if candidate.query_text in successful_code_paths:
+                if selected_pair not in allowed_code_continuations:
+                    raise ValueError(
+                        "L2 revision read_code_file candidate must use an available continuation option"
+                    )
+            elif candidate.read_code_file_start_char != 0:
+                raise ValueError(
+                    "L2 revision first read of a code file must use start_char=0"
+                )
+        elif candidate.target_tool_name == "search_code" and remaining_query_attempts <= 0:
+            raise ValueError("L2 revision search_code candidate requires remaining query budget")
 
 
 def _allowed_revision_read_doc_ids(revision_input: dict[str, object]) -> set[str]:
@@ -618,6 +711,55 @@ def _allowed_revision_read_doc_ids(revision_input: dict[str, object]) -> set[str
         if doc_id:
             doc_ids.add(doc_id)
     return doc_ids
+
+
+def _allowed_code_read_continuations(
+    revision_input: dict[str, object],
+) -> set[tuple[str, int]]:
+    options = revision_input.get("code_read_continuation_options")
+    if not isinstance(options, list):
+        return set()
+    result: set[tuple[str, int]] = set()
+    for item in options:
+        if not isinstance(item, dict):
+            continue
+        file_path = item.get("file_path")
+        start_char = item.get("start_char")
+        if (
+            isinstance(file_path, str)
+            and file_path
+            and isinstance(start_char, int)
+            and not isinstance(start_char, bool)
+            and start_char >= 0
+        ):
+            result.add((file_path, start_char))
+    return result
+
+
+def _successful_code_read_paths(revision_input: dict[str, object]) -> set[str]:
+    ranges = revision_input.get("read_code_file_ranges")
+    if not isinstance(ranges, list):
+        return set()
+    return {
+        str(item.get("file_path"))
+        for item in ranges
+        if isinstance(item, dict)
+        and item.get("read_status") == "ok"
+        and isinstance(item.get("file_path"), str)
+        and item.get("file_path")
+    }
+
+
+def _non_negative_int_field(
+    payload: dict[str, object],
+    field_name: str,
+    *,
+    default: int,
+) -> int:
+    value = payload.get(field_name, default)
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        raise ValueError(f"{field_name} must be a non-negative integer")
+    return value
 
 
 def _int(value: object) -> int:

@@ -345,8 +345,19 @@ def _distill_read_code_file(
     if not isinstance(char_count, int):
         char_count = len(text)
     preview = _shorten(" ".join(text.split()), max_preview_chars)
+    range_start = payload.get("range_start_char")
+    range_end = payload.get("range_end_char_exclusive")
+    total_chars = payload.get("total_char_count") or payload.get("char_count")
+    if all(isinstance(value, int) for value in (range_start, range_end, total_chars)):
+        limits.append(
+            "CODE_RANGE:"
+            f"file_path={file_path};range=[{range_start},{range_end});"
+            f"total_char_count={total_chars};"
+            f"truncated_before={payload.get('truncated_before') is True};"
+            f"truncated_after={payload.get('truncated_after') is True}"
+        )
     if payload.get("truncated") is True:
-        limits.append("read_code_file 원문이 max_chars 제한으로 잘렸다.")
+        limits.append("read_code_file 원문이 전체 파일의 일부 구간으로 제한됐다.")
 
     return [
         ToolResultDistilledItem(

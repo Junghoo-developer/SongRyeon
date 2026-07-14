@@ -51,6 +51,9 @@ node_2's relative or mixed interpretation, so do not use it to erase an explicit
   are different scopes.
 - Search candidates are not original reads.
 - `read_code_file` and `read_doc` are separate evidence channels.
+- `code_read_continuity.items` contains CODE-owned `[range_start_char, range_end_char_exclusive)` boundaries.
+- When `truncated_before` or `truncated_after` is true, do not describe the supplied code text as the complete file.
+- `remaining_read_code_file_calls` is a remaining call budget, not proof that the current evidence is sufficient.
 - `original_material_acquired` confirms non-empty original acquisition only; semantic relevance
   still depends on L3 goal-match status.
 - `candidates_only` must never be called original-material acquisition.

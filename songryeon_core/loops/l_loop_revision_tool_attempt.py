@@ -4,13 +4,19 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from songryeon_core.core.data_store import DataRecord, DataStore
-from songryeon_core.core.schemas import ToolCacheStatusRecord
+from songryeon_core.core.schemas import (
+    CodeReadRangeRecord,
+    ToolCacheStatusRecord,
+    validate_code_read_range_record,
+)
 from songryeon_core.core.trace_store import TraceStore
 from songryeon_core.loops.l_loop_namespace import LRunIds
 from songryeon_core.tools.tool_efficiency_policy import (
+    build_code_read_continuation_options,
     cache_status_from_search_payload,
     distilled_input_size,
     make_cache_status_record,
+    make_code_read_range_record,
     record_tool_use_budget_frame,
 )
 from songryeon_core.tools.tool_result_distiller import record_tool_result_distillation
@@ -50,10 +56,12 @@ def run_l_loop_revision_tool_attempt(
     turn_id: str,
     revision_query_frame_data_id: str,
     document_root: str | Path = "Administrative_Reform_1",
+    code_root: str | Path | None = None,
     search_top_k: int = 3,
     max_tool_calls: int = 3,
     max_query_attempts: int = 3,
     max_read_doc_calls: int = 2,
+    max_read_code_file_calls: int = 0,
     max_input_chars: int = 6000,
     id_namespace: LRunIds | None = None,
 ) -> LLoopRevisionToolAttemptResult:
@@ -69,6 +77,10 @@ def run_l_loop_revision_tool_attempt(
     attempt_index = _attempt_index_from_revision_query_frame_id(revision_query_frame_data_id)
     query_text = _required_text(query_payload, "query_text")
     tool_name = _required_text(query_payload, "target_tool_name")
+    read_code_file_start_char = _non_negative_int(
+        query_payload,
+        "read_code_file_start_char",
+    )
     if tool_name not in {
         "search_docs",
         "read_artifact",
@@ -79,7 +91,7 @@ def run_l_loop_revision_tool_attempt(
     }:
         raise ValueError(f"unsupported revision tool: {tool_name}")
 
-    registry = build_document_tool_registry(document_root)
+    registry = build_document_tool_registry(document_root, code_root=code_root)
     catalog_trace_id, catalog_id = _ensure_tool_catalog(
         trace_store=trace_store,
         data_store=data_store,
@@ -111,6 +123,29 @@ def run_l_loop_revision_tool_attempt(
         tool_name,
         id_namespace=id_namespace,
     )
+
+    latest_budget = _latest_budget_record(
+        data_store,
+        turn_id,
+        id_namespace=id_namespace,
+    )
+    latest_budget_payload = (
+        _require_dict_payload(latest_budget) if latest_budget is not None else {}
+    )
+    read_code_file_ranges = _code_read_range_records(
+        latest_budget_payload.get("read_code_file_ranges")
+    )
+    if (
+        tool_name == "read_code_file"
+        and len(read_code_file_ranges) >= max_read_code_file_calls
+    ):
+        raise ValueError("L revision read_code_file requires remaining code-read budget")
+    if tool_name == "read_code_file":
+        _validate_code_read_request_against_history(
+            file_path=query_text,
+            start_char=read_code_file_start_char,
+            ranges=read_code_file_ranges,
+        )
 
     runner = ToolRunner(registry)
     if tool_name == "search_docs":
@@ -162,6 +197,7 @@ def run_l_loop_revision_tool_attempt(
             input_ref=_unique_strings([query_record.source_trace_id, choice_trace_id]),
             id_namespace=id_namespace,
             file_path=query_text,
+            start_char=read_code_file_start_char,
         )
     else:
         tool_result = runner.run(
@@ -181,12 +217,13 @@ def run_l_loop_revision_tool_attempt(
         tool_result=tool_result,
         id_namespace=id_namespace,
     )
-    latest_budget = _latest_budget_record(
-        data_store,
-        turn_id,
-        id_namespace=id_namespace,
-    )
-    latest_budget_payload = _require_dict_payload(latest_budget) if latest_budget is not None else {}
+    if tool_name == "read_code_file":
+        read_code_file_ranges.append(
+            make_code_read_range_record(
+                tool_result_data_id=tool_result.data_ref.data_id,
+                payload=tool_result.payload,
+            )
+        )
     executed_queries = _string_list(latest_budget_payload.get("executed_queries"))
     if tool_name in {"search_docs", "search_code"} and query_text not in executed_queries:
         executed_queries.append(query_text)
@@ -218,6 +255,7 @@ def run_l_loop_revision_tool_attempt(
         search_top_k=search_top_k,
         max_query_attempts=max_query_attempts,
         max_read_doc_calls=max_read_doc_calls,
+        max_read_code_file_calls=max_read_code_file_calls,
         max_input_chars=max_input_chars,
         tool_call_count=_int(latest_budget_payload, "tool_call_count") + 1,
         executed_queries=executed_queries,
@@ -248,6 +286,7 @@ def run_l_loop_revision_tool_attempt(
             ]
         ),
         id_namespace=id_namespace,
+        read_code_file_ranges=read_code_file_ranges,
     )
 
     return LLoopRevisionToolAttemptResult(
@@ -444,6 +483,58 @@ def _cache_status_records(value: object) -> list[ToolCacheStatusRecord]:
     return records
 
 
+def _code_read_range_records(value: object) -> list[CodeReadRangeRecord]:
+    if not isinstance(value, list):
+        return []
+    records: list[CodeReadRangeRecord] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        try:
+            record = CodeReadRangeRecord(
+                tool_result_data_id=_required_text(item, "tool_result_data_id"),
+                file_path=_required_text(item, "file_path"),
+                requested_start_char=_int(item, "requested_start_char"),
+                range_start_char=_int(item, "range_start_char"),
+                range_end_char_exclusive=_int(item, "range_end_char_exclusive"),
+                returned_char_count=_int(item, "returned_char_count"),
+                total_char_count=_int(item, "total_char_count"),
+                truncated_before=item.get("truncated_before") is True,
+                truncated_after=item.get("truncated_after") is True,
+                read_status=_required_text(item, "read_status"),
+            )
+            validate_code_read_range_record(record)
+        except (TypeError, ValueError):
+            continue
+        records.append(record)
+    return records
+
+
+def _validate_code_read_request_against_history(
+    *,
+    file_path: str,
+    start_char: int,
+    ranges: list[CodeReadRangeRecord],
+) -> None:
+    """실행 직전에도 L2가 고른 path/start가 code ledger 경계 안인지 확인한다."""
+
+    successful_paths = {
+        record.file_path for record in ranges if record.read_status == "ok"
+    }
+    if file_path not in successful_paths:
+        if start_char != 0:
+            raise ValueError("first read_code_file request must use start_char=0")
+        return
+    allowed_pairs = {
+        (option.file_path, option.start_char)
+        for option in build_code_read_continuation_options(ranges)
+    }
+    if (file_path, start_char) not in allowed_pairs:
+        raise ValueError(
+            "revision read_code_file request must match an available continuation option"
+        )
+
+
 def _string_list(value: object) -> list[str]:
     if not isinstance(value, list):
         return []
@@ -452,6 +543,13 @@ def _string_list(value: object) -> list[str]:
         if isinstance(item, str) and item and item not in result:
             result.append(item)
     return result
+
+
+def _non_negative_int(payload: dict[str, object], field_name: str) -> int:
+    value = payload.get(field_name, 0)
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        raise ValueError(f"{field_name} must be a non-negative integer")
+    return value
 
 
 def _unique_strings(values: list[str | None]) -> list[str]:

@@ -153,10 +153,11 @@ def test_l2_receives_filtered_tools_and_scope_payload() -> None:
         data_store=data_store,
         turn_id="turn_order_134",
         l1_event=l1_event,
-        user_input="source file 읽기",
+        user_input="songryeon_core/tools/code_tools.py source file 읽기",
         adapter=planner_adapter,
         source_data_ids=["L1:goal_frame", "L:tool_scope_frame", "L:tool_budget_partition_frame"],
         available_tools=available_tools,
+        available_explicit_code_file_paths=["songryeon_core/tools/code_tools.py"],
         l_tool_scope=_scope_frame_dict(
             mode="code_only",
             groups=["code_inspection_tools"],

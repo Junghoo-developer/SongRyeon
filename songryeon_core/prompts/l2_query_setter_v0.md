@@ -23,6 +23,7 @@ Use this exact shape:
       "expected_signal": "what kind of document chunk should match",
       "priority": 1,
       "target_tool_name": "search_docs",
+      "read_code_file_start_char": 0,
       "source_data_ids": ["L1:goal_frame"]
     }
   ]
@@ -41,7 +42,11 @@ Create 1-3 candidates. The selected candidate ID must match one candidate.
 - `search_docs` is semantic search: write a concise description of the wanted content.
 - `read_artifact` is exact reference reading: write only the explicit artifact reference, such as `CODE_STRUCTURE_MAP_v1` or `ORDER_084_NODE4_REMAND_BLOCKING`.
 - `search_code` is literal source-code substring search: write the exact identifier, path fragment, field name, or short code phrase to find.
-- `read_code_file` is exact file reading: write only the workspace-relative source/config file path.
+- `available_explicit_code_file_paths` is a code-supplied absolute list made from paths that both exist in the workspace and appear literally in the user input.
+- `read_code_file` is exact file reading: copy one whole path from `available_explicit_code_file_paths` into `query_text` without adding any words.
+- If `available_explicit_code_file_paths` is empty, do not choose `read_code_file`.
+- Initial L2 planning must always use `read_code_file_start_char=0`. Nonzero continuation is revision-only.
+- Candidates for tools other than `read_code_file` must also use `read_code_file_start_char=0`.
 - `list_code_files` ignores `query_text` semantically; use a concise label such as `codebase file layout`.
 - Read the supplied `l1_goal` and `l2_planning_contract`. They are the main source for what evidence the L loop must gather.
 - Treat `attribution_source_data_ids` only as source IDs to copy into candidate `source_data_ids`. Do not interpret those IDs as search topics.

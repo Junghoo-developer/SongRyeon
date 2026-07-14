@@ -4,6 +4,7 @@ from dataclasses import asdict
 
 from songryeon_core.core.data_store import DataStore
 from songryeon_core.core.schemas import (
+    CodeReadRangeRecord,
     LLoopReturnSummaryFrame,
     MemoryItem,
     MemoryPacketFrom0,
@@ -16,6 +17,7 @@ from songryeon_core.core.schemas import (
     RLoopMemoryHandoffPacketFrame,
     ZeroState,
     validate_l_loop_return_summary_frame,
+    validate_code_read_range_record,
     validate_memory_packet_payload,
     validate_node0_document_material_packet_frame,
     validate_r_loop_memory_handoff_packet_frame,
@@ -1015,6 +1017,18 @@ def build_l_loop_return_summary_frame(
         max_field="max_query_attempts",
         used_field="query_count",
     )
+    read_code_file_ranges = _code_read_range_records(
+        budget_payload.get("read_code_file_ranges")
+    )
+    max_read_code_file_calls = _int(
+        budget_payload,
+        "max_read_code_file_calls",
+    )
+    read_code_file_call_count = len(read_code_file_ranges)
+    remaining_read_code_file_calls = max(
+        max_read_code_file_calls - read_code_file_call_count,
+        0,
+    )
     failure_level, route_hint, route_hint_reason = _return_failure_level_and_route_hint(
         l_loop_task_status=l_loop_task_status,
         l3_goal_match_status=l3_goal_match_status,
@@ -1045,6 +1059,9 @@ def build_l_loop_return_summary_frame(
         remaining_tool_calls=remaining_tool_calls,
         remaining_read_doc_calls=remaining_read_doc_calls,
         remaining_query_attempts=remaining_query_attempts,
+        max_read_code_file_calls=max_read_code_file_calls,
+        read_code_file_call_count=read_code_file_call_count,
+        remaining_read_code_file_calls=remaining_read_code_file_calls,
         l3_goal_match_status=l3_goal_match_status,
         l3_semantic_goal_match_status=l3_semantic_goal_match_status,
         recommended_next_route_for_node1=route_hint,
@@ -1056,6 +1073,7 @@ def build_l_loop_return_summary_frame(
         ),
         read_doc_ids=read_doc_ids,
         read_code_file_paths=read_code_file_paths,
+        read_code_file_ranges=read_code_file_ranges,
         search_result_doc_ids=search_result_doc_ids,
         source_trace_ids=_unique_strings(source_trace_ids),
         source_data_ids=_unique_strings(source_data_ids),
@@ -1103,6 +1121,8 @@ def build_l_loop_return_summary_items(frame: LLoopReturnSummaryFrame) -> list[Me
                 f"budget_stop_reason={frame.budget_stop_reason};"
                 f"remaining_tool_calls={frame.remaining_tool_calls};"
                 f"remaining_read_doc_calls={frame.remaining_read_doc_calls};"
+                "remaining_read_code_file_calls="
+                f"{frame.remaining_read_code_file_calls};"
                 f"remaining_query_attempts={frame.remaining_query_attempts}"
             ),
             source_data_ids=source_data_ids,
@@ -1124,11 +1144,58 @@ def build_l_loop_return_summary_items(frame: LLoopReturnSummaryFrame) -> list[Me
                 "COPIED_FIELDS:"
                 f"read_doc_ids={_format_list(frame.read_doc_ids)};"
                 f"read_code_file_paths={_format_list(frame.read_code_file_paths)};"
+                f"read_code_file_call_count={frame.read_code_file_call_count};"
                 f"search_result_doc_ids={_format_list(frame.search_result_doc_ids)}"
             ),
             source_data_ids=source_data_ids,
         ),
     ]
+
+
+def _code_read_range_records(value: object) -> list[CodeReadRangeRecord]:
+    """최신 tool budget에 보존된 code-read range 장부를 검증해 복원한다."""
+
+    if not isinstance(value, list):
+        return []
+    records: list[CodeReadRangeRecord] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        try:
+            record = CodeReadRangeRecord(
+                tool_result_data_id=_required_string(item, "tool_result_data_id"),
+                file_path=_required_string(item, "file_path"),
+                requested_start_char=_required_integer(item, "requested_start_char"),
+                range_start_char=_required_integer(item, "range_start_char"),
+                range_end_char_exclusive=_required_integer(
+                    item,
+                    "range_end_char_exclusive",
+                ),
+                returned_char_count=_required_integer(item, "returned_char_count"),
+                total_char_count=_required_integer(item, "total_char_count"),
+                truncated_before=item.get("truncated_before") is True,
+                truncated_after=item.get("truncated_after") is True,
+                read_status=_required_string(item, "read_status"),
+            )
+            validate_code_read_range_record(record)
+        except (TypeError, ValueError):
+            continue
+        records.append(record)
+    return records
+
+
+def _required_string(payload: dict[str, object], field_name: str) -> str:
+    value = payload.get(field_name)
+    if isinstance(value, str) and value:
+        return value
+    raise ValueError(f"{field_name} must be a non-empty string")
+
+
+def _required_integer(payload: dict[str, object], field_name: str) -> int:
+    value = payload.get(field_name)
+    if isinstance(value, int) and not isinstance(value, bool):
+        return value
+    raise ValueError(f"{field_name} must be an integer")
 
 
 def _latest_payload_by_type_fragment(

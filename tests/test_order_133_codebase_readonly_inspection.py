@@ -137,7 +137,10 @@ def test_l_loop_runs_read_code_file_and_node3_brief_receives_source_context() ->
         data_store=data_store,
         turn_id="turn_order_133",
         memory_packet=memory_packet,
-        search_query="코드 구조 읽기 MVP source file을 읽어줘",
+        search_query=(
+            "songryeon_core/tools/code_tools.py 파일을 직접 읽어서 "
+            "코드 구조 읽기 MVP를 확인해줘"
+        ),
         l_tool_scope_adapter=CodeInspectionScopeAdapter(),
         l2_query_planner_adapter=CodeReadQueryPlannerAdapter(),
         max_tool_calls=3,
@@ -167,7 +170,10 @@ def test_l_loop_runs_read_code_file_and_node3_brief_receives_source_context() ->
         trace_store=trace_store,
         data_store=data_store,
         turn_id="turn_order_133",
-        user_question="코드 구조 읽기 MVP source file을 읽어줘",
+        user_question=(
+            "songryeon_core/tools/code_tools.py 파일을 직접 읽어서 "
+            "코드 구조 읽기 MVP를 확인해줘"
+        ),
         handoff_frame_id="node_2:handoff_frame",
         boundary=MetainfoBoundary(),
         input_trace_ids=[seed.event_id, *result.source_trace_ids],

@@ -24,6 +24,7 @@ Use this exact shape:
       "expected_signal": "what kind of evidence should appear if this retry works",
       "priority": 1,
       "target_tool_name": "search_docs",
+      "read_code_file_start_char": 0,
       "source_data_ids": ["L2:revision_input:0001"]
     }
   ]
@@ -44,8 +45,15 @@ Create 1-3 candidates. The selected candidate ID must match one candidate.
 - Choose `list_code_files`, `search_code`, or `read_code_file` only when the original user request is about source code structure or a specific source/config file, not project documents.
 - `search_code` is literal source-code substring search; use an exact identifier, field name, path fragment, or short code phrase.
 - `read_code_file` is exact file reading; write only the workspace-relative source/config file path.
+- `revision_input.read_code_file_ranges` is a CODE-owned ledger of exact path and `[range_start_char, range_end_char_exclusive)` ranges already returned.
+- `revision_input.code_read_continuation_options` is the CODE-owned list of exact `(file_path, start_char)` pairs that continue a previously truncated file without rereading an existing start.
+- `revision_input.remaining_read_code_file_calls` is the remaining CODE-owned read budget. Never choose `read_code_file` when it is 0.
+- When continuing a previously successful code-file read, copy one exact option's `file_path` into `query_text` and its `start_char` into `read_code_file_start_char`.
+- Do not choose `start_char=0` for a previously successful path. This would reread the old prefix and will be rejected.
+- A code file that has not been successfully read in this L run may still be read first with `read_code_file_start_char=0`.
+- Candidates for tools other than `read_code_file` must use `read_code_file_start_char=0`.
 - For `read_doc`, `query_text` must be exactly one doc_id from `revision_input.unread_candidate_doc_ids`.
-- If `revision_input.remaining_query_attempts` is 0 and `revision_input.remaining_read_doc_calls` is greater than 0, do not create `search_docs` candidates. Create `read_doc` candidates from unread candidate doc IDs.
+- If `revision_input.remaining_query_attempts` is 0, do not create `search_docs` or `search_code` candidates. A direct `read_doc` or `read_code_file` candidate is allowed only when its matching read budget remains.
 - Do not choose `list_docs`; it is not an L2 planning target.
 - Do not claim that document contents are true.
 - Do not pretend that the retry has already succeeded.

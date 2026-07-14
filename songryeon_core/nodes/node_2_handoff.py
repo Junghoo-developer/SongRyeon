@@ -13,6 +13,7 @@ from songryeon_core.core.schemas import (
     Node2HandoffFrame,
     Node0DocumentMaterialItem,
     Node3BriefClaim,
+    Node3CodeReadBoundary,
     Node3BriefDocument,
     Node3ExcludedDocumentContext,
     Node3L3DocumentSummaryMaterial,
@@ -485,6 +486,10 @@ def record_node3_input_brief(
         id_namespace=id_namespace,
     )
     actual_tool_read_code_file_count = len(actual_tool_read_code_file_paths)
+    code_read_boundaries = _node3_code_read_boundaries(
+        data_store=data_store,
+        id_namespace=id_namespace,
+    )
     supplied_source_code_context_count = _supplied_source_code_context_count(
         data_store=data_store,
         read_documents=read_documents,
@@ -651,6 +656,15 @@ def record_node3_input_brief(
         actual_tool_read_doc_documents=actual_tool_read_doc_documents,
         actual_tool_read_code_file_count=actual_tool_read_code_file_count,
         actual_tool_read_code_file_paths=actual_tool_read_code_file_paths,
+        code_read_boundaries=code_read_boundaries,
+        max_read_code_file_calls=_int(
+            l_loop_return_summary,
+            "max_read_code_file_calls",
+        ),
+        remaining_read_code_file_calls=_int(
+            l_loop_return_summary,
+            "remaining_read_code_file_calls",
+        ),
         supplied_document_context_count=len(read_documents),
         supplied_source_code_context_count=supplied_source_code_context_count,
         source_code_outlines=source_code_outlines,
@@ -791,6 +805,8 @@ def record_node3_input_brief(
             "실제 read_code_file 도구 원문 읽기 수와 read_doc 도구 원문 읽기 수는 다른 count다.",
             "사용자가 read_doc 수를 물으면 actual_tool_read_doc_count만 기준으로 답하고, supplied_document_context_count를 read_doc 수로 말하지 않는다.",
             "사용자가 코드 파일 원문 읽기 여부를 물으면 actual_tool_read_code_file_count와 actual_tool_read_code_file_paths를 기준으로 답한다.",
+            "code_read_boundaries의 문자 구간과 truncated_before/truncated_after를 보고 전체 파일을 읽었는지 일부만 읽었는지 구분한다.",
+            "remaining_read_code_file_calls는 code가 계산한 남은 코드 원문 읽기 예산이며 의미상 충분성을 뜻하지 않는다.",
             "source_code_outlines는 read_code_file 원문에서 code가 뽑은 문법 장부이며, source 파일 기능 설명의 coverage checklist로 사용한다.",
             "source_code_outlines의 함수명만 보고 의미를 단정하지 않고, supplied source text를 함께 근거로 설명한다.",
             "최종 검색 후보와 L3 누적 검색 후보는 다른 count다.",
@@ -856,6 +872,11 @@ def record_node3_input_brief(
                     outline.source_data_id
                     for outline in source_code_outlines
                     if outline.source_data_id
+                ],
+                *[
+                    boundary.source_data_id
+                    for boundary in code_read_boundaries
+                    if boundary.source_data_id
                 ],
                 *[
                     summary.source_data_id
@@ -1364,6 +1385,16 @@ def node3_brief_llm_payload(frame: Node3InputBriefFrame) -> dict[str, object]:
             "file_paths": list(frame.actual_tool_read_code_file_paths),
             "boundary": "This counts successful read_code_file tool outputs only. It is separate from read_doc.",
         },
+        "code_read_continuity": {
+            "call_count": len(frame.code_read_boundaries),
+            "max_read_code_file_calls": frame.max_read_code_file_calls,
+            "remaining_read_code_file_calls": frame.remaining_read_code_file_calls,
+            "items": _node3_code_read_boundary_payloads(frame),
+            "boundary": (
+                "CODE-owned path/range/truncation facts. [start, end) is the exact returned text range. "
+                "A positive truncated_after means the supplied text is not the end of the file."
+            ),
+        },
         "supplied_document_context": {
             "count": frame.supplied_document_context_count,
             "source_code_context_count": frame.supplied_source_code_context_count,
@@ -1646,6 +1677,7 @@ def _node3_task_focused_llm_payload(
     selected_document_payloads = []
     selected_summary_payloads = []
     selected_source_code_outlines = []
+    selected_code_read_boundaries = []
     selected_recent_memory_contexts = []
     selected_vessel_material: dict[str, object] = {
         "status": "not_selected",
@@ -1666,6 +1698,10 @@ def _node3_task_focused_llm_payload(
             frame,
             selected_source_ids=selected_source_ids,
             selected_source_kinds=selected_source_kinds,
+        )
+        selected_code_read_boundaries = _node3_code_read_boundary_payloads(
+            frame,
+            selected_source_ids=selected_source_ids,
         )
         if "selected_recent_memory_context" in selected_source_kinds:
             selected_recent_memory_contexts = _node3_selected_recent_memory_payloads(frame)
@@ -1729,6 +1765,8 @@ def _node3_task_focused_llm_payload(
         "absolute_grounding_facts": {
             "actual_tool_read_doc_count": frame.actual_tool_read_doc_count,
             "actual_tool_read_code_file_count": frame.actual_tool_read_code_file_count,
+            "read_code_file_call_count": len(frame.code_read_boundaries),
+            "remaining_read_code_file_calls": frame.remaining_read_code_file_calls,
             "supplied_document_context_count": frame.supplied_document_context_count,
             "source_code_outline_count": len(frame.source_code_outlines),
             "llm_raw_document_text_count": len(selected_document_payloads),
@@ -1758,6 +1796,7 @@ def _node3_task_focused_llm_payload(
                 len(selected_document_payloads)
                 + len(selected_summary_payloads)
                 + len(selected_source_code_outlines)
+                + len(selected_code_read_boundaries)
                 + len(selected_recent_memory_contexts)
                 + (
                     len(selected_vessel_material.get("items", []))
@@ -1784,6 +1823,13 @@ def _node3_task_focused_llm_payload(
         "source_code_outlines": {
             "count": len(selected_source_code_outlines),
             "items": selected_source_code_outlines,
+        },
+        "code_read_continuity": {
+            "call_count": len(selected_code_read_boundaries),
+            "max_read_code_file_calls": frame.max_read_code_file_calls,
+            "remaining_read_code_file_calls": frame.remaining_read_code_file_calls,
+            "items": selected_code_read_boundaries,
+            "boundary": "CODE-owned exact path/range/truncation facts for node_2-selected code material.",
         },
         "selected_recent_memory_contexts": selected_recent_memory_contexts,
         "vessel_r_material": selected_vessel_material,
@@ -2195,6 +2241,30 @@ def _node3_raw_document_payloads(
             "text_payload_status": "included",
         }
         for document in frame.read_documents
+    ]
+
+
+def _node3_code_read_boundary_payloads(
+    frame: Node3InputBriefFrame,
+    *,
+    selected_source_ids: set[str] | None = None,
+) -> list[dict[str, object]]:
+    return [
+        {
+            "file_path": boundary.file_path,
+            "requested_start_char": boundary.requested_start_char,
+            "range_start_char": boundary.range_start_char,
+            "range_end_char_exclusive": boundary.range_end_char_exclusive,
+            "returned_char_count": boundary.returned_char_count,
+            "total_char_count": boundary.total_char_count,
+            "truncated": boundary.truncated,
+            "truncated_before": boundary.truncated_before,
+            "truncated_after": boundary.truncated_after,
+            "read_status": boundary.read_status,
+        }
+        for boundary in frame.code_read_boundaries
+        if selected_source_ids is None
+        or boundary.source_data_id in selected_source_ids
     ]
 
 
@@ -2674,6 +2744,91 @@ def _read_code_documents(
             )
         )
     return documents
+
+
+def _node3_code_read_boundaries(
+    *,
+    data_store: DataStore,
+    id_namespace: LRunIds | None,
+) -> list[Node3CodeReadBoundary]:
+    """read_code_file payload의 range/truncation 절대정보를 node_3용으로 복사한다."""
+
+    boundaries: list[Node3CodeReadBoundary] = []
+    for record in data_store.list_records():
+        if not _record_in_namespace(record.data_id, id_namespace=id_namespace):
+            continue
+        if not _is_code_extract_record(record.data_type):
+            continue
+        if not isinstance(record.payload, dict):
+            continue
+        payload = record.payload
+        file_path = payload.get("file_path")
+        read_status = payload.get("read_status")
+        if not isinstance(file_path, str) or not file_path:
+            continue
+        if not isinstance(read_status, str) or not read_status:
+            continue
+        text = payload.get("text")
+        returned_char_count = _payload_int_or_default(
+            payload,
+            "returned_char_count",
+            default=len(text) if isinstance(text, str) else 0,
+        )
+        total_char_count = _payload_int_or_default(
+            payload,
+            "total_char_count",
+            default=_payload_int_or_default(
+                payload,
+                "char_count",
+                default=returned_char_count,
+            ),
+        )
+        range_start_char = _payload_int_or_default(
+            payload,
+            "range_start_char",
+            default=0,
+        )
+        range_end_char_exclusive = _payload_int_or_default(
+            payload,
+            "range_end_char_exclusive",
+            default=min(range_start_char + returned_char_count, total_char_count),
+        )
+        truncated_before = payload.get("truncated_before") is True
+        truncated_after = payload.get("truncated_after") is True
+        if "truncated_after" not in payload and payload.get("truncated") is True:
+            truncated_after = range_end_char_exclusive < total_char_count
+        boundaries.append(
+            Node3CodeReadBoundary(
+                file_path=file_path,
+                requested_start_char=_payload_int_or_default(
+                    payload,
+                    "requested_start_char",
+                    default=range_start_char,
+                ),
+                range_start_char=range_start_char,
+                range_end_char_exclusive=range_end_char_exclusive,
+                returned_char_count=returned_char_count,
+                total_char_count=total_char_count,
+                truncated=truncated_before or truncated_after,
+                truncated_before=truncated_before,
+                truncated_after=truncated_after,
+                read_status=read_status,
+                source_data_id=record.data_id,
+            )
+        )
+    return boundaries
+
+
+def _payload_int_or_default(
+    payload: dict[str, object],
+    field_name: str,
+    *,
+    default: int,
+) -> int:
+    value = payload.get(field_name)
+    if isinstance(value, int) and not isinstance(value, bool):
+        return value
+    return default
 
 
 def _packed_read_documents(pack_payload: dict[str, object]) -> list[Node3BriefDocument]:

@@ -1000,8 +1000,26 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
             f" / query_attempts={latest_budget.get('query_count', 0)}/{latest_budget.get('max_query_attempts', '?')}"
             f" / search_top_k={latest_budget.get('search_top_k', '?')}"
             f" / read_doc={latest_budget.get('read_doc_count', 0)}/{latest_budget.get('max_read_doc_calls', '?')}"
+            " / read_code_file="
+            f"{latest_budget.get('read_code_file_count', 0)}/"
+            f"{latest_budget.get('max_read_code_file_calls', '?')}"
             f" / stop_reason={latest_budget.get('stop_reason', 'unknown')}"
         )
+        code_ranges = latest_budget.get("read_code_file_ranges")
+        if isinstance(code_ranges, list) and code_ranges:
+            lines.append("  - code read ranges (최근 3개):")
+            for item in code_ranges[-3:]:
+                if not isinstance(item, dict):
+                    continue
+                lines.append(
+                    "    - "
+                    f"{item.get('file_path', 'unknown')} "
+                    f"[{item.get('range_start_char', '?')}, "
+                    f"{item.get('range_end_char_exclusive', '?')})/"
+                    f"{item.get('total_char_count', '?')} "
+                    f"truncated_before={item.get('truncated_before', False)} "
+                    f"truncated_after={item.get('truncated_after', False)}"
+                )
         old_name = latest_budget.get("max_query_candidates")
         new_name = latest_budget.get("max_query_attempts")
         if old_name == new_name:
@@ -1054,6 +1072,7 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
             f"stop={frame.get('budget_stop_reason', 'unknown')} "
             f"/ remaining_tool={frame.get('remaining_tool_calls', 0)} "
             f"/ remaining_read={frame.get('remaining_read_doc_calls', 0)} "
+            f"/ remaining_code_read={frame.get('remaining_read_code_file_calls', 0)} "
             f"/ remaining_query={frame.get('remaining_query_attempts', 0)}"
         )
         lines.append(f"  - route_hint_reason: {frame.get('route_hint_reason', '')}")
@@ -1112,6 +1131,11 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
                 f"source={frame.get('query_source', 'unknown')}"
             )
             lines.append(f"    query: {frame.get('query_text', '')}")
+            if frame.get("target_tool_name") == "read_code_file":
+                lines.append(
+                    "    code range start: "
+                    f"{frame.get('read_code_file_start_char', 0)}"
+                )
 
     revision_achievements = _payloads_with_type(result, "node_output:L3_revision_achievement_frame")
     if revision_achievements:

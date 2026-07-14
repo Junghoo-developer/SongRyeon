@@ -122,6 +122,21 @@ def test_read_code_file_counts_as_source_code_evidence_without_becoming_read_doc
     assert achievement_payload["read_code_file_paths"] == ["songryeon_core/tools/code_tools.py"]
     assert achievement_payload["actual_read_code_file_count"] == 1
 
+    budget_payload = data_store.require_record(result.tool_budget_data_ids[-1]).payload
+    assert isinstance(budget_payload, dict)
+    assert budget_payload["read_code_file_count"] == 1
+    assert budget_payload["max_read_code_file_calls"] >= 1
+    assert len(budget_payload["read_code_file_ranges"]) == 1
+    budget_range = budget_payload["read_code_file_ranges"][0]
+    assert budget_range["file_path"] == "songryeon_core/tools/code_tools.py"
+    assert budget_range["range_start_char"] == 0
+    assert budget_range["returned_char_count"] == (
+        budget_range["range_end_char_exclusive"] - budget_range["range_start_char"]
+    )
+    assert budget_range["truncated_after"] == (
+        budget_range["range_end_char_exclusive"] < budget_range["total_char_count"]
+    )
+
     _, _, return_summary_id, _ = record_l_loop_return_summary_for_node1(
         trace_store=trace_store,
         data_store=data_store,
@@ -135,6 +150,12 @@ def test_read_code_file_counts_as_source_code_evidence_without_becoming_read_doc
     assert return_summary["actual_read_doc_count"] == 0
     assert return_summary["actual_read_code_file_count"] == 1
     assert return_summary["read_code_file_paths"] == ["songryeon_core/tools/code_tools.py"]
+    assert return_summary["read_code_file_call_count"] == 1
+    assert return_summary["max_read_code_file_calls"] == budget_payload["max_read_code_file_calls"]
+    assert return_summary["remaining_read_code_file_calls"] == (
+        return_summary["max_read_code_file_calls"] - 1
+    )
+    assert return_summary["read_code_file_ranges"] == budget_payload["read_code_file_ranges"]
     assert return_summary["failure_level"] == "none"
 
     seed = trace_store.create_event(
@@ -158,6 +179,14 @@ def test_read_code_file_counts_as_source_code_evidence_without_becoming_read_doc
     assert brief.actual_tool_read_doc_count == 0
     assert brief.actual_tool_read_code_file_count == 1
     assert brief.actual_tool_read_code_file_paths == ["songryeon_core/tools/code_tools.py"]
+    assert brief.max_read_code_file_calls == return_summary["max_read_code_file_calls"]
+    assert brief.remaining_read_code_file_calls == return_summary[
+        "remaining_read_code_file_calls"
+    ]
+    assert len(brief.code_read_boundaries) == 1
+    assert brief.code_read_boundaries[0].file_path == "songryeon_core/tools/code_tools.py"
+    assert brief.code_read_boundaries[0].range_start_char == 0
+    assert brief.code_read_boundaries[0].truncated_after == budget_range["truncated_after"]
     assert brief.supplied_source_code_context_count == 1
     assert len(brief.source_code_outlines) == 1
     outline = brief.source_code_outlines[0]
@@ -182,6 +211,14 @@ def test_read_code_file_counts_as_source_code_evidence_without_becoming_read_doc
     assert outline_payload["count"] == 1
     assert outline_payload["items"][0]["public_function_names"] == outline.public_function_names
     assert "source_data_id" not in outline_payload["items"][0]
+    continuity_payload = payload["code_read_continuity"]
+    assert continuity_payload["call_count"] == 1
+    assert continuity_payload["max_read_code_file_calls"] == brief.max_read_code_file_calls
+    assert continuity_payload["remaining_read_code_file_calls"] == (
+        brief.remaining_read_code_file_calls
+    )
+    assert continuity_payload["items"][0]["file_path"] == "songryeon_core/tools/code_tools.py"
+    assert "source_data_id" not in continuity_payload["items"][0]
 
     grounding = build_node3_grounding_block(brief)
     assert "실제 read_doc 도구 원문 읽기: 0개" in grounding
