@@ -1355,10 +1355,15 @@ def run_l_loop(
             *failure_trace_ids,
         ]
     )
+    l3_original_material_result_data_ids = _l3_original_material_result_data_ids(
+        data_store=data_store,
+        tool_result_data_ids=tool_result_data_ids,
+    )
     l3_input_data_ids = _unique_strings(
         [
             run_data_id,
             l1_goal_data_id,
+            *explicit_artifact_reference_data_ids,
             *budget_plan_data_ids,
             tool_scope_data_id,
             tool_budget_partition_data_id,
@@ -1367,6 +1372,7 @@ def run_l_loop(
             l2_query_data_id,
             *tool_choice_ids,
             *control_data_ids,
+            *l3_original_material_result_data_ids,
             *tool_distillation_data_ids,
             *tool_budget_data_ids,
             *failure_signal_data_ids,
@@ -1524,6 +1530,9 @@ def run_l_loop(
                         *revision_tool_result.source_data_ids,
                     ]
                 ),
+                # L3 revision 의미 판단은 이번 구간만이 아니라 현재 L run에서 이미
+                # 읽은 앞 구간도 함께 봐야 같은 파일의 연속 문맥을 잃지 않는다.
+                semantic_material_source_data_ids=list(tool_result_data_ids),
                 user_query=search_query,
                 l1_goal_data_id=l1_goal_data_id,
                 adapter=l3_result_adapter,
@@ -2065,6 +2074,25 @@ def _source_trace_ids_for_data_ids(
         if record is not None and record.source_trace_id:
             trace_ids.append(record.source_trace_id)
     return _unique_strings(trace_ids)
+
+
+def _l3_original_material_result_data_ids(
+    *,
+    data_store: DataStore,
+    tool_result_data_ids: list[str],
+) -> list[str]:
+    """L3에 직접 공급할 현재 실행의 문서/코드 원문 tool result ID만 고른다."""
+
+    material_ids: list[str] = []
+    for data_id in tool_result_data_ids:
+        record = data_store.get_record(data_id)
+        if record is None:
+            continue
+        if record.data_type.startswith(
+            ("tool_result:read_doc", "tool_result:read_artifact", "tool_result:read_code_file")
+        ):
+            material_ids.append(data_id)
+    return _unique_strings(material_ids)
 
 
 def _unique_strings(values: list[str | None]) -> list[str]:

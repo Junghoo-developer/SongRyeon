@@ -21,6 +21,7 @@ class WrongOperationalFactsL3Adapter:
     def complete(self, request: LLMRequest) -> LLMResponse:
         if "L3 Result Keeper v0" in request.prompt:
             self.l3_input_payload = request.input_payload
+            preview = request.input_payload["read_document_previews"][0]
             payload: dict[str, object] = {
                 # 이전 L3 출력 형식을 일부러 섞어도 authoritative 운영 frame에는
                 # 복사되지 않아야 한다.
@@ -32,6 +33,12 @@ class WrongOperationalFactsL3Adapter:
                 "micro_achievement_reason": "잘못 센 운영 숫자다.",
                 "semantic_goal_match_status": "matched",
                 "semantic_goal_match_reason": "읽은 문서가 질문의 요약 경계를 직접 다룬다.",
+                "semantic_evidence_bindings": [
+                    {
+                        "material_ref": preview["material_ref"],
+                        "evidence_excerpt": preview["text_preview"][:40],
+                    }
+                ],
             }
         else:
             payload = {

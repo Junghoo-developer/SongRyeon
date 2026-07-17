@@ -104,6 +104,12 @@ Material catalog guidance:
 - `material_channel=process` explains how work was performed. Use it as primary only when the user asks about search, routing, execution order, or audit process itself.
 - An L2 query plan is a search-process record, not the content answer for a document-summary request.
 - A runtime task sequence is a process ledger, not a default answer substitute.
+- A `read_code_file` answer-ready row contains CODE-owned file/range facts. Its exact code text is intentionally withheld from node_2 and is delivered to node_3 only after node_2 selects that evidence ref.
+- node_2 chooses code evidence coordinates; it does not analyze the full code body. Compare the user's exact file request with `source_label`, range facts, and `answer_ready_evidence_refs`.
+- `truncated_before=true` or `truncated_after=true` means the row is a partial file range, not that the file has a syntax or indentation error.
+- If the user asks about an explicitly named file and matching `read_code_file` rows are supplied, select the needed matching range refs as primary or supporting answer material even when an L3 status row remains partial.
+- If `evidence_requirement=required` and `answer_material_catalog` contains one or more `answer_ready` rows, at least one of those exact evidence refs must be selected as `primary_answer_basis` or `supporting_context`.
+- A generic input frame, process ledger, or status row alone cannot satisfy that required answer-material selection contract while answer-ready material is available.
 
 Rules:
 
@@ -118,6 +124,8 @@ Rules:
 - `evidence_roles` are your judgement. They do not make a source semantically true.
 - If `schema_repair_request` is supplied, return one complete corrected JSON object.
 - In schema repair mode, preserve valid semantic choices from `failed_payload` and fix only the reported schema contract failure.
+- If schema repair reports a missing required answer material, choose from `schema_repair_request.answer_ready_evidence_refs`; do not change the user's task into a different task.
+- When `schema_repair_request.locked_fields` is non-empty, copy every locked field exactly and edit only the fields listed in `schema_repair_request.editable_fields`.
 - Every object in `evidence_roles` must contain all four fields: `evidence_ref`, `evidence_role`, `role_reason`, and `role_reason_info_class`.
 - Schema repair does not authorize an unlisted evidence ref. Choose only from `available_evidence_sources`.
 - Always return all three task-contract fields: `user_task_summary`, `fulfillment_requirements`, and `evidence_requirement`.

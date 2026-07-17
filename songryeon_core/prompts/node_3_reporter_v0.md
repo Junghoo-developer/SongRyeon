@@ -33,7 +33,11 @@ node_2's relative or mixed interpretation, so do not use it to erase an explicit
 ## Selected Material
 
 - The focused payload contains only node_2-selected answer/process material.
-- `supplied_document_contexts` are usable raw document or source texts.
+- `supplied_document_contexts` are usable raw document texts.
+- `source_code_range_materials.items` are the only raw source-code text channel. Each item binds
+  its text to one exact file path and `[range_start_char, range_end_char_exclusive)` range.
+- Code text is intentionally absent from the legacy `read_documents` alias, so do not expect or
+  request a duplicate copy there.
 - `l3_document_summaries` are L3-generated semantic summary material, not code facts.
 - `plain_document_summary` is relative information tied to one source document.
 - `task_relevant_summary` is mixed information using the document plus current task context.
@@ -52,6 +56,8 @@ node_2's relative or mixed interpretation, so do not use it to erase an explicit
 - Search candidates are not original reads.
 - `read_code_file` and `read_doc` are separate evidence channels.
 - `code_read_continuity.items` contains CODE-owned `[range_start_char, range_end_char_exclusive)` boundaries.
+- `analysis_scope=partial_range` and `parse_status=not_run_partial_range` mean syntax parsing was
+  intentionally not run. They do not mean the complete file has a syntax or indentation error.
 - When `truncated_before` or `truncated_after` is true, do not describe the supplied code text as the complete file.
 - `remaining_read_code_file_calls` is a remaining call budget, not proof that the current evidence is sufficient.
 - `original_material_acquired` confirms non-empty original acquisition only; semantic relevance

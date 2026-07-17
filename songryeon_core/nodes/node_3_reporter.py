@@ -103,7 +103,10 @@ def render_report_with_llm(
     prompt_ref = "songryeon_core/prompts/node_3_reporter_v0.md"
     prompt = Path(prompt_ref).read_text(encoding="utf-8")
     input_payload = node3_brief_llm_payload(brief_frame)
-    input_payload["code_supplied_grounding_block"] = build_node3_grounding_block(brief_frame)
+    input_payload["code_supplied_grounding_block"] = build_node3_grounding_block(
+        brief_frame,
+        llm_payload=input_payload,
+    )
     input_payload["report_assembly_policy"] = (
         "CODE will prepend code_supplied_grounding_block. "
         "node_3 must return only body_markdown and must not write the grounding block or counts."
@@ -141,7 +144,11 @@ def render_report_with_llm(
     )
 
 
-def build_node3_grounding_block(brief_frame: Node3InputBriefFrame) -> str:
+def build_node3_grounding_block(
+    brief_frame: Node3InputBriefFrame,
+    *,
+    llm_payload: dict[str, object] | None = None,
+) -> str:
     """Node3InputBriefFrame의 절대 count로 사용자-facing grounding block을 만든다."""
 
     if (
@@ -149,15 +156,19 @@ def build_node3_grounding_block(brief_frame: Node3InputBriefFrame) -> str:
         and brief_frame.evidence_requirement == "not_required"
     ):
         return ""
+    payload = llm_payload or node3_brief_llm_payload(brief_frame)
+    total_raw_text_count, code_range_text_count = _llm_raw_text_counts(payload)
     return "\n".join(
         [
             "근거 기준:",
             f"- 실제 read_doc 도구 원문 읽기: {brief_frame.actual_tool_read_doc_count}개",
-            f"- 실제 read_code_file 도구 원문 읽기: {brief_frame.actual_tool_read_code_file_count}개",
+            f"- 실제 read_code_file 고유 파일: {brief_frame.actual_tool_read_code_file_count}개",
+            f"- 실제 read_code_file 호출/구간: {len(brief_frame.code_read_boundaries)}개",
             f"- node_3 공급 문서 context: {brief_frame.supplied_document_context_count}개",
             f"- node_3 공급 source-code context: {brief_frame.supplied_source_code_context_count}개",
             f"- source-code 구조 목록: {len(brief_frame.source_code_outlines)}개",
-            f"- node_3 LLM 원문 text: {brief_frame.llm_raw_document_text_count}개",
+            f"- node_3 LLM 원문 text: {total_raw_text_count}개",
+            f"- node_3 LLM 코드 구간 text: {code_range_text_count}개",
             f"- L3 문서별 요약 재료: {brief_frame.llm_l3_summary_context_count}개",
             f"- 검색 후보 문서(최종): {brief_frame.final_search_candidate_count}개",
             f"- 검색 후보 문서(누적): {brief_frame.accumulated_search_candidate_count}개",
@@ -170,6 +181,27 @@ def build_node3_grounding_block(brief_frame: Node3InputBriefFrame) -> str:
             f"- 답변 한계: {_grounding_limit_text(brief_frame)}",
         ]
     )
+
+
+def _llm_raw_text_counts(payload: dict[str, object]) -> tuple[int, int]:
+    """실제 node_3 LLM payload 안에 포함된 원문 항목 수를 센다."""
+
+    absolute_facts = payload.get("absolute_grounding_facts")
+    if isinstance(absolute_facts, dict):
+        total = absolute_facts.get("llm_total_raw_text_count")
+        code = absolute_facts.get("llm_raw_code_range_text_count")
+        if isinstance(total, int) and isinstance(code, int):
+            return total, code
+
+    document_contexts = payload.get("supplied_document_contexts")
+    document_count = len(document_contexts) if isinstance(document_contexts, list) else 0
+    code_bundle = payload.get("source_code_range_materials")
+    code_count = 0
+    if isinstance(code_bundle, dict):
+        raw_text_count = code_bundle.get("raw_text_count")
+        if isinstance(raw_text_count, int):
+            code_count = raw_text_count
+    return document_count + code_count, code_count
 
 
 def assemble_node3_report_markdown(

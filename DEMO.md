@@ -10,6 +10,23 @@ Layer 2. Local verification: prove the baseline tests pass.
 Layer 3. Optional graph memory: show the Neo4j Vessel / R traversal path.
 ```
 
+## Three-Minute Reviewer Path
+
+This path needs only Python and the repository. It does not need model weights, Ollama,
+Neo4j, or an external API.
+
+```powershell
+python main.py fake-turn "송련이 뭔지 짧게 설명해줘" --compact
+python main.py quick-smoke
+```
+
+What to verify in the first output:
+
+1. The runtime names the fake adapter instead of pretending it is Qwen.
+2. Route, L/R execution, memory transfer, evidence counts, and node_4 status are code-owned counts.
+3. The answer labels itself as a deterministic no-model demo.
+4. The full ledger is still available through the same command with `--pretty`.
+
 ## What To Say First
 
 SongRyeon Core is not a polished assistant.

@@ -30,6 +30,11 @@ Rules:
 - Treat supplied `node3_input_brief.read_documents`, `node3_input_brief.allowed_claims`,
   `node3_input_brief.runtime_task_sequence`, `selected_recent_memory_contexts`, and
   `node3_input_brief.vessel_r_material` as the checkable grounding channels.
+- Treat `node3_input_brief.source_code_range_materials.items` as the checkable raw source-code
+  channel. Each item applies only to its supplied file path and exact character range.
+- `analysis_scope=partial_range` with `parse_status=not_run_partial_range` is an explicit CODE fact
+  that syntax analysis was not run. If the report turns that state into a file syntax or indentation
+  error, mark it as a grounding contradiction and request revision.
 - Treat supplied `node3_input_brief.document_material_packet.items` and `node3_input_brief.document_evidence_role_boundaries` as the checkable document role ledger.
 - Treat supplied `selected_recent_memory_contexts` as the only allowed grounding material for previous-conversation utterance claims.
 - Treat supplied `node3_input_brief.answer_basis` as the answer posture chosen by node_2.

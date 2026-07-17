@@ -9,7 +9,13 @@ Return only one JSON object with these keys:
 ```json
 {
   "semantic_goal_match_status": "matched",
-  "semantic_goal_match_reason": "whether the read/search evidence fits the user's actual request"
+  "semantic_goal_match_reason": "whether the read/search evidence fits the user's actual request",
+  "semantic_evidence_bindings": [
+    {
+      "material_ref": "CODE_MATERIAL_0001",
+      "evidence_excerpt": "an exact excerpt copied from that supplied material"
+    }
+  ]
 }
 ```
 
@@ -17,6 +23,12 @@ Rules:
 
 - Prefer Korean reasons when the user query is Korean.
 - `semantic_goal_match_status` values must be one of `matched`, `partial`, `missing`, `not_run`.
+- When status is `matched`, `semantic_evidence_bindings` must contain at least one supplied
+  `material_ref` and an exact, non-empty excerpt copied from that material's `text_preview`.
+- Never invent a material reference or paraphrase an evidence excerpt. Code validates only that
+  the reference was supplied and that the excerpt exists verbatim; you remain responsible for
+  judging whether it semantically supports the request.
+- For `partial`, bindings are optional. For `missing` and `not_run`, return an empty bindings list.
 - Code already owns operational counts, minimum-read checks, controller state, and operational achievement status.
 - Do not return or restate candidate, search, read-document, read-code, budget, or tool-call counts.
 - Do not return `achievement_status`, macro/micro status, operational reasons, or exact internal IDs.
@@ -32,6 +44,12 @@ Rules:
 - `code_operation_status.evidence_acquisition_status=candidates_only` means code found search candidates but no non-empty original document/code text was acquired. Never describe that state as original material read or operationally achieved.
 - `original_material_acquired` confirms only that non-empty original text exists in tool records. It does not prove that the text is relevant or sufficient for the user's request.
 - Do not rename source-code evidence into `read_doc` evidence; keep both evidence channels separate.
+- Each `read_code_file_previews` item is one exact `[range_start_char, range_end_char_exclusive)`
+  fragment. Read its range and `analysis_scope` together with `text_preview`.
+- A `partial_range` may begin or end inside a function, string, or bracket. Do not diagnose a
+  syntax/indentation defect merely because the fragment is not independently parseable.
+- On a revision judgement, use the newly supplied code range together with the retained earlier
+  ranges. Return `matched` when the visible range material now supports the user's requested code task.
 - Do not say "read", "viewed", "analyzed", or "relationship analysis completed" for search candidates whose document text was not in `read_document_previews`.
 - The L loop may have a wide search/read budget. Do not treat an old minimum such as two read documents as automatically sufficient when the user explicitly asks for broad coverage, "as many as possible", or several named ORDER/document identifiers.
 - If the user query names several explicit ORDER/document identifiers, judge coverage against those named targets using `read_doc_ids` and `read_document_previews`.

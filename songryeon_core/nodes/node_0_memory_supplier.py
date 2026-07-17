@@ -751,10 +751,9 @@ def build_node0_document_material_packet_frame(
         source_data_ids=source_data_ids,
         data_type="node_output:l_loop_return_summary_frame",
     )
-    l3_payload = _latest_payload_by_type_fragment(
+    l3_payload = _latest_l3_achievement_payload(
         data_store=data_store,
         source_data_ids=source_data_ids,
-        type_fragment="L3_achievement_frame",
     )
     context_pack_payload = _latest_payload_by_exact_type(
         data_store=data_store,
@@ -925,10 +924,9 @@ def build_l_loop_return_summary_frame(
         source_data_ids=source_data_ids,
         type_fragment="L1_goal_frame",
     )
-    l3_payload = _latest_payload_by_type_fragment(
+    l3_payload = _latest_l3_achievement_payload(
         data_store=data_store,
         source_data_ids=source_data_ids,
-        type_fragment="L3_achievement_frame",
     )
     budget_payload = _latest_payload_by_exact_type(
         data_store=data_store,
@@ -1207,6 +1205,26 @@ def _latest_payload_by_type_fragment(
     for data_id in reversed(source_data_ids):
         record = data_store.get_record(data_id)
         if record is None or type_fragment not in record.data_type:
+            continue
+        if isinstance(record.payload, dict):
+            return record.payload
+    return {}
+
+
+def _latest_l3_achievement_payload(
+    *,
+    data_store: DataStore,
+    source_data_ids: list[str],
+) -> dict[str, object]:
+    """초기/수정 L3 중 source 순서상 가장 최신 판정 payload를 돌려준다."""
+
+    achievement_types = {
+        "node_output:L3_achievement_frame",
+        "node_output:L3_revision_achievement_frame",
+    }
+    for data_id in reversed(source_data_ids):
+        record = data_store.get_record(data_id)
+        if record is None or record.data_type not in achievement_types:
             continue
         if isinstance(record.payload, dict):
             return record.payload

@@ -5,6 +5,9 @@ from pathlib import Path
 
 from songryeon_core.core.data_store import DataStore
 from songryeon_core.core.schemas import (
+    ANSWER_BASIS_INFO_CLASSES,
+    ANSWER_BASIS_MODES,
+    BASIS_REASON_CODES,
     DataRef,
     MetainfoBoundary,
     MixedInfoRef,
@@ -27,6 +30,10 @@ NODE2_ANSWER_BASIS_FRAME_DATA_ID = "node_2:answer_basis_frame"
 NODE2_ANSWER_BASIS_SCHEMA_REPAIR_MAX_ATTEMPTS = 1
 ANSWER_MATERIAL_CATALOG_MAX_ITEMS = 48
 ANSWER_MATERIAL_PREVIEW_MAX_CHARS = 700
+REQUIRED_ANSWER_MATERIAL_SELECTION_ERROR = (
+    "Node2 evidence_requirement=required must select at least one "
+    "answer_ready evidence source as primary_answer_basis or supporting_context"
+)
 
 
 def build_metainfo_boundary(
@@ -407,7 +414,6 @@ def run_node2_answer_basis_selection(
                 "source_label": source["source_label"],
                 "source_kind": source["source_kind"],
                 "material_channel": source.get("material_channel", "generic"),
-                "material_preview": source.get("material_preview", ""),
             }
             for source in available_evidence_sources
         ],
@@ -419,8 +425,16 @@ def run_node2_answer_basis_selection(
                 "material_channel": source.get("material_channel", "generic"),
                 "material_preview": source.get("material_preview", ""),
             }
-            for source in available_evidence_sources
+            for source in sorted(
+                available_evidence_sources,
+                key=_answer_material_channel_sort_key,
+            )
             if source.get("material_channel") != "generic"
+        ],
+        "answer_ready_evidence_refs": [
+            source["evidence_ref"]
+            for source in available_evidence_sources
+            if source.get("material_channel") == "answer_ready"
         ],
         "answer_basis_modes": [
             "absolute_first",
@@ -475,10 +489,15 @@ def run_node2_answer_basis_selection(
     attempt_results = [first_result]
     llm_result = first_result
     if _should_repair_answer_basis_schema_failure(first_result):
+        repair_locked_fields = _answer_basis_repair_locked_fields(
+            failed_payload=first_result.validation.payload,
+            failure_reason=first_result.validation.error,
+        )
         repair_input_payload = _answer_basis_schema_repair_input_payload(
             base_payload=input_payload,
             failed_payload=first_result.validation.payload,
             failure_reason=first_result.validation.error,
+            locked_fields=repair_locked_fields,
         )
         llm_result = executor.run(
             node_id="node_2",
@@ -496,6 +515,7 @@ def run_node2_answer_basis_selection(
                 payload,
                 evidence_source_id_by_ref=evidence_source_id_by_ref,
                 evidence_source_metadata_by_ref=evidence_source_metadata_by_ref,
+                repair_locked_fields=repair_locked_fields,
             ),
         )
         attempt_results.append(llm_result)
@@ -698,7 +718,7 @@ def _answer_material_record_metadata(
             label=f"읽은 코드 원문: {file_path}",
             kind="read_code_file",
             channel="answer_ready",
-            preview=_catalog_preview(payload.get("text")),
+            preview=_code_range_catalog_material(payload),
         )
     if data_type == "node_output:selected_recent_memory_context_frame":
         items = payload.get("items") if isinstance(payload.get("items"), list) else []
@@ -858,6 +878,44 @@ def _catalog_preview(*values: object) -> str:
     if len(compact) <= ANSWER_MATERIAL_PREVIEW_MAX_CHARS:
         return compact
     return f"{compact[: ANSWER_MATERIAL_PREVIEW_MAX_CHARS - 3]}..."
+
+
+def _code_range_catalog_material(payload: dict[str, object]) -> str:
+    """node_2에는 코드 원문 대신 선택에 필요한 절대 범위 좌표만 제공한다."""
+
+    text = payload.get("text")
+    source_text = text if isinstance(text, str) else ""
+    range_start = _non_negative_catalog_int(payload.get("range_start_char"))
+    range_end = _non_negative_catalog_int(payload.get("range_end_char_exclusive"))
+    total_chars = _non_negative_catalog_int(
+        payload.get("total_char_count") or payload.get("char_count")
+    )
+    header = (
+        "CODE_RANGE_ABSOLUTE_FACTS:"
+        f"range=[{range_start},{range_end});"
+        f"total_char_count={total_chars};"
+        f"truncated_before={payload.get('truncated_before') is True};"
+        f"truncated_after={payload.get('truncated_after') is True};"
+        f"returned_text_chars={len(source_text)};"
+        "exact_text_delivery=node_3_after_evidence_selection"
+    )
+    return header
+
+
+def _answer_material_channel_sort_key(source: dict[str, object]) -> tuple[int, str]:
+    """답변 원재료를 상태/과정 장부보다 먼저 보여주되 evidence ref는 바꾸지 않는다."""
+
+    channel_order = {"answer_ready": 0, "status": 1, "process": 2}
+    return (
+        channel_order.get(str(source.get("material_channel") or "generic"), 9),
+        str(source.get("evidence_ref") or ""),
+    )
+
+
+def _non_negative_catalog_int(value: object) -> int:
+    if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+        return value
+    return 0
 
 
 def _answer_basis_source_row(
@@ -1105,6 +1163,7 @@ def _validate_answer_basis_payload(
     *,
     evidence_source_id_by_ref: dict[str, str],
     evidence_source_metadata_by_ref: dict[str, dict[str, object]] | None = None,
+    repair_locked_fields: dict[str, object] | None = None,
 ) -> None:
     resolved_roles = _evidence_roles_from_payload(
         payload.get("evidence_roles"),
@@ -1138,6 +1197,15 @@ def _validate_answer_basis_payload(
         source_data_ids=_unique_strings(list(evidence_source_id_by_ref.values())),
     )
     validate_node2_answer_basis_frame(frame)
+    _validate_required_answer_material_selection(
+        evidence_requirement=evidence_requirement,
+        resolved_roles=resolved_roles,
+        evidence_source_metadata_by_ref=evidence_source_metadata_by_ref,
+    )
+    _validate_answer_basis_repair_locked_fields(
+        payload=payload,
+        locked_fields=repair_locked_fields,
+    )
 
 
 def _should_repair_answer_basis_schema_failure(result: object) -> bool:
@@ -1155,6 +1223,7 @@ def _answer_basis_schema_repair_input_payload(
     base_payload: dict[str, object],
     failed_payload: dict[str, object] | None,
     failure_reason: str | None,
+    locked_fields: dict[str, object] | None = None,
 ) -> dict[str, object]:
     """의미를 고치지 않고 실패한 JSON 계약을 LLM이 다시 맞추도록 입력을 만든다."""
 
@@ -1171,12 +1240,122 @@ def _answer_basis_schema_repair_input_payload(
             "role_reason",
             "role_reason_info_class",
         ],
+        "answer_ready_evidence_refs": [
+            str(item.get("evidence_ref") or "").strip()
+            for item in base_payload.get("answer_material_catalog", [])
+            if isinstance(item, dict)
+            and item.get("material_channel") == "answer_ready"
+            and str(item.get("evidence_ref") or "").strip()
+        ],
+        "required_evidence_selection_rule": (
+            "When evidence_requirement is required and answer-ready evidence exists, "
+            "select at least one answer-ready evidence_ref as primary_answer_basis "
+            "or supporting_context."
+        ),
+        "locked_fields": dict(locked_fields or {}),
+        "editable_fields": (
+            ["evidence_roles"]
+            if REQUIRED_ANSWER_MATERIAL_SELECTION_ERROR in str(failure_reason or "")
+            else "fields_named_by_validation_error_except_locked_fields"
+        ),
         "boundary": (
             "Repair the complete JSON object using only official evidence refs. "
             "Code still validates every field and does not choose semantic roles."
         ),
     }
     return payload
+
+
+def _answer_basis_repair_locked_fields(
+    *,
+    failed_payload: dict[str, object] | None,
+    failure_reason: str | None,
+) -> dict[str, object]:
+    """첫 응답에서 유효했던 과업 계약은 오류 종류와 무관하게 재작성 중 잠근다."""
+
+    if not isinstance(failed_payload, dict):
+        return {}
+    locked_fields: dict[str, object] = {}
+
+    user_task_summary = str(failed_payload.get("user_task_summary") or "").strip()
+    if user_task_summary:
+        locked_fields["user_task_summary"] = user_task_summary
+
+    fulfillment_requirements = _string_list(
+        failed_payload.get("fulfillment_requirements")
+    )
+    if fulfillment_requirements:
+        locked_fields["fulfillment_requirements"] = fulfillment_requirements
+
+    evidence_requirement = str(
+        failed_payload.get("evidence_requirement") or ""
+    ).strip()
+    if evidence_requirement in {"not_required", "optional", "required"}:
+        locked_fields["evidence_requirement"] = evidence_requirement
+
+    # 이 오류는 과업 계약이 아니라 evidence role 선택만 고치면 된다. 이때는
+    # 이미 유효한 말하기 모드 판단도 함께 잠가 의미 drift를 막는다.
+    if REQUIRED_ANSWER_MATERIAL_SELECTION_ERROR in str(failure_reason or ""):
+        answer_basis_mode = str(
+            failed_payload.get("answer_basis_mode") or ""
+        ).strip()
+        if answer_basis_mode in ANSWER_BASIS_MODES:
+            locked_fields["answer_basis_mode"] = answer_basis_mode
+
+        basis_reason_codes = _string_list(failed_payload.get("basis_reason_codes"))
+        if basis_reason_codes and all(
+            reason_code in BASIS_REASON_CODES for reason_code in basis_reason_codes
+        ):
+            locked_fields["basis_reason_codes"] = basis_reason_codes
+
+        mode_selection_reason = str(
+            failed_payload.get("mode_selection_reason") or ""
+        ).strip()
+        if mode_selection_reason:
+            locked_fields["mode_selection_reason"] = mode_selection_reason
+
+        reason_info_class = str(
+            failed_payload.get("mode_selection_reason_info_class") or ""
+        ).strip()
+        if reason_info_class in ANSWER_BASIS_INFO_CLASSES:
+            locked_fields["mode_selection_reason_info_class"] = reason_info_class
+
+    return locked_fields
+
+
+def _validate_answer_basis_repair_locked_fields(
+    *,
+    payload: dict[str, object],
+    locked_fields: dict[str, object] | None,
+) -> None:
+    for field_name, expected_value in (locked_fields or {}).items():
+        if payload.get(field_name) != expected_value:
+            raise ValueError(
+                f"Node2 schema repair must preserve locked field: {field_name}"
+            )
+
+
+def _validate_required_answer_material_selection(
+    *,
+    evidence_requirement: str,
+    resolved_roles: list[Node2EvidenceRole],
+    evidence_source_metadata_by_ref: dict[str, dict[str, object]] | None,
+) -> None:
+    """필수 근거 계약과 실제 답변 재료 선택이 구조적으로 모순되지 않는지 확인한다."""
+
+    if evidence_requirement != "required":
+        return
+    metadata_rows = (evidence_source_metadata_by_ref or {}).values()
+    if not any(row.get("material_channel") == "answer_ready" for row in metadata_rows):
+        return
+    answer_roles = {"primary_answer_basis", "supporting_context"}
+    if any(
+        role.material_channel == "answer_ready"
+        and role.evidence_role in answer_roles
+        for role in resolved_roles
+    ):
+        return
+    raise ValueError(REQUIRED_ANSWER_MATERIAL_SELECTION_ERROR)
 
 
 def _evidence_roles_from_payload(

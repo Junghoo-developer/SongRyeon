@@ -50,6 +50,8 @@ R_LOOP_VESSEL_TRAVERSE_RESULT_DATA_TYPE = "r_loop:vessel_traverse_result"
 R_LOOP_VESSEL_READ_PACKET_DATA_TYPE = "r_loop:vessel_read_packet"
 R_LOOP_VESSEL_RETURN_PACKET_DATA_TYPE = "r_loop:vessel_return_packet"
 NODE3_VESSEL_R_MATERIAL_SUMMARY_MAX_CHARS = 1200
+NODE3_CODE_RANGE_RAW_TEXT_BUDGET_CHARS = 24000
+NODE3_CODE_RANGE_RAW_TEXT_BUDGET_UNIT = "chars"
 VESSEL_R_INTERNAL_GRAPH_ID_RE = re.compile(r"graph:[A-Za-z0-9_:\-.]+")
 VESSEL_R_REDACTED_GRAPH_ID_LABEL = "[internal graph id omitted]"
 
@@ -802,13 +804,15 @@ def record_node3_input_brief(
             "답변 첫머리의 '근거 기준:' 블록은 code가 Node3InputBriefFrame의 절대 count로 고정 생성한다.",
             "node_3 LLM은 읽은 문서 수, 검색 후보 문서 수, 현재 턴 실행 순서 자료 수를 직접 쓰지 않고 본문만 작성한다.",
             "실제 read_doc 도구 원문 읽기 수와 node_3 공급 문서 context 수는 다른 count다.",
-            "실제 read_code_file 도구 원문 읽기 수와 read_doc 도구 원문 읽기 수는 다른 count다.",
+            "actual_tool_read_code_file_count는 read_code_file 고유 파일 수이고 code_read_boundaries 길이는 호출/구간 수다.",
             "사용자가 read_doc 수를 물으면 actual_tool_read_doc_count만 기준으로 답하고, supplied_document_context_count를 read_doc 수로 말하지 않는다.",
-            "사용자가 코드 파일 원문 읽기 여부를 물으면 actual_tool_read_code_file_count와 actual_tool_read_code_file_paths를 기준으로 답한다.",
+            "사용자가 코드 파일 원문 읽기 여부를 물으면 고유 파일 수와 호출/구간 수를 분리해 답한다.",
             "code_read_boundaries의 문자 구간과 truncated_before/truncated_after를 보고 전체 파일을 읽었는지 일부만 읽었는지 구분한다.",
             "remaining_read_code_file_calls는 code가 계산한 남은 코드 원문 읽기 예산이며 의미상 충분성을 뜻하지 않는다.",
             "source_code_outlines는 read_code_file 원문에서 code가 뽑은 문법 장부이며, source 파일 기능 설명의 coverage checklist로 사용한다.",
             "source_code_outlines의 함수명만 보고 의미를 단정하지 않고, supplied source text를 함께 근거로 설명한다.",
+            "source_code_range_materials는 코드 원문과 정확한 문자 구간을 결합한 canonical 재료이며, read_documents에서 같은 코드 원문을 다시 찾지 않는다.",
+            "analysis_scope=partial_range와 parse_status=not_run_partial_range는 부분 구간 문법 분석을 실행하지 않았다는 뜻이며, 전체 파일의 문법 오류가 아니다.",
             "최종 검색 후보와 L3 누적 검색 후보는 다른 count다.",
             "검색 후보 문서는 원문을 읽은 문서가 아니다. 검색 후보만 보고 읽은 문서처럼 말하지 않는다.",
             "document_context_pack excluded 문서는 읽은 문서가 아니다. 예산 때문에 공급되지 않은 후보로만 언급한다.",
@@ -1372,7 +1376,19 @@ def node3_brief_llm_payload(frame: Node3InputBriefFrame) -> dict[str, object]:
         return _node3_vessel_r_focused_llm_payload(frame)
 
     raw_document_payloads = _node3_raw_document_payloads(frame)
+    code_range_material_bundle = _node3_code_range_material_bundle(
+        _node3_code_range_material_payloads(frame)
+    )
+    code_range_material_payloads = code_range_material_bundle["items"]
     omitted_raw_document_payloads = _node3_omitted_raw_document_payloads(frame)
+    included_code_range_text_count = sum(
+        1
+        for item in code_range_material_payloads
+        if item.get("text_payload_status") == "included"
+    )
+    actual_raw_text_payload_count = (
+        len(raw_document_payloads) + included_code_range_text_count
+    )
     return {
         "user_question": frame.user_question,
         "brief_status": frame.brief_status,
@@ -1382,8 +1398,14 @@ def node3_brief_llm_payload(frame: Node3InputBriefFrame) -> dict[str, object]:
         },
         "actual_tool_read_code_file": {
             "count": frame.actual_tool_read_code_file_count,
+            "unique_file_count": frame.actual_tool_read_code_file_count,
+            "call_or_range_count": len(frame.code_read_boundaries),
             "file_paths": list(frame.actual_tool_read_code_file_paths),
-            "boundary": "This counts successful read_code_file tool outputs only. It is separate from read_doc.",
+            "boundary": (
+                "count and unique_file_count mean unique successful file paths. "
+                "call_or_range_count means successful read_code_file range records. "
+                "Both are separate from read_doc."
+            ),
         },
         "code_read_continuity": {
             "call_count": len(frame.code_read_boundaries),
@@ -1398,7 +1420,9 @@ def node3_brief_llm_payload(frame: Node3InputBriefFrame) -> dict[str, object]:
         "supplied_document_context": {
             "count": frame.supplied_document_context_count,
             "source_code_context_count": frame.supplied_source_code_context_count,
-            "raw_text_payload_count": frame.llm_raw_document_text_count,
+            "raw_text_payload_count": actual_raw_text_payload_count,
+            "raw_document_text_payload_count": len(raw_document_payloads),
+            "raw_code_range_text_payload_count": included_code_range_text_count,
             "raw_text_replaced_by_l3_summary_count": frame.raw_context_replaced_by_summary_count,
             "source_kind": (
                 "document_context_pack"
@@ -1408,18 +1432,27 @@ def node3_brief_llm_payload(frame: Node3InputBriefFrame) -> dict[str, object]:
             "boundary": (
                 "count is the preserved Node3InputBriefFrame document context count. "
                 "source_code_context_count is the subset copied from read_code_file outputs. "
-                "raw_text_payload_count is the number of full raw document texts actually included "
+                "raw_text_payload_count is the number of regular document or code-range text items actually included "
                 "in this LLM payload. These are not the same count as actual read_doc tool calls."
             ),
         },
         "source_code_outlines": {
             "count": len(frame.source_code_outlines),
             "boundary": (
-                "Code-built syntax inventory from successful read_code_file outputs. "
-                "It lists top-level names and line numbers only; it is not a semantic summary. "
-                "Use public_function_names as a coverage checklist when explaining a source file."
+                "Code-built analysis ledger from successful read_code_file outputs. "
+                "Only complete_file items may contain a top-level syntax inventory. "
+                "partial_range items use not_run_partial_range and are not syntax failures. "
+                "This ledger is not a semantic summary."
             ),
             "items": _node3_source_code_outline_payloads(frame),
+        },
+        "source_code_range_materials": {
+            **code_range_material_bundle,
+            "boundary": (
+                "Each item binds one code text fragment to its exact CODE-owned path and [start, end) range. "
+                "partial_range with parse_status=not_run_partial_range is not a syntax failure. "
+                "Only whole ranges that fit the CODE-owned aggregate text budget are included."
+            ),
         },
         "material_delivery_policy": _node3_material_delivery_policy_llm_payload(frame),
         "document_material_packet": {
@@ -1487,7 +1520,7 @@ def node3_brief_llm_payload(frame: Node3InputBriefFrame) -> dict[str, object]:
             ],
         },
         "available_document_extract_count": frame.supplied_document_context_count,
-        "available_raw_document_text_count": frame.llm_raw_document_text_count,
+        "available_raw_document_text_count": actual_raw_text_payload_count,
         "available_search_candidate_document_count": frame.final_search_candidate_count,
         "search_candidate_scope": {
             "legacy_search_candidate_count_is": "final_search_candidate_count",
@@ -1667,6 +1700,12 @@ def _node3_task_focused_llm_payload(
         if role.evidence_role in {"primary_answer_basis", "supporting_context"}
     ]
     selected_source_ids = {role.source_data_id for role in selected_roles}
+    selected_code_source_id_order = [
+        role.source_data_id
+        for role in selected_roles
+        if role.source_kind == "read_code_file"
+    ]
+    selected_code_source_ids = set(selected_code_source_id_order)
     selected_source_kinds = {
         role.source_kind
         for role in selected_roles
@@ -1675,6 +1714,7 @@ def _node3_task_focused_llm_payload(
     evidence_not_required = frame.evidence_requirement == "not_required"
 
     selected_document_payloads = []
+    selected_code_range_materials = []
     selected_summary_payloads = []
     selected_source_code_outlines = []
     selected_code_read_boundaries = []
@@ -1689,6 +1729,12 @@ def _node3_task_focused_llm_payload(
             selected_source_ids=selected_source_ids,
             selected_source_kinds=selected_source_kinds,
         )
+        selected_code_range_materials = _node3_selected_code_range_material_payloads(
+            frame,
+            selected_source_ids=selected_code_source_ids,
+            selected_source_id_order=selected_code_source_id_order,
+            selected_source_kinds=selected_source_kinds,
+        )
         selected_summary_payloads = _node3_selected_l3_summary_payloads(
             frame,
             selected_source_ids=selected_source_ids,
@@ -1696,12 +1742,12 @@ def _node3_task_focused_llm_payload(
         )
         selected_source_code_outlines = _node3_selected_source_code_outline_payloads(
             frame,
-            selected_source_ids=selected_source_ids,
+            selected_source_ids=selected_code_source_ids,
             selected_source_kinds=selected_source_kinds,
         )
         selected_code_read_boundaries = _node3_code_read_boundary_payloads(
             frame,
-            selected_source_ids=selected_source_ids,
+            selected_source_ids=selected_code_source_ids,
         )
         if "selected_recent_memory_context" in selected_source_kinds:
             selected_recent_memory_contexts = _node3_selected_recent_memory_payloads(frame)
@@ -1743,6 +1789,18 @@ def _node3_task_focused_llm_payload(
         for claim in frame.allowed_claims
         if claim.source_data_id in selected_source_ids
     ]
+    selected_code_range_material_bundle = _node3_code_range_material_bundle(
+        selected_code_range_materials
+    )
+    selected_code_range_materials = selected_code_range_material_bundle["items"]
+    selected_code_range_text_count = sum(
+        1
+        for item in selected_code_range_materials
+        if item.get("text_payload_status") == "included"
+    )
+    selected_total_raw_text_count = (
+        len(selected_document_payloads) + selected_code_range_text_count
+    )
 
     payload: dict[str, object] = {
         "user_question": frame.user_question,
@@ -1765,11 +1823,14 @@ def _node3_task_focused_llm_payload(
         "absolute_grounding_facts": {
             "actual_tool_read_doc_count": frame.actual_tool_read_doc_count,
             "actual_tool_read_code_file_count": frame.actual_tool_read_code_file_count,
+            "actual_tool_read_code_file_unique_file_count": frame.actual_tool_read_code_file_count,
             "read_code_file_call_count": len(frame.code_read_boundaries),
             "remaining_read_code_file_calls": frame.remaining_read_code_file_calls,
             "supplied_document_context_count": frame.supplied_document_context_count,
             "source_code_outline_count": len(frame.source_code_outlines),
             "llm_raw_document_text_count": len(selected_document_payloads),
+            "llm_raw_code_range_text_count": selected_code_range_text_count,
+            "llm_total_raw_text_count": selected_total_raw_text_count,
             "llm_l3_summary_context_count": len(selected_summary_payloads),
             "final_search_candidate_count": frame.final_search_candidate_count,
             "accumulated_search_candidate_count": frame.accumulated_search_candidate_count,
@@ -1794,6 +1855,7 @@ def _node3_task_focused_llm_payload(
             "selected_evidence_count": len(selected_roles),
             "selected_answer_material_count": (
                 len(selected_document_payloads)
+                + len(selected_code_range_materials)
                 + len(selected_summary_payloads)
                 + len(selected_source_code_outlines)
                 + len(selected_code_read_boundaries)
@@ -1815,6 +1877,14 @@ def _node3_task_focused_llm_payload(
             {**document, "legacy_alias": "supplied_document_context"}
             for document in selected_document_payloads
         ],
+        "source_code_range_materials": {
+            **selected_code_range_material_bundle,
+            "boundary": (
+                "Each item is one node_2-selected code fragment joined to its exact CODE-owned range. "
+                "The same code text is not duplicated in read_documents. "
+                "Only whole ranges that fit the CODE-owned aggregate text budget are included."
+            ),
+        },
         "l3_document_summaries": {
             "count": len(selected_summary_payloads),
             "items": selected_summary_payloads,
@@ -1823,6 +1893,10 @@ def _node3_task_focused_llm_payload(
         "source_code_outlines": {
             "count": len(selected_source_code_outlines),
             "items": selected_source_code_outlines,
+            "boundary": (
+                "Only complete_file items may contain CODE-built syntax inventory. "
+                "partial_range with not_run_partial_range means parsing was intentionally skipped."
+            ),
         },
         "code_read_continuity": {
             "call_count": len(selected_code_read_boundaries),
@@ -1877,6 +1951,7 @@ def _node3_selected_raw_document_payloads(
         return []
     include_pack = "document_context_pack" in selected_source_kinds
     include_all_read = "l3_result" in selected_source_kinds
+    code_source_data_ids = _node3_code_source_data_ids(frame)
     return [
         {
             "document_name": document.document_name,
@@ -1885,10 +1960,31 @@ def _node3_selected_raw_document_payloads(
             "text_payload_status": "included",
         }
         for document in frame.read_documents
-        if include_pack
-        or include_all_read
-        or document.source_data_id in selected_source_ids
+        if document.source_data_id not in code_source_data_ids
+        and (
+            include_pack
+            or include_all_read
+            or document.source_data_id in selected_source_ids
+        )
     ]
+
+
+def _node3_selected_code_range_material_payloads(
+    frame: Node3InputBriefFrame,
+    *,
+    selected_source_ids: set[str],
+    selected_source_id_order: list[str],
+    selected_source_kinds: set[str],
+) -> list[dict[str, object]]:
+    """node_2가 고른 코드 근거만 path/range/text가 결합된 항목으로 만든다."""
+
+    if "read_code_file" not in selected_source_kinds:
+        return []
+    return _node3_code_range_material_payloads(
+        frame,
+        selected_source_ids=selected_source_ids,
+        preferred_source_id_order=selected_source_id_order,
+    )
 
 
 def _node3_selected_l3_summary_payloads(
@@ -1932,20 +2028,18 @@ def _node3_selected_source_code_outline_payloads(
     selected_source_ids: set[str],
     selected_source_kinds: set[str],
 ) -> list[dict[str, object]]:
-    if not selected_source_kinds.intersection({"read_code_file", "l3_result"}):
+    if "read_code_file" not in selected_source_kinds:
         return []
     payloads = _node3_source_code_outline_payloads(frame)
-    if "l3_result" in selected_source_kinds:
-        return payloads
-    allowed_paths = {
-        outline.file_path
+    allowed_source_ids = {
+        outline.source_data_id
         for outline in frame.source_code_outlines
         if outline.source_data_id in selected_source_ids
     }
     return [
         payload
-        for payload in payloads
-        if str(payload.get("file_path") or "") in allowed_paths
+        for outline, payload in zip(frame.source_code_outlines, payloads, strict=True)
+        if outline.source_data_id in allowed_source_ids
     ]
 
 
@@ -2222,6 +2316,8 @@ def _node3_material_delivery_policy_llm_payload(
         "boundary": (
             "This is a CODE policy mapping from answer_basis_mode and L3 summary availability. "
             "It is not a semantic judgement about document importance. "
+            "The llm_* counts in this policy frame are pre-focus policy counts; "
+            "use absolute_grounding_facts or supplied payload item counts for the actual task-focused payload. "
             "When raw_document_policy=omit_raw_text_from_llm_payload, original document records remain in DataStore "
             "but full raw text is omitted from this node_3 LLM payload."
         ),
@@ -2233,6 +2329,7 @@ def _node3_raw_document_payloads(
 ) -> list[dict[str, object]]:
     if frame.raw_document_policy == "omit_raw_text_from_llm_payload":
         return []
+    code_source_data_ids = _node3_code_source_data_ids(frame)
     return [
         {
             "document_name": document.document_name,
@@ -2241,7 +2338,145 @@ def _node3_raw_document_payloads(
             "text_payload_status": "included",
         }
         for document in frame.read_documents
+        if document.source_data_id not in code_source_data_ids
     ]
+
+
+def _node3_code_source_data_ids(frame: Node3InputBriefFrame) -> set[str]:
+    """brief 안에서 read_code_file 원문에 해당하는 내부 연결 키만 모은다."""
+
+    return {boundary.source_data_id for boundary in frame.code_read_boundaries}
+
+
+def _node3_code_range_material_payloads(
+    frame: Node3InputBriefFrame,
+    *,
+    selected_source_ids: set[str] | None = None,
+    preferred_source_id_order: list[str] | None = None,
+) -> list[dict[str, object]]:
+    """코드 원문과 그 절대 범위를 하나의 안전한 LLM 재료 항목으로 결합한다."""
+
+    documents_by_source_id = {
+        document.source_data_id: document
+        for document in frame.read_documents
+    }
+    outlines_by_source_id = {
+        outline.source_data_id: outline
+        for outline in frame.source_code_outlines
+    }
+    preferred_rank = {
+        source_data_id: index
+        for index, source_data_id in enumerate(preferred_source_id_order or [])
+    }
+    ordered_boundaries = sorted(
+        frame.code_read_boundaries,
+        key=lambda item: (
+            preferred_rank.get(item.source_data_id, len(preferred_rank)),
+            item.file_path,
+            item.range_start_char,
+            item.range_end_char_exclusive,
+        ),
+    )
+    payloads: list[dict[str, object]] = []
+    for index, boundary in enumerate(ordered_boundaries, start=1):
+        if (
+            selected_source_ids is not None
+            and boundary.source_data_id not in selected_source_ids
+        ):
+            continue
+        document = documents_by_source_id.get(boundary.source_data_id)
+        outline = outlines_by_source_id.get(boundary.source_data_id)
+        include_text = (
+            frame.raw_document_policy != "omit_raw_text_from_llm_payload"
+            and document is not None
+        )
+        text = document.text if include_text and document is not None else ""
+        payloads.append(
+            {
+                # 내부 DataStore ID 대신 이 payload 안에서만 쓰는 순번을 노출한다.
+                "material_ref": f"CODE_RANGE_{index:04d}",
+                "file_path": boundary.file_path,
+                "requested_start_char": boundary.requested_start_char,
+                "range_start_char": boundary.range_start_char,
+                "range_end_char_exclusive": boundary.range_end_char_exclusive,
+                "returned_char_count": boundary.returned_char_count,
+                "total_char_count": boundary.total_char_count,
+                "truncated": boundary.truncated,
+                "truncated_before": boundary.truncated_before,
+                "truncated_after": boundary.truncated_after,
+                "read_status": boundary.read_status,
+                "analysis_scope": (
+                    outline.analysis_scope if outline is not None else "not_recorded"
+                ),
+                "parse_status": (
+                    outline.parse_status if outline is not None else "not_recorded"
+                ),
+                "utf8_bom_present": (
+                    outline.utf8_bom_present if outline is not None else False
+                ),
+                "text_payload_status": (
+                    "included"
+                    if include_text
+                    else "omitted_by_material_delivery_policy"
+                    if document is not None
+                    else "not_available"
+                ),
+                "text_char_count": len(text),
+                "text": text,
+            }
+        )
+    return payloads
+
+
+def _node3_code_range_material_bundle(
+    materials: list[dict[str, object]],
+    *,
+    raw_text_budget_chars: int = NODE3_CODE_RANGE_RAW_TEXT_BUDGET_CHARS,
+) -> dict[str, object]:
+    """코드 구간을 자르지 않고 전체 원문 예산 안에 드는 항목만 LLM에 넣는다."""
+
+    included_items: list[dict[str, object]] = []
+    excluded_items: list[dict[str, object]] = []
+    used_chars = 0
+    for material in materials:
+        text = str(material.get("text") or "")
+        has_text = material.get("text_payload_status") == "included" and bool(text)
+        if has_text and used_chars + len(text) > raw_text_budget_chars:
+            excluded = {
+                key: value
+                for key, value in material.items()
+                if key != "text"
+            }
+            excluded.update(
+                {
+                    "text_payload_status": "excluded_by_code_text_budget",
+                    "text_char_count": len(text),
+                    "exclusion_reason": "CODE_STATUS:whole_range_exceeds_remaining_code_text_budget",
+                }
+            )
+            excluded_items.append(excluded)
+            continue
+        included_items.append(material)
+        if has_text:
+            used_chars += len(text)
+
+    raw_text_count = sum(
+        1
+        for item in included_items
+        if item.get("text_payload_status") == "included" and item.get("text")
+    )
+    return {
+        "count": len(included_items),
+        "selected_count": len(materials),
+        "raw_text_count": raw_text_count,
+        "raw_text_chars": used_chars,
+        "raw_text_budget_chars": raw_text_budget_chars,
+        "raw_text_budget_unit": NODE3_CODE_RANGE_RAW_TEXT_BUDGET_UNIT,
+        "whole_range_only": True,
+        "excluded_count": len(excluded_items),
+        "excluded_items": excluded_items,
+        "items": included_items,
+    }
 
 
 def _node3_code_read_boundary_payloads(
@@ -2273,6 +2508,7 @@ def _node3_omitted_raw_document_payloads(
 ) -> list[dict[str, object]]:
     if frame.raw_document_policy != "omit_raw_text_from_llm_payload":
         return []
+    code_source_data_ids = _node3_code_source_data_ids(frame)
     return [
         {
             "document_name": document.document_name,
@@ -2281,6 +2517,7 @@ def _node3_omitted_raw_document_payloads(
             "replacement_material": "l3_document_summaries",
         }
         for document in frame.read_documents
+        if document.source_data_id not in code_source_data_ids
     ]
 
 
@@ -2293,6 +2530,10 @@ def _node3_source_code_outline_payloads(
             {
                 "file_path": outline.file_path,
                 "language": outline.language,
+                "analysis_scope": outline.analysis_scope,
+                "range_start_char": outline.range_start_char,
+                "range_end_char_exclusive": outline.range_end_char_exclusive,
+                "total_char_count": outline.total_char_count,
                 "parse_status": outline.parse_status,
                 "top_level_symbol_count": outline.top_level_symbol_count,
                 "public_symbol_count": outline.public_symbol_count,
@@ -2308,6 +2549,7 @@ def _node3_source_code_outline_payloads(
                     for symbol in outline.top_level_symbols
                 ],
                 "parse_error_type": outline.parse_error_type,
+                "utf8_bom_present": outline.utf8_bom_present,
             }
         )
     return payloads
@@ -2734,11 +2976,17 @@ def _read_code_documents(
         if not isinstance(text, str) or not text.strip():
             continue
         file_path = record.payload.get("file_path")
-        char_count = record.payload.get("char_count")
+        returned_char_count = record.payload.get("returned_char_count")
         documents.append(
             Node3BriefDocument(
                 document_name=file_path if isinstance(file_path, str) and file_path else "읽은 코드 파일",
-                char_count=char_count if isinstance(char_count, int) else len(text),
+                # 이 객체가 가진 text는 전체 파일이 아니라 반환 구간일 수 있다.
+                # 따라서 context 크기는 전체 파일 크기가 아니라 실제 text 크기로 기록한다.
+                char_count=(
+                    returned_char_count
+                    if isinstance(returned_char_count, int)
+                    else len(text)
+                ),
                 text=text,
                 source_data_id=record.data_id,
             )
@@ -3285,11 +3533,33 @@ def _source_code_outlines(
         file_path = payload.get("file_path")
         if not isinstance(file_path, str) or not file_path.strip():
             file_path = document.document_name
+        range_start_char = _payload_int_or_default(
+            payload,
+            "range_start_char",
+            default=0,
+        )
+        range_end_char_exclusive = _payload_int_or_default(
+            payload,
+            "range_end_char_exclusive",
+            default=range_start_char + len(text),
+        )
+        total_char_count = _payload_int_or_default(
+            payload,
+            "total_char_count",
+            default=_payload_int_or_default(
+                payload,
+                "char_count",
+                default=range_end_char_exclusive,
+            ),
+        )
         outlines.append(
             _build_source_code_outline(
                 file_path=file_path,
                 text=text,
                 source_data_id=record.data_id,
+                range_start_char=range_start_char,
+                range_end_char_exclusive=range_end_char_exclusive,
+                total_char_count=total_char_count,
             )
         )
     return outlines
@@ -3300,33 +3570,72 @@ def _build_source_code_outline(
     file_path: str,
     text: str,
     source_data_id: str,
+    range_start_char: int,
+    range_end_char_exclusive: int,
+    total_char_count: int,
 ) -> Node3SourceCodeOutline:
     language = _source_code_language(file_path)
+    analysis_scope = (
+        "complete_file"
+        if range_start_char == 0 and range_end_char_exclusive == total_char_count
+        else "partial_range"
+    )
+    utf8_bom_present = text.startswith("\ufeff")
+    if analysis_scope == "partial_range":
+        # 부분 구간은 함수/문자열/괄호 중간에서 시작할 수 있다. 여기서 SyntaxError를
+        # 만들면 전체 파일 오류처럼 보이므로 문법 분석 자체를 실행하지 않는다.
+        return Node3SourceCodeOutline(
+            file_path=file_path,
+            language=language,
+            parse_status="not_run_partial_range",
+            source_data_id=source_data_id,
+            analysis_scope=analysis_scope,
+            range_start_char=range_start_char,
+            range_end_char_exclusive=range_end_char_exclusive,
+            total_char_count=total_char_count,
+            top_level_symbol_count=0,
+            public_symbol_count=0,
+            public_function_names=[],
+            top_level_symbols=[],
+            utf8_bom_present=utf8_bom_present,
+        )
     if language != "python":
         return Node3SourceCodeOutline(
             file_path=file_path,
             language=language,
             parse_status="unsupported_language",
             source_data_id=source_data_id,
+            analysis_scope=analysis_scope,
+            range_start_char=range_start_char,
+            range_end_char_exclusive=range_end_char_exclusive,
+            total_char_count=total_char_count,
             top_level_symbol_count=0,
             public_symbol_count=0,
             public_function_names=[],
             top_level_symbols=[],
+            utf8_bom_present=utf8_bom_present,
         )
 
     try:
-        tree = ast.parse(text, filename=file_path)
+        # Python이 파일을 직접 열 때는 UTF-8 BOM을 인코딩 표지로 처리한다. ast.parse는
+        # 이미 디코딩된 문자열을 받으므로, 분석용 복사본에서만 같은 표지를 제거한다.
+        tree = ast.parse(text.removeprefix("\ufeff"), filename=file_path)
     except SyntaxError as exc:
         return Node3SourceCodeOutline(
             file_path=file_path,
             language=language,
             parse_status="parse_failed",
             source_data_id=source_data_id,
+            analysis_scope=analysis_scope,
+            range_start_char=range_start_char,
+            range_end_char_exclusive=range_end_char_exclusive,
+            total_char_count=total_char_count,
             top_level_symbol_count=0,
             public_symbol_count=0,
             public_function_names=[],
             top_level_symbols=[],
             parse_error_type=type(exc).__name__,
+            utf8_bom_present=utf8_bom_present,
         )
 
     symbols: list[Node3SourceCodeSymbol] = []
@@ -3358,10 +3667,15 @@ def _build_source_code_outline(
         language=language,
         parse_status="parsed",
         source_data_id=source_data_id,
+        analysis_scope=analysis_scope,
+        range_start_char=range_start_char,
+        range_end_char_exclusive=range_end_char_exclusive,
+        total_char_count=total_char_count,
         top_level_symbol_count=len(symbols),
         public_symbol_count=sum(1 for symbol in symbols if symbol.is_public),
         public_function_names=public_function_names,
         top_level_symbols=symbols,
+        utf8_bom_present=utf8_bom_present,
     )
 
 

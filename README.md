@@ -2,7 +2,7 @@
 
 [![smoke-test](https://github.com/Junghoo-developer/SongRyeon/actions/workflows/smoke-test.yml/badge.svg)](https://github.com/Junghoo-developer/SongRyeon/actions/workflows/smoke-test.yml)
 
-[한국어 README](README.ko.md) | [Demo Commands](DEMO.md) | [Release Notes](RELEASE_NOTES.md)
+[한국어 README](README.ko.md) | [Demo Commands](DEMO.md) | [Release Notes](RELEASE_NOTES.md) | [Third-Party Licenses](THIRD_PARTY_LICENSES.md)
 
 **Keywords:** LLM agents, provenance, runtime honesty, traceability, local-first AI, smoke-tested agent architecture.
 
@@ -92,6 +92,15 @@ SongRyeon Core is my small, local-first attempt to make those questions visible 
 - Experimental Vessel-backed R traversal that can walk graph memory through R1/R2/R3 frames.
 
 ## Current Demo Path
+
+Reviewers and first-time users can start without a model or Neo4j:
+
+```powershell
+python main.py fake-turn "송련이 뭔지 짧게 설명해줘" --compact
+```
+
+`--compact` displays the core code-verified counts and final answer. It does not delete the
+underlying trace/data ledger; use the existing `--pretty` view for full audits.
 
 After creating a local `.env`, the normal interactive start is now one command:
 
@@ -199,13 +208,13 @@ You can also point `QWEN_LOCAL_ENDPOINT` at an OpenAI-compatible local HTTP endp
 
 ## Current Baseline
 
-As of 2026-07-03:
+Local checkpoint as of 2026-07-17:
 
 - `python -m compileall songryeon_core main.py` passes.
-- `python -m pytest` passes: 279 tests.
+- `python -m pytest` passes: 476 passed, 5 deselected.
 - `python main.py smoke-test` passes.
 - `python main.py fast-test --profile graph` passes.
-- GitHub Actions `smoke-test` passes on `main`.
+- GitHub Actions for this checkpoint must be confirmed after the latest branch is pushed.
 - Pytest has import, schema split compatibility, and domain smoke-case coverage.
 - Relative direct-field claims are tested.
 - Source-bundle planner claims remain mixed information.
@@ -249,3 +258,4 @@ This project is released under the [MIT License](LICENSE).
 - The Qwen/Ollama path is optional; users must follow the license of the model they configure.
 - The Neo4j Vessel path is optional and requires a local Neo4j setup.
 - Development tests use `pytest` through `requirements-dev.txt`.
+- See [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) for contest-oriented license notes.

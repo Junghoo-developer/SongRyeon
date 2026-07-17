@@ -428,6 +428,25 @@ class SongRyeonAllNodesFakeLLMAdapter:
         candidate_count = int(request.input_payload.get("candidate_count") or 0)
         controller_decision = request.input_payload.get("controller_decision")
         status = "achieved" if candidate_count > 0 and controller_decision == "stop_success" else "partial"
+        supplied_materials = [
+            item
+            for field_name in ("read_document_previews", "read_code_file_previews")
+            for item in (request.input_payload.get(field_name) or [])
+            if isinstance(item, dict)
+            and isinstance(item.get("material_ref"), str)
+            and isinstance(item.get("text_preview"), str)
+            and item.get("text_preview")
+        ]
+        semantic_status = "matched" if supplied_materials else "partial"
+        semantic_bindings: list[dict[str, str]] = []
+        if supplied_materials:
+            first_material = supplied_materials[0]
+            semantic_bindings.append(
+                {
+                    "material_ref": str(first_material["material_ref"]),
+                    "evidence_excerpt": str(first_material["text_preview"])[:80],
+                }
+            )
         return {
             "achievement_status": status,
             "reason": "검색 후보 보존 여부와 controller 종료 신호를 구분해 운영 목표 달성 여부를 판정했다.",
@@ -437,8 +456,13 @@ class SongRyeonAllNodesFakeLLMAdapter:
             "micro_achievement_reason": "첫 조회 조건 실행과 후보 보존 결과가 있는지 확인했다.",
             "goal_match_status": "not_applicable",
             "goal_match_reason": "CODE_STATUS:no_specific_doc_hint_detected",
-            "semantic_goal_match_status": "matched" if candidate_count > 0 else "partial",
-            "semantic_goal_match_reason": "fake adapter confirms semantic fit for smoke testing.",
+            "semantic_goal_match_status": semantic_status,
+            "semantic_goal_match_reason": (
+                "fake adapter bound semantic fit to one supplied original-material excerpt."
+                if supplied_materials
+                else "fake adapter received no original-material preview to bind."
+            ),
+            "semantic_evidence_bindings": semantic_bindings,
         }
 
     def _node_2_payload(self, request: LLMRequest) -> dict[str, object]:
@@ -565,6 +589,12 @@ class SongRyeonAllNodesFakeLLMAdapter:
         l3_summary_items = l3_summary_bundle.get("items")
         if not isinstance(l3_summary_items, list):
             l3_summary_items = []
+        code_range_bundle = request.input_payload.get("source_code_range_materials")
+        if not isinstance(code_range_bundle, dict):
+            code_range_bundle = {}
+        code_range_items = code_range_bundle.get("items")
+        if not isinstance(code_range_items, list):
+            code_range_items = []
         l_loop_result = request.input_payload.get("l_loop_result")
         if not isinstance(l_loop_result, dict):
             l_loop_result = {}
@@ -647,6 +677,24 @@ class SongRyeonAllNodesFakeLLMAdapter:
                     "그래서 이번 데모에서는 그래프 기억 탐색 결과를 완료 상태로 단정하지 않고, "
                     f"상태만 제한적으로 보고할게. R 탐색 상태 표기: {task_status}."
                 )
+        elif code_range_items:
+            first_code_range = next(
+                (
+                    item
+                    for item in code_range_items
+                    if isinstance(item, dict) and str(item.get("text") or "").strip()
+                ),
+                {},
+            )
+            file_path = str(first_code_range.get("file_path") or "읽은 코드 파일")
+            text = str(first_code_range.get("text") or "")
+            preview = " ".join(text.split())[:600]
+            body_markdown = (
+                f"이번 턴에서는 `{file_path}`의 범위가 표시된 코드 원문을 답변 근거로 사용했어.\n\n"
+                f"공급 코드 미리보기: {preview}\n\n"
+                "부분 구간은 전체 파일 문법 오류로 판정하지 않았어."
+                f"{l_loop_limit_note}"
+            )
         elif l3_summary_items:
             first_summary = (
                 l3_summary_items[0]

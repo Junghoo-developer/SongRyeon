@@ -1453,6 +1453,7 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
         excluded_document_contexts = node3_brief.get("excluded_document_contexts")
         document_material_items = node3_brief.get("document_material_items")
         runtime_tasks = node3_brief.get("runtime_tasks")
+        code_read_boundaries = node3_brief.get("code_read_boundaries")
         doc_count = len(read_documents) if isinstance(read_documents, list) else 0
         supplied_context_count = _payload_int(
             node3_brief.get("supplied_document_context_count"),
@@ -1522,7 +1523,8 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
             "- node_3 input brief: "
             f"{node3_brief.get('brief_status', 'unknown')} / "
             f"actual_read_doc={actual_tool_read_doc_count} / "
-            f"actual_read_code_file={actual_tool_read_code_file_count} / "
+            f"read_code_unique_files={actual_tool_read_code_file_count} / "
+            f"read_code_calls_or_ranges={len(code_read_boundaries) if isinstance(code_read_boundaries, list) else 0} / "
             f"supplied_contexts={supplied_context_count} / "
             f"source_code_contexts={supplied_source_code_context_count} / "
             f"source_code_outlines={source_code_outline_count} / "
@@ -2028,6 +2030,28 @@ def render_pretty_turn(result: dict[str, object], *, user_input: str) -> str:
     """한 턴 결과를 런타임 요약과 최종 답변으로 합쳐 출력한다."""
 
     return f"{render_runtime_view(result, user_input=user_input)}\n\n{render_chat_answer(result, user_input=user_input)}"
+
+
+def render_compact_turn(result: dict[str, object], *, user_input: str) -> str:
+    """심사·시연 때 핵심 절대정보와 최종 답변만 짧게 보여준다.
+
+    전체 pretty 출력에는 모든 장부가 들어가므로 감사에는 좋지만 첫 시연에는 너무 길다.
+    이 렌더러는 기존 장부를 삭제하거나 새 의미를 만들지 않고, 이미 계산된 핵심 count와
+    최종 답변만 골라 보여준다. 원본 trace/data는 ``result`` 안에 그대로 남아 있다.
+    """
+
+    lines = [
+        "[runtime:compact]",
+        f"- 입력: {user_input}",
+        f"- 모델: {_runtime_model(result)}",
+        f"- 상태: {result.get('status', 'unknown')}",
+        f"- trace/data: {result.get('trace_count', 0)} / {result.get('data_record_count', 0)}",
+    ]
+    if result.get("status") == "structure_failed":
+        lines.extend(_structure_failure_runtime_lines(result))
+    lines.extend(_learning_absolute_audit_lines(result))
+    runtime_text = "\n".join(lines)
+    return f"{runtime_text}\n\n{render_chat_answer(result, user_input=user_input)}"
 
 
 def _learning_absolute_audit_lines(result: dict[str, object]) -> list[str]:

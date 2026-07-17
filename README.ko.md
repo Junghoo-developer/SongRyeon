@@ -2,7 +2,7 @@
 
 [![smoke-test](https://github.com/Junghoo-developer/SongRyeon/actions/workflows/smoke-test.yml/badge.svg)](https://github.com/Junghoo-developer/SongRyeon/actions/workflows/smoke-test.yml)
 
-[English README](README.md) | [데모 명령어](DEMO.md) | [릴리즈 노트](RELEASE_NOTES.md)
+[English README](README.md) | [데모 명령어](DEMO.md) | [릴리즈 노트](RELEASE_NOTES.md) | [제3자 라이선스](THIRD_PARTY_LICENSES.md)
 
 **키워드:** LLM 에이전트, 출처 추적, 런타임 정직성, traceability, 로컬 우선 AI, smoke-tested agent architecture.
 
@@ -97,6 +97,15 @@ LLM 판단은 LLM 판단으로 둔다.
 - R1/R2/R3 frame으로 Vessel graph memory를 탐색하는 실험적 R traversal.
 
 ## 현재 데모 경로
+
+심사자나 처음 보는 사람은 모델과 Neo4j 없이 다음 한 줄부터 실행할 수 있습니다.
+
+```powershell
+python main.py fake-turn "송련이 뭔지 짧게 설명해줘" --compact
+```
+
+`--compact`는 핵심 절대정보 count와 최종 답변만 짧게 보여줍니다. 전체 trace/data 장부는
+없애지 않으며, 개발 감사에서는 기존 `--pretty`를 사용하면 됩니다.
 
 로컬 `.env` 설정이 끝났다면 평소에는 다음 한 줄만 실행하면 됩니다.
 
@@ -205,13 +214,13 @@ python main.py qwen-turn "송련의 문서 메모리 인덱스가 무엇인지 �
 
 ## 현재 기준선
 
-2026-07-03 기준:
+2026-07-17 로컬 체크포인트 기준:
 
 - `python -m compileall songryeon_core main.py` 통과.
-- `python -m pytest` 통과: 279 tests.
+- `python -m pytest` 통과: 476 passed, 5 deselected.
 - `python main.py smoke-test` 통과.
 - `python main.py fast-test --profile graph` 통과.
-- GitHub Actions `smoke-test`가 `main`에서 통과.
+- 이 기준선의 GitHub Actions 결과는 최신 브랜치를 push한 뒤 별도로 확인해야 함.
 - pytest는 import, schema split compatibility, 도메인별 smoke case를 검사함.
 - 하나의 source field에 직접 대응하는 claim은 relative info로 테스트됨.
 - source bundle 기반 planner claim은 mixed info로 유지됨.
@@ -256,3 +265,4 @@ python main.py qwen-turn "송련의 문서 메모리 인덱스가 무엇인지 �
 - Qwen/Ollama 경로는 선택 기능이며, 사용자가 설정한 모델의 라이선스를 따라야 합니다.
 - Neo4j Vessel 경로는 선택 기능이며, 로컬 Neo4j 설정이 필요합니다.
 - 개발 테스트는 `requirements-dev.txt`의 `pytest`를 사용합니다.
+- 대회 검토용 상세 고지는 [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md)에 있습니다.

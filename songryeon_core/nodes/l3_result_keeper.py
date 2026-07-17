@@ -1,7 +1,7 @@
 ﻿from __future__ import annotations
 
 import re
-from dataclasses import asdict, replace
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
 from songryeon_core.core.data_store import DataStore
@@ -10,6 +10,7 @@ from songryeon_core.core.schemas import (
     L3PerDocumentSummaryFrame,
     L3PreservedInfoFrame,
     L3PreservedSearchCandidate,
+    L3SemanticEvidenceBinding,
     TraceEvent,
     validate_l3_achievement_frame,
     validate_l3_per_document_summary_frame,
@@ -28,6 +29,17 @@ L3_REVISION_ACHIEVEMENT_FRAME_DATA_ID_PREFIX = "L3:revision_achievement"
 L3_PER_DOCUMENT_SUMMARY_FRAME_DATA_ID_PREFIX = "L3:per_document_summary"
 L3_PER_DOCUMENT_SUMMARY_PROMPT_REF = "songryeon_core/prompts/l3_per_document_summary_v0.md"
 L3_PER_DOCUMENT_SUMMARY_MAX_SOURCE_CHARS = 12000
+L3_CODE_PREVIEW_TOTAL_BUDGET_CHARS = 24000
+L3_SEMANTIC_EVIDENCE_EXCERPT_MAX_CHARS = 400
+
+
+@dataclass(frozen=True)
+class _L3SemanticMaterial:
+    """LLM용 안전 ref와 실제 DataStore 원문을 code 안에서만 연결한다."""
+
+    material_ref: str
+    source_data_id: str
+    text: str
 
 
 def l3_revision_preserved_frame_data_id(
@@ -187,18 +199,14 @@ def run_l3_revision_result_keeper(
     revision_query_frame_data_id: str,
     revision_tool_source_trace_ids: list[str],
     revision_tool_source_data_ids: list[str],
+    semantic_material_source_data_ids: list[str] | None = None,
     user_query: str = "",
     final_control_data_id: str | None = None,
     l1_goal_data_id: str = "L1:goal_frame",
     adapter: LLMAdapter | None = None,
     id_namespace: LRunIds | None = None,
 ) -> TraceEvent:
-    """Re-run the L3 preservation/achievement check after one revision tool attempt.
-
-    이 함수는 L3의 의미 판단을 새로 만들지 않는다. revision tool attempt가 남긴
-    tool result/distillation/budget 같은 구조화 기록만 모아, 다음 continuation
-    controller가 읽을 수 있는 attempt별 L3 프레임으로 다시 포장한다.
-    """
+    """revision tool attempt 뒤 구조 판정과 L3 의미 적합성을 다시 기록한다."""
 
     preserved_frame_id = l3_revision_preserved_frame_data_id(
         attempt_index,
@@ -216,26 +224,64 @@ def run_l3_revision_result_keeper(
             *revision_tool_source_data_ids,
         ]
     )
+    semantic_input_data_ids = _unique_strings(
+        [*input_data_ids, *(semantic_material_source_data_ids or [])]
+    )
 
     preserved_frame = _build_preserved_frame(
         frame_id=preserved_frame_id,
         turn_id=turn_id,
         input_trace_ids=input_trace_ids,
-        input_data_ids=input_data_ids,
+        input_data_ids=semantic_input_data_ids,
         data_store=data_store,
     )
     validate_l3_preserved_info_frame(preserved_frame)
-    achievement_frame = _build_achievement_frame(
-        frame_id=achievement_frame_id,
-        turn_id=turn_id,
-        preserved_frame=preserved_frame,
-        input_trace_ids=input_trace_ids,
-        input_data_ids=input_data_ids,
-        data_store=data_store,
-        final_control_data_id=final_control_data_id,
-        user_query=user_query,
-        target_goal_data_id=l1_goal_data_id,
-    )
+    if adapter is not None:
+        try:
+            achievement_frame = _build_llm_achievement_frame(
+                trace_store=trace_store,
+                data_store=data_store,
+                turn_id=turn_id,
+                preserved_frame=preserved_frame,
+                input_trace_ids=input_trace_ids,
+                input_data_ids=semantic_input_data_ids,
+                final_control_data_id=final_control_data_id,
+                user_query=user_query,
+                adapter=adapter,
+                achievement_frame_data_id=achievement_frame_id,
+                target_goal_data_id=l1_goal_data_id,
+            )
+            achievement_frame = _promote_revision_semantic_match(
+                frame=achievement_frame,
+                current_original_material_count=_original_material_count_for_ids(
+                    data_store=data_store,
+                    source_data_ids=semantic_input_data_ids,
+                ),
+            )
+        except Exception:
+            achievement_frame = _build_achievement_frame(
+                frame_id=achievement_frame_id,
+                turn_id=turn_id,
+                preserved_frame=preserved_frame,
+                input_trace_ids=input_trace_ids,
+                input_data_ids=semantic_input_data_ids,
+                data_store=data_store,
+                final_control_data_id=final_control_data_id,
+                user_query=user_query,
+                target_goal_data_id=l1_goal_data_id,
+            )
+    else:
+        achievement_frame = _build_achievement_frame(
+            frame_id=achievement_frame_id,
+            turn_id=turn_id,
+            preserved_frame=preserved_frame,
+            input_trace_ids=input_trace_ids,
+            input_data_ids=semantic_input_data_ids,
+            data_store=data_store,
+            final_control_data_id=final_control_data_id,
+            user_query=user_query,
+            target_goal_data_id=l1_goal_data_id,
+        )
     validate_l3_achievement_frame(achievement_frame)
 
     event = trace_store.create_event(
@@ -570,6 +616,7 @@ def _build_achievement_frame(
         user_query=user_query,
         preserved_frame=preserved_frame,
         data_store=data_store,
+        allowed_source_data_ids=set(input_data_ids),
     )
     actual_read_doc_count = len(goal_match["read_doc_ids"])
     actual_read_code_file_count = len(goal_match["read_code_file_paths"])
@@ -750,6 +797,7 @@ def _build_llm_achievement_frame(
         user_query=user_query,
         preserved_frame=preserved_frame,
         data_store=data_store,
+        allowed_source_data_ids=set(input_data_ids),
     )
     read_doc_ids = list(goal_match["read_doc_ids"])
     read_code_file_paths = list(goal_match["read_code_file_paths"])
@@ -765,6 +813,23 @@ def _build_llm_achievement_frame(
         user_query=user_query,
         target_goal_data_id=target_goal_data_id,
     )
+    allowed_source_data_ids = set(input_data_ids)
+    read_document_previews = _read_doc_previews_from_data_store(
+        data_store,
+        allowed_source_data_ids=allowed_source_data_ids,
+    )
+    read_code_file_previews = _read_code_file_previews_from_data_store(
+        data_store,
+        allowed_source_data_ids=allowed_source_data_ids,
+    )
+    semantic_materials = _l3_semantic_materials(
+        read_document_previews=read_document_previews,
+        read_code_file_previews=read_code_file_previews,
+    )
+    semantic_material_by_ref = {
+        material.material_ref: material
+        for material in semantic_materials
+    }
     input_payload = {
         "user_query": user_query,
         "l1_goal": _l1_semantic_goal_payload(l1_goal),
@@ -786,17 +851,23 @@ def _build_llm_achievement_frame(
         "specific_document_request": _l3_specific_request_semantic_payload(goal_match),
         "read_document_previews": [
             {
+                "material_ref": preview.get("material_ref"),
                 "doc_id": preview.get("doc_id"),
                 "text_preview": preview.get("text_preview"),
             }
-            for preview in _read_doc_previews_from_data_store(data_store)
+            for preview in read_document_previews
         ],
         "read_code_file_previews": [
             {
+                "material_ref": preview.get("material_ref"),
                 "file_path": preview.get("file_path"),
+                "range_start_char": preview.get("range_start_char"),
+                "range_end_char_exclusive": preview.get("range_end_char_exclusive"),
+                "total_char_count": preview.get("total_char_count"),
+                "analysis_scope": preview.get("analysis_scope"),
                 "text_preview": preview.get("text_preview"),
             }
-            for preview in _read_code_file_previews_from_data_store(data_store)
+            for preview in read_code_file_previews
         ],
         "candidate_previews": [
             {
@@ -816,7 +887,10 @@ def _build_llm_achievement_frame(
         prompt_ref=prompt_ref,
         input_ref=input_trace_ids,
         source_data_ids=input_data_ids,
-        payload_validator=_validate_l3_semantic_payload,
+        payload_validator=lambda payload: _validate_l3_semantic_payload(
+            payload,
+            semantic_material_by_ref=semantic_material_by_ref,
+        ),
     )
     if llm_result.failure_type != "none" or llm_result.validation.payload is None:
         raise ValueError(f"L3 LLM result keeper failed: {llm_result.failure_type}")
@@ -837,6 +911,10 @@ def _build_llm_achievement_frame(
     semantic_goal_match_reason = str(
         payload.get("semantic_goal_match_reason") or "CODE_STATUS:llm_semantic_goal_match_not_run"
     ).strip()
+    semantic_evidence_bindings = _l3_semantic_evidence_bindings_from_payload(
+        payload=payload,
+        semantic_material_by_ref=semantic_material_by_ref,
+    )
     achievement_status = operation_frame.achievement_status
     reason = operation_frame.reason
     macro_status = operation_frame.macro_achievement_status
@@ -860,6 +938,7 @@ def _build_llm_achievement_frame(
         micro_reason=micro_reason,
         semantic_goal_match_status=semantic_goal_match_status,
         semantic_goal_match_reason=semantic_goal_match_reason,
+        semantic_evidence_bindings=semantic_evidence_bindings,
     )
     generation_source = (
         f"{operation_frame.achievement_generation_source}"
@@ -884,6 +963,47 @@ def _build_llm_achievement_frame(
         micro_achievement_reason=micro_reason,
         semantic_goal_match_status=semantic_goal_match_status,
         semantic_goal_match_reason=semantic_goal_match_reason,
+        semantic_evidence_bindings=semantic_evidence_bindings,
+    )
+
+
+def _promote_revision_semantic_match(
+    *,
+    frame: L3AchievementFrame,
+    current_original_material_count: int,
+) -> L3AchievementFrame:
+    """revision의 LLM 의미 일치와 CODE 원문 조건이 함께 맞을 때만 달성으로 닫는다."""
+
+    if frame.llm_semantic_judgement_status != "ran":
+        return frame
+    if frame.semantic_goal_match_status != "matched":
+        return frame
+    if frame.goal_match_status in {"partial", "missing"}:
+        return frame
+    if current_original_material_count <= 0:
+        return frame
+    if current_original_material_count < frame.original_material_required_count:
+        return frame
+
+    completion_reason = "CODE_STATUS:revision_semantic_match_with_original_material"
+    return replace(
+        frame,
+        achievement_status="achieved",
+        reason=_append_guard_reason(frame.reason, completion_reason),
+        macro_achievement_status="achieved",
+        macro_achievement_reason=_append_guard_reason(
+            frame.macro_achievement_reason,
+            completion_reason,
+        ),
+        micro_achievement_status="achieved",
+        micro_achievement_reason=_append_guard_reason(
+            frame.micro_achievement_reason,
+            completion_reason,
+        ),
+        achievement_generation_source=(
+            f"{frame.achievement_generation_source}"
+            "+CODE:REVISION_SEMANTIC_MATCH_COMPLETION_POLICY"
+        ),
     )
 
 
@@ -943,8 +1063,12 @@ def _l3_judgement_contract(l1_goal: dict[str, object]) -> list[str]:
     return contract
 
 
-def _validate_l3_semantic_payload(payload: dict[str, object]) -> None:
-    """Qwen L3가 생성할 수 있는 의미 적합성 필드만 검증한다."""
+def _validate_l3_semantic_payload(
+    payload: dict[str, object],
+    *,
+    semantic_material_by_ref: dict[str, _L3SemanticMaterial],
+) -> None:
+    """L3 의미 판단과 실제 공급 원문 사이의 구조적 결속을 검증한다."""
 
     status = str(payload.get("semantic_goal_match_status") or "").strip()
     reason = str(payload.get("semantic_goal_match_reason") or "").strip()
@@ -952,6 +1076,83 @@ def _validate_l3_semantic_payload(payload: dict[str, object]) -> None:
         raise ValueError("unknown L3 semantic_goal_match_status")
     if status != "not_run" and not reason:
         raise ValueError("L3 semantic_goal_match_reason must not be empty")
+    bindings = payload.get("semantic_evidence_bindings")
+    if bindings is None:
+        bindings = []
+    if not isinstance(bindings, list):
+        raise ValueError("L3 semantic_evidence_bindings must be a list")
+    if status == "matched" and not bindings:
+        raise ValueError("matched L3 semantic judgement requires evidence bindings")
+
+    seen_refs: set[str] = set()
+    for item in bindings:
+        if not isinstance(item, dict):
+            raise ValueError("L3 semantic evidence binding must be an object")
+        material_ref = str(item.get("material_ref") or "").strip()
+        evidence_excerpt = str(item.get("evidence_excerpt") or "")
+        if not material_ref or not evidence_excerpt.strip():
+            raise ValueError(
+                "L3 semantic evidence binding requires material_ref and evidence_excerpt"
+            )
+        if material_ref in seen_refs:
+            raise ValueError("L3 semantic evidence material refs must be unique")
+        seen_refs.add(material_ref)
+        material = semantic_material_by_ref.get(material_ref)
+        if material is None:
+            raise ValueError("L3 semantic evidence material_ref was not supplied")
+        if len(evidence_excerpt) > L3_SEMANTIC_EVIDENCE_EXCERPT_MAX_CHARS:
+            raise ValueError("L3 semantic evidence excerpt is too long")
+        if evidence_excerpt not in material.text:
+            raise ValueError(
+                "L3 semantic evidence excerpt must be copied exactly from supplied material"
+            )
+
+
+def _l3_semantic_materials(
+    *,
+    read_document_previews: list[dict[str, object]],
+    read_code_file_previews: list[dict[str, object]],
+) -> list[_L3SemanticMaterial]:
+    materials: list[_L3SemanticMaterial] = []
+    for preview in [*read_document_previews, *read_code_file_previews]:
+        material_ref = str(preview.get("material_ref") or "").strip()
+        source_data_id = str(preview.get("source_data_id") or "").strip()
+        text = str(preview.get("text_preview") or "")
+        if material_ref and source_data_id and text:
+            materials.append(
+                _L3SemanticMaterial(
+                    material_ref=material_ref,
+                    source_data_id=source_data_id,
+                    text=text,
+                )
+            )
+    return materials
+
+
+def _l3_semantic_evidence_bindings_from_payload(
+    *,
+    payload: dict[str, object],
+    semantic_material_by_ref: dict[str, _L3SemanticMaterial],
+) -> list[L3SemanticEvidenceBinding]:
+    bindings: list[L3SemanticEvidenceBinding] = []
+    raw_bindings = payload.get("semantic_evidence_bindings")
+    if not isinstance(raw_bindings, list):
+        return bindings
+    for item in raw_bindings:
+        if not isinstance(item, dict):
+            continue
+        material_ref = str(item.get("material_ref") or "").strip()
+        material = semantic_material_by_ref.get(material_ref)
+        if material is None:
+            continue
+        bindings.append(
+            L3SemanticEvidenceBinding(
+                material_ref=material_ref,
+                source_data_id=material.source_data_id,
+                evidence_excerpt=str(item.get("evidence_excerpt") or ""),
+            )
+        )
+    return bindings
 
 
 def _extract_search_candidates(
@@ -1065,10 +1266,14 @@ def _build_goal_match_context(
     user_query: str,
     preserved_frame: L3PreservedInfoFrame,
     data_store: DataStore | None,
+    allowed_source_data_ids: set[str],
 ) -> dict[str, object]:
     """사용자가 특정 문서를 요구했는지와 실제 L루프 산출이 맞았는지 코드로 대조한다."""
 
-    explicit_artifact_hint = _explicit_artifact_requested_doc_hint(data_store)
+    explicit_artifact_hint = _explicit_artifact_requested_doc_hint(
+        data_store,
+        allowed_source_data_ids=allowed_source_data_ids,
+    )
     requested_doc_hint = explicit_artifact_hint or _extract_requested_doc_hint(user_query)
     requested_doc_hint_source = (
         "explicit_artifact_reference_frame"
@@ -1077,8 +1282,14 @@ def _build_goal_match_context(
         if requested_doc_hint
         else "none"
     )
-    read_doc_ids = _read_doc_ids_from_data_store(data_store)
-    read_code_file_paths = _read_code_file_paths_from_data_store(data_store)
+    read_doc_ids = _read_doc_ids_from_data_store(
+        data_store,
+        allowed_source_data_ids=allowed_source_data_ids,
+    )
+    read_code_file_paths = _read_code_file_paths_from_data_store(
+        data_store,
+        allowed_source_data_ids=allowed_source_data_ids,
+    )
     search_result_doc_ids = _unique_strings(
         [candidate.doc_id for candidate in preserved_frame.candidates if candidate.doc_id]
     )
@@ -1198,10 +1409,20 @@ def _apply_semantic_goal_match_guard(
     micro_reason: str,
     semantic_goal_match_status: str,
     semantic_goal_match_reason: str,
+    semantic_evidence_bindings: list[L3SemanticEvidenceBinding],
 ) -> tuple[str, str, str, str, str, str]:
     """LLM semantic judgement can downgrade achievement; code does not invent semantic labels."""
 
-    if semantic_goal_match_status in {"not_run", "matched"}:
+    if semantic_goal_match_status == "not_run":
+        return (
+            achievement_status,
+            reason,
+            macro_status,
+            macro_reason,
+            micro_status,
+            micro_reason,
+        )
+    if semantic_goal_match_status == "matched" and semantic_evidence_bindings:
         return (
             achievement_status,
             reason,
@@ -1324,13 +1545,19 @@ def _extract_requested_doc_hint(text: str) -> str:
     return ""
 
 
-def _explicit_artifact_requested_doc_hint(data_store: DataStore | None) -> str:
+def _explicit_artifact_requested_doc_hint(
+    data_store: DataStore | None,
+    *,
+    allowed_source_data_ids: set[str],
+) -> str:
     """명시 문서 resolver가 남긴 절대 좌표를 L3 목표 대조에 재사용한다."""
 
     if data_store is None:
         return ""
 
     for record in reversed(data_store.list_records()):
+        if record.data_id not in allowed_source_data_ids:
+            continue
         if record.data_type != "node_output:explicit_artifact_reference_frame":
             continue
         payload = record.payload
@@ -1365,12 +1592,18 @@ def _clean_doc_hint(value: str) -> str:
     return value.strip().strip("`'\"").rstrip(".,:;)]}")
 
 
-def _read_doc_ids_from_data_store(data_store: DataStore | None) -> list[str]:
+def _read_doc_ids_from_data_store(
+    data_store: DataStore | None,
+    *,
+    allowed_source_data_ids: set[str],
+) -> list[str]:
     if data_store is None:
         return []
 
     doc_ids: list[str] = []
     for record in data_store.list_records():
+        if record.data_id not in allowed_source_data_ids:
+            continue
         if not _is_document_extract_record(record.data_type):
             continue
         payload = record.payload
@@ -1411,12 +1644,18 @@ def _original_material_requirement_status(
     return "unsatisfied"
 
 
-def _read_code_file_paths_from_data_store(data_store: DataStore | None) -> list[str]:
+def _read_code_file_paths_from_data_store(
+    data_store: DataStore | None,
+    *,
+    allowed_source_data_ids: set[str],
+) -> list[str]:
     if data_store is None:
         return []
 
     paths: list[str] = []
     for record in data_store.list_records():
+        if record.data_id not in allowed_source_data_ids:
+            continue
         if not _is_code_extract_record(record.data_type):
             continue
         payload = record.payload
@@ -1438,6 +1677,7 @@ def _read_doc_previews_from_data_store(
     *,
     max_docs: int = 3,
     max_text_chars: int = 1200,
+    allowed_source_data_ids: set[str],
 ) -> list[dict[str, object]]:
     """Package read_doc outputs for L3 LLM judgement without adding semantic interpretation."""
 
@@ -1446,6 +1686,8 @@ def _read_doc_previews_from_data_store(
 
     previews: list[dict[str, object]] = []
     for record in data_store.list_records():
+        if record.data_id not in allowed_source_data_ids:
+            continue
         if not _is_document_extract_record(record.data_type):
             continue
         payload = record.payload
@@ -1459,6 +1701,7 @@ def _read_doc_previews_from_data_store(
             text = ""
         previews.append(
             {
+                "material_ref": f"DOC_MATERIAL_{len(previews) + 1:04d}",
                 "source_data_id": record.data_id,
                 "doc_id": doc_id,
                 "char_count": payload.get("char_count"),
@@ -1474,15 +1717,18 @@ def _read_code_file_previews_from_data_store(
     data_store: DataStore | None,
     *,
     max_files: int = 3,
-    max_text_chars: int = 1200,
+    max_total_text_chars: int = L3_CODE_PREVIEW_TOTAL_BUDGET_CHARS,
+    allowed_source_data_ids: set[str],
 ) -> list[dict[str, object]]:
-    """Package read_code_file outputs for L3 LLM judgement without interpretation."""
+    """최신 코드 구간을 전체 구간 단위 예산 안에서 L3에게 포장한다."""
 
     if data_store is None:
         return []
 
-    previews: list[dict[str, object]] = []
+    candidates: list[dict[str, object]] = []
     for record in data_store.list_records():
+        if record.data_id not in allowed_source_data_ids:
+            continue
         if not _is_code_extract_record(record.data_type):
             continue
         payload = record.payload
@@ -1496,18 +1742,75 @@ def _read_code_file_previews_from_data_store(
             continue
         if not isinstance(text, str):
             text = ""
-        previews.append(
+        candidates.append(
             {
                 "source_data_id": record.data_id,
                 "file_path": file_path,
                 "char_count": payload.get("char_count"),
                 "line_count": payload.get("line_count"),
-                "text_preview": text[:max_text_chars],
+                "range_start_char": payload.get("range_start_char"),
+                "range_end_char_exclusive": payload.get("range_end_char_exclusive"),
+                "total_char_count": payload.get("total_char_count") or payload.get("char_count"),
+                "analysis_scope": (
+                    "complete_file"
+                    if payload.get("range_start_char") == 0
+                    and payload.get("range_end_char_exclusive")
+                    == (payload.get("total_char_count") or payload.get("char_count"))
+                    else "partial_range"
+                ),
+                # read_code_file이 이미 확정한 구간을 여기서 다시 자르지 않는다.
+                # 전체 구간이 총예산에 들어오지 않으면 아래 선택 단계에서 통째로 제외한다.
+                "text_preview": text,
             }
         )
-        if len(previews) >= max_files:
+
+    # revision에서는 방금 읽은 뒤쪽 구간이 가장 중요하다. 최신 구간부터 예산에
+    # 넣되, 한 구간의 preview를 중간에서 추가 절단하지 않는다.
+    selected_reversed: list[dict[str, object]] = []
+    used_chars = 0
+    for candidate in reversed(candidates):
+        text_preview = str(candidate.get("text_preview") or "")
+        if not text_preview:
+            continue
+        if used_chars + len(text_preview) > max_total_text_chars:
+            continue
+        selected_reversed.append(candidate)
+        used_chars += len(text_preview)
+        if len(selected_reversed) >= max_files:
             break
-    return previews
+
+    selected = list(reversed(selected_reversed))
+    for index, preview in enumerate(selected, start=1):
+        preview["material_ref"] = f"CODE_MATERIAL_{index:04d}"
+    return selected
+
+
+def _original_material_count_for_ids(
+    *,
+    data_store: DataStore,
+    source_data_ids: list[str],
+) -> int:
+    """지정된 현재 L lineage 안에서 비어 있지 않은 문서/코드 원본 종류 수를 센다."""
+
+    document_ids: set[str] = set()
+    code_paths: set[str] = set()
+    for data_id in source_data_ids:
+        record = data_store.get_record(data_id)
+        if record is None or not isinstance(record.payload, dict):
+            continue
+        payload = record.payload
+        text = payload.get("text")
+        if not isinstance(text, str) or not text.strip():
+            continue
+        if _is_document_extract_record(record.data_type):
+            doc_id = payload.get("doc_id")
+            if isinstance(doc_id, str) and doc_id:
+                document_ids.add(doc_id)
+        elif _is_code_extract_record(record.data_type) and payload.get("read_status") == "ok":
+            file_path = payload.get("file_path")
+            if isinstance(file_path, str) and file_path:
+                code_paths.add(file_path)
+    return len(document_ids) + len(code_paths)
 
 
 def _is_document_extract_record(data_type: str) -> bool:

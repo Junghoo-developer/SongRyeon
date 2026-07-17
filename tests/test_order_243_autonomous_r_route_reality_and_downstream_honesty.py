@@ -84,6 +84,10 @@ def test_l3_uses_explicit_resolver_id_and_downgrades_unrelated_read() -> None:
         user_query="ORDER 090 문서를 설명해줘",
         preserved_frame=L3PreservedInfoFrame(frame_id="L:preserved", turn_id="turn_order_243"),
         data_store=data_store,
+        allowed_source_data_ids={
+            explicit_frame.frame_id,
+            "tool_result:read_doc:unrelated",
+        },
     )
 
     assert goal_match["requested_doc_hint_source"] == "explicit_artifact_reference_frame"

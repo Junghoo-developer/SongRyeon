@@ -1,5 +1,19 @@
 # Release Notes
 
+## 2026-07-17: Competition Submission Readiness Checkpoint
+
+- ORDER 261/262 tighten code-range evidence assembly, current-run scoping, L3 evidence binding,
+  node_3 code-text budgeting, latest revision propagation, and count consistency.
+- A compact first-run view is available through:
+
+```powershell
+python main.py fake-turn "송련이 뭔지 짧게 설명해줘" --compact
+```
+
+- Third-party component and model disclosure notes are in `THIRD_PARTY_LICENSES.md`.
+- Local verification baseline before publication: 476 passed, 5 deselected; `SMOKE_TEST_OK`.
+- Remote GitHub Actions for this checkpoint must be confirmed after push.
+
 ## 2026-07-03: Vessel Graph Memory And R Traversal Baseline
 
 This is the first public baseline where SongRyeon Core can show a local graph-memory path end to end.

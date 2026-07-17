@@ -121,6 +121,9 @@ def test_read_code_file_counts_as_source_code_evidence_without_becoming_read_doc
     assert achievement_payload["read_doc_ids"] == []
     assert achievement_payload["read_code_file_paths"] == ["songryeon_core/tools/code_tools.py"]
     assert achievement_payload["actual_read_code_file_count"] == 1
+    assert set(result.explicit_artifact_reference_data_ids).issubset(
+        set(achievement_payload["source_data_ids"])
+    )
 
     budget_payload = data_store.require_record(result.tool_budget_data_ids[-1]).payload
     assert isinstance(budget_payload, dict)
@@ -222,6 +225,7 @@ def test_read_code_file_counts_as_source_code_evidence_without_becoming_read_doc
 
     grounding = build_node3_grounding_block(brief)
     assert "실제 read_doc 도구 원문 읽기: 0개" in grounding
-    assert "실제 read_code_file 도구 원문 읽기: 1개" in grounding
+    assert "실제 read_code_file 고유 파일: 1개" in grounding
+    assert "실제 read_code_file 호출/구간: 1개" in grounding
     assert "node_3 공급 source-code context: 1개" in grounding
     assert "source-code 구조 목록: 1개" in grounding

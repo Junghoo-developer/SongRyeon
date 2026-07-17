@@ -2422,10 +2422,17 @@ class Node3SourceCodeOutline:
     file_path: str
     # 절대 정보: 현재 파서는 python만 구조화한다.
     language: str
-    # 절대 정보: parsed, unsupported_language, parse_failed 중 하나.
+    # 절대 정보: parsed, unsupported_language, parse_failed,
+    # not_run_partial_range 중 하나.
     parse_status: str
     # 절대 정보: 이 outline이 대응하는 read_code_file DataStore record.
     source_data_id: str
+    # 절대 정보: complete_file 또는 partial_range. 부분 구간은 전체 파일처럼 parse하지 않는다.
+    analysis_scope: str
+    # 절대 정보: 이 outline과 같은 source record가 실제 반환한 문자 범위.
+    range_start_char: int
+    range_end_char_exclusive: int
+    total_char_count: int
     # 절대 정보: top-level symbol 수.
     top_level_symbol_count: int = 0
     # 절대 정보: public symbol 수.
@@ -2436,6 +2443,8 @@ class Node3SourceCodeOutline:
     top_level_symbols: list[Node3SourceCodeSymbol] = field(default_factory=list)
     # 절대 정보: 파싱 실패 시 예외 종류만 기록한다. 의미 판단이 아니다.
     parse_error_type: str = ""
+    # 절대 정보: 분석용 원문 맨 앞에 UTF-8 BOM 문자가 있었는지 표시한다.
+    utf8_bom_present: bool = False
 
 
 @dataclass
@@ -2453,7 +2462,7 @@ class Node3InputBriefFrame:
     actual_tool_read_doc_count: int = 0
     # 절대 정보: 실제 read_doc/read_artifact 도구가 기록한 문서명 목록.
     actual_tool_read_doc_documents: list[str] = field(default_factory=list)
-    # 절대 정보: 실제 read_code_file 도구가 기록한 source/config 파일 수.
+    # 절대 정보: 실제 read_code_file 성공 기록에 나온 고유 source/config 파일 경로 수.
     actual_tool_read_code_file_count: int = 0
     # 절대 정보: 실제 read_code_file 도구가 기록한 source/config 파일 경로 목록.
     actual_tool_read_code_file_paths: list[str] = field(default_factory=list)
@@ -2767,12 +2776,25 @@ def _validate_node3_source_code_outline(outline: Node3SourceCodeOutline) -> None
         "language": outline.language,
         "parse_status": outline.parse_status,
         "source_data_id": outline.source_data_id,
+        "analysis_scope": outline.analysis_scope,
     }.items():
         if not value:
             raise ValueError(f"Node3SourceCodeOutline.{field_name} must not be empty")
-    if outline.parse_status not in {"parsed", "unsupported_language", "parse_failed"}:
+    if outline.analysis_scope not in {"complete_file", "partial_range"}:
+        raise ValueError(
+            f"unknown Node3SourceCodeOutline.analysis_scope: {outline.analysis_scope}"
+        )
+    if outline.parse_status not in {
+        "parsed",
+        "unsupported_language",
+        "parse_failed",
+        "not_run_partial_range",
+    }:
         raise ValueError(f"unknown Node3SourceCodeOutline.parse_status: {outline.parse_status}")
     for field_name, value in {
+        "range_start_char": outline.range_start_char,
+        "range_end_char_exclusive": outline.range_end_char_exclusive,
+        "total_char_count": outline.total_char_count,
         "top_level_symbol_count": outline.top_level_symbol_count,
         "public_symbol_count": outline.public_symbol_count,
     }.items():
@@ -2780,6 +2802,24 @@ def _validate_node3_source_code_outline(outline: Node3SourceCodeOutline) -> None
             raise TypeError(f"Node3SourceCodeOutline.{field_name} must be an integer")
         if value < 0:
             raise ValueError(f"Node3SourceCodeOutline.{field_name} must not be negative")
+    if outline.range_start_char > outline.range_end_char_exclusive:
+        raise ValueError("Node3SourceCodeOutline range start must not exceed range end")
+    if outline.range_end_char_exclusive > outline.total_char_count:
+        raise ValueError("Node3SourceCodeOutline range end must not exceed total")
+    expected_scope = (
+        "complete_file"
+        if outline.range_start_char == 0
+        and outline.range_end_char_exclusive == outline.total_char_count
+        else "partial_range"
+    )
+    if outline.analysis_scope != expected_scope:
+        raise ValueError("Node3SourceCodeOutline.analysis_scope must mirror its range")
+    if outline.analysis_scope == "partial_range" and outline.parse_status != "not_run_partial_range":
+        raise ValueError("partial Node3SourceCodeOutline must not be parsed as a complete file")
+    if outline.analysis_scope == "complete_file" and outline.parse_status == "not_run_partial_range":
+        raise ValueError("complete Node3SourceCodeOutline must not use partial-range parse status")
+    if not isinstance(outline.utf8_bom_present, bool):
+        raise TypeError("Node3SourceCodeOutline.utf8_bom_present must be a boolean")
     if outline.top_level_symbol_count != len(outline.top_level_symbols):
         raise ValueError(
             "Node3SourceCodeOutline.top_level_symbol_count must mirror top_level_symbols length"
@@ -2800,6 +2840,11 @@ def _validate_node3_source_code_outline(outline: Node3SourceCodeOutline) -> None
         raise ValueError(
             "Node3SourceCodeOutline.public_function_names must mirror public function symbols"
         )
+    if outline.parse_status == "not_run_partial_range":
+        if outline.top_level_symbols or outline.public_function_names or outline.parse_error_type:
+            raise ValueError(
+                "partial Node3SourceCodeOutline must not contain parse results or parse errors"
+            )
     for symbol in outline.top_level_symbols:
         _validate_node3_source_code_symbol(symbol)
 
@@ -5883,7 +5928,7 @@ class LLoopReturnSummaryFrame:
     read_doc_ids: list[str] = field(default_factory=list)
     # 절대 정보: 실제 read_code_file로 읽은 source/config 파일 경로 목록.
     read_code_file_paths: list[str] = field(default_factory=list)
-    # 절대 정보: read_code_file 성공 기록 수. read_doc 수와 섞지 않는다.
+    # 절대 정보: read_code_file 성공 기록에 나온 고유 파일 경로 수. 호출 수와 섞지 않는다.
     actual_read_code_file_count: int = 0
     # 절대 정보: tool scope partition이 허용한 최대 read_code_file 호출 횟수.
     max_read_code_file_calls: int = 0
@@ -6142,7 +6187,7 @@ L3_PRESERVED_INFO_FRAME_SCHEMA_NAME = "L3PreservedInfoFrame"
 L3_PRESERVED_INFO_FRAME_SCHEMA_VERSION = "0.1"
 L3_JUDGEMENT_STATUSES = {"not_judged"}
 L3_ACHIEVEMENT_FRAME_SCHEMA_NAME = "L3AchievementFrame"
-L3_ACHIEVEMENT_FRAME_SCHEMA_VERSION = "0.2"
+L3_ACHIEVEMENT_FRAME_SCHEMA_VERSION = "0.3"
 L3_ACHIEVEMENT_STATUSES = {"achieved", "partial", "failed"}
 L3_GOAL_MATCH_STATUSES = {"matched", "partial", "missing", "not_applicable"}
 L3_SEMANTIC_GOAL_MATCH_STATUSES = {"matched", "partial", "missing", "not_run"}
@@ -6267,6 +6312,18 @@ def _validate_l3_preserved_candidate(candidate: L3PreservedSearchCandidate) -> N
 
 
 @dataclass
+class L3SemanticEvidenceBinding:
+    """L3 의미 판단이 실제로 공급받은 원문 조각에 대응한다는 절대 좌표."""
+
+    # 절대 정보: L3 LLM payload 안에서만 쓰는 안전한 재료 번호.
+    material_ref: str
+    # 절대 정보: code가 material_ref를 다시 연결한 DataStore record ID.
+    source_data_id: str
+    # 절대 정보: LLM이 공급 원문에서 그대로 복사했고 code가 존재를 확인한 짧은 발췌.
+    evidence_excerpt: str
+
+
+@dataclass
 class L3AchievementFrame:
     """L3가 L루프의 운영 목표 달성 여부와 이유를 DataStore에 저장하는 판단 프레임."""
 
@@ -6320,7 +6377,7 @@ class L3AchievementFrame:
     read_doc_ids: list[str] = field(default_factory=list)
     # 절대 정보: 이번 L루프에서 실제 read_code_file로 읽은 source/config 파일 경로 목록.
     read_code_file_paths: list[str] = field(default_factory=list)
-    # 절대 정보: read_code_file 성공 기록 수. read_doc 수와 섞지 않는다.
+    # 절대 정보: read_code_file 성공 기록에 나온 고유 파일 경로 수. 호출 수와 섞지 않는다.
     actual_read_code_file_count: int = 0
     # 절대 정보: search_docs 결과에서 L3가 보존한 문서 ID 목록.
     search_result_doc_ids: list[str] = field(default_factory=list)
@@ -6331,6 +6388,8 @@ class L3AchievementFrame:
     goal_match_reason: str = "CODE_STATUS:no_specific_doc_hint_detected"
     semantic_goal_match_status: str = "not_run"
     semantic_goal_match_reason: str = "CODE_STATUS:llm_semantic_goal_match_not_run"
+    # 절대 좌표 + 복사 원문: L3의 의미 판단이 어느 공급 재료에 대응하는지 보존한다.
+    semantic_evidence_bindings: list[L3SemanticEvidenceBinding] = field(default_factory=list)
     # 절대 정보: 실제 비어 있지 않은 read_doc/read_artifact 원문 수.
     actual_read_doc_count: int = 0
     # 절대 정보: 문서+코드 원문 수. 검색 후보 수와 섞지 않는다.
@@ -6378,6 +6437,34 @@ def validate_l3_achievement_frame(frame: L3AchievementFrame) -> None:
         raise ValueError(f"unknown L3 semantic_goal_match_status: {frame.semantic_goal_match_status}")
     if frame.semantic_goal_match_status != "not_run" and not frame.semantic_goal_match_reason:
         raise ValueError("L3AchievementFrame.semantic_goal_match_reason must not be empty when semantic match ran")
+    if (
+        frame.llm_semantic_judgement_status == "ran"
+        and frame.semantic_goal_match_status == "matched"
+        and not frame.semantic_evidence_bindings
+    ):
+        raise ValueError(
+            "matched L3 semantic judgement requires semantic_evidence_bindings"
+        )
+    seen_material_refs: set[str] = set()
+    for binding in frame.semantic_evidence_bindings:
+        for field_name, value in {
+            "material_ref": binding.material_ref,
+            "source_data_id": binding.source_data_id,
+            "evidence_excerpt": binding.evidence_excerpt,
+        }.items():
+            if not value:
+                raise ValueError(
+                    f"L3SemanticEvidenceBinding.{field_name} must not be empty"
+                )
+        if binding.material_ref in seen_material_refs:
+            raise ValueError(
+                "L3AchievementFrame semantic evidence material refs must be unique"
+            )
+        seen_material_refs.add(binding.material_ref)
+        if binding.source_data_id not in frame.source_data_ids:
+            raise ValueError(
+                "L3 semantic evidence source_data_id must be in frame.source_data_ids"
+            )
     if frame.evidence_acquisition_status not in L_EVIDENCE_ACQUISITION_STATUSES:
         raise ValueError(
             "unknown L3 evidence_acquisition_status: "

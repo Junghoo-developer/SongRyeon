@@ -50,7 +50,7 @@ from songryeon_core.runtime.r_loop_vessel_answer_demo import (
 from songryeon_core.runtime.replay import replay_run
 from songryeon_core.runtime.quick_smoke import run_quick_smoke_tests
 from songryeon_core.runtime.smoke_test import run_smoke_tests
-from songryeon_core.runtime.terminal_view import render_pretty_turn
+from songryeon_core.runtime.terminal_view import render_compact_turn, render_pretty_turn
 from songryeon_core.runtime.user_turn import (
     run_codex_sdk_user_turn,
     run_fake_user_turn,
@@ -575,7 +575,7 @@ def main() -> None:
             max_read_doc_calls=args.max_read_doc_calls,
             max_input_chars=args.max_input_chars,
             max_document_context_chars=args.max_document_context_chars,
-            include_data_records=args.pretty,
+            include_data_records=args.pretty or args.compact,
             force_l_route=args.force_l,
             force_vessel_r_route=args.force_vessel_r_route,
             same_turn_l_reroute_enabled=args.same_turn_l_reroute,
@@ -598,6 +598,8 @@ def main() -> None:
         )
         if args.pretty:
             print(render_pretty_turn(result, user_input=args.user_input))
+        elif args.compact:
+            print(render_compact_turn(result, user_input=args.user_input))
         else:
             print(json.dumps(_turn_summary(result, include_report=args.include_report), ensure_ascii=False, indent=2))
     elif args.command == "qwen-turn":
@@ -614,7 +616,7 @@ def main() -> None:
             max_read_doc_calls=args.max_read_doc_calls,
             max_input_chars=args.max_input_chars,
             max_document_context_chars=args.max_document_context_chars,
-            include_data_records=args.pretty,
+            include_data_records=args.pretty or args.compact,
             force_l_route=args.force_l,
             force_vessel_r_route=args.force_vessel_r_route,
             same_turn_l_reroute_enabled=args.same_turn_l_reroute,
@@ -637,6 +639,8 @@ def main() -> None:
         )
         if args.pretty:
             print(render_pretty_turn(result, user_input=args.user_input))
+        elif args.compact:
+            print(render_compact_turn(result, user_input=args.user_input))
         else:
             print(json.dumps(_turn_summary(result, include_report=args.include_report), ensure_ascii=False, indent=2))
     elif args.command == "qwen-chat":
@@ -900,7 +904,9 @@ def _add_turn_runtime_args(parser: argparse.ArgumentParser, *, include_qwen_args
     # 이렇게 해두면 max_tool_calls 같은 기본값을 명령마다 따로 고치지 않아도 된다.
     parser.add_argument("--export", default=None)
     parser.add_argument("--include-report", action="store_true")
-    parser.add_argument("--pretty", action="store_true")
+    display_group = parser.add_mutually_exclusive_group()
+    display_group.add_argument("--pretty", action="store_true")
+    display_group.add_argument("--compact", action="store_true")
     parser.add_argument("--max-tool-calls", type=int, default=DEFAULT_MAX_TOOL_CALLS)
     parser.add_argument("--search-top-k", type=int, default=DEFAULT_SEARCH_TOP_K)
     parser.add_argument("--max-query-attempts", type=int, default=DEFAULT_MAX_QUERY_ATTEMPTS)
@@ -1201,7 +1207,10 @@ def _run_qwen_chat(args: argparse.Namespace) -> None:
             session_memory=session_memory,
             current_turn_id=current_turn_id,
         )
-        print(render_pretty_turn(result, user_input=user_input))
+        if args.compact:
+            print(render_compact_turn(result, user_input=user_input))
+        else:
+            print(render_pretty_turn(result, user_input=user_input))
         print("")
         store_chat_turn_result(
             session_memory=session_memory,
