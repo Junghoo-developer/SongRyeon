@@ -1,5 +1,25 @@
 # Release Notes
 
+## 2026-07-17: Competition Reviewer Demo And Product Positioning
+
+- Added a deterministic one-command reviewer demo:
+
+```powershell
+python main.py competition-demo
+```
+
+- The screen reproduces three boundaries without an external API or Neo4j:
+  - local report/check path,
+  - honest failed fallback,
+  - explicit unread-document role conflict blocked by a CODE guard.
+- The controlled guard scene exposes five candidates, two actual `read_doc` results, and
+  three unread candidates.
+- README and demo documentation now lead with user-facing states: code verified, model
+  interpreted, public release allowed, and revision required.
+- Added a competition report outline and tightened third-party license disclosures.
+- This checkpoint does not claim general hallucination detection or semantic truth checking.
+- Local verification: 478 passed, 5 deselected; `SMOKE_TEST_OK`.
+
 ## 2026-07-17: Competition Submission Readiness Checkpoint
 
 - ORDER 261/262 tighten code-range evidence assembly, current-run scoping, L3 evidence binding,

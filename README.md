@@ -2,13 +2,43 @@
 
 [![smoke-test](https://github.com/Junghoo-developer/SongRyeon/actions/workflows/smoke-test.yml/badge.svg)](https://github.com/Junghoo-developer/SongRyeon/actions/workflows/smoke-test.yml)
 
-[한국어 README](README.ko.md) | [Demo Commands](DEMO.md) | [Release Notes](RELEASE_NOTES.md) | [Third-Party Licenses](THIRD_PARTY_LICENSES.md)
+[한국어 README](README.ko.md) | [Three-Minute Demo](DEMO.md) | [Competition Report Outline](COMPETITION_SUBMISSION_REPORT_OUTLINE.md) | [Release Notes](RELEASE_NOTES.md) | [Third-Party Licenses](THIRD_PARTY_LICENSES.md)
+
+> **A local agent that shows what it read and how far its answer can be trusted, instead of merely sounding smarter.**
+
+SongRyeon Core is a local document and source-code investigation agent. It shows what a
+small local model searched and actually read, separates **what code verified** from **what
+the model inferred**, and blocks explicit evidence-role conflicts before public release.
+
+## Reproduce It In One Minute
+
+Only Python and this repository are required. No external API, model weights, or Neo4j
+instance is needed.
+
+```powershell
+python main.py competition-demo
+```
+
+The single screen reproduces three deterministic scenes:
+
+```text
+LOCAL           runs the local report-and-check path with test doubles
+HONEST FALLBACK records a broken model response as a failed CODE:FALLBACK
+CODE GUARD      blocks an explicit claim that an unread candidate was actually read
+```
+
+The first-screen vocabulary is intentionally plain:
+
+- **Code verified**: candidate, actual-read, unread, and final-gate counts/statuses.
+- **Model inferred**: semantic interpretation, answer text, and evidence-role judgment.
+- **Public release allowed**: the report passed the structural checks.
+- **Revision required**: an explicit model claim conflicts with the code-owned ledger.
+
+This demo does not claim to solve hallucinations in general. It reproduces the narrower
+boundary the code can prove: explicit structural conflicts involving evidence roles,
+actual document reads, and counts.
 
 **Keywords:** LLM agents, provenance, runtime honesty, traceability, local-first AI, smoke-tested agent architecture.
-
-SongRyeon Core is a tiny agent runtime that forces an LLM to separate **what the code verified** from **what the model inferred**.
-
-The goal is simple: when an agent answers, it should not blur facts, guesses, summaries, tool results, and internal routing decisions into one confident-looking paragraph.
 
 ## Feedback Wanted
 
@@ -96,11 +126,12 @@ SongRyeon Core is my small, local-first attempt to make those questions visible 
 Reviewers and first-time users can start without a model or Neo4j:
 
 ```powershell
-python main.py fake-turn "송련이 뭔지 짧게 설명해줘" --compact
+python main.py competition-demo
 ```
 
-`--compact` displays the core code-verified counts and final answer. It does not delete the
-underlying trace/data ledger; use the existing `--pretty` view for full audits.
+Use `python main.py competition-demo --json` for the structured result. The existing
+`fake-turn --compact` and `--pretty` views remain available for the general short demo and
+full ledger audit.
 
 After creating a local `.env`, the normal interactive start is now one command:
 
@@ -211,7 +242,7 @@ You can also point `QWEN_LOCAL_ENDPOINT` at an OpenAI-compatible local HTTP endp
 Local checkpoint as of 2026-07-17:
 
 - `python -m compileall songryeon_core main.py` passes.
-- `python -m pytest` passes: 476 passed, 5 deselected.
+- `python -m pytest` passes: 478 passed, 5 deselected.
 - `python main.py smoke-test` passes.
 - `python main.py fast-test --profile graph` passes.
 - GitHub Actions for this checkpoint must be confirmed after the latest branch is pushed.

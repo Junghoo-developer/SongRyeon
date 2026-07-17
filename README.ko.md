@@ -2,14 +2,42 @@
 
 [![smoke-test](https://github.com/Junghoo-developer/SongRyeon/actions/workflows/smoke-test.yml/badge.svg)](https://github.com/Junghoo-developer/SongRyeon/actions/workflows/smoke-test.yml)
 
-[English README](README.md) | [데모 명령어](DEMO.md) | [릴리즈 노트](RELEASE_NOTES.md) | [제3자 라이선스](THIRD_PARTY_LICENSES.md)
+[English README](README.md) | [3분 데모](DEMO.md) | [대회 보고서 골격](COMPETITION_SUBMISSION_REPORT_OUTLINE.md) | [릴리즈 노트](RELEASE_NOTES.md) | [제3자 라이선스](THIRD_PARTY_LICENSES.md)
+
+> **더 똑똑한 답변보다, 무엇을 읽었고 어디까지 믿을 수 있는지 보여주는 로컬 에이전트.**
+
+송련 코어는 작은 로컬 모델이 무엇을 검색했고 실제로 무엇을 읽었는지 보여주고,
+**코드가 확인한 사실**과 **모델이 해석한 말**을 분리하며, 명시적인 근거 역할 충돌을
+사용자에게 공개하기 전에 차단하는 문서·코드 조사 에이전트입니다.
+
+## 1분 재현
+
+Python과 저장소만 있으면 됩니다. 외부 API, 모델 가중치, Neo4j는 필요하지 않습니다.
+
+```powershell
+python main.py competition-demo
+```
+
+한 화면에서 다음 세 장면을 확인합니다.
+
+```text
+LOCAL           전체 보고·검사 경로를 로컬 테스트 모델로 실행
+HONEST FALLBACK 모델 출력이 깨지면 실패와 CODE:FALLBACK을 숨기지 않음
+CODE GUARD      미열람 후보를 읽었다는 명시적 주장을 수정 필요로 판정하고 공개 차단
+```
+
+화면의 뜻은 단순합니다.
+
+- **코드가 확인함**: 후보 수, 실제 원문 읽기 수, 미열람 수, 최종 gate 상태.
+- **모델이 해석함**: 문서의 의미, 답변 내용, 근거 역할에 대한 판단.
+- **공개 가능**: 구조적 검사를 통과한 보고.
+- **수정 필요**: 코드가 확인한 장부와 모델의 명시적 주장이 충돌한 보고.
+
+이 데모는 모든 환각을 잡는다고 증명하지 않습니다. 문서 역할, 실제 원문 읽기 여부,
+count처럼 **코드가 확인할 수 있는 구조적 충돌**을 정직하게 드러내고 차단하는 범위만
+재현합니다.
 
 **키워드:** LLM 에이전트, 출처 추적, 런타임 정직성, traceability, 로컬 우선 AI, smoke-tested agent architecture.
-
-송련 코어는 LLM 에이전트가 **코드가 확인한 사실**과 **모델이 해석한 말**을 섞어 말하지 않게 만드는 작은 런타임 실험입니다.
-
-목표는 단순합니다.
-에이전트가 답변할 때 사실, 추측, 요약, 도구 결과, 내부 라우팅 판단을 한 덩어리의 그럴듯한 문단으로 뭉개지 않게 하는 것입니다.
 
 ## 피드백을 받고 싶습니다
 
@@ -101,11 +129,12 @@ LLM 판단은 LLM 판단으로 둔다.
 심사자나 처음 보는 사람은 모델과 Neo4j 없이 다음 한 줄부터 실행할 수 있습니다.
 
 ```powershell
-python main.py fake-turn "송련이 뭔지 짧게 설명해줘" --compact
+python main.py competition-demo
 ```
 
-`--compact`는 핵심 절대정보 count와 최종 답변만 짧게 보여줍니다. 전체 trace/data 장부는
-없애지 않으며, 개발 감사에서는 기존 `--pretty`를 사용하면 됩니다.
+구조화 결과가 필요하면 `python main.py competition-demo --json`을 사용합니다.
+기존 `fake-turn --compact`와 `--pretty`는 각각 짧은 일반 데모와 전체 장부 감사용으로
+그대로 유지됩니다.
 
 로컬 `.env` 설정이 끝났다면 평소에는 다음 한 줄만 실행하면 됩니다.
 
@@ -217,7 +246,7 @@ python main.py qwen-turn "송련의 문서 메모리 인덱스가 무엇인지 �
 2026-07-17 로컬 체크포인트 기준:
 
 - `python -m compileall songryeon_core main.py` 통과.
-- `python -m pytest` 통과: 476 passed, 5 deselected.
+- `python -m pytest` 통과: 478 passed, 5 deselected.
 - `python main.py smoke-test` 통과.
 - `python main.py fast-test --profile graph` 통과.
 - 이 기준선의 GitHub Actions 결과는 최신 브랜치를 push한 뒤 별도로 확인해야 함.

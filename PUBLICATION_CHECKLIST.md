@@ -4,6 +4,21 @@ This checklist is for publishing SongRyeon Core as a public GitHub portfolio rep
 
 ## Before First Push
 
+- [ ] Confirm the one-command competition reviewer demo works:
+
+```powershell
+python main.py competition-demo
+python main.py competition-demo --json
+```
+
+- [ ] Confirm all three scenes report `PASS`, the final status is
+  `SONGRYEON_COMPETITION_DEMO_OK`, and CODE GUARD reports candidates/read/unread as
+  `5 / 2 / 3`.
+- [ ] Confirm README, `DEMO.md`, `COMPETITION_SUBMISSION_REPORT_OUTLINE.md`, and
+  `THIRD_PARTY_LICENSES.md` use the same product claim and limitations.
+- [ ] Confirm the 3-minute video does not describe the deterministic guard demo as a live
+  model-quality comparison or general hallucination detector.
+
 - [ ] Decide repository visibility: public or private first, then public later.
 - [ ] Decide license.
   - Recommended for a portfolio/open-source style repo: MIT License.
@@ -37,13 +52,13 @@ rg -n "C:\\\\Users|OneDrive|바탕 화면" . -g "!Administrative_Reform_1/05_Exe
 ## Suggested GitHub Description
 
 ```text
-Local-first agent runtime experiment focused on provenance, traceable LLM judgments, and smoke-tested runtime honesty.
+Auditable local agent that shows what it searched, what it actually read, and what requires revision.
 ```
 
 ## Suggested README Pitch
 
 ```text
-SongRyeon Core separates code-verified facts, single-source semantic judgments, and multi-source synthesis inside a small local agent runtime.
+SongRyeon Core separates code-verified evidence from model interpretation and blocks explicit evidence-role conflicts before release.
 ```
 
 ## Safe Commit / Push Commands

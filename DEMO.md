@@ -1,45 +1,78 @@
 # SongRyeon Core Demo Path
 
-This file is the practical path for showing SongRyeon Core to another developer.
+This is the official reviewer path for SongRyeon Core. The first demo needs only Python
+and the repository. It does not need model weights, Ollama, Neo4j, or an external API.
 
-The demo is split into three layers:
+## Three-Minute Reviewer Script
 
-```text
-Layer 1. No model, no Neo4j: prove the runtime can run.
-Layer 2. Local verification: prove the baseline tests pass.
-Layer 3. Optional graph memory: show the Neo4j Vessel / R traversal path.
-```
+### 0:00-0:30 - State The Problem
 
-## Three-Minute Reviewer Path
+Use this sentence:
 
-This path needs only Python and the repository. It does not need model weights, Ollama,
-Neo4j, or an external API.
+> SongRyeon Core is a local document and source-code investigation agent that shows what
+> a model actually read, separates code-verified facts from model interpretation, and
+> blocks explicit evidence-role conflicts before public release.
+
+Do not claim that the project solves hallucinations in general. The current code guard
+checks explicit structural conflicts that code can prove, such as document roles, actual
+read status, and counts.
+
+### 0:30-1:00 - Run One Command
 
 ```powershell
-python main.py fake-turn "송련이 뭔지 짧게 설명해줘" --compact
-python main.py quick-smoke
+python main.py competition-demo
 ```
 
-What to verify in the first output:
+The command runs deterministic test doubles only. `external_api_calls=0` and
+`neo4j_connections=0` are part of the returned result, not an inference from timing.
 
-1. The runtime names the fake adapter instead of pretending it is Qwen.
-2. Route, L/R execution, memory transfer, evidence counts, and node_4 status are code-owned counts.
-3. The answer labels itself as a deterministic no-model demo.
-4. The full ledger is still available through the same command with `--pretty`.
+### 1:00-1:30 - Scene 1: LOCAL
 
-## What To Say First
+Point to the full local report/check path and the final `pass`. This proves that the
+deterministic no-model path can traverse the reporting and gatekeeping boundary. It does
+not prove live Qwen quality.
 
-SongRyeon Core is not a polished assistant.
-It is a local-first agent runtime experiment focused on provenance, runtime honesty, and separating code-verified facts from LLM judgments.
+### 1:30-2:00 - Scene 2: HONEST FALLBACK
 
-The most stable story today is:
+The controlled node_2 model returns broken JSON. Point to:
 
 ```text
-1. The runtime records code-verified facts and LLM judgments separately.
-2. A fake adapter can run the full node/report/check path without Qwen.
-3. Internal documents and source files can be ingested into graph memory.
-4. A local Neo4j Vessel can store that graph.
-5. Experimental R traversal can walk that graph through explicit R1/R2/R3 frames.
+generated_by=CODE:FALLBACK
+semantic=failed
+failure=parse_failed
+```
+
+The important behavior is not that fallback exists; it is that fallback does not pretend
+to be an LLM judgment.
+
+### 2:00-2:40 - Scene 3: CODE GUARD
+
+The ledger contains five search candidates, two actual `read_doc` results, and three
+unread candidates. A controlled model explicitly claims that one unread candidate was
+read and returns a `pass` gate. The code-owned document-role guard changes the final gate
+to `needs_revision` and the public answer to `blocked`.
+
+This scene proves the explicit role-conflict guard only. It does not prove general semantic
+truth checking.
+
+### 2:40-3:00 - Show Reproducibility And Limits
+
+```powershell
+python main.py competition-demo --json
+python -m compileall songryeon_core main.py
+python -m pytest
+python main.py smoke-test
+```
+
+Use `--json` when a reviewer wants the exact fields behind the short screen. The full
+development ledger remains available through the existing `fake-turn --pretty` path.
+
+## Deeper Demo Layers
+
+```text
+Layer 1. competition-demo: no model and no Neo4j.
+Layer 2. local verification: compileall, pytest, and smoke-test.
+Layer 3. optional live paths: Qwen/Ollama and Neo4j Vessel/R traversal.
 ```
 
 ## Layer 1: First Run Without Qwen Or Neo4j

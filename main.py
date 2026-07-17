@@ -69,6 +69,10 @@ from songryeon_core.runtime.chat_session import (
     current_chat_turn_id,
     store_chat_turn_result,
 )
+from songryeon_core.runtime.competition_demo import (
+    render_competition_demo,
+    run_competition_demo,
+)
 from songryeon_core.runtime.defaults import (
     DEFAULT_MAX_DOCUMENT_CONTEXT_CHARS,
     DEFAULT_MAX_INPUT_CHARS,
@@ -190,6 +194,10 @@ def main() -> None:
 
     openai_chat_parser = subparsers.add_parser("openai-chat")
     _add_openai_turn_runtime_args(openai_chat_parser)
+
+    # competition-demo는 외부 API/Neo4j 없이 심사용 신뢰 경계 세 가지를 한 화면에 재현한다.
+    competition_demo_parser = subparsers.add_parser("competition-demo")
+    competition_demo_parser.add_argument("--json", action="store_true")
 
     # quick-smoke는 문서 검색/Neo4j/Qwen 없이 최소 건강 상태만 본다.
     subparsers.add_parser("quick-smoke")
@@ -659,6 +667,14 @@ def main() -> None:
             )
     elif args.command == "openai-chat":
         _run_openai_chat(args)
+    elif args.command == "competition-demo":
+        result = run_competition_demo()
+        if args.json:
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+        else:
+            print(render_competition_demo(result))
+        if result.get("passed") is not True:
+            raise SystemExit(1)
     elif args.command == "quick-smoke":
         print(json.dumps(run_quick_smoke_tests(), ensure_ascii=False, indent=2))
     elif args.command == "smoke-test":
