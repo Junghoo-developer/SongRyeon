@@ -53,6 +53,7 @@ class CodexSDKAdapter:
         reasoning_effort: str = DEFAULT_CODEX_SDK_REASONING_EFFORT,
         codex_bin: str | None = None,
         codex_factory: Callable[[object], object] | None = None,
+        sdk_symbols: dict[str, object] | None = None,
     ) -> None:
         if reasoning_effort not in {"none", "minimal", "low", "medium", "high", "xhigh"}:
             raise ValueError("unknown Codex SDK reasoning effort")
@@ -60,6 +61,9 @@ class CodexSDKAdapter:
         self.reasoning_effort = reasoning_effort
         self.codex_bin, self.codex_bin_source = resolve_codex_bin(codex_bin)
         self._codex_factory = codex_factory
+        # 선택 SDK가 없는 CI에서도 주입된 가짜 transport 경계를 검사할 수 있게 한다.
+        # 실제 실행은 override가 없으므로 계속 openai_codex의 공식 symbol만 사용한다.
+        self._sdk_symbols_override = sdk_symbols
         self._codex: object | None = None
         self._workdir = tempfile.TemporaryDirectory(prefix="songryeon_codex_sdk_")
         self._account_checked = False
@@ -87,7 +91,7 @@ class CodexSDKAdapter:
         try:
             codex = self._get_codex()
             self._verify_chatgpt_account(codex)
-            sdk = _sdk_symbols()
+            sdk = self._resolved_sdk_symbols()
             thread = codex.thread_start(
                 approval_mode=sdk["ApprovalMode"].deny_all,
                 base_instructions=_base_instructions(request.prompt),
@@ -162,7 +166,7 @@ class CodexSDKAdapter:
     def _get_codex(self) -> object:
         if self._codex is not None:
             return self._codex
-        sdk = _sdk_symbols()
+        sdk = self._resolved_sdk_symbols()
         config = sdk["CodexConfig"](
             codex_bin=self.codex_bin,
             cwd=self._workdir.name,
@@ -172,6 +176,16 @@ class CodexSDKAdapter:
             self.sanitized_environment_variable_count = removed_count
             self._codex = factory(config)
         return self._codex
+
+    def _resolved_sdk_symbols(self) -> dict[str, object]:
+        override = self._sdk_symbols_override
+        if override is None:
+            return _sdk_symbols()
+        required = {"ApprovalMode", "Codex", "CodexConfig", "ReasoningEffort", "Sandbox"}
+        missing = sorted(required.difference(override))
+        if missing:
+            raise ValueError(f"Codex SDK symbol override is missing: {missing}")
+        return override
 
     def _verify_chatgpt_account(self, codex: object) -> None:
         if self._account_checked:

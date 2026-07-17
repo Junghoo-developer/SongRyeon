@@ -56,6 +56,18 @@ class _FakeCodex:
         self.closed = True
 
 
+def _fake_sdk_symbols() -> dict[str, object]:
+    """선택 패키지를 설치하지 않은 CI에서도 adapter 계약만 검사한다."""
+
+    return {
+        "ApprovalMode": SimpleNamespace(deny_all="deny_all"),
+        "Codex": _FakeCodex,
+        "CodexConfig": lambda **kwargs: SimpleNamespace(**kwargs),
+        "ReasoningEffort": lambda value: value,
+        "Sandbox": SimpleNamespace(read_only="read_only"),
+    }
+
+
 def test_codex_sdk_adapter_uses_chatgpt_read_only_isolated_transport(
     monkeypatch,
 ) -> None:
@@ -71,7 +83,10 @@ def test_codex_sdk_adapter_uses_chatgpt_read_only_isolated_transport(
 
     monkeypatch.setenv("OPENAI_API_KEY", "must-not-reach-child")
     monkeypatch.setenv("SONGRYEON_NEO4J_PASSWORD", "must-not-reach-child")
-    adapter = CodexSDKAdapter(codex_factory=factory)
+    adapter = CodexSDKAdapter(
+        codex_factory=factory,
+        sdk_symbols=_fake_sdk_symbols(),
+    )
 
     response = adapter.complete(
         LLMRequest(prompt="Return route JSON", input_payload={"question": "test"})
@@ -102,7 +117,10 @@ def test_codex_sdk_adapter_uses_chatgpt_read_only_isolated_transport(
 
 def test_codex_sdk_adapter_rejects_any_tool_activity() -> None:
     fake = _FakeCodex(item_type="commandExecution")
-    adapter = CodexSDKAdapter(codex_factory=lambda config: fake)
+    adapter = CodexSDKAdapter(
+        codex_factory=lambda config: fake,
+        sdk_symbols=_fake_sdk_symbols(),
+    )
 
     with pytest.raises(RuntimeError, match="forbidden tool"):
         adapter.complete(LLMRequest(prompt="JSON only", input_payload={"x": 1}))
@@ -119,7 +137,10 @@ def test_codex_sdk_adapter_rejects_non_chatgpt_auth() -> None:
     fake.account = lambda **kwargs: SimpleNamespace(  # type: ignore[method-assign]
         account=SimpleNamespace(root=SimpleNamespace(type="apiKey"))
     )
-    adapter = CodexSDKAdapter(codex_factory=lambda config: fake)
+    adapter = CodexSDKAdapter(
+        codex_factory=lambda config: fake,
+        sdk_symbols=_fake_sdk_symbols(),
+    )
 
     with pytest.raises(RuntimeError, match="not authenticated with ChatGPT"):
         adapter.complete(LLMRequest(prompt="JSON only", input_payload={"x": 1}))
