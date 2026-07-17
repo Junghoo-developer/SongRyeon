@@ -108,14 +108,18 @@ python main.py smoke-test
 python main.py fast-test --profile graph
 -> FAST_TEST_OK
 -> 148 passed in 51.50s
+
+GitHub Actions smoke-test #44
+-> commit 3fd7ef8
+-> success in 1m 36s
+-> https://github.com/Junghoo-developer/SongRyeon/actions/runs/29569371267
 ```
 
 ## 9. 남은 일
 
-1. push 뒤 GitHub Actions 원격 결과를 확인한다.
-2. 3분 영상은 `DEMO.md` 대본대로 실제 녹화한다.
-3. 제출 직전 결과보고서의 commit, 날짜, 검증 수치를 다시 측정해 채운다.
-4. `openai-codex` Python 배포물을 제출물에 실제로 묶을 경우 정확한 배포 라이선스를
+1. 3분 영상은 `DEMO.md` 대본대로 실제 녹화한다.
+2. 제출 직전 결과보고서의 commit, 날짜, 검증 수치를 다시 측정해 채운다.
+3. `openai-codex` Python 배포물을 제출물에 실제로 묶을 경우 정확한 배포 라이선스를
    다시 확인한다.
 
 ## 10. 판정
