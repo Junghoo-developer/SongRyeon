@@ -322,6 +322,11 @@ def _grounding_limit_text(brief_frame: Node3InputBriefFrame) -> str:
     if brief_frame.l_loop_result_attitude_hint == "l_loop_partial_or_failed":
         return "L 검색 목표가 부분/실패 신호를 남겼으므로, 공급된 문서 범위와 한계를 분리해 말한다."
     if (
+        brief_frame.l_loop_result_attitude_hint
+        == "l_loop_original_material_acquired_l3_semantic_failed"
+    ):
+        return "L 원문은 확보됐지만 L3 의미 검사가 실패했으므로, 원문은 사용할 수 있어도 L3가 적합성을 확인했다고 말하지 않는다."
+    if (
         brief_frame.r_loop_result_material is not None
         and brief_frame.r_loop_result_material.attitude_hint != "r_loop_sufficient"
     ):
@@ -347,7 +352,9 @@ def _l_loop_grounding_lines(brief_frame: Node3InputBriefFrame) -> list[str]:
         (
             "- L 검색 목표 상태: "
             f"{brief_frame.l_loop_task_status} / {brief_frame.l_loop_failure_level} "
-            f"/ semantic={brief_frame.l3_semantic_goal_match_status}"
+            f"/ semantic={brief_frame.l3_semantic_goal_match_status} "
+            f"/ semantic_execution={brief_frame.l3_semantic_execution_status} "
+            f"/ semantic_failure={brief_frame.l3_semantic_failure_type}"
         )
     ]
 

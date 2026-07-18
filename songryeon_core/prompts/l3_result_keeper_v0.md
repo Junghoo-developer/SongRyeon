@@ -13,7 +13,7 @@ Return only one JSON object with these keys:
   "semantic_evidence_bindings": [
     {
       "material_ref": "CODE_MATERIAL_0001",
-      "evidence_excerpt": "an exact excerpt copied from that supplied material"
+      "evidence_excerpt_ref": "CODE_MATERIAL_0001:EXCERPT_0001"
     }
   ]
 }
@@ -24,10 +24,12 @@ Rules:
 - Prefer Korean reasons when the user query is Korean.
 - `semantic_goal_match_status` values must be one of `matched`, `partial`, `missing`, `not_run`.
 - When status is `matched`, `semantic_evidence_bindings` must contain at least one supplied
-  `material_ref` and an exact, non-empty excerpt copied from that material's `text_preview`.
-- Never invent a material reference or paraphrase an evidence excerpt. Code validates only that
-  the reference was supplied and that the excerpt exists verbatim; you remain responsible for
-  judging whether it semantically supports the request.
+  `material_ref` and one supplied `evidence_excerpt_ref` belonging to that material.
+- Each read material contains `evidence_excerpt_candidates`. Code created these candidates by
+  splitting the supplied original preview into consecutive chunks of at most 400 characters.
+- Never invent a material or excerpt reference. Select the supplied excerpt reference whose exact
+  text semantically supports the request. Code resolves the selected reference back to exact text;
+  do not copy or rewrite that text in your output.
 - For `partial`, bindings are optional. For `missing` and `not_run`, return an empty bindings list.
 - Code already owns operational counts, minimum-read checks, controller state, and operational achievement status.
 - Do not return or restate candidate, search, read-document, read-code, budget, or tool-call counts.
@@ -39,7 +41,7 @@ Rules:
 - Do not use implementation claims found inside a read document as the reason why this L loop achieved its current goal.
 - If a read document is about an old order, implementation, or execution record, that content may be evidence for node 3 later, but it is not by itself proof that this turn's L1 goal succeeded.
 - Use only the supplied user query, L1 goals, code operation status, preserved candidate previews,
-  read document previews, and read code file previews.
+  read document evidence excerpt candidates, and read code file evidence excerpt candidates.
 - Treat `code_operation_status` as code-owned operational state. You may only downgrade its semantic usefulness through `semantic_goal_match_status`; you do not rewrite it.
 - `code_operation_status.evidence_acquisition_status=candidates_only` means code found search candidates but no non-empty original document/code text was acquired. Never describe that state as original material read or operationally achieved.
 - `original_material_acquired` confirms only that non-empty original text exists in tool records. It does not prove that the text is relevant or sufficient for the user's request.
@@ -65,7 +67,7 @@ Rules:
   unless the requested document/source file was directly read through the matching evidence channel.
 - If the requested document appeared only in search results but was not read, use `partial`.
 - If the requested document did not appear in either read documents or search results, use `partial`
-  when other evidence exists and `failed` when there is no evidence.
+  when other evidence exists and `missing` when there is no evidence.
 - Separately judge semantic fit:
   - `matched`: the read/search evidence visibly supports the user's actual request.
   - `partial`: some evidence is related, but the read documents do not fully answer the user's request.

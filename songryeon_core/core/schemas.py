@@ -2173,7 +2173,7 @@ def validate_node2_handoff_frame(frame: Node2HandoffFrame) -> None:
 
 
 NODE3_INPUT_BRIEF_FRAME_SCHEMA_NAME = "Node3InputBriefFrame"
-NODE3_INPUT_BRIEF_FRAME_SCHEMA_VERSION = "0.2"
+NODE3_INPUT_BRIEF_FRAME_SCHEMA_VERSION = "0.3"
 NODE3_INPUT_BRIEF_STATUSES = {"ready", "insufficient"}
 NODE3_DOCUMENT_CONTEXT_PACK_STATUSES = {
     "not_recorded",
@@ -2558,6 +2558,12 @@ class Node3InputBriefFrame:
     l_loop_failure_level: str = "none"
     l3_goal_match_status: str = "not_run"
     l3_semantic_goal_match_status: str = "not_run"
+    # 절대 정보: L3 LLM 의미 검사가 실제 실행됐는지, 실패했는지 보존한다.
+    l3_semantic_execution_status: str = "not_run"
+    # 절대 정보: L3 의미 검사 호출의 실패 종류. 의미 판단 결과와 섞지 않는다.
+    l3_semantic_failure_type: str = "not_run"
+    # 절대 정보: L3 의미 검사 실패 또는 미실행 상태의 기록 이유.
+    l3_semantic_failure_reason: str = "CODE_STATUS:l3_semantic_judgement_not_run"
     # 절대 정보: L이 후보만 확보했는지 비어 있지 않은 원문까지 확보했는지 구분한다.
     l_evidence_acquisition_status: str = "not_recorded"
     l_original_material_count: int = 0
@@ -2917,6 +2923,7 @@ def _validate_node3_l_loop_result_fields(frame: Node3InputBriefFrame) -> None:
         "not_recorded",
         "none",
         "l2_retryable",
+        "l3_semantic_failed",
         "l1_replan_needed",
         "budget_exhausted",
         "give_up_recommended",
@@ -2946,6 +2953,22 @@ def _validate_node3_l_loop_result_fields(frame: Node3InputBriefFrame) -> None:
             "unknown Node3InputBriefFrame.l3_semantic_goal_match_status: "
             f"{frame.l3_semantic_goal_match_status}"
         )
+    if frame.l3_semantic_execution_status not in L3_SEMANTIC_EXECUTION_STATUSES:
+        raise ValueError(
+            "unknown Node3InputBriefFrame.l3_semantic_execution_status: "
+            f"{frame.l3_semantic_execution_status}"
+        )
+    if frame.l3_semantic_failure_type not in L3_SEMANTIC_FAILURE_TYPES:
+        raise ValueError(
+            "unknown Node3InputBriefFrame.l3_semantic_failure_type: "
+            f"{frame.l3_semantic_failure_type}"
+        )
+    _validate_l3_semantic_execution_contract(
+        execution_status=frame.l3_semantic_execution_status,
+        failure_type=frame.l3_semantic_failure_type,
+        failure_reason=frame.l3_semantic_failure_reason,
+        owner="Node3InputBriefFrame",
+    )
     if frame.l_evidence_acquisition_status not in {
         "not_recorded",
         *L_EVIDENCE_ACQUISITION_STATUSES,
@@ -2975,6 +2998,7 @@ def _validate_node3_l_loop_result_fields(frame: Node3InputBriefFrame) -> None:
         "not_recorded",
         "l_loop_achieved",
         "l_loop_partial_or_failed",
+        "l_loop_original_material_acquired_l3_semantic_failed",
         "l_loop_budget_exhausted",
         "l_loop_missing_or_uncertain",
     }:
@@ -5618,7 +5642,7 @@ L_LOOP_CONTROL_FRAME_SCHEMA_VERSION = "0.1"
 L_LOOP_CONTINUATION_FRAME_SCHEMA_NAME = "LLoopContinuationFrame"
 L_LOOP_CONTINUATION_FRAME_SCHEMA_VERSION = "0.1"
 L_LOOP_RETURN_SUMMARY_FRAME_SCHEMA_NAME = "LLoopReturnSummaryFrame"
-L_LOOP_RETURN_SUMMARY_FRAME_SCHEMA_VERSION = "0.2"
+L_LOOP_RETURN_SUMMARY_FRAME_SCHEMA_VERSION = "0.3"
 L_EVIDENCE_ACQUISITION_STATUSES = {
     "none",
     "candidates_only",
@@ -5652,6 +5676,7 @@ L_LOOP_RETURN_TASK_STATUSES = {"achieved", "partial", "failed", "unknown"}
 L_LOOP_RETURN_FAILURE_LEVELS = {
     "none",
     "l2_retryable",
+    "l3_semantic_failed",
     "l1_replan_needed",
     "budget_exhausted",
     "give_up_recommended",
@@ -5953,6 +5978,12 @@ class LLoopReturnSummaryFrame:
     l3_goal_match_status: str
     # 복사 정보: L3의 의미 목표 매칭 상태. 원 L3 frame의 생성자/status로 정보 등급을 판별한다.
     l3_semantic_goal_match_status: str
+    # 절대 정보: 최신 L3 LLM 의미 검사 호출의 실행 상태.
+    l3_semantic_execution_status: str
+    # 절대 정보: 최신 L3 LLM 의미 검사 호출의 실패 종류.
+    l3_semantic_failure_type: str
+    # 절대 정보: 최신 L3 LLM 의미 검사 호출의 실패 또는 미실행 이유.
+    l3_semantic_failure_reason: str
     # 참고 신호: 1이 다음 라우팅을 판단할 때 참고할 수 있는 후보. 확정 라우팅이 아니다.
     recommended_next_route_for_node1: str
     # 절대/정책 설명: route hint를 만든 코드 조건 라벨.
@@ -6003,6 +6034,9 @@ def validate_l_loop_return_summary_frame(frame: LLoopReturnSummaryFrame) -> None
         "budget_stop_reason": frame.budget_stop_reason,
         "l3_goal_match_status": frame.l3_goal_match_status,
         "l3_semantic_goal_match_status": frame.l3_semantic_goal_match_status,
+        "l3_semantic_execution_status": frame.l3_semantic_execution_status,
+        "l3_semantic_failure_type": frame.l3_semantic_failure_type,
+        "l3_semantic_failure_reason": frame.l3_semantic_failure_reason,
         "recommended_next_route_for_node1": frame.recommended_next_route_for_node1,
         "route_hint_reason": frame.route_hint_reason,
         "evidence_acquisition_status": frame.evidence_acquisition_status,
@@ -6034,6 +6068,22 @@ def validate_l_loop_return_summary_frame(frame: LLoopReturnSummaryFrame) -> None
         raise ValueError(
             f"unknown L loop return l3_semantic_goal_match_status: {frame.l3_semantic_goal_match_status}"
         )
+    if frame.l3_semantic_execution_status not in L3_SEMANTIC_EXECUTION_STATUSES:
+        raise ValueError(
+            "unknown L loop return l3_semantic_execution_status: "
+            f"{frame.l3_semantic_execution_status}"
+        )
+    if frame.l3_semantic_failure_type not in L3_SEMANTIC_FAILURE_TYPES:
+        raise ValueError(
+            "unknown L loop return l3_semantic_failure_type: "
+            f"{frame.l3_semantic_failure_type}"
+        )
+    _validate_l3_semantic_execution_contract(
+        execution_status=frame.l3_semantic_execution_status,
+        failure_type=frame.l3_semantic_failure_type,
+        failure_reason=frame.l3_semantic_failure_reason,
+        owner="LLoopReturnSummaryFrame",
+    )
     if frame.recommended_next_route_for_node1 not in L_LOOP_RETURN_ROUTE_HINTS:
         raise ValueError(
             f"unknown L loop return route hint: {frame.recommended_next_route_for_node1}"
@@ -6226,10 +6276,19 @@ L3_PRESERVED_INFO_FRAME_SCHEMA_NAME = "L3PreservedInfoFrame"
 L3_PRESERVED_INFO_FRAME_SCHEMA_VERSION = "0.1"
 L3_JUDGEMENT_STATUSES = {"not_judged"}
 L3_ACHIEVEMENT_FRAME_SCHEMA_NAME = "L3AchievementFrame"
-L3_ACHIEVEMENT_FRAME_SCHEMA_VERSION = "0.3"
+L3_ACHIEVEMENT_FRAME_SCHEMA_VERSION = "0.4"
 L3_ACHIEVEMENT_STATUSES = {"achieved", "partial", "failed"}
 L3_GOAL_MATCH_STATUSES = {"matched", "partial", "missing", "not_applicable"}
 L3_SEMANTIC_GOAL_MATCH_STATUSES = {"matched", "partial", "missing", "not_run"}
+L3_SEMANTIC_EXECUTION_STATUSES = {"not_run", "ran", "failed"}
+L3_SEMANTIC_FAILURE_TYPES = {
+    "none",
+    "not_run",
+    "parse_failed",
+    "schema_failed",
+    "adapter_failed",
+    "internal_error",
+}
 L3_PER_DOCUMENT_SUMMARY_FRAME_SCHEMA_NAME = "L3PerDocumentSummaryFrame"
 L3_PER_DOCUMENT_SUMMARY_FRAME_SCHEMA_VERSION = "0.1"
 L3_DOCUMENT_SUMMARY_STATUSES = {"ran", "failed"}
@@ -6241,6 +6300,28 @@ L3_DOCUMENT_SUMMARY_FAILURE_TYPES = {
     "timeout",
     "unknown",
 }
+
+
+def _validate_l3_semantic_execution_contract(
+    *,
+    execution_status: str,
+    failure_type: str,
+    failure_reason: str,
+    owner: str,
+) -> None:
+    """L3 의미 검사 호출 상태와 실패 기록이 서로 모순되지 않는지 확인한다."""
+
+    if not failure_reason:
+        raise ValueError(f"{owner}.l3_semantic_failure_reason must not be empty")
+    expected_failure_types = {
+        "not_run": {"not_run"},
+        "ran": {"none"},
+        "failed": L3_SEMANTIC_FAILURE_TYPES - {"none", "not_run"},
+    }
+    if failure_type not in expected_failure_types[execution_status]:
+        raise ValueError(
+            f"{owner} L3 semantic execution/failure contract is inconsistent"
+        )
 
 
 @dataclass
@@ -6356,9 +6437,11 @@ class L3SemanticEvidenceBinding:
 
     # 절대 정보: L3 LLM payload 안에서만 쓰는 안전한 재료 번호.
     material_ref: str
+    # 절대 정보: code가 만든 고정 길이 원문 조각 번호표.
+    evidence_excerpt_ref: str
     # 절대 정보: code가 material_ref를 다시 연결한 DataStore record ID.
     source_data_id: str
-    # 절대 정보: LLM이 공급 원문에서 그대로 복사했고 code가 존재를 확인한 짧은 발췌.
+    # 절대 정보: LLM이 고른 번호표를 code가 정확한 원문으로 복원한 짧은 발췌.
     evidence_excerpt: str
 
 
@@ -6397,6 +6480,12 @@ class L3AchievementFrame:
     achievement_generation_source: str = "CODE:OPERATION_CHECK"
     # LLM이 의미적 충분성/달성 판단을 수행했는지.
     llm_semantic_judgement_status: str = "not_run"
+    # 절대 정보: L3 LLM 의미 검사 호출 자체의 실행 상태.
+    llm_semantic_execution_status: str = "not_run"
+    # 절대 정보: L3 LLM 의미 검사 호출의 실패 종류.
+    llm_semantic_failure_type: str = "not_run"
+    # 절대 정보: 실패 또는 미실행 이유. 의미 적합성 판단문과 구분한다.
+    llm_semantic_failure_reason: str = "CODE_STATUS:l3_semantic_judgement_not_run"
     # 절대 정보: L3가 평가한 L1 거시 목표.
     target_macro_goal: str = ""
     # 절대 정보: L3가 평가한 L1 미시 목표.
@@ -6476,6 +6565,32 @@ def validate_l3_achievement_frame(frame: L3AchievementFrame) -> None:
         raise ValueError(f"unknown L3 semantic_goal_match_status: {frame.semantic_goal_match_status}")
     if frame.semantic_goal_match_status != "not_run" and not frame.semantic_goal_match_reason:
         raise ValueError("L3AchievementFrame.semantic_goal_match_reason must not be empty when semantic match ran")
+    if frame.llm_semantic_execution_status not in L3_SEMANTIC_EXECUTION_STATUSES:
+        raise ValueError(
+            "unknown L3AchievementFrame.llm_semantic_execution_status: "
+            f"{frame.llm_semantic_execution_status}"
+        )
+    if frame.llm_semantic_failure_type not in L3_SEMANTIC_FAILURE_TYPES:
+        raise ValueError(
+            "unknown L3AchievementFrame.llm_semantic_failure_type: "
+            f"{frame.llm_semantic_failure_type}"
+        )
+    _validate_l3_semantic_execution_contract(
+        execution_status=frame.llm_semantic_execution_status,
+        failure_type=frame.llm_semantic_failure_type,
+        failure_reason=frame.llm_semantic_failure_reason,
+        owner="L3AchievementFrame",
+    )
+    if (
+        frame.llm_semantic_execution_status == "ran"
+        and frame.llm_semantic_judgement_status != "ran"
+    ):
+        raise ValueError("ran L3 semantic execution requires ran judgement status")
+    if (
+        frame.llm_semantic_execution_status != "ran"
+        and frame.llm_semantic_judgement_status != "not_run"
+    ):
+        raise ValueError("non-ran L3 semantic execution requires not_run judgement status")
     if (
         frame.llm_semantic_judgement_status == "ran"
         and frame.semantic_goal_match_status == "matched"
@@ -6484,10 +6599,11 @@ def validate_l3_achievement_frame(frame: L3AchievementFrame) -> None:
         raise ValueError(
             "matched L3 semantic judgement requires semantic_evidence_bindings"
         )
-    seen_material_refs: set[str] = set()
+    seen_excerpt_refs: set[str] = set()
     for binding in frame.semantic_evidence_bindings:
         for field_name, value in {
             "material_ref": binding.material_ref,
+            "evidence_excerpt_ref": binding.evidence_excerpt_ref,
             "source_data_id": binding.source_data_id,
             "evidence_excerpt": binding.evidence_excerpt,
         }.items():
@@ -6495,11 +6611,11 @@ def validate_l3_achievement_frame(frame: L3AchievementFrame) -> None:
                 raise ValueError(
                     f"L3SemanticEvidenceBinding.{field_name} must not be empty"
                 )
-        if binding.material_ref in seen_material_refs:
+        if binding.evidence_excerpt_ref in seen_excerpt_refs:
             raise ValueError(
-                "L3AchievementFrame semantic evidence material refs must be unique"
+                "L3AchievementFrame semantic evidence excerpt refs must be unique"
             )
-        seen_material_refs.add(binding.material_ref)
+        seen_excerpt_refs.add(binding.evidence_excerpt_ref)
         if binding.source_data_id not in frame.source_data_ids:
             raise ValueError(
                 "L3 semantic evidence source_data_id must be in frame.source_data_ids"

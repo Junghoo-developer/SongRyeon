@@ -994,6 +994,21 @@ def build_l_loop_return_summary_frame(
         "semantic_goal_match_status",
         fallback="not_run",
     )
+    l3_semantic_execution_status = _text(
+        l3_payload,
+        "llm_semantic_execution_status",
+        fallback="not_run",
+    )
+    l3_semantic_failure_type = _text(
+        l3_payload,
+        "llm_semantic_failure_type",
+        fallback="not_run",
+    )
+    l3_semantic_failure_reason = _text(
+        l3_payload,
+        "llm_semantic_failure_reason",
+        fallback="CODE_STATUS:l3_semantic_judgement_not_run",
+    )
     final_continuation_status = _text(
         continuation_payload,
         "continuation_status",
@@ -1031,6 +1046,7 @@ def build_l_loop_return_summary_frame(
         l_loop_task_status=l_loop_task_status,
         l3_goal_match_status=l3_goal_match_status,
         l3_semantic_goal_match_status=l3_semantic_goal_match_status,
+        l3_semantic_execution_status=l3_semantic_execution_status,
         required_min_read_documents=required_min_read_documents,
         actual_read_doc_count=actual_read_doc_count,
         actual_source_evidence_count=actual_read_doc_count + actual_read_code_file_count,
@@ -1062,6 +1078,9 @@ def build_l_loop_return_summary_frame(
         remaining_read_code_file_calls=remaining_read_code_file_calls,
         l3_goal_match_status=l3_goal_match_status,
         l3_semantic_goal_match_status=l3_semantic_goal_match_status,
+        l3_semantic_execution_status=l3_semantic_execution_status,
+        l3_semantic_failure_type=l3_semantic_failure_type,
+        l3_semantic_failure_reason=l3_semantic_failure_reason,
         recommended_next_route_for_node1=route_hint,
         route_hint_reason=route_hint_reason,
         evidence_acquisition_status=evidence_acquisition_status,
@@ -1090,7 +1109,9 @@ def build_l_loop_return_summary_items(frame: LLoopReturnSummaryFrame) -> list[Me
                 "COPIED_FIELDS:"
                 f"task_status={frame.l_loop_task_status};"
                 f"failure_level={frame.failure_level};"
-                f"final_continuation_status={frame.final_continuation_status}"
+                f"final_continuation_status={frame.final_continuation_status};"
+                f"l3_semantic_execution_status={frame.l3_semantic_execution_status};"
+                f"l3_semantic_failure_type={frame.l3_semantic_failure_type}"
             ),
             source_data_ids=source_data_ids,
         ),
@@ -1259,6 +1280,7 @@ def _return_failure_level_and_route_hint(
     l_loop_task_status: str,
     l3_goal_match_status: str,
     l3_semantic_goal_match_status: str,
+    l3_semantic_execution_status: str,
     required_min_read_documents: int,
     actual_read_doc_count: int,
     actual_source_evidence_count: int,
@@ -1274,9 +1296,24 @@ def _return_failure_level_and_route_hint(
         required_min_read_documents > 0
         and actual_source_evidence_count < required_min_read_documents
     )
-    l3_unsatisfied = (
+    operation_unsatisfied = (
         l_loop_task_status in {"partial", "failed", "unknown"}
         or l3_goal_match_status in {"partial", "missing"}
+    )
+    if (
+        l3_semantic_execution_status == "failed"
+        and not minimum_evidence_missing
+        and not operation_unsatisfied
+        and actual_source_evidence_count > 0
+    ):
+        return (
+            "l3_semantic_failed",
+            "2",
+            "CODE_STATUS:l3_semantic_judgement_failed_original_material_preserved",
+        )
+    l3_unsatisfied = (
+        operation_unsatisfied
+        or l3_semantic_execution_status == "failed"
         or l3_semantic_goal_match_status in {"partial", "missing"}
     )
     if not minimum_evidence_missing and not l3_unsatisfied:

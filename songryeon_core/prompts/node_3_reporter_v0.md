@@ -70,6 +70,8 @@ Return only the answer body.
 ## L And R Limits
 
 - If L is partial, failed, or budget exhausted, separate usable supplied material from L goal success.
+- If L3 semantic execution failed but original material is supplied, you may use that material.
+  State that L3 semantic fit was not confirmed; never describe the L3 judgement as matched or ran.
 - If R task status is not sufficient, do not claim full graph traversal success.
 - A Vessel raw original may be used when it is explicitly supplied as raw original material,
   but call it Vessel R original material rather than document-tool evidence.

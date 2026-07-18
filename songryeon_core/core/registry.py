@@ -422,7 +422,7 @@ def build_default_schema_registry() -> SchemaRegistry:
             ),
             SchemaRecord(
                 schema_name="LLoopReturnSummaryFrame",
-                version="0.2",
+                version="0.3",
                 target_node="node_0",
                 required=True,
                 fields=[
@@ -446,6 +446,9 @@ def build_default_schema_registry() -> SchemaRegistry:
                     "remaining_query_attempts",
                     "l3_goal_match_status",
                     "l3_semantic_goal_match_status",
+                    "l3_semantic_execution_status",
+                    "l3_semantic_failure_type",
+                    "l3_semantic_failure_reason",
                     "recommended_next_route_for_node1",
                     "route_hint_reason",
                     "source_trace_ids",
@@ -491,7 +494,7 @@ def build_default_schema_registry() -> SchemaRegistry:
             ),
             SchemaRecord(
                 schema_name="L3AchievementFrame",
-                version="0.2",
+                version="0.4",
                 target_node="L3_achievement",
                 required=True,
                 fields=[
@@ -508,6 +511,9 @@ def build_default_schema_registry() -> SchemaRegistry:
                     "evidence_acquisition_status",
                     "original_material_required_count",
                     "original_material_requirement_status",
+                    "llm_semantic_execution_status",
+                    "llm_semantic_failure_type",
+                    "llm_semantic_failure_reason",
                     "evidence_trace_ids",
                     "evidence_data_ids",
                     "source_trace_ids",

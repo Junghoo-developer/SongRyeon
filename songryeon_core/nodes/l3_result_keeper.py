@@ -42,6 +42,16 @@ class _L3SemanticMaterial:
     text: str
 
 
+@dataclass(frozen=True)
+class _L3SemanticEvidenceCandidate:
+    """code가 기계적으로 나눈 원문 조각과 안전한 번호표의 대응."""
+
+    material_ref: str
+    evidence_excerpt_ref: str
+    source_data_id: str
+    text: str
+
+
 def l3_revision_preserved_frame_data_id(
     attempt_index: int,
     *,
@@ -123,8 +133,8 @@ def run_l3_result_keeper(
                 achievement_frame_data_id=achievement_frame_data_id,
                 target_goal_data_id=target_goal_data_id,
             )
-        except Exception:
-            achievement_frame = _build_achievement_frame(
+        except Exception as exc:
+            operation_frame = _build_achievement_frame(
                 frame_id=achievement_frame_data_id,
                 turn_id=turn_id,
                 preserved_frame=preserved_frame,
@@ -134,6 +144,16 @@ def run_l3_result_keeper(
                 final_control_data_id=final_control_data_id,
                 user_query=user_query,
                 target_goal_data_id=target_goal_data_id,
+            )
+            achievement_frame = replace(
+                operation_frame,
+                achievement_generation_source=(
+                    f"{operation_frame.achievement_generation_source}"
+                    "+CODE:L3_SEMANTIC_INTERNAL_FAILURE_RECORD"
+                ),
+                llm_semantic_execution_status="failed",
+                llm_semantic_failure_type="internal_error",
+                llm_semantic_failure_reason=f"{type(exc).__name__}: {exc}",
             )
     else:
         achievement_frame = _build_achievement_frame(
@@ -830,6 +850,13 @@ def _build_llm_achievement_frame(
         material.material_ref: material
         for material in semantic_materials
     }
+    semantic_evidence_candidates = _l3_semantic_evidence_candidates(
+        semantic_materials
+    )
+    semantic_evidence_candidate_by_ref = {
+        candidate.evidence_excerpt_ref: candidate
+        for candidate in semantic_evidence_candidates
+    }
     input_payload = {
         "user_query": user_query,
         "l1_goal": _l1_semantic_goal_payload(l1_goal),
@@ -853,7 +880,10 @@ def _build_llm_achievement_frame(
             {
                 "material_ref": preview.get("material_ref"),
                 "doc_id": preview.get("doc_id"),
-                "text_preview": preview.get("text_preview"),
+                "evidence_excerpt_candidates": _l3_evidence_candidate_payloads(
+                    semantic_evidence_candidates,
+                    material_ref=str(preview.get("material_ref") or ""),
+                ),
             }
             for preview in read_document_previews
         ],
@@ -865,7 +895,10 @@ def _build_llm_achievement_frame(
                 "range_end_char_exclusive": preview.get("range_end_char_exclusive"),
                 "total_char_count": preview.get("total_char_count"),
                 "analysis_scope": preview.get("analysis_scope"),
-                "text_preview": preview.get("text_preview"),
+                "evidence_excerpt_candidates": _l3_evidence_candidate_payloads(
+                    semantic_evidence_candidates,
+                    material_ref=str(preview.get("material_ref") or ""),
+                ),
             }
             for preview in read_code_file_previews
         ],
@@ -890,10 +923,38 @@ def _build_llm_achievement_frame(
         payload_validator=lambda payload: _validate_l3_semantic_payload(
             payload,
             semantic_material_by_ref=semantic_material_by_ref,
+            semantic_evidence_candidate_by_ref=semantic_evidence_candidate_by_ref,
         ),
     )
     if llm_result.failure_type != "none" or llm_result.validation.payload is None:
-        raise ValueError(f"L3 LLM result keeper failed: {llm_result.failure_type}")
+        frame_source_trace_ids = list(input_trace_ids)
+        if llm_result.trace_event_id:
+            frame_source_trace_ids.append(llm_result.trace_event_id)
+        frame_source_data_ids = _unique_strings(
+            [
+                *input_data_ids,
+                preserved_frame.frame_id,
+                final_control_data_id,
+                llm_result.call_data_id,
+            ]
+        )
+        return replace(
+            operation_frame,
+            evidence_trace_ids=_unique_strings(frame_source_trace_ids),
+            evidence_data_ids=frame_source_data_ids,
+            source_trace_ids=_unique_strings(frame_source_trace_ids),
+            source_data_ids=frame_source_data_ids,
+            achievement_generation_source=(
+                f"{operation_frame.achievement_generation_source}"
+                "+CODE:L3_SEMANTIC_LLM_FAILURE_RECORD"
+            ),
+            llm_semantic_execution_status="failed",
+            llm_semantic_failure_type=llm_result.failure_type,
+            llm_semantic_failure_reason=(
+                llm_result.validation.error
+                or f"CODE_STATUS:l3_semantic_{llm_result.failure_type}"
+            ),
+        )
 
     payload = llm_result.validation.payload
     frame_source_trace_ids = list(input_trace_ids)
@@ -914,6 +975,7 @@ def _build_llm_achievement_frame(
     semantic_evidence_bindings = _l3_semantic_evidence_bindings_from_payload(
         payload=payload,
         semantic_material_by_ref=semantic_material_by_ref,
+        semantic_evidence_candidate_by_ref=semantic_evidence_candidate_by_ref,
     )
     achievement_status = operation_frame.achievement_status
     reason = operation_frame.reason
@@ -957,6 +1019,9 @@ def _build_llm_achievement_frame(
         source_data_ids=frame_source_data_ids,
         achievement_generation_source=generation_source,
         llm_semantic_judgement_status="ran",
+        llm_semantic_execution_status="ran",
+        llm_semantic_failure_type="none",
+        llm_semantic_failure_reason="CODE_STATUS:none",
         macro_achievement_status=macro_status,
         macro_achievement_reason=macro_reason,
         micro_achievement_status=micro_status,
@@ -1067,6 +1132,7 @@ def _validate_l3_semantic_payload(
     payload: dict[str, object],
     *,
     semantic_material_by_ref: dict[str, _L3SemanticMaterial],
+    semantic_evidence_candidate_by_ref: dict[str, _L3SemanticEvidenceCandidate],
 ) -> None:
     """L3 의미 판단과 실제 공급 원문 사이의 구조적 결속을 검증한다."""
 
@@ -1084,27 +1150,28 @@ def _validate_l3_semantic_payload(
     if status == "matched" and not bindings:
         raise ValueError("matched L3 semantic judgement requires evidence bindings")
 
-    seen_refs: set[str] = set()
+    seen_excerpt_refs: set[str] = set()
     for item in bindings:
         if not isinstance(item, dict):
             raise ValueError("L3 semantic evidence binding must be an object")
         material_ref = str(item.get("material_ref") or "").strip()
-        evidence_excerpt = str(item.get("evidence_excerpt") or "")
-        if not material_ref or not evidence_excerpt.strip():
+        evidence_excerpt_ref = str(item.get("evidence_excerpt_ref") or "").strip()
+        if not material_ref or not evidence_excerpt_ref:
             raise ValueError(
-                "L3 semantic evidence binding requires material_ref and evidence_excerpt"
+                "L3 semantic evidence binding requires material_ref and evidence_excerpt_ref"
             )
-        if material_ref in seen_refs:
-            raise ValueError("L3 semantic evidence material refs must be unique")
-        seen_refs.add(material_ref)
+        if evidence_excerpt_ref in seen_excerpt_refs:
+            raise ValueError("L3 semantic evidence excerpt refs must be unique")
+        seen_excerpt_refs.add(evidence_excerpt_ref)
         material = semantic_material_by_ref.get(material_ref)
         if material is None:
             raise ValueError("L3 semantic evidence material_ref was not supplied")
-        if len(evidence_excerpt) > L3_SEMANTIC_EVIDENCE_EXCERPT_MAX_CHARS:
-            raise ValueError("L3 semantic evidence excerpt is too long")
-        if evidence_excerpt not in material.text:
+        candidate = semantic_evidence_candidate_by_ref.get(evidence_excerpt_ref)
+        if candidate is None:
+            raise ValueError("L3 semantic evidence_excerpt_ref was not supplied")
+        if candidate.material_ref != material_ref:
             raise ValueError(
-                "L3 semantic evidence excerpt must be copied exactly from supplied material"
+                "L3 semantic evidence_excerpt_ref does not belong to material_ref"
             )
 
 
@@ -1129,10 +1196,54 @@ def _l3_semantic_materials(
     return materials
 
 
+def _l3_semantic_evidence_candidates(
+    materials: list[_L3SemanticMaterial],
+) -> list[_L3SemanticEvidenceCandidate]:
+    """원문을 의미 판단 없이 고정 길이 연속 조각으로 나눈다."""
+
+    candidates: list[_L3SemanticEvidenceCandidate] = []
+    for material in materials:
+        for excerpt_index, start_char in enumerate(
+            range(0, len(material.text), L3_SEMANTIC_EVIDENCE_EXCERPT_MAX_CHARS),
+            start=1,
+        ):
+            candidates.append(
+                _L3SemanticEvidenceCandidate(
+                    material_ref=material.material_ref,
+                    evidence_excerpt_ref=(
+                        f"{material.material_ref}:EXCERPT_{excerpt_index:04d}"
+                    ),
+                    source_data_id=material.source_data_id,
+                    text=material.text[
+                        start_char : start_char + L3_SEMANTIC_EVIDENCE_EXCERPT_MAX_CHARS
+                    ],
+                )
+            )
+    return candidates
+
+
+def _l3_evidence_candidate_payloads(
+    candidates: list[_L3SemanticEvidenceCandidate],
+    *,
+    material_ref: str,
+) -> list[dict[str, str]]:
+    """특정 재료에 속한 번호표와 정확한 원문 조각만 L3 입력에 싣는다."""
+
+    return [
+        {
+            "evidence_excerpt_ref": candidate.evidence_excerpt_ref,
+            "text": candidate.text,
+        }
+        for candidate in candidates
+        if candidate.material_ref == material_ref
+    ]
+
+
 def _l3_semantic_evidence_bindings_from_payload(
     *,
     payload: dict[str, object],
     semantic_material_by_ref: dict[str, _L3SemanticMaterial],
+    semantic_evidence_candidate_by_ref: dict[str, _L3SemanticEvidenceCandidate],
 ) -> list[L3SemanticEvidenceBinding]:
     bindings: list[L3SemanticEvidenceBinding] = []
     raw_bindings = payload.get("semantic_evidence_bindings")
@@ -1143,13 +1254,16 @@ def _l3_semantic_evidence_bindings_from_payload(
             continue
         material_ref = str(item.get("material_ref") or "").strip()
         material = semantic_material_by_ref.get(material_ref)
-        if material is None:
+        evidence_excerpt_ref = str(item.get("evidence_excerpt_ref") or "").strip()
+        candidate = semantic_evidence_candidate_by_ref.get(evidence_excerpt_ref)
+        if material is None or candidate is None:
             continue
         bindings.append(
             L3SemanticEvidenceBinding(
                 material_ref=material_ref,
+                evidence_excerpt_ref=evidence_excerpt_ref,
                 source_data_id=material.source_data_id,
-                evidence_excerpt=str(item.get("evidence_excerpt") or ""),
+                evidence_excerpt=candidate.text,
             )
         )
     return bindings

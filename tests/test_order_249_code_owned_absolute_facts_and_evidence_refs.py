@@ -22,6 +22,7 @@ class WrongOperationalFactsL3Adapter:
         if "L3 Result Keeper v0" in request.prompt:
             self.l3_input_payload = request.input_payload
             preview = request.input_payload["read_document_previews"][0]
+            excerpt = preview["evidence_excerpt_candidates"][0]
             payload: dict[str, object] = {
                 # 이전 L3 출력 형식을 일부러 섞어도 authoritative 운영 frame에는
                 # 복사되지 않아야 한다.
@@ -36,7 +37,7 @@ class WrongOperationalFactsL3Adapter:
                 "semantic_evidence_bindings": [
                     {
                         "material_ref": preview["material_ref"],
-                        "evidence_excerpt": preview["text_preview"][:40],
+                        "evidence_excerpt_ref": excerpt["evidence_excerpt_ref"],
                     }
                 ],
             }

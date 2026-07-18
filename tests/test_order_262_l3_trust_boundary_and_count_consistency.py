@@ -14,6 +14,7 @@ from songryeon_core.core.schemas import (
 from songryeon_core.core.trace_store import TraceStore
 from songryeon_core.llm.base import LLMRequest, LLMResponse
 from songryeon_core.nodes.l3_result_keeper import (
+    _L3SemanticEvidenceCandidate,
     _L3SemanticMaterial,
     _validate_l3_semantic_payload,
     run_l3_result_keeper,
@@ -53,10 +54,18 @@ class RecordingPartialL3Adapter:
         )
 
 
-def test_l3_matched_rejects_unknown_ref_and_non_verbatim_excerpt() -> None:
+def test_l3_matched_rejects_unknown_material_or_excerpt_ref() -> None:
     materials = {
         "CODE_MATERIAL_0001": _L3SemanticMaterial(
             material_ref="CODE_MATERIAL_0001",
+            source_data_id="L:run:0002:tool_result:read_code_file:001",
+            text="def visible_function():\n    return 1\n",
+        )
+    }
+    candidates = {
+        "CODE_MATERIAL_0001:EXCERPT_0001": _L3SemanticEvidenceCandidate(
+            material_ref="CODE_MATERIAL_0001",
+            evidence_excerpt_ref="CODE_MATERIAL_0001:EXCERPT_0001",
             source_data_id="L:run:0002:tool_result:read_code_file:001",
             text="def visible_function():\n    return 1\n",
         )
@@ -70,14 +79,15 @@ def test_l3_matched_rejects_unknown_ref_and_non_verbatim_excerpt() -> None:
                 "semantic_evidence_bindings": [
                     {
                         "material_ref": "CODE_MATERIAL_9999",
-                        "evidence_excerpt": "def visible_function",
+                        "evidence_excerpt_ref": "CODE_MATERIAL_0001:EXCERPT_0001",
                     }
                 ],
             },
             semantic_material_by_ref=materials,
+            semantic_evidence_candidate_by_ref=candidates,
         )
 
-    with pytest.raises(ValueError, match="copied exactly"):
+    with pytest.raises(ValueError, match="evidence_excerpt_ref was not supplied"):
         _validate_l3_semantic_payload(
             {
                 "semantic_goal_match_status": "matched",
@@ -85,11 +95,12 @@ def test_l3_matched_rejects_unknown_ref_and_non_verbatim_excerpt() -> None:
                 "semantic_evidence_bindings": [
                     {
                         "material_ref": "CODE_MATERIAL_0001",
-                        "evidence_excerpt": "원문에는 없는 요약 문장",
+                        "evidence_excerpt_ref": "CODE_MATERIAL_0001:EXCERPT_9999",
                     }
                 ],
             },
             semantic_material_by_ref=materials,
+            semantic_evidence_candidate_by_ref=candidates,
         )
 
 

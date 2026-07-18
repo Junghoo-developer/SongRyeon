@@ -1175,7 +1175,9 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
                 f"{frame.get('frame_id', 'unknown')} "
                 f"status={frame.get('achievement_status', 'unknown')} "
                 f"candidates={frame.get('candidate_count', 0)} "
-                f"LLM_SEMANTIC={frame.get('llm_semantic_judgement_status', 'not_run')}"
+                f"LLM_SEMANTIC={frame.get('llm_semantic_judgement_status', 'not_run')} "
+                f"execution={frame.get('llm_semantic_execution_status', 'not_run')} "
+                f"failure={frame.get('llm_semantic_failure_type', 'not_run')}"
             )
             lines.append(f"    reason: {frame.get('reason', '')}")
 
@@ -1215,6 +1217,12 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
             f"LLM_SEMANTIC={achievement.get('llm_semantic_judgement_status', 'not_run')}]: "
             f"{achievement.get('achievement_status', 'unknown')} / "
             f"{achievement.get('controller_decision', 'unknown')}"
+        )
+        lines.append(
+            "- L3 의미 검사 호출: "
+            f"status={achievement.get('llm_semantic_execution_status', 'not_run')} / "
+            f"failure={achievement.get('llm_semantic_failure_type', 'not_run')} / "
+            f"reason={achievement.get('llm_semantic_failure_reason', '')}"
         )
         lines.append(
             "- L3 근거 확보 절대상태: "
@@ -1641,6 +1649,10 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
                 f"acquisition={node3_brief.get('l_evidence_acquisition_status', 'unknown')} / "
                 f"originals={node3_brief.get('l_original_material_count', 0)} / "
                 f"semantic={node3_brief.get('l3_semantic_goal_match_status', 'unknown')} / "
+                "semantic_execution="
+                f"{node3_brief.get('l3_semantic_execution_status', 'not_run')} / "
+                "semantic_failure="
+                f"{node3_brief.get('l3_semantic_failure_type', 'not_run')} / "
                 f"remaining_query={node3_brief.get('remaining_query_attempts', 0)} / "
                 f"hint={l_loop_attitude_hint}"
             )

@@ -728,6 +728,21 @@ def record_node3_input_brief(
             "l3_semantic_goal_match_status",
             fallback="not_run",
         ),
+        l3_semantic_execution_status=_text(
+            l_loop_return_summary,
+            "l3_semantic_execution_status",
+            fallback="not_run",
+        ),
+        l3_semantic_failure_type=_text(
+            l_loop_return_summary,
+            "l3_semantic_failure_type",
+            fallback="not_run",
+        ),
+        l3_semantic_failure_reason=_text(
+            l_loop_return_summary,
+            "l3_semantic_failure_reason",
+            fallback="CODE_STATUS:l3_semantic_judgement_not_run",
+        ),
         l_evidence_acquisition_status=_text(
             l_loop_return_summary,
             "evidence_acquisition_status",
@@ -1644,6 +1659,9 @@ def node3_brief_llm_payload(frame: Node3InputBriefFrame) -> dict[str, object]:
             "failure_level": frame.l_loop_failure_level,
             "l3_goal_match_status": frame.l3_goal_match_status,
             "l3_semantic_goal_match_status": frame.l3_semantic_goal_match_status,
+            "l3_semantic_execution_status": frame.l3_semantic_execution_status,
+            "l3_semantic_failure_type": frame.l3_semantic_failure_type,
+            "l3_semantic_failure_reason": frame.l3_semantic_failure_reason,
             "evidence_acquisition_status": frame.l_evidence_acquisition_status,
             "original_material_count": frame.l_original_material_count,
             "original_material_requirement_status": (
@@ -1913,6 +1931,9 @@ def _node3_task_focused_llm_payload(
             "failure_level": frame.l_loop_failure_level,
             "l3_goal_match_status": frame.l3_goal_match_status,
             "l3_semantic_goal_match_status": frame.l3_semantic_goal_match_status,
+            "l3_semantic_execution_status": frame.l3_semantic_execution_status,
+            "l3_semantic_failure_type": frame.l3_semantic_failure_type,
+            "l3_semantic_failure_reason": frame.l3_semantic_failure_reason,
             "evidence_acquisition_status": frame.l_evidence_acquisition_status,
             "original_material_count": frame.l_original_material_count,
             "original_material_requirement_status": (
@@ -3732,6 +3753,13 @@ def _l_loop_result_attitude_hint(payload: dict[str, object]) -> str:
     failure_level = _text(payload, "failure_level", fallback="unknown")
     goal_match = _text(payload, "l3_goal_match_status", fallback="not_run")
     semantic_match = _text(payload, "l3_semantic_goal_match_status", fallback="not_run")
+    semantic_execution = _text(
+        payload,
+        "l3_semantic_execution_status",
+        fallback="not_run",
+    )
+    if semantic_execution == "failed":
+        return "l_loop_original_material_acquired_l3_semantic_failed"
     if task_status == "achieved" and failure_level == "none":
         return "l_loop_achieved"
     if failure_level == "budget_exhausted":

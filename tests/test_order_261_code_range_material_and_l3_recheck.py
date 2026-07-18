@@ -82,10 +82,11 @@ class RecordingSemanticAdapter:
         semantic_evidence_bindings: list[dict[str, str]] = []
         if self.status == "matched":
             preview = request.input_payload["read_code_file_previews"][0]
+            excerpt = preview["evidence_excerpt_candidates"][0]
             semantic_evidence_bindings.append(
                 {
                     "material_ref": preview["material_ref"],
-                    "evidence_excerpt": preview["text_preview"][:40],
+                    "evidence_excerpt_ref": excerpt["evidence_excerpt_ref"],
                 }
             )
         payload = {
@@ -486,7 +487,11 @@ def test_revision_l3_rechecks_all_current_code_ranges_before_closing(
     assert isinstance(previews, list)
     assert {item["range_start_char"] for item in previews} == {0, 12000}
     assert all(item["analysis_scope"] == "partial_range" for item in previews)
-    assert any("target_function" in item["text_preview"] for item in previews)
+    assert any(
+        "target_function" in excerpt["text"]
+        for item in previews
+        for excerpt in item["evidence_excerpt_candidates"]
+    )
 
 
 def _boundary(

@@ -434,17 +434,20 @@ class SongRyeonAllNodesFakeLLMAdapter:
             for item in (request.input_payload.get(field_name) or [])
             if isinstance(item, dict)
             and isinstance(item.get("material_ref"), str)
-            and isinstance(item.get("text_preview"), str)
-            and item.get("text_preview")
+            and isinstance(item.get("evidence_excerpt_candidates"), list)
+            and item.get("evidence_excerpt_candidates")
         ]
         semantic_status = "matched" if supplied_materials else "partial"
         semantic_bindings: list[dict[str, str]] = []
         if supplied_materials:
             first_material = supplied_materials[0]
+            first_excerpt = first_material["evidence_excerpt_candidates"][0]
             semantic_bindings.append(
                 {
                     "material_ref": str(first_material["material_ref"]),
-                    "evidence_excerpt": str(first_material["text_preview"])[:80],
+                    "evidence_excerpt_ref": str(
+                        first_excerpt["evidence_excerpt_ref"]
+                    ),
                 }
             )
         return {
