@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import time
 from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
 from typing import Callable
 
 from songryeon_core.core.data_store import DataStore
@@ -29,6 +31,11 @@ class LLMNodeExecutionResult:
     call_data_id: str | None = None
     retry_count: int = 0
     failure_type: str = "none"
+    timing_status: str = "not_recorded"
+    started_at_utc: str | None = None
+    finished_at_utc: str | None = None
+    execution_duration_ms: int = 0
+    configured_timeout_seconds: int | None = None
 
 
 class LLMNodeExecutor:
@@ -61,20 +68,55 @@ class LLMNodeExecutor:
 
         final_result: LLMNodeExecutionResult | None = None
         for attempt_index in range(max_retries + 1):
-            result = self._run_once(
-                node_id=node_id,
-                prompt=prompt,
-                input_payload=input_payload,
-                payload_validator=payload_validator,
-            )
+            selected_prompt_ref = prompt_ref or f"inline:{node_id}"
+            started_at_utc = _utc_now()
+            started_monotonic_ns = time.monotonic_ns()
+            reserved_event_id: str | None = None
+            reserved_call_data_id: str | None = None
+            if trace_store is not None and turn_id is not None:
+                reserved_event_id = trace_store.next_event_id()
+                reserved_call_data_id = f"llm_call:{node_id}:{reserved_event_id}"
+                trace_store.emit_live_preview(
+                    event_id=reserved_event_id,
+                    turn_id=turn_id,
+                    actor=f"llm:{node_id}",
+                    event_type="llm_call_started",
+                    input_ref=input_ref or [],
+                    output_ref=[reserved_call_data_id],
+                    raw_content_ref=f"prompt={selected_prompt_ref}",
+                    schema_status="not_checked",
+                    timestamp=started_at_utc,
+                )
+            try:
+                result = self._run_once(
+                    node_id=node_id,
+                    prompt=prompt,
+                    input_payload=input_payload,
+                    payload_validator=payload_validator,
+                )
+            finally:
+                finished_at_utc = _utc_now()
+                execution_duration_ms = max(
+                    0,
+                    round((time.monotonic_ns() - started_monotonic_ns) / 1_000_000),
+                )
+            result.timing_status = "recorded"
+            result.started_at_utc = started_at_utc
+            result.finished_at_utc = finished_at_utc
+            result.execution_duration_ms = execution_duration_ms
+            result.configured_timeout_seconds = _configured_timeout_seconds(self.adapter)
             result.retry_count = attempt_index
             if trace_store is not None and data_store is not None and turn_id is not None:
+                if reserved_event_id is None or reserved_call_data_id is None:
+                    raise RuntimeError("LLM call trace reservation is missing")
                 trace_event_id, call_data_id = self._record_call(
                     trace_store=trace_store,
                     data_store=data_store,
                     turn_id=turn_id,
+                    event_id=reserved_event_id,
+                    call_data_id=reserved_call_data_id,
                     node_id=node_id,
-                    prompt_ref=prompt_ref or f"inline:{node_id}",
+                    prompt_ref=selected_prompt_ref,
                     input_payload=input_payload,
                     input_ref=input_ref or [],
                     source_data_ids=source_data_ids or [],
@@ -141,6 +183,8 @@ class LLMNodeExecutor:
         trace_store: TraceStore,
         data_store: DataStore,
         turn_id: str,
+        event_id: str,
+        call_data_id: str,
         node_id: str,
         prompt_ref: str,
         input_payload: dict[str, object],
@@ -148,8 +192,6 @@ class LLMNodeExecutor:
         source_data_ids: list[str],
         result: LLMNodeExecutionResult,
     ) -> tuple[str, str]:
-        event_id = trace_store.next_event_id()
-        call_data_id = f"llm_call:{node_id}:{event_id}"
         parse_status = "passed" if result.validation.ok or result.failure_type == "schema_failed" else "failed"
         validation_status = "passed" if result.failure_type == "none" else "failed"
         if result.failure_type == "parse_failed":
@@ -180,6 +222,11 @@ class LLMNodeExecutor:
             input_payload_json_char_count=input_payload_audit["input_payload_json_char_count"],
             input_payload_top_level_keys=input_payload_audit["input_payload_top_level_keys"],
             input_payload_preview_json=input_payload_audit["input_payload_preview_json"],
+            timing_status=result.timing_status,
+            started_at_utc=result.started_at_utc,
+            finished_at_utc=result.finished_at_utc,
+            execution_duration_ms=result.execution_duration_ms,
+            configured_timeout_seconds=result.configured_timeout_seconds,
         )
         validate_llm_call_frame(frame)
         event = trace_store.create_event(
@@ -189,6 +236,10 @@ class LLMNodeExecutor:
             event_type="llm_call",
             input_ref=input_ref,
             output_ref=[call_data_id],
+            raw_content_ref=(
+                f"duration_ms={result.execution_duration_ms};"
+                f"failure={result.failure_type}"
+            ),
             schema_status="passed" if result.failure_type == "none" else "failed",
         )
         data_store.create_record(
@@ -217,3 +268,14 @@ class LLMNodeExecutor:
             "input_payload_top_level_keys": sorted(input_payload.keys()),
             "input_payload_preview_json": payload_json[:INPUT_PAYLOAD_PREVIEW_JSON_CHAR_LIMIT],
         }
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+
+
+def _configured_timeout_seconds(adapter: LLMAdapter) -> int | None:
+    value = getattr(adapter, "timeout_seconds", None)
+    if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+        return value
+    return None

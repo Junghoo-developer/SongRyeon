@@ -31,8 +31,10 @@ class LLMRuntimeConfig:
     endpoint_configured: bool = False
     # 안전 정보: Qwen 호출 방식. endpoint가 있으면 http, 없으면 ollama.
     transport: str = "ollama"
-    # 절대 정보: Qwen HTTP 호출 제한 시간.
+    # 절대 정보: adapter에 설정한 개별 호출 제한 시간.
     timeout_seconds: int = 30
+    # 절대 정보: 선택 transport가 위 timeout 설정을 어디서 강제하는지.
+    timeout_enforcement_status: str = "not_applicable"
     # 절대 정보: 외부 API 키의 실제 값이 아니라 설정 여부만 보존한다.
     api_key_configured: bool = False
     # 절대 정보: OpenAI reasoning/output 상한. Qwen 모드에서는 사용하지 않는다.
@@ -112,6 +114,10 @@ def build_llm_runtime_config(
             else ("http" if selected_endpoint else "ollama")
         ),
         timeout_seconds=selected_timeout,
+        timeout_enforcement_status=_timeout_enforcement_status(
+            mode=selected_mode,
+            endpoint_configured=bool(selected_endpoint),
+        ),
         api_key_configured=bool(selected_api_key),
         reasoning_effort=selected_reasoning_effort,
         max_output_tokens=selected_max_output_tokens,
@@ -300,3 +306,13 @@ def _openai_api_failure_type(exc: Exception) -> str:
 def _validate_timeout(timeout_seconds: int) -> None:
     if timeout_seconds <= 0:
         raise ValueError("LLM timeout must be positive")
+
+
+def _timeout_enforcement_status(*, mode: str, endpoint_configured: bool) -> str:
+    if mode == "qwen":
+        if endpoint_configured:
+            return "enforced_by_urlopen"
+        return "enforced_by_ollama_httpx_client"
+    if mode == "openai":
+        return "enforced_by_openai_client"
+    return "not_applicable"

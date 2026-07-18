@@ -45,10 +45,13 @@ def test_qwen_direct_ollama_call_uses_explicit_long_context(monkeypatch) -> None
     captured: dict[str, object] = {}
 
     class FakeOllamaModule:
-        @staticmethod
-        def chat(**kwargs):
-            captured.update(kwargs)
-            return {"message": {"content": "{}"}}
+        class Client:
+            def __init__(self, **kwargs):
+                captured["client_kwargs"] = kwargs
+
+            def chat(self, **kwargs):
+                captured.update(kwargs)
+                return {"message": {"content": "{}"}}
 
     monkeypatch.setitem(sys.modules, "ollama", FakeOllamaModule())
     adapter = QwenLocalHTTPAdapter()
@@ -64,6 +67,7 @@ def test_qwen_direct_ollama_call_uses_explicit_long_context(monkeypatch) -> None
         "temperature": 0,
         "num_ctx": DEFAULT_QWEN_NUM_CTX,
     }
+    assert captured["client_kwargs"] == {"timeout": 30}
 
 
 class RecordingSemanticAdapter:

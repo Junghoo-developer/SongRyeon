@@ -146,6 +146,28 @@ Neo4j 설정값이 모두 있으면 실험적 Vessel R 경로까지 자동으로
 Vessel R 없이 Qwen 대화가 시작됩니다. 기존의 세부 명령은 감사와 개발용으로 그대로
 유지됩니다.
 
+### 내 업무 폴더 조사
+
+송련 저장소가 아닌 사용자의 업무 폴더를 먼저 점검합니다. 이 명령은 파일을 복사하거나
+LLM을 호출하지 않고, 읽기 허용 후보와 제외 count만 code 절대정보로 표시합니다.
+
+```powershell
+python main.py workspace-check "C:\내업무\프로젝트"
+```
+
+그 폴더를 로컬 Qwen이 읽기 전용으로 조사하게 하려면 다음처럼 실행합니다.
+
+```powershell
+python main.py qwen-chat --workspace "C:\내업무\프로젝트"
+```
+
+`.env`에 `SONGRYEON_WORKSPACE_ROOT=C:\내업무\프로젝트`를 한 번 적으면 이후에는
+`python main.py`만 실행해도 같은 폴더가 연결됩니다. 첫 MVP는 `.md`, `.txt`, `.py`,
+`.json`, `.toml`, `.yaml`, `.yml`만 지원하며, `.env`, key 파일, Git·가상환경·cache·build
+폴더는 명시 정책으로 제외합니다. 외부 API 전송과 Neo4j/심야정부 자동 적재는 하지
+않습니다. workspace가 활성화된 Qwen HTTP endpoint도 현재 컴퓨터의 loopback 주소만
+허용합니다.
+
 먼저 모델 없이 실행되는 길부터 확인합니다.
 
 ```powershell
@@ -243,10 +265,10 @@ python main.py qwen-turn "송련의 문서 메모리 인덱스가 무엇인지 �
 
 ## 현재 기준선
 
-2026-07-17 로컬 체크포인트 기준:
+2026-07-18 로컬 체크포인트 기준:
 
 - `python -m compileall songryeon_core main.py` 통과.
-- `python -m pytest` 통과: 478 passed, 5 deselected.
+- `python -m pytest` 통과: 496 passed, 1 skipped, 5 deselected.
 - `python main.py smoke-test` 통과.
 - `python main.py fast-test --profile graph` 통과.
 - 이 기준선의 GitHub Actions 결과는 최신 브랜치를 push한 뒤 별도로 확인해야 함.

@@ -106,6 +106,43 @@ class TraceStore:
         )
         return self.add_event(event)
 
+    def emit_live_preview(
+        self,
+        *,
+        turn_id: str,
+        actor: str,
+        event_type: str,
+        event_id: str,
+        timestamp: str | None = None,
+        input_ref: list[str] | None = None,
+        output_ref: list[str] | None = None,
+        raw_content_ref: str | None = None,
+        schema_status: str = "not_checked",
+    ) -> TraceEvent | None:
+        """아직 끝나지 않은 작업을 live sink에만 미리 알린다.
+
+        preview는 공식 trace 사건이 아니므로 저장소와 event ID 순서를 바꾸지 않는다.
+        같은 event_id의 최종 사건은 작업이 끝난 뒤 `create_event()`로 별도 저장된다.
+        """
+
+        if self._on_event is None:
+            return None
+        event_time = timestamp or datetime.now().isoformat(timespec="seconds")
+        event = TraceEvent(
+            event_id=event_id,
+            turn_id=turn_id,
+            timestamp=event_time,
+            actor=actor,
+            event_type=event_type,
+            input_ref=input_ref or [],
+            output_ref=output_ref or [],
+            raw_content_ref=raw_content_ref,
+            schema_status=schema_status,
+        )
+        self._validate_event(event)
+        self._on_event(event)
+        return event
+
     def next_event_id(self, prefix: str = "trace") -> str:
         """현재 저장소 기준으로 다음 trace ID 후보를 만든다."""
 

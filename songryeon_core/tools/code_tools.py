@@ -2,26 +2,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from songryeon_core.tools.workspace_policy import (
+    WORKSPACE_CODE_EXTENSIONS,
+    WORKSPACE_EXCLUDED_DIR_NAMES,
+    iter_workspace_files,
+    workspace_file_rejection_reason,
+)
 
-DEFAULT_CODE_FILE_EXTENSIONS = {
-    ".py",
-    ".json",
-    ".toml",
-    ".yml",
-    ".yaml",
-}
-DEFAULT_IGNORED_DIR_NAMES = {
-    ".git",
-    ".mypy_cache",
-    ".pytest_cache",
-    ".ruff_cache",
-    ".venv",
-    "__pycache__",
-    "build",
-    "dist",
-    "node_modules",
-    "venv",
-}
+DEFAULT_CODE_FILE_EXTENSIONS = set(WORKSPACE_CODE_EXTENSIONS)
+DEFAULT_IGNORED_DIR_NAMES = set(WORKSPACE_EXCLUDED_DIR_NAMES)
 
 
 def explicit_code_file_paths_from_text(
@@ -52,8 +41,17 @@ def explicit_code_file_paths_from_text(
         )
         if reference_index is not None:
             matches.append((reference_index, relative_path))
-    matches.sort(key=lambda item: (item[0], item[1]))
-    return [relative_path for _, relative_path in matches]
+    # 같은 위치에서 실제 경로가 겹치면 긴 경로가 사용자가 쓴 전체 토큰에 더 가깝다.
+    # 중요도 판단이 아니라 실제 workspace 경로 문자열의 prefix 충돌 제거다.
+    matches.sort(key=lambda item: (item[0], -len(item[1]), item[1]))
+    selected: list[tuple[int, str]] = []
+    occupied_starts: set[int] = set()
+    for index, relative_path in matches:
+        if index in occupied_starts:
+            continue
+        occupied_starts.add(index)
+        selected.append((index, relative_path))
+    return [relative_path for _, relative_path in selected]
 
 
 def list_code_files(
@@ -232,16 +230,10 @@ def _iter_code_files(
 ) -> list[Path]:
     if not root_path.exists():
         return []
-    files: list[Path] = []
-    for path in root_path.rglob("*"):
-        if not path.is_file():
-            continue
-        if _has_ignored_part(path):
-            continue
-        if path.suffix.lower() not in allowed_extensions:
-            continue
-        files.append(path)
-    return sorted(files, key=lambda item: _relative_posix_path(root_path=root_path, path=item))
+    return iter_workspace_files(
+        root=root_path,
+        allowed_extensions=allowed_extensions,
+    )
 
 
 def _file_listing_item(*, root_path: Path, path: Path) -> dict[str, object]:
@@ -258,20 +250,15 @@ def _resolve_code_file(*, root_path: Path, file_path: str) -> dict[str, object]:
     raw_path = Path(file_path)
     if raw_path.is_absolute():
         return {"status": "absolute_path_rejected"}
-    candidate = (root_path / raw_path).resolve()
-    try:
-        candidate.relative_to(root_path)
-    except ValueError:
-        return {"status": "path_outside_workspace_rejected"}
-    if _has_ignored_part(candidate):
-        return {"status": "ignored_path_rejected"}
-    if not candidate.exists():
-        return {"status": "not_found"}
-    if not candidate.is_file():
-        return {"status": "not_file"}
-    if candidate.suffix.lower() not in DEFAULT_CODE_FILE_EXTENSIONS:
-        return {"status": "unsupported_extension"}
-    return {"status": "ok", "path": candidate}
+    candidate = root_path / raw_path
+    reason = workspace_file_rejection_reason(
+        root=root_path,
+        path=candidate,
+        allowed_extensions=DEFAULT_CODE_FILE_EXTENSIONS,
+    )
+    if reason is not None:
+        return {"status": reason}
+    return {"status": "ok", "path": candidate.resolve()}
 
 
 def _normalized_extensions(include_extensions: list[str] | None) -> set[str]:
@@ -286,10 +273,6 @@ def _normalized_extensions(include_extensions: list[str] | None) -> set[str]:
             value = f".{value}"
         result.add(value)
     return result or set(DEFAULT_CODE_FILE_EXTENSIONS)
-
-
-def _has_ignored_part(path: Path) -> bool:
-    return any(part in DEFAULT_IGNORED_DIR_NAMES for part in path.parts)
 
 
 def _relative_posix_path(*, root_path: Path, path: Path) -> str:
@@ -313,7 +296,11 @@ def _exact_path_reference_index(*, text: str, relative_path: str) -> int | None:
 
 
 def _is_path_token_character(character: str) -> bool:
-    return character.isalnum() or character in {"_", "-", ".", "/"}
+    # 지원 파일은 허용 확장자로 끝난다. 확장자 뒤 한글은 파일명의 연장이 아니라
+    # 자연어 조사일 수 있으므로 ASCII 경로 문법만 경계 판정에 사용한다.
+    return character.isascii() and (
+        character.isalnum() or character in {"_", "-", ".", "/"}
+    )
 
 
 def _line_count(text: str) -> int:

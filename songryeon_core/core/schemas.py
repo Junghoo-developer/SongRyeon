@@ -1511,11 +1511,13 @@ def validate_node4_gatekeeper_frame(frame: Node4GatekeeperFrame) -> None:
 
 
 LLM_CALL_FRAME_SCHEMA_NAME = "LLMCallFrame"
-LLM_CALL_FRAME_SCHEMA_VERSION = "0.1"
+LLM_CALL_FRAME_SCHEMA_VERSION = "0.2"
+LLM_CALL_FRAME_COMPATIBLE_SCHEMA_VERSIONS = {"0.1", "0.2"}
 LLM_CALL_PARSE_STATUSES = {"passed", "failed", "not_checked"}
 LLM_CALL_VALIDATION_STATUSES = {"passed", "failed", "not_checked"}
 LLM_CALL_FAILURE_TYPES = {"none", "parse_failed", "schema_failed", "adapter_failed"}
 LLM_CALL_INPUT_PAYLOAD_AUDIT_STATUSES = {"not_recorded", "recorded"}
+LLM_CALL_TIMING_STATUSES = {"not_recorded", "recorded"}
 
 
 @dataclass
@@ -1562,6 +1564,15 @@ class LLMCallFrame:
     input_payload_top_level_keys: list[str] = field(default_factory=list)
     # 절대 정보: 입력 payload JSON 앞부분. 대형 문서 폭탄을 피하기 위해 실행기가 길이를 제한한다.
     input_payload_preview_json: str = ""
+    # 절대 정보: 공통 executor가 이 호출의 시간을 측정했는지.
+    timing_status: str = "not_recorded"
+    # 절대 정보: 공통 executor 진입 시각과 종료 시각. UTC ISO-8601 문자열이다.
+    started_at_utc: str | None = None
+    finished_at_utc: str | None = None
+    # 절대 정보: adapter 호출과 parse/schema 검사를 합친 monotonic 경과 시간.
+    execution_duration_ms: int = 0
+    # 절대 정보: adapter에 설정된 개별 호출 timeout. 확인할 수 없으면 None이다.
+    configured_timeout_seconds: int | None = None
     # 절대 정보: 적용된 스키마 이름.
     schema_name: str = LLM_CALL_FRAME_SCHEMA_NAME
     # 절대 정보: 적용된 스키마 버전.
@@ -1590,7 +1601,7 @@ def validate_llm_call_frame(frame: LLMCallFrame) -> None:
 
     if frame.schema_name != LLM_CALL_FRAME_SCHEMA_NAME:
         raise ValueError(f"unknown LLM call frame schema_name: {frame.schema_name}")
-    if frame.schema_version != LLM_CALL_FRAME_SCHEMA_VERSION:
+    if frame.schema_version not in LLM_CALL_FRAME_COMPATIBLE_SCHEMA_VERSIONS:
         raise ValueError(f"unknown LLM call frame schema_version: {frame.schema_version}")
     if frame.parse_status not in LLM_CALL_PARSE_STATUSES:
         raise ValueError(f"unknown LLM parse_status: {frame.parse_status}")
@@ -1600,6 +1611,8 @@ def validate_llm_call_frame(frame: LLMCallFrame) -> None:
         raise ValueError(f"unknown LLM failure_type: {frame.failure_type}")
     if frame.input_payload_audit_status not in LLM_CALL_INPUT_PAYLOAD_AUDIT_STATUSES:
         raise ValueError(f"unknown LLM input_payload_audit_status: {frame.input_payload_audit_status}")
+    if frame.timing_status not in LLM_CALL_TIMING_STATUSES:
+        raise ValueError(f"unknown LLM timing_status: {frame.timing_status}")
     if not isinstance(frame.retry_count, int):
         raise TypeError("LLMCallFrame.retry_count must be an integer")
     if frame.retry_count < 0:
@@ -1618,6 +1631,32 @@ def validate_llm_call_frame(frame: LLMCallFrame) -> None:
     else:
         if frame.input_payload_sha256 is not None:
             raise ValueError("LLMCallFrame.input_payload_sha256 must be None when input payload audit is not recorded")
+
+    if not isinstance(frame.execution_duration_ms, int) or isinstance(
+        frame.execution_duration_ms,
+        bool,
+    ):
+        raise TypeError("LLMCallFrame.execution_duration_ms must be an integer")
+    if frame.execution_duration_ms < 0:
+        raise ValueError("LLMCallFrame.execution_duration_ms must not be negative")
+    if frame.configured_timeout_seconds is not None:
+        if not isinstance(frame.configured_timeout_seconds, int) or isinstance(
+            frame.configured_timeout_seconds,
+            bool,
+        ):
+            raise TypeError("LLMCallFrame.configured_timeout_seconds must be an integer")
+        if frame.configured_timeout_seconds <= 0:
+            raise ValueError("LLMCallFrame.configured_timeout_seconds must be positive")
+    if frame.timing_status == "recorded":
+        if not frame.started_at_utc or not frame.finished_at_utc:
+            raise ValueError("recorded LLM timing requires started_at_utc and finished_at_utc")
+    else:
+        if frame.started_at_utc is not None or frame.finished_at_utc is not None:
+            raise ValueError("unrecorded LLM timing must not have timestamps")
+        if frame.execution_duration_ms != 0:
+            raise ValueError("unrecorded LLM timing must have zero execution_duration_ms")
+        if frame.configured_timeout_seconds is not None:
+            raise ValueError("unrecorded LLM timing must not have configured_timeout_seconds")
 
     for trace_id in frame.source_trace_ids:
         if not trace_id:

@@ -143,6 +143,28 @@ With complete Neo4j values, the launcher automatically enables the experimental 
 route. Without them, it starts Qwen chat without Vessel R. The existing advanced commands
 remain available for audits and development.
 
+### Inspect your own workspace
+
+Preview the read-only boundary before calling any model. This command does not copy files or
+call an LLM; it reports code-owned candidate and exclusion counts.
+
+```powershell
+python main.py workspace-check "C:\work\project"
+```
+
+Connect that folder to the local Qwen path:
+
+```powershell
+python main.py qwen-chat --workspace "C:\work\project"
+```
+
+Set `SONGRYEON_WORKSPACE_ROOT=C:\work\project` once in the local `.env` to keep using
+`python main.py`. The first MVP supports `.md`, `.txt`, `.py`, `.json`, `.toml`, `.yaml`, and
+`.yml`. It explicitly excludes `.env`, key files, Git metadata, virtual environments, caches,
+and build outputs. It does not send workspace text through the external API commands or
+automatically ingest it into Neo4j/night processing. With a workspace active, Qwen HTTP
+endpoints are restricted to this computer's loopback address.
+
 Start with the no-model path:
 
 ```powershell
@@ -239,10 +261,10 @@ You can also point `QWEN_LOCAL_ENDPOINT` at an OpenAI-compatible local HTTP endp
 
 ## Current Baseline
 
-Local checkpoint as of 2026-07-17:
+Local checkpoint as of 2026-07-18:
 
 - `python -m compileall songryeon_core main.py` passes.
-- `python -m pytest` passes: 478 passed, 5 deselected.
+- `python -m pytest` passes: 496 passed, 1 skipped, 5 deselected.
 - `python main.py smoke-test` passes.
 - `python main.py fast-test --profile graph` passes.
 - GitHub Actions for this checkpoint must be confirmed after the latest branch is pushed.

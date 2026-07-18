@@ -144,6 +144,7 @@ def run_l_loop(
     memory_packet_data_ids: list[str] | None = None,
     zero_state: ZeroState | None = None,
     document_root: str | Path = "Administrative_Reform_1",
+    code_root: str | Path | None = None,
     l1_goal_adapter: LLMAdapter | None = None,
     l_tool_scope_adapter: LLMAdapter | None = None,
     l2_query_planner_adapter: LLMAdapter | None = None,
@@ -240,7 +241,7 @@ def run_l_loop(
     budget_plan_trace_ids = [budget_plan_trace_id]
     budget_plan_data_ids = [budget_plan_data_id]
 
-    codebase_root = Path.cwd()
+    codebase_root = Path.cwd() if code_root is None else Path(code_root).resolve()
     tool_registry = build_document_tool_registry(
         document_root,
         code_root=codebase_root,
@@ -1499,6 +1500,7 @@ def run_l_loop(
                 turn_id=turn_id,
                 revision_query_frame_data_id=revision_query_id,
                 document_root=document_root,
+                code_root=codebase_root,
                 search_top_k=search_top_k,
                 max_tool_calls=max_tool_calls,
                 max_query_attempts=max_query_attempts,

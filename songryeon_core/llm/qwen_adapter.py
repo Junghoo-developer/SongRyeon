@@ -3,6 +3,7 @@
 import json
 import os
 import urllib.request
+from collections.abc import Callable
 
 from songryeon_core.llm.base import LLMRequest, LLMResponse
 
@@ -25,11 +26,13 @@ class QwenLocalHTTPAdapter:
         model_id: str = "qwen3:14b",
         timeout_seconds: int = 30,
         num_ctx: int | None = None,
+        ollama_client_factory: Callable[..., object] | None = None,
     ) -> None:
         self.endpoint = endpoint or os.environ.get("QWEN_LOCAL_ENDPOINT")
         self.model_id = model_id
         self.timeout_seconds = timeout_seconds
         self.num_ctx = _resolve_num_ctx(num_ctx)
+        self._ollama_client_factory = ollama_client_factory
 
     def complete(self, request: LLMRequest) -> LLMResponse:
         if not self.endpoint:
@@ -79,7 +82,21 @@ class QwenLocalHTTPAdapter:
         }
         if request.response_format == "json":
             kwargs["format"] = "json"
-        raw = _json_safe_raw(ollama.chat(**kwargs))
+        client_factory = self._ollama_client_factory or ollama.Client
+        client = client_factory(timeout=self.timeout_seconds)
+        chat = getattr(client, "chat", None)
+        if not callable(chat):
+            raise RuntimeError("ollama Client does not provide chat()")
+        try:
+            raw_response = chat(**kwargs)
+        except Exception as exc:
+            if _is_transport_timeout(exc):
+                raise TimeoutError(
+                    "direct Ollama transport timed out after configured "
+                    f"{self.timeout_seconds} seconds"
+                ) from exc
+            raise
+        raw = _json_safe_raw(raw_response)
         text = _extract_text(raw)
         return LLMResponse(text=text, model_id=self.model_id, raw=raw)
 
@@ -139,3 +156,15 @@ def _json_safe_raw(raw: object) -> object:
         return dict(raw)  # type: ignore[arg-type]
     except Exception:
         return {"raw_text": str(raw)}
+
+
+def _is_transport_timeout(exc: Exception) -> bool:
+    """Ollama가 쓰는 httpx timeout 계열과 내장 TimeoutError만 기술적으로 분류한다."""
+
+    if isinstance(exc, TimeoutError):
+        return True
+    try:
+        import httpx
+    except Exception:
+        return False
+    return isinstance(exc, httpx.TimeoutException)

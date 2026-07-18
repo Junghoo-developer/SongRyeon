@@ -1,5 +1,40 @@
 # Release Notes
 
+## 2026-07-18: Read-Only External Workspace Boundary
+
+- Added a local-only, read-only workspace boundary for user-selected folders:
+
+```powershell
+python main.py workspace-check "C:\path\to\work"
+python main.py qwen-chat --workspace "C:\path\to\work"
+```
+
+- The code-owned manifest records supported file coordinates, sizes, modification times,
+  hashes, and explicit exclusion counts without copying the files.
+- Supported extensions are `.md`, `.txt`, `.py`, `.json`, `.toml`, `.yaml`, and `.yml`.
+- Explicit secret names, Git/virtual-environment/cache/build directories, paths outside the
+  selected root, and symbolic-link escapes are excluded by policy.
+- Workspace candidates remain distinct from files actually read by L-loop tools.
+- Explicit workspace paths remain detectable when a Korean particle directly follows the file
+  name, and the terminal now distinguishes the first L3 judgment from the latest revision.
+- Existing L2/L3 `llm_call` failure records are rendered as compact fallback diagnostics without
+  exposing raw model text.
+- External API commands do not expose the workspace option, workspace-enabled Qwen HTTP calls
+  require a loopback endpoint, and no automatic Neo4j or night ingestion is performed.
+- Completed LLM calls now record UTC start/end, monotonic duration, and the configured adapter
+  timeout. Live trace prints the node before a model call starts, without changing official trace
+  counts or IDs.
+- A 150-second forced-L observation identified an unfinished direct Ollama L1 call. The configured
+  timeout was not enforced by the previous module-level `ollama.chat(...)` transport.
+- Direct Ollama calls now use `ollama.Client(timeout=N)`, which forwards the configured timeout to
+  the package's internal httpx client. Runtime output names the transport enforcement boundary.
+- A live five-second timeout test returned each local Qwen call in roughly 5.0-5.3 seconds and kept
+  the final strict router failure visible instead of silently fabricating a route.
+- Local verification: 496 passed, 1 skipped, 5 deselected; `SMOKE_TEST_OK`; competition demo
+  three scenes passed.
+- A repeated forced-L Qwen live measurement exceeded the 600-second command limit. The feature
+  boundary passes deterministic tests, but live sequential-call latency remains an open risk.
+
 ## 2026-07-17: Competition Reviewer Demo And Product Positioning
 
 - Added a deterministic one-command reviewer demo:

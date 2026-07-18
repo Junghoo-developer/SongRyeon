@@ -28,6 +28,7 @@ from songryeon_core.nodes.node_1_router import ROUTER_FALLBACK_POLICY_QWEN_STRIC
 from songryeon_core.runtime.dry_run import run_dry_turn
 from songryeon_core.runtime.live_trace import make_live_trace_sink
 from songryeon_core.runtime.replay import replay_run
+from songryeon_core.tools.workspace_policy import workspace_qwen_endpoint_is_local
 
 
 DEFAULT_HYBRID_QWEN_MODEL_ID = "qwen3:14b"
@@ -82,6 +83,7 @@ def run_fake_user_turn(
     turn_id: str | None = None,
     previous_turn_capsules: list[TurnStateCapsule] | None = None,
     recent_raw_conversation: list[dict[str, str]] | None = None,
+    workspace_root: str | Path | None = None,
 ) -> dict[str, object]:
     """Fake adapter로 전체 노드 흐름을 실행한다.
 
@@ -137,6 +139,7 @@ def run_fake_user_turn(
         previous_turn_capsules=previous_turn_capsules,
         recent_raw_conversation=recent_raw_conversation,
         live_trace_sink=make_live_trace_sink(enabled=live_trace),
+        workspace_root=workspace_root,
     )
     return _turn_response(
         status=_status_from_result(result),
@@ -187,6 +190,7 @@ def run_qwen_user_turn(
     turn_id: str | None = None,
     previous_turn_capsules: list[TurnStateCapsule] | None = None,
     recent_raw_conversation: list[dict[str, str]] | None = None,
+    workspace_root: str | Path | None = None,
 ) -> dict[str, object]:
     """Qwen adapter로 사용자 턴을 실행한다.
 
@@ -202,6 +206,14 @@ def run_qwen_user_turn(
     )
     runtime = llm_runtime_status(config)
     selected_endpoint = endpoint if endpoint is not None else os.environ.get("QWEN_LOCAL_ENDPOINT")
+    if workspace_root is not None and not workspace_qwen_endpoint_is_local(selected_endpoint):
+        return {
+            "status": "blocked",
+            "reason": "workspace_requires_local_qwen_endpoint",
+            "workspace_policy_status": "blocked_remote_qwen_endpoint",
+            "runtime": runtime,
+            "user_input": user_input,
+        }
     adapter = build_llm_adapter(config, endpoint=selected_endpoint)
     if adapter is None:
         return {
@@ -257,6 +269,7 @@ def run_qwen_user_turn(
             previous_turn_capsules=previous_turn_capsules,
             recent_raw_conversation=recent_raw_conversation,
             live_trace_sink=make_live_trace_sink(enabled=live_trace),
+            workspace_root=workspace_root,
         )
     except Exception as exc:
         diagnostics = _structure_failure_diagnostics(exc)
@@ -741,6 +754,24 @@ def _turn_response(
         "data_record_count": result.get("data_record_count"),
         "relative_info_count": result.get("relative_info_count"),
         "mixed_info_count": result.get("mixed_info_count"),
+        "workspace_active": result.get("workspace_active"),
+        "workspace_manifest_frame_id": result.get("workspace_manifest_frame_id"),
+        "workspace_label": result.get("workspace_label"),
+        "workspace_manifest_status": result.get("workspace_manifest_status"),
+        "workspace_candidate_file_count": result.get(
+            "workspace_candidate_file_count"
+        ),
+        "workspace_source_kind_counts": result.get("workspace_source_kind_counts"),
+        "workspace_excluded_file_count": result.get(
+            "workspace_excluded_file_count"
+        ),
+        "workspace_excluded_directory_count": result.get(
+            "workspace_excluded_directory_count"
+        ),
+        "workspace_access_mode": result.get("workspace_access_mode"),
+        "workspace_automatic_graph_ingest_status": result.get(
+            "workspace_automatic_graph_ingest_status"
+        ),
         "llm_call_count": result.get("llm_call_count"),
         "tool_result_count": result.get("tool_result_count"),
         "tool_distillation_count": result.get("tool_distillation_count"),

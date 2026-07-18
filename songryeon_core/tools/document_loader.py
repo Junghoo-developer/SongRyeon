@@ -3,6 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from songryeon_core.tools.workspace_policy import (
+    WORKSPACE_DOCUMENT_EXTENSIONS,
+    iter_workspace_files,
+    workspace_file_rejection_reason,
+)
+
 
 @dataclass
 class DocumentRecord:
@@ -28,13 +34,14 @@ class DocumentChunk:
 
 
 def list_markdown_docs(root: str | Path) -> list[DocumentRecord]:
-    """root 아래의 Markdown 문서를 doc_id 기준으로 목록화한다."""
+    """root 아래의 허용된 Markdown/텍스트 문서를 doc_id 기준으로 목록화한다."""
 
     safe_root = _resolve_root(root)
     records: list[DocumentRecord] = []
-    for path in sorted(safe_root.rglob("*.md")):
-        if not path.is_file():
-            continue
+    for path in iter_workspace_files(
+        root=safe_root,
+        allowed_extensions=WORKSPACE_DOCUMENT_EXTENSIONS,
+    ):
         relative = path.relative_to(safe_root).as_posix()
         stat = path.stat()
         records.append(
@@ -50,11 +57,11 @@ def list_markdown_docs(root: str | Path) -> list[DocumentRecord]:
 
 
 def read_markdown_doc(root: str | Path, doc_id: str) -> str:
-    """root 아래의 doc_id 문서를 UTF-8 텍스트로 읽는다."""
+    """root 아래의 doc_id Markdown/텍스트 문서를 UTF-8로 읽는다."""
 
     safe_root = _resolve_root(root)
     path = _resolve_doc_path(safe_root, doc_id)
-    return path.read_text(encoding="utf-8")
+    return path.read_text(encoding="utf-8-sig", errors="replace")
 
 
 def chunk_markdown_docs(
@@ -63,7 +70,7 @@ def chunk_markdown_docs(
     max_chars: int = 900,
     overlap_chars: int = 120,
 ) -> list[DocumentChunk]:
-    """Markdown 문서들을 단순 문자 길이 기준으로 chunk로 나눈다."""
+    """허용된 Markdown/텍스트 문서를 단순 문자 길이 기준으로 chunk로 나눈다."""
 
     if max_chars <= 0:
         raise ValueError("max_chars must be > 0")
@@ -113,13 +120,18 @@ def _resolve_doc_path(root: Path, doc_id: str) -> Path:
 
     if not doc_id:
         raise ValueError("doc_id must not be empty")
-    path = (root / doc_id).resolve()
-    if not path.is_relative_to(root):
+    path = root / doc_id
+    reason = workspace_file_rejection_reason(
+        root=root,
+        path=path,
+        allowed_extensions=WORKSPACE_DOCUMENT_EXTENSIONS,
+    )
+    if reason == "path_outside_workspace_rejected":
         raise ValueError(f"doc_id escapes document root: {doc_id}")
-    if not path.exists():
+    if reason == "not_found":
         raise FileNotFoundError(f"document does not exist: {doc_id}")
-    if not path.is_file():
+    if reason == "not_file":
         raise FileNotFoundError(f"document is not a file: {doc_id}")
-    if path.suffix.lower() != ".md":
-        raise ValueError(f"document is not markdown: {doc_id}")
-    return path
+    if reason is not None:
+        raise ValueError(f"document rejected by workspace policy ({reason}): {doc_id}")
+    return path.resolve()

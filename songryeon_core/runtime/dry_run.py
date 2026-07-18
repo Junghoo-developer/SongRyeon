@@ -1,6 +1,7 @@
 ﻿from __future__ import annotations
 
 from dataclasses import asdict
+from pathlib import Path
 
 from songryeon_core.core.data_store import DataStore
 from songryeon_core.core.graph_memory import (
@@ -24,6 +25,11 @@ from songryeon_core.core.schemas import (
     validate_turn_outcome_frame,
 )
 from songryeon_core.core.trace_store import TraceEventSink, TraceStore
+from songryeon_core.core.workspace_manifest import (
+    RecordedWorkspaceManifest,
+    record_workspace_manifest,
+    workspace_manifest_memory_item,
+)
 from songryeon_core.llm.base import LLMAdapter
 from songryeon_core.llm.fake import MemoryRelevanceNoneSelectedFakeLLMAdapter
 from songryeon_core.runtime.artifact_export import export_runtime_artifacts
@@ -170,6 +176,7 @@ def run_dry_turn(
     vessel_r_max_node_reads: int = 6,
     vessel_r_max_raw_original_material_reads: int = 5,
     vessel_r_driver_factory_for_test: object | None = None,
+    workspace_root: str | Path | None = None,
 ) -> dict[str, object]:
     """한 턴의 구조 흐름을 trace/data로 실행한다.
 
@@ -184,6 +191,9 @@ def run_dry_turn(
     effective_enable_vessel_r_route = enable_vessel_r_route or force_vessel_r_route
     trace_store = TraceStore(on_event=live_trace_sink)
     data_store = DataStore()
+    recorded_workspace_manifest: RecordedWorkspaceManifest | None = None
+    active_document_root: str | Path = DEFAULT_DOCUMENT_ROOT
+    active_code_root: str | Path | None = None
     zero_state = ZeroState(
         recent_raw_conversation=list(recent_raw_conversation or []),
         previous_turn_capsules=list(previous_turn_capsules or []),
@@ -250,6 +260,29 @@ def run_dry_turn(
         schema_status="not_checked",
     )
 
+    # 사용자가 업무 폴더를 명시한 경우에만 code가 읽기 전용 manifest를 만든다.
+    # 이 단계는 파일의 관련성을 판단하지 않고 path/size/mtime/hash만 기록한다.
+    if workspace_root is not None:
+        recorded_workspace_manifest = record_workspace_manifest(
+            trace_store=trace_store,
+            data_store=data_store,
+            turn_id=turn_id,
+            root_path=workspace_root,
+            input_ref=[user_event.event_id],
+        )
+        active_document_root = recorded_workspace_manifest.frame.root_path
+        active_code_root = recorded_workspace_manifest.frame.root_path
+    workspace_trace_ids = (
+        [recorded_workspace_manifest.trace_event_id]
+        if recorded_workspace_manifest is not None
+        else []
+    )
+    workspace_data_ids = (
+        [recorded_workspace_manifest.data_id]
+        if recorded_workspace_manifest is not None
+        else []
+    )
+
     # 2. 0이 1에게 줄 사전 기억 패킷 생성.
     # 학습 메모: supply_memory()는 packet의 trace 근거 뼈대를 만들고,
     # build_pre_route_memory_items()가 사람이 읽기 쉬운 item 목록을 붙인다.
@@ -267,6 +300,10 @@ def run_dry_turn(
         packet_id=node0_pre_data_id,
         packet=packet_for_1,
     )
+    if recorded_workspace_manifest is not None:
+        node0_pre_memory_items.append(
+            workspace_manifest_memory_item(recorded_workspace_manifest.frame)
+        )
     node0_pre_relevance_candidate_frames = build_recent_memory_relevance_candidate_frames(
         zero_state=zero_state,
         packet_id=node0_pre_data_id,
@@ -293,7 +330,8 @@ def run_dry_turn(
         turn_id=turn_id,
         packet=packet_for_1,
         mode="pre_route_report",
-        input_ref=[user_event.event_id],
+        input_ref=[user_event.event_id, *workspace_trace_ids],
+        source_data_ids=workspace_data_ids,
         memory_items=node0_pre_memory_items,
         relevance_candidate_frames=node0_pre_relevance_candidate_frames,
         compression_candidate_frames=[node0_pre_compression_candidate_frame],
@@ -305,8 +343,9 @@ def run_dry_turn(
             step_index=1,
             node_id="node_0",
             mode="pre_route_report",
-            input_trace_ids=[user_event.event_id],
+            input_trace_ids=[user_event.event_id, *workspace_trace_ids],
             output_trace_ids=[node0_pre_trace_id],
+            input_data_ids=workspace_data_ids,
             status="completed",
         )
     )
@@ -361,6 +400,7 @@ def run_dry_turn(
             node0_pre_trace_id,
             memory_relevance_selection_trace_id,
             selected_memory_context_trace_id,
+            *workspace_trace_ids,
         ]
     )
     node1_route_source_data_ids = _unique_strings(
@@ -368,6 +408,7 @@ def run_dry_turn(
             node0_pre_data_id,
             memory_relevance_selection_data_id,
             selected_memory_context_data_id,
+            *workspace_data_ids,
         ]
     )
     if node_1_router_adapter is not None and not force_l_route and not force_vessel_r_route:
@@ -904,7 +945,9 @@ def run_dry_turn(
                 packet=packet_for_l,
                 mode=decision.expected_next_0_mode,
                 input_ref=current_l_input_trace_ids,
-                source_data_ids=current_l_source_data_ids,
+                source_data_ids=_unique_strings(
+                    [*current_l_source_data_ids, *workspace_data_ids]
+                ),
                 id_namespace=l_run_ids,
             )
             node0_l_data_id = l_run_ids.memory_packet_data_id(
@@ -928,9 +971,12 @@ def run_dry_turn(
                 turn_id=turn_id,
                 memory_packet=packet_for_l,
                 search_query=user_input,
-                memory_packet_data_ids=[node0_l_data_id],
+                memory_packet_data_ids=_unique_strings(
+                    [node0_l_data_id, *workspace_data_ids]
+                ),
                 zero_state=zero_state,
-                document_root=DEFAULT_DOCUMENT_ROOT,
+                document_root=active_document_root,
+                code_root=active_code_root,
                 l1_goal_adapter=l1_goal_adapter,
                 l_tool_scope_adapter=l_tool_scope_adapter,
                 l2_query_planner_adapter=l2_query_planner_adapter,
@@ -1584,6 +1630,52 @@ def run_dry_turn(
         "mixed_info_count": len(boundary.mixed_info),
         "data_ids": [record.data_id for record in data_store.list_records()],
         "data_records": data_store.to_records(),
+        "workspace_active": recorded_workspace_manifest is not None,
+        "workspace_manifest_frame_id": (
+            recorded_workspace_manifest.data_id
+            if recorded_workspace_manifest is not None
+            else None
+        ),
+        "workspace_label": (
+            recorded_workspace_manifest.frame.workspace_label
+            if recorded_workspace_manifest is not None
+            else None
+        ),
+        "workspace_manifest_status": (
+            recorded_workspace_manifest.frame.manifest_status
+            if recorded_workspace_manifest is not None
+            else "not_configured"
+        ),
+        "workspace_candidate_file_count": (
+            recorded_workspace_manifest.frame.candidate_file_count
+            if recorded_workspace_manifest is not None
+            else 0
+        ),
+        "workspace_source_kind_counts": (
+            dict(recorded_workspace_manifest.frame.source_kind_counts)
+            if recorded_workspace_manifest is not None
+            else {}
+        ),
+        "workspace_excluded_file_count": (
+            recorded_workspace_manifest.frame.excluded_file_count
+            if recorded_workspace_manifest is not None
+            else 0
+        ),
+        "workspace_excluded_directory_count": (
+            recorded_workspace_manifest.frame.excluded_directory_count
+            if recorded_workspace_manifest is not None
+            else 0
+        ),
+        "workspace_access_mode": (
+            recorded_workspace_manifest.frame.access_mode
+            if recorded_workspace_manifest is not None
+            else "not_configured"
+        ),
+        "workspace_automatic_graph_ingest_status": (
+            recorded_workspace_manifest.frame.automatic_graph_ingest_status
+            if recorded_workspace_manifest is not None
+            else "not_run"
+        ),
         "movement_count": len(movements),
         "task_ledger_trace_id": task_ledger_trace_id,
         "task_ledger_data_ids": task_ledger_data_ids,

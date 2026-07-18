@@ -139,7 +139,7 @@ def build_document_tool_registry(
     *,
     code_root: str | Path | None = None,
 ) -> ToolRegistry:
-    """Administrative_Reform_1 같은 문서 루트에 묶인 읽기 전용 도구 레지스트리."""
+    """선택된 문서/코드 root에 묶인 읽기 전용 도구 레지스트리."""
 
     root = Path(document_root)
     codebase_root = Path.cwd() if code_root is None else Path(code_root)
@@ -147,7 +147,7 @@ def build_document_tool_registry(
         [
             ToolSpec(
                 name="list_docs",
-                description="Markdown 문서 목록을 읽기 전용으로 가져온다.",
+                description="Markdown/텍스트 문서 목록을 읽기 전용으로 가져온다.",
                 read_only=True,
                 output_data_type="tool_result:list_docs",
                 function=lambda: list_docs(root=root),
@@ -155,7 +155,7 @@ def build_document_tool_registry(
             ),
             ToolSpec(
                 name="read_doc",
-                description="Markdown 문서 하나를 읽기 전용으로 가져온다.",
+                description="Markdown/텍스트 문서 하나를 읽기 전용으로 가져온다.",
                 read_only=True,
                 output_data_type="tool_result:read_doc",
                 function=lambda doc_id: read_doc(root=root, doc_id=doc_id),
@@ -163,7 +163,7 @@ def build_document_tool_registry(
             ),
             ToolSpec(
                 name="read_artifact",
-                description="명시적인 Markdown 문서명, 파일명, 경로를 정확히 해석해 읽는다.",
+                description="명시적인 문서명, 파일명, 경로를 정확히 해석해 읽는다.",
                 read_only=True,
                 output_data_type="tool_result:read_artifact",
                 function=lambda artifact_ref: read_artifact(root=root, artifact_ref=artifact_ref),
@@ -171,7 +171,7 @@ def build_document_tool_registry(
             ),
             ToolSpec(
                 name="search_docs",
-                description="Markdown 문서를 임베딩 검색한다.",
+                description="Markdown/텍스트 문서를 임베딩 검색한다.",
                 read_only=True,
                 output_data_type="tool_result:search_docs",
                 function=lambda query, top_k=5: search_docs(root=root, query=query, top_k=top_k),

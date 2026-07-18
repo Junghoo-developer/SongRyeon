@@ -181,6 +181,10 @@ def route_next_with_llm(
             data_store=data_store,
             source_data_ids=source_data_ids,
         ),
+        "active_workspace_context": _active_workspace_router_context(
+            data_store=data_store,
+            source_data_ids=source_data_ids,
+        ),
         "allowed_routes": allowed_routes,
         "route_meanings": route_meanings,
         "route_capability_cards": _route_capability_cards(
@@ -626,6 +630,41 @@ def _recent_memory_router_context(
         "selected_recent_memory_context_records": selected_context_records,
         "selected_recent_memory_context_count": selected_context_count,
         "selection_statuses": selection_statuses,
+    }
+
+
+def _active_workspace_router_context(
+    *,
+    data_store: DataStore,
+    source_data_ids: list[str],
+) -> dict[str, object]:
+    """node_1에게 업무 폴더의 존재와 count만 주고 전체 path/hash 목록은 숨긴다."""
+
+    for data_id in source_data_ids:
+        record = data_store.get_record(data_id)
+        if (
+            record is None
+            or record.data_type != "node_output:workspace_manifest_frame"
+            or not isinstance(record.payload, dict)
+        ):
+            continue
+        payload = record.payload
+        return {
+            "workspace_status": "active",
+            "workspace_manifest_frame_id": data_id,
+            "workspace_label": payload.get("workspace_label"),
+            "manifest_status": payload.get("manifest_status"),
+            "candidate_file_count": payload.get("candidate_file_count", 0),
+            "source_kind_counts": payload.get("source_kind_counts", {}),
+            "supported_extensions": payload.get("supported_extensions", []),
+            "access_mode": payload.get("access_mode"),
+            "automatic_graph_ingest_status": payload.get(
+                "automatic_graph_ingest_status"
+            ),
+        }
+    return {
+        "workspace_status": "not_configured",
+        "candidate_file_count": 0,
     }
 
 

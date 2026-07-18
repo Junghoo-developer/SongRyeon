@@ -105,6 +105,9 @@ def build_default_chat_cli_args(
         args.append("--live-trace")
     if _vessel_r_enabled(values):
         args.extend(["--enable-r-route-experimental", "--enable-vessel-r-route"])
+    workspace_root = str(values.get("SONGRYEON_WORKSPACE_ROOT") or "").strip()
+    if workspace_root:
+        args.extend(["--workspace", workspace_root])
     return args
 
 

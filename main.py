@@ -73,6 +73,10 @@ from songryeon_core.runtime.competition_demo import (
     render_competition_demo,
     run_competition_demo,
 )
+from songryeon_core.core.workspace_manifest import (
+    build_workspace_manifest,
+    workspace_manifest_cli_payload,
+)
 from songryeon_core.runtime.defaults import (
     DEFAULT_MAX_DOCUMENT_CONTEXT_CHARS,
     DEFAULT_MAX_INPUT_CHARS,
@@ -119,6 +123,10 @@ def main() -> None:
 
     # show-orders는 현재 발주서 목록을 빠르게 훑기 위한 작은 보조 명령이다.
     subparsers.add_parser("show-orders")
+
+    # workspace-check는 LLM 호출이나 파일 복사 없이 업무 폴더 읽기 경계를 먼저 보여준다.
+    workspace_check_parser = subparsers.add_parser("workspace-check")
+    workspace_check_parser.add_argument("root")
 
     # replay는 export로 저장한 실행 기록을 다시 읽을 때 쓴다.
     replay_parser = subparsers.add_parser("replay")
@@ -175,17 +183,29 @@ def main() -> None:
     # fake-turn은 가짜 LLM adapter로 한 턴을 돌린다. 구조 회귀 테스트에 가깝다.
     fake_turn_parser = subparsers.add_parser("fake-turn")
     fake_turn_parser.add_argument("user_input")
-    _add_turn_runtime_args(fake_turn_parser, include_qwen_args=False)
+    _add_turn_runtime_args(
+        fake_turn_parser,
+        include_qwen_args=False,
+        include_workspace=True,
+    )
 
     # qwen-turn은 사용자 입력 하나를 Qwen 기반 한 턴으로 실행한다.
     qwen_turn_parser = subparsers.add_parser("qwen-turn")
     qwen_turn_parser.add_argument("user_input")
-    _add_turn_runtime_args(qwen_turn_parser, include_qwen_args=True)
+    _add_turn_runtime_args(
+        qwen_turn_parser,
+        include_qwen_args=True,
+        include_workspace=True,
+    )
 
     # qwen-chat은 qwen-turn을 반복 호출하는 대화형 껍데기다.
     # 세션 안 raw conversation과 capsule을 다음 턴의 ZeroState로 이어준다.
     qwen_chat_parser = subparsers.add_parser("qwen-chat")
-    _add_turn_runtime_args(qwen_chat_parser, include_qwen_args=True)
+    _add_turn_runtime_args(
+        qwen_chat_parser,
+        include_qwen_args=True,
+        include_workspace=True,
+    )
 
     # 외부 Codex 비교 실험은 기존 qwen 명령과 분리해 실수로 과금하지 않게 한다.
     openai_turn_parser = subparsers.add_parser("openai-turn")
@@ -512,6 +532,18 @@ def main() -> None:
     elif args.command == "show-orders":
         for path in sorted(Path("Administrative_Reform_1/04_Orders").glob("*.md")):
             print(path.as_posix())
+    elif args.command == "workspace-check":
+        frame = build_workspace_manifest(
+            root_path=args.root,
+            turn_id="workspace_check",
+        )
+        print(
+            json.dumps(
+                workspace_manifest_cli_payload(frame),
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
     elif args.command == "replay":
         print(replay_run(args.run_dir))
     elif args.command == "qwen-ping":
@@ -603,6 +635,7 @@ def main() -> None:
                 args.vessel_max_raw_original_material_reads
             ),
             live_trace=args.live_trace,
+            workspace_root=args.workspace,
         )
         if args.pretty:
             print(render_pretty_turn(result, user_input=args.user_input))
@@ -644,6 +677,7 @@ def main() -> None:
                 args.vessel_max_raw_original_material_reads
             ),
             live_trace=args.live_trace,
+            workspace_root=args.workspace,
         )
         if args.pretty:
             print(render_pretty_turn(result, user_input=args.user_input))
@@ -915,7 +949,12 @@ def main() -> None:
             raise SystemExit(1)
 
 
-def _add_turn_runtime_args(parser: argparse.ArgumentParser, *, include_qwen_args: bool) -> None:
+def _add_turn_runtime_args(
+    parser: argparse.ArgumentParser,
+    *,
+    include_qwen_args: bool,
+    include_workspace: bool = False,
+) -> None:
     # fake-turn/qwen-turn/qwen-chat이 공유하는 실행 옵션을 한 곳에서 붙인다.
     # 이렇게 해두면 max_tool_calls 같은 기본값을 명령마다 따로 고치지 않아도 된다.
     parser.add_argument("--export", default=None)
@@ -951,6 +990,12 @@ def _add_turn_runtime_args(parser: argparse.ArgumentParser, *, include_qwen_args
     parser.add_argument("--vessel-max-node-reads", type=int, default=6)
     parser.add_argument("--vessel-max-raw-original-material-reads", type=int, default=5)
     parser.add_argument("--live-trace", action="store_true")
+    if include_workspace:
+        parser.add_argument(
+            "--workspace",
+            default=None,
+            help="로컬 fake/Qwen이 읽기 전용으로 조사할 업무 폴더",
+        )
     if include_qwen_args:
         parser.add_argument("--endpoint", default=None)
         parser.add_argument("--model-id", default=None)
@@ -1154,10 +1199,11 @@ def _run_qwen_chat(args: argparse.Namespace) -> None:
     if getattr(args, "default_launch", False):
         vessel_status = "켜짐" if args.enable_vessel_r_route else "꺼짐"
         trace_status = "켜짐" if args.live_trace else "꺼짐"
+        workspace_status = Path(args.workspace).name if args.workspace else "미설정"
         print(
             "간편 실행: "
             f"Qwen / Vessel R={vessel_status} / 실시간 진행={trace_status} / "
-            f"timeout={args.timeout}초"
+            f"workspace={workspace_status} / timeout={args.timeout}초"
         )
     print("종료하려면 /exit 또는 /quit 입력")
     print("")
@@ -1217,6 +1263,7 @@ def _run_qwen_chat(args: argparse.Namespace) -> None:
             recent_raw_conversation=session_memory.recent_raw_conversation,
             previous_turn_capsules=session_memory.previous_turn_capsules,
             live_trace=args.live_trace,
+            workspace_root=args.workspace,
         )
         attach_chat_session_snapshot(
             result=result,

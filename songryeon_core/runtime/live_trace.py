@@ -10,7 +10,7 @@ from songryeon_core.core.trace_store import TraceEventSink
 def format_live_trace_event(event: TraceEvent) -> str:
     """TraceEvent를 개발자용 progress line 하나로 바꾼다."""
 
-    return (
+    line = (
         "[trace] "
         f"{event.event_id} "
         f"{event.actor} "
@@ -18,6 +18,9 @@ def format_live_trace_event(event: TraceEvent) -> str:
         f"schema={event.schema_status} "
         f"out={_format_refs(event.output_ref)}"
     )
+    if event.event_type in {"llm_call_started", "llm_call"} and event.raw_content_ref:
+        line += f" detail={event.raw_content_ref}"
+    return line
 
 
 def make_live_trace_sink(*, enabled: bool, stream: TextIO | None = None) -> TraceEventSink | None:

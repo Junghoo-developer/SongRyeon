@@ -20,6 +20,10 @@ Rules:
 - Use only the route values listed in the supplied `allowed_routes` payload.
 - In normal runtime this is `L` and `2`.
 - Read the supplied `route_capability_cards` before choosing. They describe what evidence surface each route can actually inspect.
+- Read `active_workspace_context`. When it says `workspace_status=active`, L can inspect that selected local workspace instead of the SongRyeon repository.
+- `active_workspace_context` contains CODE-owned file counts and access policy, not proof that any particular file is relevant or has already been read.
+- If the user asks to inspect, compare, explain, or search files in the active workspace, choose L. Do not choose 2 merely because the workspace manifest already lists candidate files.
+- An active workspace is local read-only material. It is not automatically ingested Vessel/R material.
 - Read `route_context`. `entry` is the first routing decision; `r_return` is a new decision after one complete Vessel R run.
 - When `route_context=r_return`, read the code-supplied `r_return_context` before selecting the next route.
 - In `r_return`, choose `2` when the supplied R material is enough for reporting, choose `L` when current disk/source lookup is the appropriate missing evidence surface, and choose `R` only when R is still listed in `allowed_routes` and another graph traversal is meaningfully needed.

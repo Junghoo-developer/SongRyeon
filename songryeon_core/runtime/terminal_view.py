@@ -17,6 +17,14 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
         f"- 상태: {result.get('status', 'unknown')}",
         f"- trace/data: {result.get('trace_count', 0)} / {result.get('data_record_count', 0)}",
     ]
+    runtime_payload = result.get("runtime")
+    if isinstance(runtime_payload, dict) and runtime_payload.get("timeout_enforcement_status"):
+        lines.append(
+            "- LLM timeout policy [CODE/RUNTIME_CONFIG]: "
+            f"configured={runtime_payload.get('timeout_seconds', 'unknown')}s / "
+            f"enforcement={runtime_payload.get('timeout_enforcement_status', 'unknown')} / "
+            f"transport={runtime_payload.get('transport', 'unknown')}"
+        )
     if result.get("status") == "structure_failed":
         lines.extend(_structure_failure_runtime_lines(result))
     lines.extend(_codex_sdk_runtime_lines(result))
@@ -27,6 +35,16 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
             f"recent_raw_conversation={session_memory.get('recent_raw_conversation_count', 0)} / "
             f"previous_turn_capsules={session_memory.get('previous_turn_capsule_count', 0)} / "
             f"current_turn_id={session_memory.get('current_turn_id', result.get('turn_id', 'unknown'))}"
+        )
+    if result.get("workspace_active") is True:
+        lines.append(
+            "- active workspace [CODE/READ_ONLY]: "
+            f"label={result.get('workspace_label', 'unknown')} / "
+            f"candidates={result.get('workspace_candidate_file_count', 0)} / "
+            f"kinds={result.get('workspace_source_kind_counts', {})} / "
+            f"excluded_files={result.get('workspace_excluded_file_count', 0)} / "
+            f"excluded_dirs={result.get('workspace_excluded_directory_count', 0)} / "
+            f"graph_ingest={result.get('workspace_automatic_graph_ingest_status', 'not_run')}"
         )
 
     task_frames = _payloads_with_type(result, "task_ledger:task_frame")
@@ -49,6 +67,9 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
             )
         if len(task_frames) > 5:
             lines.append(f"  - ... +{len(task_frames) - 5} tasks")
+
+    lines.extend(_llm_call_timing_lines(result))
+    lines.extend(_l_loop_llm_failure_lines(result))
 
     lines.extend(_learning_absolute_audit_lines(result))
 
@@ -1150,17 +1171,38 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
             )
             lines.append(f"    reason: {frame.get('reason', '')}")
 
-    achievement_record = _latest_run_scoped_record(
+    initial_achievement_record = _latest_run_scoped_record(
         result,
         records,
         "L3:achievement_frame",
         data_type="node_output:L3_achievement_frame",
     )
-    achievement = _payload_from_record(achievement_record)
+    initial_achievement = _payload_from_record(initial_achievement_record)
+    achievement_record = initial_achievement_record
+    achievement = initial_achievement
+    achievement_label = "L3 달성 판단"
+    if revision_achievements:
+        if initial_achievement:
+            lines.append(
+                "- L3 최초 달성 판단: "
+                f"{initial_achievement.get('achievement_status', 'unknown')} / "
+                f"{initial_achievement.get('evidence_acquisition_status', 'unknown')} / "
+                "original_materials="
+                f"{initial_achievement.get('original_material_count', 0)}"
+            )
+        latest_revision_record = _latest_record_with_type(
+            records,
+            "node_output:L3_revision_achievement_frame",
+        )
+        latest_revision = _payload_from_record(latest_revision_record)
+        if latest_revision:
+            achievement_record = latest_revision_record
+            achievement = latest_revision
+            achievement_label = "L3 최신 달성 판단"
     if achievement:
         achievement_source_id = str(achievement_record.get("data_id") or "L3:achievement_frame")
         lines.append(
-            "- L3 달성 판단 "
+            f"- {achievement_label} "
             f"[{achievement.get('achievement_generation_source', 'CODE:OPERATION_CHECK')} | "
             f"LLM_SEMANTIC={achievement.get('llm_semantic_judgement_status', 'not_run')}]: "
             f"{achievement.get('achievement_status', 'unknown')} / "
@@ -2615,6 +2657,109 @@ def _short_display_text(text: str, *, limit: int = 180) -> str:
     if len(compact) <= limit:
         return compact
     return f"{compact[: limit - 3]}..."
+
+
+def _l_loop_llm_failure_lines(result: dict[str, object]) -> list[str]:
+    """기존 llm_call 장부에서 L2/L3 fallback 원인만 짧게 재렌더링한다."""
+
+    records = result.get("data_records")
+    if not isinstance(records, list):
+        return []
+    failures: list[tuple[str, dict[str, object]]] = []
+    for record in records:
+        if not isinstance(record, dict) or record.get("data_type") != "llm_call":
+            continue
+        payload = record.get("payload")
+        if not isinstance(payload, dict) or payload.get("node_id") not in {"L1", "L2", "L3"}:
+            continue
+        if payload.get("failure_type") in {None, "", "none"}:
+            continue
+        data_id = record.get("data_id")
+        failures.append((str(data_id or "llm_call:unknown"), payload))
+    if not failures:
+        return []
+
+    lines = ["- L LLM fallback diagnostics [CODE/LLM_CALL_RECORD]:"]
+    for _, payload in failures[:8]:
+        lines.append(
+            "  - "
+            f"node={payload.get('node_id', 'unknown')} "
+            f"failure={payload.get('failure_type', 'unknown')} "
+            f"parse={payload.get('parse_status', 'unknown')} "
+            f"validation={payload.get('validation_status', 'unknown')}"
+        )
+        lines.append(f"    prompt: {payload.get('prompt_ref', 'unknown')}")
+        error_message = payload.get("error_message")
+        if isinstance(error_message, str) and error_message:
+            lines.append(f"    error: {_short_display_text(error_message)}")
+    if len(failures) > 8:
+        lines.append(f"  - ... +{len(failures) - 8} failures")
+    lines.extend(
+        _metainfo_lines(
+            indent=1,
+            generated_by="CODE:TERMINAL_LLM_CALL_DIAGNOSTIC",
+            info_class="absolute_rendered_from_llm_call",
+            source_data_ids=[data_id for data_id, _ in failures],
+            semantic_judgement_status="not_run",
+        )
+    )
+    return lines
+
+
+def _llm_call_timing_lines(result: dict[str, object]) -> list[str]:
+    """완료된 LLM 호출의 code-owned 시간 장부를 실행 순서대로 표시한다."""
+
+    records = result.get("data_records")
+    if not isinstance(records, list):
+        return []
+    calls: list[tuple[str, dict[str, object]]] = []
+    for record in records:
+        if not isinstance(record, dict) or record.get("data_type") != "llm_call":
+            continue
+        payload = record.get("payload")
+        if not isinstance(payload, dict) or payload.get("timing_status") != "recorded":
+            continue
+        duration_ms = payload.get("execution_duration_ms")
+        if not isinstance(duration_ms, int) or isinstance(duration_ms, bool):
+            continue
+        calls.append((str(record.get("data_id") or "llm_call:unknown"), payload))
+    if not calls:
+        return []
+
+    total_ms = sum(int(payload["execution_duration_ms"]) for _, payload in calls)
+    slowest_index, (_, slowest) = max(
+        enumerate(calls, start=1),
+        key=lambda item: int(item[1][1]["execution_duration_ms"]),
+    )
+    lines = [
+        "- LLM call timing [CODE/LLM_CALL_RECORD]: "
+        f"calls={len(calls)} / total_ms={total_ms} / "
+        f"slowest={slowest.get('node_id', 'unknown')}#{slowest_index}:"
+        f"{slowest.get('execution_duration_ms', 0)}ms"
+    ]
+    for index, (_, payload) in enumerate(calls[:20], start=1):
+        timeout = payload.get("configured_timeout_seconds")
+        timeout_label = f"{timeout}s" if isinstance(timeout, int) else "unknown"
+        lines.append(
+            "  - "
+            f"{index:02d} node={payload.get('node_id', 'unknown')} "
+            f"duration={payload.get('execution_duration_ms', 0)}ms "
+            f"configured_timeout={timeout_label} "
+            f"failure={payload.get('failure_type', 'unknown')}"
+        )
+        lines.append(f"    prompt: {payload.get('prompt_ref', 'unknown')}")
+    if len(calls) > 20:
+        lines.append(f"  - ... +{len(calls) - 20} calls")
+    lines.extend(
+        _metainfo_lines(
+            indent=1,
+            generated_by="CODE:TERMINAL_LLM_CALL_TIMING",
+            info_class="absolute_rendered_from_llm_call",
+            source_data_ids=[data_id for data_id, _ in calls],
+            semantic_judgement_status="not_run",
+        )
+    )
+    return lines
 
 
 def _source_data_ids(payload: dict[str, object], *, fallback: list[str]) -> list[str]:
