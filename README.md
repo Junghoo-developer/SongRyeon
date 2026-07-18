@@ -264,7 +264,7 @@ You can also point `QWEN_LOCAL_ENDPOINT` at an OpenAI-compatible local HTTP endp
 Local checkpoint as of 2026-07-18:
 
 - `python -m compileall songryeon_core main.py` passes.
-- `python -m pytest` passes: 496 passed, 1 skipped, 5 deselected.
+- `python -m pytest` passes: 498 passed, 1 skipped, 5 deselected.
 - `python main.py smoke-test` passes.
 - `python main.py fast-test --profile graph` passes.
 - GitHub Actions for this checkpoint must be confirmed after the latest branch is pushed.

@@ -30,7 +30,9 @@ python main.py qwen-chat --workspace "C:\path\to\work"
   the package's internal httpx client. Runtime output names the transport enforcement boundary.
 - A live five-second timeout test returned each local Qwen call in roughly 5.0-5.3 seconds and kept
   the final strict router failure visible instead of silently fabricating a route.
-- Local verification: 496 passed, 1 skipped, 5 deselected; `SMOKE_TEST_OK`; competition demo
+- Local fake/Qwen turns now expose code-measured end-to-end wall-clock duration next to the
+  existing per-call LLM timing table. This is observation only; no global turn timeout was added.
+- Local verification: 498 passed, 1 skipped, 5 deselected; `SMOKE_TEST_OK`; competition demo
   three scenes passed.
 - A repeated forced-L Qwen live measurement exceeded the 600-second command limit. The feature
   boundary passes deterministic tests, but live sequential-call latency remains an open risk.

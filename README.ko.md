@@ -268,7 +268,7 @@ python main.py qwen-turn "송련의 문서 메모리 인덱스가 무엇인지 �
 2026-07-18 로컬 체크포인트 기준:
 
 - `python -m compileall songryeon_core main.py` 통과.
-- `python -m pytest` 통과: 496 passed, 1 skipped, 5 deselected.
+- `python -m pytest` 통과: 498 passed, 1 skipped, 5 deselected.
 - `python main.py smoke-test` 통과.
 - `python main.py fast-test --profile graph` 통과.
 - 이 기준선의 GitHub Actions 결과는 최신 브랜치를 push한 뒤 별도로 확인해야 함.

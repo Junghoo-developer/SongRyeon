@@ -25,6 +25,14 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
             f"enforcement={runtime_payload.get('timeout_enforcement_status', 'unknown')} / "
             f"transport={runtime_payload.get('transport', 'unknown')}"
         )
+    turn_timing = result.get("turn_timing")
+    if isinstance(turn_timing, dict) and turn_timing.get("timing_status") == "recorded":
+        lines.append(
+            "- 전체 턴 시간 [CODE/LOCAL_USER_TURN_WALL_CLOCK]: "
+            f"duration={turn_timing.get('execution_duration_ms', 'unknown')}ms / "
+            f"scope={turn_timing.get('scope', 'unknown')} / "
+            f"record={turn_timing.get('record_scope', 'unknown')}"
+        )
     if result.get("status") == "structure_failed":
         lines.extend(_structure_failure_runtime_lines(result))
     lines.extend(_codex_sdk_runtime_lines(result))

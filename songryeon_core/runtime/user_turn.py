@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import time
 from pathlib import Path
 
 from songryeon_core.core.schemas import TurnStateCapsule
@@ -91,6 +92,7 @@ def run_fake_user_turn(
     재현할 수 있게 해준다.
     """
 
+    turn_started_ns = time.monotonic_ns()
     adapter = SongRyeonAllNodesFakeLLMAdapter()
     result = run_dry_turn(
         user_input=user_input,
@@ -141,7 +143,7 @@ def run_fake_user_turn(
         live_trace_sink=make_live_trace_sink(enabled=live_trace),
         workspace_root=workspace_root,
     )
-    return _turn_response(
+    response = _turn_response(
         status=_status_from_result(result),
         runtime={
             "mode": "fake",
@@ -152,6 +154,7 @@ def run_fake_user_turn(
         export_dir=export_dir,
         include_data_records=include_data_records,
     )
+    return _attach_local_turn_timing(response, started_ns=turn_started_ns)
 
 
 def run_qwen_user_turn(
@@ -198,6 +201,7 @@ def run_qwen_user_turn(
     받을 수 있다. LLM 실패 시에는 구조 실패를 숨기지 않고 status로 돌려준다.
     """
 
+    turn_started_ns = time.monotonic_ns()
     config = build_llm_runtime_config(
         mode="qwen",
         endpoint=endpoint,
@@ -207,21 +211,27 @@ def run_qwen_user_turn(
     runtime = llm_runtime_status(config)
     selected_endpoint = endpoint if endpoint is not None else os.environ.get("QWEN_LOCAL_ENDPOINT")
     if workspace_root is not None and not workspace_qwen_endpoint_is_local(selected_endpoint):
-        return {
-            "status": "blocked",
-            "reason": "workspace_requires_local_qwen_endpoint",
-            "workspace_policy_status": "blocked_remote_qwen_endpoint",
-            "runtime": runtime,
-            "user_input": user_input,
-        }
+        return _attach_local_turn_timing(
+            {
+                "status": "blocked",
+                "reason": "workspace_requires_local_qwen_endpoint",
+                "workspace_policy_status": "blocked_remote_qwen_endpoint",
+                "runtime": runtime,
+                "user_input": user_input,
+            },
+            started_ns=turn_started_ns,
+        )
     adapter = build_llm_adapter(config, endpoint=selected_endpoint)
     if adapter is None:
-        return {
-            "status": "skipped",
-            "reason": "adapter_missing",
-            "runtime": runtime,
-            "user_input": user_input,
-        }
+        return _attach_local_turn_timing(
+            {
+                "status": "skipped",
+                "reason": "adapter_missing",
+                "runtime": runtime,
+                "user_input": user_input,
+            },
+            started_ns=turn_started_ns,
+        )
 
     try:
         result = run_dry_turn(
@@ -273,23 +283,27 @@ def run_qwen_user_turn(
         )
     except Exception as exc:
         diagnostics = _structure_failure_diagnostics(exc)
-        return {
-            "status": "structure_failed",
-            "reason": exc.__class__.__name__,
-            "error": str(exc),
-            **diagnostics,
-            "runtime": runtime,
-            "user_input": user_input,
-        }
+        return _attach_local_turn_timing(
+            {
+                "status": "structure_failed",
+                "reason": exc.__class__.__name__,
+                "error": str(exc),
+                **diagnostics,
+                "runtime": runtime,
+                "user_input": user_input,
+            },
+            started_ns=turn_started_ns,
+        )
 
     status = _status_from_result(result)
-    return _turn_response(
+    response = _turn_response(
         status=status,
         runtime=runtime,
         result=result,
         export_dir=export_dir,
         include_data_records=include_data_records,
     )
+    return _attach_local_turn_timing(response, started_ns=turn_started_ns)
 
 
 def run_openai_user_turn(
@@ -733,6 +747,30 @@ def run_qwen_codex_hybrid_user_turn(
         )
     finally:
         codex_adapter.close()
+
+
+def _attach_local_turn_timing(
+    response: dict[str, object],
+    *,
+    started_ns: int,
+) -> dict[str, object]:
+    """로컬 사용자 턴 입구부터 현재 응답 조립까지의 경과시간만 붙인다.
+
+    이 값은 TraceStore 사건이 아니다. 전체 턴 제한 정책을 만들기 전에 사람이
+    실제 대기시간과 개별 LLM 호출 시간표를 비교할 수 있게 하는 runtime 관측값이다.
+    """
+
+    duration_ms = round((time.monotonic_ns() - started_ns) / 1_000_000)
+    response["turn_timing"] = {
+        "timing_status": "recorded",
+        "scope": "local_user_turn_entry_to_response",
+        "execution_duration_ms": duration_ms,
+        "record_scope": "response_runtime_only",
+        "generated_by": "CODE:LOCAL_USER_TURN_WALL_CLOCK",
+        "info_class": "absolute",
+        "semantic_judgement_status": "not_run",
+    }
+    return response
 
 
 def _turn_response(
