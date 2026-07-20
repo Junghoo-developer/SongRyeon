@@ -5969,8 +5969,8 @@ class LowToolCallBudgetFakeAdapter(SongRyeonAllNodesFakeLLMAdapter):
 
     model_id = "low-tool-call-budget-fake-adapter"
 
-    def _l1_payload(self) -> dict[str, object]:
-        payload = super()._l1_payload()
+    def _l1_payload(self, request) -> dict[str, object]:
+        payload = super()._l1_payload(request)
         payload.update(
             {
                 "requested_search_top_k": 3,
@@ -5990,8 +5990,8 @@ class RequirementOnlyMultiDocFakeAdapter(SongRyeonAllNodesFakeLLMAdapter):
 
     model_id = "requirement-only-multi-doc-fake-adapter"
 
-    def _l1_payload(self) -> dict[str, object]:
-        payload = super()._l1_payload()
+    def _l1_payload(self, request) -> dict[str, object]:
+        payload = super()._l1_payload(request)
         payload.update(
             {
                 "evidence_requirement_kind": "multi_doc_relationship",

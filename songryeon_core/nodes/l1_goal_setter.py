@@ -13,6 +13,9 @@ from songryeon_core.core.schemas import (
 from songryeon_core.core.trace_store import TraceStore
 from songryeon_core.llm.base import LLMAdapter
 from songryeon_core.llm.node_executor import LLMNodeExecutor
+from songryeon_core.tools.document_context_pack import (
+    extract_explicit_artifact_references,
+)
 
 
 L1_GOAL_FRAME_DATA_ID = "L1:goal_frame"
@@ -36,6 +39,7 @@ def run_l1_goal_setter(
     `L:run:0002:L1:goal_frame`처럼 실행 회차별 ID를 써야 DataStore 충돌이 나지 않는다.
     """
 
+    explicit_artifact_references = extract_explicit_artifact_references(user_query)
     if adapter is not None and data_store is not None:
         try:
             frame = _run_l1_goal_llm(
@@ -45,6 +49,7 @@ def run_l1_goal_setter(
                 memory_packet=memory_packet,
                 user_query=user_query,
                 source_data_ids=source_data_ids or [],
+                explicit_artifact_references=explicit_artifact_references,
                 adapter=adapter,
                 goal_frame_data_id=goal_frame_data_id,
             )
@@ -53,6 +58,7 @@ def run_l1_goal_setter(
                 turn_id=turn_id,
                 memory_packet=memory_packet,
                 source_data_ids=source_data_ids or [],
+                explicit_artifact_references=explicit_artifact_references,
                 goal_frame_data_id=goal_frame_data_id,
             )
     else:
@@ -60,6 +66,7 @@ def run_l1_goal_setter(
             turn_id=turn_id,
             memory_packet=memory_packet,
             source_data_ids=source_data_ids or [],
+            explicit_artifact_references=explicit_artifact_references,
             goal_frame_data_id=goal_frame_data_id,
         )
     validate_l1_goal_frame(frame)
@@ -89,6 +96,7 @@ def _rule_stub_goal_frame(
     turn_id: str,
     memory_packet: MemoryPacketFrom0,
     source_data_ids: list[str],
+    explicit_artifact_references: list[str],
     goal_frame_data_id: str,
 ) -> L1GoalFrame:
     # RULE_STUB 경로도 LLM 경로와 같은 frame_id를 써야 한다.
@@ -107,6 +115,10 @@ def _rule_stub_goal_frame(
         requires_cross_document_analysis=False,
         randomness_mode="not_random",
         l_loop_success_condition="CODE_STATUS:rule_stub_requires_evidence_material_or_insufficiency_signal",
+        explicit_artifact_reference_count=len(explicit_artifact_references),
+        artifact_requirement_mode="not_applicable",
+        artifact_reference_occurrence_indices=[],
+        artifact_requirement_reason="CODE_STATUS:l1_semantic_requirement_not_run",
         goal_generation_source="RULE_STUB",
         llm_goal_judgement_status="not_run",
         source_trace_ids=memory_packet.trace_evidence_ids,
@@ -122,6 +134,7 @@ def _run_l1_goal_llm(
     memory_packet: MemoryPacketFrom0,
     user_query: str,
     source_data_ids: list[str],
+    explicit_artifact_references: list[str],
     adapter: LLMAdapter,
     goal_frame_data_id: str,
 ) -> L1GoalFrame:
@@ -136,6 +149,13 @@ def _run_l1_goal_llm(
             "insufficient_signal_id": memory_packet.insufficient_signal_id,
         },
         "source_data_ids": source_data_ids,
+        "explicit_artifact_references": [
+            {
+                "occurrence_index": index,
+                "raw_ref": raw_ref,
+            }
+            for index, raw_ref in enumerate(explicit_artifact_references, start=1)
+        ],
         "required_output_fields": [
             "macro_goal",
             "macro_goal_reason",
@@ -146,6 +166,9 @@ def _run_l1_goal_llm(
             "requires_cross_document_analysis",
             "randomness_mode",
             "l_loop_success_condition",
+            "artifact_requirement_mode",
+            "artifact_reference_occurrence_indices",
+            "artifact_requirement_reason",
             "requested_search_top_k",
             "requested_max_tool_calls",
             "requested_max_read_doc_calls",
@@ -163,7 +186,10 @@ def _run_l1_goal_llm(
         prompt_ref=prompt_ref,
         input_ref=memory_packet.trace_evidence_ids,
         source_data_ids=source_data_ids,
-        payload_validator=_validate_l1_goal_payload,
+        payload_validator=lambda payload: _validate_l1_goal_payload(
+            payload,
+            explicit_artifact_reference_count=len(explicit_artifact_references),
+        ),
     )
     if llm_result.failure_type != "none" or llm_result.validation.payload is None:
         raise ValueError(f"L1 LLM goal setter failed: {llm_result.failure_type}")
@@ -192,6 +218,15 @@ def _run_l1_goal_llm(
         ),
         randomness_mode=str(payload.get("randomness_mode") or "").strip(),
         l_loop_success_condition=str(payload.get("l_loop_success_condition") or "").strip(),
+        explicit_artifact_reference_count=len(explicit_artifact_references),
+        artifact_requirement_mode=_artifact_requirement_mode(
+            payload,
+            explicit_artifact_reference_count=len(explicit_artifact_references),
+        ),
+        artifact_reference_occurrence_indices=_artifact_reference_occurrence_indices(
+            payload
+        ),
+        artifact_requirement_reason=_artifact_requirement_reason(payload),
         requested_search_top_k=_nonnegative_int(payload.get("requested_search_top_k")),
         requested_max_tool_calls=_nonnegative_int(payload.get("requested_max_tool_calls")),
         requested_max_read_doc_calls=_nonnegative_int(payload.get("requested_max_read_doc_calls")),
@@ -204,7 +239,11 @@ def _run_l1_goal_llm(
     )
 
 
-def _validate_l1_goal_payload(payload: dict[str, object]) -> None:
+def _validate_l1_goal_payload(
+    payload: dict[str, object],
+    *,
+    explicit_artifact_reference_count: int = 0,
+) -> None:
     frame = L1GoalFrame(
         frame_id=L1_GOAL_FRAME_DATA_ID,
         turn_id="validation_turn",
@@ -221,6 +260,15 @@ def _validate_l1_goal_payload(payload: dict[str, object]) -> None:
         ),
         randomness_mode=str(payload.get("randomness_mode") or "").strip(),
         l_loop_success_condition=str(payload.get("l_loop_success_condition") or "").strip(),
+        explicit_artifact_reference_count=explicit_artifact_reference_count,
+        artifact_requirement_mode=_artifact_requirement_mode(
+            payload,
+            explicit_artifact_reference_count=explicit_artifact_reference_count,
+        ),
+        artifact_reference_occurrence_indices=_artifact_reference_occurrence_indices(
+            payload
+        ),
+        artifact_requirement_reason=_artifact_requirement_reason(payload),
         requested_search_top_k=_nonnegative_int(payload.get("requested_search_top_k")),
         requested_max_tool_calls=_nonnegative_int(payload.get("requested_max_tool_calls")),
         requested_max_read_doc_calls=_nonnegative_int(payload.get("requested_max_read_doc_calls")),
@@ -232,6 +280,44 @@ def _validate_l1_goal_payload(payload: dict[str, object]) -> None:
         source_data_ids=["validation_data"],
     )
     validate_l1_goal_frame(frame)
+
+
+def _artifact_requirement_mode(
+    payload: dict[str, object],
+    *,
+    explicit_artifact_reference_count: int,
+) -> str:
+    value = str(payload.get("artifact_requirement_mode") or "").strip()
+    if value:
+        return value
+    if explicit_artifact_reference_count == 0:
+        return "not_applicable"
+    raise ValueError(
+        "L1 artifact_requirement_mode is required when explicit references are supplied"
+    )
+
+
+def _artifact_reference_occurrence_indices(
+    payload: dict[str, object],
+) -> list[int]:
+    value = payload.get("artifact_reference_occurrence_indices")
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise TypeError("artifact_reference_occurrence_indices must be a list")
+    if any(not isinstance(item, int) or isinstance(item, bool) for item in value):
+        raise TypeError("artifact reference occurrence indices must be integers")
+    return list(value)
+
+
+def _artifact_requirement_reason(payload: dict[str, object]) -> str:
+    value = str(payload.get("artifact_requirement_reason") or "").strip()
+    mode = str(payload.get("artifact_requirement_mode") or "").strip()
+    if value:
+        return value
+    if not mode or mode == "not_applicable":
+        return "CODE_STATUS:not_applicable"
+    raise ValueError("active artifact requirement must include a reason")
 
 
 def _unique_strings(values: list[str | None]) -> list[str]:

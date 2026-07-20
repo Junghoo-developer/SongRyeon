@@ -63,7 +63,14 @@ Rules:
   - Use `partial` when related search candidates exist but not enough document text was read.
   - Use `missing` when neither read document text nor relevant search candidates exist.
 - Do not use keyword presets, identity presets, hidden project knowledge, or hardcoded routing assumptions.
-- If `specific_document_request.requested_doc_hint` is present, do not call semantic fit `matched`
+- If `specific_document_request.artifact_requirement_mode` is active, treat its CODE-computed
+  `artifact_requirement_status` and target document list as the structural artifact contract.
+- `ordered_fallback` means a later target is allowed only because CODE confirmed earlier selected
+  references were unavailable. Do not demand the unavailable primary artifact again when the active
+  fallback target was directly read.
+- `all_of` requires every selected target, while `any_of` requires at least one selected target.
+- If the structured artifact requirement is `not_applicable` and
+  `specific_document_request.requested_doc_hint` is present, do not call semantic fit `matched`
   unless the requested document/source file was directly read through the matching evidence channel.
 - If the requested document appeared only in search results but was not read, use `partial`.
 - If the requested document did not appear in either read documents or search results, use `partial`

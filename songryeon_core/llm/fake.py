@@ -316,7 +316,7 @@ class SongRyeonAllNodesFakeLLMAdapter:
         if "node_1 Router" in prompt:
             payload = self._node_1_payload(request)
         elif "L1 Goal Setter" in prompt:
-            payload = self._l1_payload()
+            payload = self._l1_payload(request)
         elif "L Tool Scope Planner" in prompt:
             payload = self._l_tool_scope_payload(request)
         elif "L3 Result Keeper" in prompt:
@@ -397,7 +397,9 @@ class SongRyeonAllNodesFakeLLMAdapter:
         value = context.get("selected_recent_memory_context_count")
         return value if isinstance(value, int) else 0
 
-    def _l1_payload(self) -> dict[str, object]:
+    def _l1_payload(self, request: LLMRequest) -> dict[str, object]:
+        supplied_refs = request.input_payload.get("explicit_artifact_references")
+        reference_count = len(supplied_refs) if isinstance(supplied_refs, list) else 0
         return {
             "macro_goal": "produce_l_loop_evidence_material_for_current_request",
             "macro_goal_reason": "이번 L루프의 최종 목표는 사용자 요청에 답할 수 있도록 검색 후보, 읽은 문서, 부족 신호를 구분한 근거 재료를 확보하는 것이다.",
@@ -408,6 +410,21 @@ class SongRyeonAllNodesFakeLLMAdapter:
             "requires_cross_document_analysis": True,
             "randomness_mode": "semantic_exploration",
             "l_loop_success_condition": "최소 2개 이상의 읽은 문서 추출본이나 그 부족 신호가 있어야 L루프가 정직하게 반환할 수 있다.",
+            "artifact_requirement_mode": (
+                "exact_one"
+                if reference_count == 1
+                else "all_of"
+                if reference_count > 1
+                else "not_applicable"
+            ),
+            "artifact_reference_occurrence_indices": list(
+                range(1, reference_count + 1)
+            ),
+            "artifact_requirement_reason": (
+                "fake adapter는 공급된 명시 문서 참조를 결정론적으로 검사한다."
+                if reference_count
+                else "명시 문서 참조가 공급되지 않았다."
+            ),
             "requested_search_top_k": 5,
             "requested_max_tool_calls": 4,
             "requested_max_read_doc_calls": 2,

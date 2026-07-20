@@ -24,6 +24,9 @@ Return only one JSON object with these keys:
   "requires_cross_document_analysis": false,
   "randomness_mode": "not_random",
   "l_loop_success_condition": "what evidence must exist before this L loop can honestly return",
+  "artifact_requirement_mode": "exact_one",
+  "artifact_reference_occurrence_indices": [1],
+  "artifact_requirement_reason": "why the selected explicit references have this requirement relationship",
   "requested_search_top_k": 3,
   "requested_max_tool_calls": 2,
   "requested_max_read_doc_calls": 1,
@@ -60,6 +63,24 @@ Rules:
 - `randomness_mode` must be one of `not_random`, `semantic_exploration`, or `true_random_required`.
 - `l_loop_success_condition` must state the concrete evidence condition that should be true before returning from L, such as "at least two read document extracts are available for relationship analysis".
 - For multi-document/exploratory requests, `l_loop_success_condition` should be about evidence readiness, for example "at least two original document extracts are available so node 3 can attempt relationship analysis".
+- `explicit_artifact_references` is a CODE-extracted list in user-text order. Each item has a fixed `occurrence_index` and visible `raw_ref`.
+- Do not invent, rewrite, or renumber explicit artifact references. Select only supplied occurrence indices.
+- `artifact_requirement_mode` must be one of:
+  - `not_applicable`: no structured explicit-artifact success contract is needed. Return an empty index list.
+  - `exact_one`: exactly one selected reference must be read.
+  - `all_of`: every selected reference must be read.
+  - `any_of`: at least one selected reference may satisfy the request.
+  - `ordered_fallback`: try the selected references in order; a later reference is allowed only after earlier references are unavailable.
+- Use `ordered_fallback` only when the user's wording actually permits a later artifact to replace an unavailable earlier artifact.
+- Contract example: if the user says "read A first; if A is unavailable, search for and read B",
+  and CODE supplied A as occurrence 1 and B as occurrence 2, return
+  `artifact_requirement_mode=ordered_fallback` with
+  `artifact_reference_occurrence_indices=[1, 2]`. `exact_one` is invalid for that request because
+  it discards the user-permitted fallback reference.
+- Use `all_of`, not `any_of`, when the user asks to compare, combine, or separately inspect several named artifacts.
+- `artifact_reference_occurrence_indices` must contain only indices from `explicit_artifact_references`.
+- `artifact_requirement_reason` is your interpretation of the user's requirement relationship. Do not present it as a CODE fact.
+- When no explicit references are supplied, return `not_applicable`, an empty index list, and a short not-applicable reason.
 - Budget request fields are requests only. CODE:BUDGET_POLICY will approve, reduce, or ignore them.
 - Keep budget requests small and operational. Do not request unlimited tool use.
 - For a single-document lookup or summary, request about `requested_max_read_doc_calls=1`.

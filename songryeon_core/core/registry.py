@@ -351,7 +351,7 @@ def build_default_schema_registry() -> SchemaRegistry:
             ),
             SchemaRecord(
                 schema_name="L1GoalFrame",
-                version="0.2",
+                version="0.3",
                 target_node="L1",
                 required=True,
                 fields=[
@@ -368,6 +368,10 @@ def build_default_schema_registry() -> SchemaRegistry:
                     "requires_cross_document_analysis",
                     "randomness_mode",
                     "l_loop_success_condition",
+                    "explicit_artifact_reference_count",
+                    "artifact_requirement_mode",
+                    "artifact_reference_occurrence_indices",
+                    "artifact_requirement_reason",
                     "requested_search_top_k",
                     "requested_max_tool_calls",
                     "requested_max_read_doc_calls",
@@ -522,7 +526,7 @@ def build_default_schema_registry() -> SchemaRegistry:
             ),
             SchemaRecord(
                 schema_name="L3AchievementFrame",
-                version="0.4",
+                version="0.5",
                 target_node="L3_achievement",
                 required=True,
                 fields=[
@@ -539,6 +543,10 @@ def build_default_schema_registry() -> SchemaRegistry:
                     "evidence_acquisition_status",
                     "original_material_required_count",
                     "original_material_requirement_status",
+                    "artifact_requirement_mode",
+                    "artifact_requirement_target_doc_ids",
+                    "artifact_requirement_matched_doc_ids",
+                    "artifact_requirement_status",
                     "llm_semantic_execution_status",
                     "llm_semantic_failure_type",
                     "llm_semantic_failure_reason",

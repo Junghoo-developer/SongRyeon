@@ -3679,7 +3679,7 @@ def _validate_node3_brief_runtime_task(runtime_task: Node3BriefRuntimeTask) -> N
 
 
 L1_GOAL_FRAME_SCHEMA_NAME = "L1GoalFrame"
-L1_GOAL_FRAME_SCHEMA_VERSION = "0.2"
+L1_GOAL_FRAME_SCHEMA_VERSION = "0.3"
 L1_GOAL_SOURCES = {"rule_based_l_route", "llm_l_route"}
 L1_TARGET_LOOPS = {"L"}
 L1_EVIDENCE_REQUIREMENT_KINDS = {
@@ -3694,6 +3694,13 @@ L1_RANDOMNESS_MODES = {
     "not_random",
     "semantic_exploration",
     "true_random_required",
+}
+L1_ARTIFACT_REQUIREMENT_MODES = {
+    "not_applicable",
+    "exact_one",
+    "all_of",
+    "any_of",
+    "ordered_fallback",
 }
 
 
@@ -3731,6 +3738,14 @@ class L1GoalFrame:
     randomness_mode: str = "not_random"
     # 혼합 정보: L루프가 node_1로 돌아가기 전에 어떤 재료를 갖추면 성공인지 적는다.
     l_loop_success_condition: str = ""
+    # 절대 정보: code가 사용자 입력에서 순서대로 추출해 L1에 공급한 명시 artifact 수.
+    explicit_artifact_reference_count: int = 0
+    # 혼합 정보: L1이 판단한 명시 artifact 사이의 성공 요구 관계.
+    artifact_requirement_mode: str = "not_applicable"
+    # 혼합 정보 + 절대 순번: L1이 code 공급 목록에서 선택한 1-based 발생 순번.
+    artifact_reference_occurrence_indices: list[int] = field(default_factory=list)
+    # 혼합 정보: 왜 이 요구 관계를 선택했는지 설명한다.
+    artifact_requirement_reason: str = "CODE_STATUS:not_applicable"
     # 혼합 정보: L1이 이번 목표 달성에 필요하다고 요청한 search_docs 후보 수.
     # 0이면 별도 요청이 없다는 뜻이며, 코드가 승인한 값은 BudgetPlanFrame에 따로 저장된다.
     requested_search_top_k: int = 0
@@ -3771,6 +3786,8 @@ def validate_l1_goal_frame(frame: L1GoalFrame) -> None:
         "evidence_requirement_kind": frame.evidence_requirement_kind,
         "randomness_mode": frame.randomness_mode,
         "l_loop_success_condition": frame.l_loop_success_condition,
+        "artifact_requirement_mode": frame.artifact_requirement_mode,
+        "artifact_requirement_reason": frame.artifact_requirement_reason,
         "schema_name": frame.schema_name,
         "schema_version": frame.schema_version,
     }
@@ -3792,10 +3809,16 @@ def validate_l1_goal_frame(frame: L1GoalFrame) -> None:
         )
     if frame.randomness_mode not in L1_RANDOMNESS_MODES:
         raise ValueError(f"unknown L1 randomness_mode: {frame.randomness_mode}")
+    if frame.artifact_requirement_mode not in L1_ARTIFACT_REQUIREMENT_MODES:
+        raise ValueError(
+            "unknown L1 artifact_requirement_mode: "
+            f"{frame.artifact_requirement_mode}"
+        )
     if not isinstance(frame.requires_cross_document_analysis, bool):
         raise TypeError("L1GoalFrame.requires_cross_document_analysis must be a boolean")
 
     for field_name, value in {
+        "explicit_artifact_reference_count": frame.explicit_artifact_reference_count,
         "minimum_read_documents": frame.minimum_read_documents,
         "requested_search_top_k": frame.requested_search_top_k,
         "requested_max_tool_calls": frame.requested_max_tool_calls,
@@ -3806,6 +3829,40 @@ def validate_l1_goal_frame(frame: L1GoalFrame) -> None:
             raise TypeError(f"L1GoalFrame.{field_name} must be an integer")
         if value < 0:
             raise ValueError(f"L1GoalFrame.{field_name} must not be negative")
+
+    indices = frame.artifact_reference_occurrence_indices
+    if not isinstance(indices, list):
+        raise TypeError(
+            "L1GoalFrame.artifact_reference_occurrence_indices must be a list"
+        )
+    if any(not isinstance(index, int) or isinstance(index, bool) for index in indices):
+        raise TypeError(
+            "L1GoalFrame artifact reference occurrence indices must be integers"
+        )
+    if any(index < 1 or index > frame.explicit_artifact_reference_count for index in indices):
+        raise ValueError(
+            "L1GoalFrame artifact reference occurrence index must be in supplied references"
+        )
+    if len(indices) != len(set(indices)):
+        raise ValueError(
+            "L1GoalFrame artifact reference occurrence indices must be unique"
+        )
+    if frame.artifact_requirement_mode == "not_applicable":
+        if indices:
+            raise ValueError(
+                "not_applicable artifact requirement must not select references"
+            )
+    else:
+        if not indices:
+            raise ValueError(
+                "active artifact requirement must select at least one reference"
+            )
+        if frame.artifact_requirement_mode == "exact_one" and len(indices) != 1:
+            raise ValueError("exact_one artifact requirement must select one reference")
+        if frame.artifact_requirement_mode == "ordered_fallback" and len(indices) < 2:
+            raise ValueError(
+                "ordered_fallback artifact requirement must select at least two references"
+            )
 
     for trace_id in frame.source_trace_ids:
         if not trace_id:
@@ -6285,7 +6342,7 @@ L3_PRESERVED_INFO_FRAME_SCHEMA_NAME = "L3PreservedInfoFrame"
 L3_PRESERVED_INFO_FRAME_SCHEMA_VERSION = "0.1"
 L3_JUDGEMENT_STATUSES = {"not_judged"}
 L3_ACHIEVEMENT_FRAME_SCHEMA_NAME = "L3AchievementFrame"
-L3_ACHIEVEMENT_FRAME_SCHEMA_VERSION = "0.4"
+L3_ACHIEVEMENT_FRAME_SCHEMA_VERSION = "0.5"
 L3_ACHIEVEMENT_STATUSES = {"achieved", "partial", "failed"}
 L3_GOAL_MATCH_STATUSES = {"matched", "partial", "missing", "not_applicable"}
 L3_SEMANTIC_GOAL_MATCH_STATUSES = {"matched", "partial", "missing", "not_run"}
@@ -6510,6 +6567,14 @@ class L3AchievementFrame:
     # 절대 정보/코드 힌트: 사용자 입력에서 추출한 특정 문서 요청 후보.
     # 비어 있으면 특정 문서 요청을 확정하지 않은 것이다.
     requested_doc_hint: str = ""
+    # 혼합 정보 복사값: L1이 선택한 명시 artifact 요구 관계.
+    artifact_requirement_mode: str = "not_applicable"
+    # 절대 정보: 선택된 참조 중 현재 요구 관계에서 실제 목표가 된 문서 ID.
+    artifact_requirement_target_doc_ids: list[str] = field(default_factory=list)
+    # 절대 정보: 목표 문서 중 실제 원문 읽기 record와 대응한 문서 ID.
+    artifact_requirement_matched_doc_ids: list[str] = field(default_factory=list)
+    # 절대 비교 상태: 요구 관계와 실제 읽기 결과의 대응 상태.
+    artifact_requirement_status: str = "not_applicable"
     # 절대 정보: 이번 L루프에서 실제 read_doc으로 읽은 문서 ID 목록.
     read_doc_ids: list[str] = field(default_factory=list)
     # 절대 정보: 이번 L루프에서 실제 read_code_file로 읽은 source/config 파일 경로 목록.
@@ -6570,6 +6635,23 @@ def validate_l3_achievement_frame(frame: L3AchievementFrame) -> None:
         raise ValueError(f"unknown L3 controller_decision: {frame.controller_decision}")
     if frame.goal_match_status not in L3_GOAL_MATCH_STATUSES:
         raise ValueError(f"unknown L3 goal_match_status: {frame.goal_match_status}")
+    if frame.artifact_requirement_mode not in L1_ARTIFACT_REQUIREMENT_MODES:
+        raise ValueError(
+            "unknown L3 artifact_requirement_mode: "
+            f"{frame.artifact_requirement_mode}"
+        )
+    if frame.artifact_requirement_status not in L3_GOAL_MATCH_STATUSES:
+        raise ValueError(
+            "unknown L3 artifact_requirement_status: "
+            f"{frame.artifact_requirement_status}"
+        )
+    if (
+        frame.artifact_requirement_mode == "not_applicable"
+        and frame.artifact_requirement_status != "not_applicable"
+    ):
+        raise ValueError(
+            "not_applicable artifact requirement must have not_applicable status"
+        )
     if frame.semantic_goal_match_status not in L3_SEMANTIC_GOAL_MATCH_STATUSES:
         raise ValueError(f"unknown L3 semantic_goal_match_status: {frame.semantic_goal_match_status}")
     if frame.semantic_goal_match_status != "not_run" and not frame.semantic_goal_match_reason:
@@ -6702,6 +6784,20 @@ def validate_l3_achievement_frame(frame: L3AchievementFrame) -> None:
     for doc_id in frame.search_result_doc_ids:
         if not doc_id:
             raise ValueError("L3AchievementFrame.search_result_doc_ids must not contain empty values")
+    for doc_id in frame.artifact_requirement_target_doc_ids:
+        if not doc_id:
+            raise ValueError(
+                "L3 artifact requirement target doc ids must not contain empty values"
+            )
+    for doc_id in frame.artifact_requirement_matched_doc_ids:
+        if not doc_id:
+            raise ValueError(
+                "L3 artifact requirement matched doc ids must not contain empty values"
+            )
+        if doc_id not in frame.artifact_requirement_target_doc_ids:
+            raise ValueError(
+                "L3 artifact requirement matched doc id must be a target doc id"
+            )
     for trace_id in frame.evidence_trace_ids:
         if not trace_id:
             raise ValueError("L3AchievementFrame.evidence_trace_ids must not contain empty values")

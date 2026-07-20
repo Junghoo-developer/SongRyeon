@@ -1530,6 +1530,7 @@ def run_l_loop(
                 revision_tool_source_trace_ids=revision_tool_result.source_trace_ids,
                 revision_tool_source_data_ids=_unique_strings(
                     [
+                        *explicit_artifact_reference_data_ids,
                         tool_scope_data_id,
                         tool_budget_partition_data_id,
                         *revision_tool_result.source_data_ids,

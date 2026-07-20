@@ -646,6 +646,19 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
         success_condition = l1_goal.get("l_loop_success_condition")
         if isinstance(success_condition, str) and success_condition:
             lines.append(f"    성공 조건: {success_condition}")
+        artifact_requirement_mode = l1_goal.get("artifact_requirement_mode")
+        if isinstance(artifact_requirement_mode, str) and artifact_requirement_mode:
+            lines.append(
+                "  - 명시 문서 요구 계약: "
+                f"mode={artifact_requirement_mode} / "
+                "reference_count="
+                f"{l1_goal.get('explicit_artifact_reference_count', 0)} / "
+                "selected_occurrences="
+                f"{l1_goal.get('artifact_reference_occurrence_indices', [])}"
+            )
+            artifact_requirement_reason = l1_goal.get("artifact_requirement_reason")
+            if isinstance(artifact_requirement_reason, str) and artifact_requirement_reason:
+                lines.append(f"    LLM_reason: {artifact_requirement_reason}")
         lines.extend(
             _metainfo_lines(
                 indent=2,
@@ -1315,6 +1328,25 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
             if isinstance(search_result_doc_ids, list) and search_result_doc_ids:
                 lines.append(
                     f"  - search_result_doc_ids: {_format_source_ids(search_result_doc_ids)}"
+                )
+            artifact_requirement_mode = achievement.get("artifact_requirement_mode")
+            artifact_requirement_status = achievement.get("artifact_requirement_status")
+            if (
+                isinstance(artifact_requirement_mode, str)
+                and artifact_requirement_mode != "not_applicable"
+            ):
+                lines.append(
+                    "  - 명시 문서 요구 계약: "
+                    f"mode={artifact_requirement_mode} / "
+                    f"status={artifact_requirement_status or 'unknown'}"
+                )
+                target_doc_ids = achievement.get("artifact_requirement_target_doc_ids")
+                matched_doc_ids = achievement.get("artifact_requirement_matched_doc_ids")
+                lines.append(
+                    "    targets="
+                    f"{_format_source_ids(target_doc_ids if isinstance(target_doc_ids, list) else [])} / "
+                    "matched="
+                    f"{_format_source_ids(matched_doc_ids if isinstance(matched_doc_ids, list) else [])}"
                 )
         semantic_goal_status = achievement.get("semantic_goal_match_status")
         if isinstance(semantic_goal_status, str) and semantic_goal_status:

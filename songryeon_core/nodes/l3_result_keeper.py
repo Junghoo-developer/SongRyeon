@@ -637,6 +637,7 @@ def _build_achievement_frame(
         preserved_frame=preserved_frame,
         data_store=data_store,
         allowed_source_data_ids=set(input_data_ids),
+        l1_goal=l1_goal,
     )
     actual_read_doc_count = len(goal_match["read_doc_ids"])
     actual_read_code_file_count = len(goal_match["read_code_file_paths"])
@@ -778,6 +779,14 @@ def _build_achievement_frame(
         micro_achievement_status=micro_status,
         micro_achievement_reason=micro_reason,
         requested_doc_hint=str(goal_match["requested_doc_hint"]),
+        artifact_requirement_mode=str(goal_match["artifact_requirement_mode"]),
+        artifact_requirement_target_doc_ids=list(
+            goal_match["artifact_requirement_target_doc_ids"]
+        ),
+        artifact_requirement_matched_doc_ids=list(
+            goal_match["artifact_requirement_matched_doc_ids"]
+        ),
+        artifact_requirement_status=str(goal_match["artifact_requirement_status"]),
         read_doc_ids=list(goal_match["read_doc_ids"]),
         read_code_file_paths=list(goal_match["read_code_file_paths"]),
         actual_read_code_file_count=actual_read_code_file_count,
@@ -818,6 +827,7 @@ def _build_llm_achievement_frame(
         preserved_frame=preserved_frame,
         data_store=data_store,
         allowed_source_data_ids=set(input_data_ids),
+        l1_goal=l1_goal,
     )
     read_doc_ids = list(goal_match["read_doc_ids"])
     read_code_file_paths = list(goal_match["read_code_file_paths"])
@@ -1088,6 +1098,15 @@ def _l1_semantic_goal_payload(l1_goal: dict[str, object]) -> dict[str, object]:
         "l_loop_success_condition": str(
             l1_goal.get("l_loop_success_condition") or ""
         ),
+        "artifact_requirement_mode": str(
+            l1_goal.get("artifact_requirement_mode") or "not_applicable"
+        ),
+        "artifact_reference_occurrence_indices": list(
+            l1_goal.get("artifact_reference_occurrence_indices") or []
+        ),
+        "artifact_requirement_reason": str(
+            l1_goal.get("artifact_requirement_reason") or ""
+        ),
     }
 
 
@@ -1105,6 +1124,18 @@ def _l3_specific_request_semantic_payload(
             goal_match.get("goal_match_status") or "not_applicable"
         ),
         "goal_match_reason": str(goal_match.get("goal_match_reason") or ""),
+        "artifact_requirement_mode": str(
+            goal_match.get("artifact_requirement_mode") or "not_applicable"
+        ),
+        "artifact_requirement_status": str(
+            goal_match.get("artifact_requirement_status") or "not_applicable"
+        ),
+        "artifact_requirement_target_doc_ids": list(
+            goal_match.get("artifact_requirement_target_doc_ids") or []
+        ),
+        "artifact_requirement_matched_doc_ids": list(
+            goal_match.get("artifact_requirement_matched_doc_ids") or []
+        ),
         "read_doc_ids": list(goal_match.get("read_doc_ids") or []),
         "read_code_file_paths": list(goal_match.get("read_code_file_paths") or []),
     }
@@ -1381,8 +1412,39 @@ def _build_goal_match_context(
     preserved_frame: L3PreservedInfoFrame,
     data_store: DataStore | None,
     allowed_source_data_ids: set[str],
+    l1_goal: dict[str, object] | None = None,
 ) -> dict[str, object]:
     """사용자가 특정 문서를 요구했는지와 실제 L루프 산출이 맞았는지 코드로 대조한다."""
+
+    read_doc_ids = _read_doc_ids_from_data_store(
+        data_store,
+        allowed_source_data_ids=allowed_source_data_ids,
+    )
+    read_code_file_paths = _read_code_file_paths_from_data_store(
+        data_store,
+        allowed_source_data_ids=allowed_source_data_ids,
+    )
+    search_result_doc_ids = _unique_strings(
+        [candidate.doc_id for candidate in preserved_frame.candidates if candidate.doc_id]
+    )
+    base_context: dict[str, object] = {
+        "read_doc_ids": read_doc_ids,
+        "read_code_file_paths": read_code_file_paths,
+        "search_result_doc_ids": search_result_doc_ids,
+        "artifact_requirement_mode": "not_applicable",
+        "artifact_requirement_target_doc_ids": [],
+        "artifact_requirement_matched_doc_ids": [],
+        "artifact_requirement_status": "not_applicable",
+    }
+    artifact_requirement = _structured_artifact_requirement_context(
+        data_store=data_store,
+        allowed_source_data_ids=allowed_source_data_ids,
+        l1_goal=l1_goal or {},
+        read_doc_ids=read_doc_ids,
+        search_result_doc_ids=search_result_doc_ids,
+    )
+    if artifact_requirement is not None:
+        return {**base_context, **artifact_requirement}
 
     explicit_artifact_hint = _explicit_artifact_requested_doc_hint(
         data_store,
@@ -1396,82 +1458,274 @@ def _build_goal_match_context(
         if requested_doc_hint
         else "none"
     )
-    read_doc_ids = _read_doc_ids_from_data_store(
-        data_store,
-        allowed_source_data_ids=allowed_source_data_ids,
-    )
-    read_code_file_paths = _read_code_file_paths_from_data_store(
-        data_store,
-        allowed_source_data_ids=allowed_source_data_ids,
-    )
-    search_result_doc_ids = _unique_strings(
-        [candidate.doc_id for candidate in preserved_frame.candidates if candidate.doc_id]
-    )
 
     if not requested_doc_hint:
         return {
+            **base_context,
             "requested_doc_hint": "",
             "requested_doc_hint_source": requested_doc_hint_source,
-            "read_doc_ids": read_doc_ids,
-            "read_code_file_paths": read_code_file_paths,
-            "search_result_doc_ids": search_result_doc_ids,
             "goal_match_status": "not_applicable",
             "goal_match_reason": "CODE_STATUS:no_specific_doc_hint_detected",
         }
 
     if any(_doc_matches_hint(doc_id, requested_doc_hint) for doc_id in read_doc_ids):
         return {
+            **base_context,
             "requested_doc_hint": requested_doc_hint,
             "requested_doc_hint_source": requested_doc_hint_source,
-            "read_doc_ids": read_doc_ids,
-            "read_code_file_paths": read_code_file_paths,
-            "search_result_doc_ids": search_result_doc_ids,
             "goal_match_status": "matched",
             "goal_match_reason": "CODE_STATUS:requested_doc_read_doc_matched",
         }
 
     if any(_doc_matches_hint(file_path, requested_doc_hint) for file_path in read_code_file_paths):
         return {
+            **base_context,
             "requested_doc_hint": requested_doc_hint,
             "requested_doc_hint_source": requested_doc_hint_source,
-            "read_doc_ids": read_doc_ids,
-            "read_code_file_paths": read_code_file_paths,
-            "search_result_doc_ids": search_result_doc_ids,
             "goal_match_status": "matched",
             "goal_match_reason": "CODE_STATUS:requested_source_code_file_read_code_file_matched",
         }
 
     if any(_doc_matches_hint(doc_id, requested_doc_hint) for doc_id in search_result_doc_ids):
         return {
+            **base_context,
             "requested_doc_hint": requested_doc_hint,
             "requested_doc_hint_source": requested_doc_hint_source,
-            "read_doc_ids": read_doc_ids,
-            "read_code_file_paths": read_code_file_paths,
-            "search_result_doc_ids": search_result_doc_ids,
             "goal_match_status": "partial",
             "goal_match_reason": "CODE_STATUS:requested_doc_found_in_search_results_but_not_read",
         }
 
     if read_doc_ids or read_code_file_paths or search_result_doc_ids:
         return {
+            **base_context,
             "requested_doc_hint": requested_doc_hint,
             "requested_doc_hint_source": requested_doc_hint_source,
-            "read_doc_ids": read_doc_ids,
-            "read_code_file_paths": read_code_file_paths,
-            "search_result_doc_ids": search_result_doc_ids,
             "goal_match_status": "partial",
             "goal_match_reason": "CODE_STATUS:requested_doc_not_matched_but_l_loop_has_other_evidence",
         }
 
     return {
+        **base_context,
         "requested_doc_hint": requested_doc_hint,
         "requested_doc_hint_source": requested_doc_hint_source,
-        "read_doc_ids": read_doc_ids,
-        "read_code_file_paths": read_code_file_paths,
-        "search_result_doc_ids": search_result_doc_ids,
         "goal_match_status": "missing",
         "goal_match_reason": "CODE_STATUS:requested_doc_not_matched_and_no_l_loop_evidence",
     }
+
+
+def _structured_artifact_requirement_context(
+    *,
+    data_store: DataStore | None,
+    allowed_source_data_ids: set[str],
+    l1_goal: dict[str, object],
+    read_doc_ids: list[str],
+    search_result_doc_ids: list[str],
+) -> dict[str, object] | None:
+    """L1의 의미 관계와 CODE resolver/read 기록을 결합해 artifact 충족 상태를 계산한다."""
+
+    mode = str(l1_goal.get("artifact_requirement_mode") or "not_applicable")
+    if mode == "not_applicable":
+        return None
+    raw_indices = l1_goal.get("artifact_reference_occurrence_indices")
+    indices = (
+        [item for item in raw_indices if isinstance(item, int) and not isinstance(item, bool)]
+        if isinstance(raw_indices, list)
+        else []
+    )
+    resolver_payload = _explicit_artifact_reference_payload(
+        data_store,
+        allowed_source_data_ids=allowed_source_data_ids,
+    )
+    if resolver_payload is None:
+        return _artifact_requirement_result(
+            mode=mode,
+            requested_doc_hint="",
+            target_doc_ids=[],
+            matched_doc_ids=[],
+            status="missing",
+            reason="CODE_STATUS:artifact_requirement_resolver_frame_missing",
+        )
+
+    raw_resolved = resolver_payload.get("resolved_references")
+    resolved = [item for item in raw_resolved if isinstance(item, dict)] if isinstance(raw_resolved, list) else []
+    by_index = {
+        item.get("occurrence_index"): item
+        for item in resolved
+        if isinstance(item.get("occurrence_index"), int)
+    }
+    selected = [by_index[index] for index in indices if index in by_index]
+    if not indices or len(selected) != len(indices):
+        return _artifact_requirement_result(
+            mode=mode,
+            requested_doc_hint="",
+            target_doc_ids=[],
+            matched_doc_ids=[],
+            status="missing",
+            reason="CODE_STATUS:artifact_requirement_reference_index_unresolved",
+        )
+
+    if mode == "ordered_fallback":
+        return _ordered_fallback_artifact_requirement_result(
+            selected=selected,
+            read_doc_ids=read_doc_ids,
+        )
+
+    target_doc_ids = _unique_strings(
+        [
+            str(item.get("selected_doc_id") or "")
+            for item in selected
+            if item.get("resolve_status") == "unique"
+            and str(item.get("selected_doc_id") or "")
+        ]
+    )
+    matched_doc_ids = _matched_target_doc_ids(
+        target_doc_ids=target_doc_ids,
+        observed_doc_ids=read_doc_ids,
+    )
+    requested_doc_hint = (
+        target_doc_ids[0]
+        if target_doc_ids
+        else _artifact_reference_label(selected[0])
+    )
+    all_selected_resolved = len(target_doc_ids) == len(selected)
+    if mode == "exact_one":
+        status = "matched" if len(matched_doc_ids) == 1 else "partial" if target_doc_ids else "missing"
+        reason = (
+            "CODE_STATUS:exact_artifact_requirement_read_matched"
+            if status == "matched"
+            else "CODE_STATUS:exact_artifact_requirement_resolved_but_not_read"
+            if status == "partial"
+            else "CODE_STATUS:exact_artifact_requirement_unresolved"
+        )
+    elif mode == "all_of":
+        status = (
+            "matched"
+            if all_selected_resolved and len(matched_doc_ids) == len(target_doc_ids)
+            else "partial"
+            if target_doc_ids or matched_doc_ids
+            else "missing"
+        )
+        reason = (
+            "CODE_STATUS:all_artifact_requirements_read_matched"
+            if status == "matched"
+            else "CODE_STATUS:all_artifact_requirements_not_fully_read"
+            if status == "partial"
+            else "CODE_STATUS:all_artifact_requirements_unresolved"
+        )
+    else:  # any_of
+        status = "matched" if matched_doc_ids else "partial" if target_doc_ids else "missing"
+        reason = (
+            "CODE_STATUS:any_artifact_requirement_read_matched"
+            if status == "matched"
+            else "CODE_STATUS:any_artifact_requirement_resolved_but_not_read"
+            if status == "partial"
+            else "CODE_STATUS:any_artifact_requirement_unresolved"
+        )
+
+    return _artifact_requirement_result(
+        mode=mode,
+        requested_doc_hint=requested_doc_hint,
+        target_doc_ids=target_doc_ids,
+        matched_doc_ids=matched_doc_ids,
+        status=status,
+        reason=reason,
+    )
+
+
+def _ordered_fallback_artifact_requirement_result(
+    *,
+    selected: list[dict[str, object]],
+    read_doc_ids: list[str],
+) -> dict[str, object]:
+    active_item: dict[str, object] | None = None
+    blocked_item: dict[str, object] | None = None
+    for item in selected:
+        resolve_status = str(item.get("resolve_status") or "")
+        if resolve_status == "not_found":
+            continue
+        if resolve_status == "unique" and str(item.get("selected_doc_id") or ""):
+            active_item = item
+            break
+        blocked_item = item
+        break
+
+    if active_item is None:
+        requested_doc_hint = _artifact_reference_label(blocked_item or selected[0])
+        reason = (
+            "CODE_STATUS:ordered_fallback_blocked_by_unresolved_reference"
+            if blocked_item is not None
+            else "CODE_STATUS:ordered_fallback_no_available_reference"
+        )
+        return _artifact_requirement_result(
+            mode="ordered_fallback",
+            requested_doc_hint=requested_doc_hint,
+            target_doc_ids=[],
+            matched_doc_ids=[],
+            status="missing",
+            reason=reason,
+        )
+
+    target_doc_id = str(active_item.get("selected_doc_id") or "")
+    matched_doc_ids = _matched_target_doc_ids(
+        target_doc_ids=[target_doc_id],
+        observed_doc_ids=read_doc_ids,
+    )
+    status = "matched" if matched_doc_ids else "partial"
+    reason = (
+        "CODE_STATUS:ordered_fallback_active_artifact_read_matched"
+        if status == "matched"
+        else "CODE_STATUS:ordered_fallback_active_artifact_not_read"
+    )
+    return _artifact_requirement_result(
+        mode="ordered_fallback",
+        requested_doc_hint=target_doc_id,
+        target_doc_ids=[target_doc_id],
+        matched_doc_ids=matched_doc_ids,
+        status=status,
+        reason=reason,
+    )
+
+
+def _artifact_requirement_result(
+    *,
+    mode: str,
+    requested_doc_hint: str,
+    target_doc_ids: list[str],
+    matched_doc_ids: list[str],
+    status: str,
+    reason: str,
+) -> dict[str, object]:
+    return {
+        "requested_doc_hint": requested_doc_hint,
+        "requested_doc_hint_source": "l1_artifact_requirement+explicit_artifact_reference_frame",
+        "artifact_requirement_mode": mode,
+        "artifact_requirement_target_doc_ids": target_doc_ids,
+        "artifact_requirement_matched_doc_ids": matched_doc_ids,
+        "artifact_requirement_status": status,
+        "goal_match_status": status,
+        "goal_match_reason": reason,
+    }
+
+
+def _matched_target_doc_ids(
+    *,
+    target_doc_ids: list[str],
+    observed_doc_ids: list[str],
+) -> list[str]:
+    return [
+        target_doc_id
+        for target_doc_id in target_doc_ids
+        if any(_doc_matches_hint(doc_id, target_doc_id) for doc_id in observed_doc_ids)
+    ]
+
+
+def _artifact_reference_label(item: dict[str, object]) -> str:
+    return str(
+        item.get("selected_doc_id")
+        or item.get("normalized_ref")
+        or item.get("raw_ref")
+        or ""
+    )
 
 
 def _apply_goal_match_guard(
@@ -1666,31 +1920,45 @@ def _explicit_artifact_requested_doc_hint(
 ) -> str:
     """명시 문서 resolver가 남긴 절대 좌표를 L3 목표 대조에 재사용한다."""
 
-    if data_store is None:
+    payload = _explicit_artifact_reference_payload(
+        data_store,
+        allowed_source_data_ids=allowed_source_data_ids,
+    )
+    if payload is None:
         return ""
+    resolved_references = payload.get("resolved_references")
+    if not isinstance(resolved_references, list):
+        return ""
+    for item in resolved_references:
+        if not isinstance(item, dict):
+            continue
+        selected_doc_id = item.get("selected_doc_id")
+        if item.get("resolve_status") == "unique" and isinstance(selected_doc_id, str) and selected_doc_id:
+            return selected_doc_id
+        for key in ("normalized_ref", "raw_ref"):
+            value = item.get(key)
+            if isinstance(value, str) and value:
+                return value
+    return ""
 
+
+def _explicit_artifact_reference_payload(
+    data_store: DataStore | None,
+    *,
+    allowed_source_data_ids: set[str],
+) -> dict[str, object] | None:
+    """현재 L3 입력 경계 안에 있는 최신 explicit resolver payload를 찾는다."""
+
+    if data_store is None:
+        return None
     for record in reversed(data_store.list_records()):
         if record.data_id not in allowed_source_data_ids:
             continue
         if record.data_type != "node_output:explicit_artifact_reference_frame":
             continue
-        payload = record.payload
-        if not isinstance(payload, dict):
-            continue
-        resolved_references = payload.get("resolved_references")
-        if not isinstance(resolved_references, list):
-            continue
-        for item in resolved_references:
-            if not isinstance(item, dict):
-                continue
-            selected_doc_id = item.get("selected_doc_id")
-            if item.get("resolve_status") == "unique" and isinstance(selected_doc_id, str) and selected_doc_id:
-                return selected_doc_id
-            for key in ("normalized_ref", "raw_ref"):
-                value = item.get(key)
-                if isinstance(value, str) and value:
-                    return value
-    return ""
+        if isinstance(record.payload, dict):
+            return record.payload
+    return None
 
 
 def _looks_like_doc_hint(value: str) -> bool:
