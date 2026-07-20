@@ -315,6 +315,11 @@ def _strip_accidental_grounding_block(markdown: str) -> str:
 
 
 def _grounding_limit_text(brief_frame: Node3InputBriefFrame) -> str:
+    if (
+        brief_frame.l_loop_result_attitude_hint
+        == "l_loop_no_original_material_l3_semantic_failed"
+    ):
+        return "실제 L 원문을 확보하지 못했고 L3 의미 검사도 실패했으므로, 검색 후보와 처리 장부를 원문 근거처럼 말하지 않는다."
     if brief_frame.raw_document_policy == "omit_raw_text_from_llm_payload":
         return "원문 record는 보존되어 있지만 node_3 LLM 입력에서는 원문 text를 생략하고 L3 요약 재료를 사용한다."
     if brief_frame.l_loop_result_attitude_hint == "l_loop_budget_exhausted":

@@ -3007,6 +3007,7 @@ def _validate_node3_l_loop_result_fields(frame: Node3InputBriefFrame) -> None:
         "l_loop_achieved",
         "l_loop_partial_or_failed",
         "l_loop_original_material_acquired_l3_semantic_failed",
+        "l_loop_no_original_material_l3_semantic_failed",
         "l_loop_budget_exhausted",
         "l_loop_missing_or_uncertain",
     }:

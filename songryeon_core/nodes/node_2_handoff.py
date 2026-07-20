@@ -3758,8 +3758,11 @@ def _l_loop_result_attitude_hint(payload: dict[str, object]) -> str:
         "l3_semantic_execution_status",
         fallback="not_run",
     )
+    original_material_count = _int(payload, "original_material_count")
     if semantic_execution == "failed":
-        return "l_loop_original_material_acquired_l3_semantic_failed"
+        if original_material_count > 0:
+            return "l_loop_original_material_acquired_l3_semantic_failed"
+        return "l_loop_no_original_material_l3_semantic_failed"
     if task_status == "achieved" and failure_level == "none":
         return "l_loop_achieved"
     if failure_level == "budget_exhausted":
