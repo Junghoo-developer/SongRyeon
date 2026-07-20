@@ -1403,7 +1403,7 @@ def _validate_node2_evidence_role(
 
 
 NODE4_GATEKEEPER_FRAME_SCHEMA_NAME = "Node4GatekeeperFrame"
-NODE4_GATEKEEPER_FRAME_SCHEMA_VERSION = "0.2"
+NODE4_GATEKEEPER_FRAME_SCHEMA_VERSION = "0.3"
 NODE4_GATE_STATUSES = {"pass", "needs_revision", "failed"}
 NODE4_TASK_FULFILLMENT_STATUSES = {
     "fulfilled",
@@ -1436,6 +1436,10 @@ class Node4GatekeeperFrame:
     revision_targets: list[str] = field(default_factory=list)
     task_fulfillment_status: str = "not_checkable"
     grounding_consistency_status: str = "not_checkable"
+    # 절대 정보: node_4가 어떤 근거 범위 안에서 보고문을 검사했는지 밝힌다.
+    gate_evidence_scope: str = "supplied_evidence_bundle"
+    # 절대 정보: 현재 프로젝트 전체와의 최신성 대조는 별도 도구가 없으므로 실행하지 않는다.
+    project_currentness_check_status: str = "not_run"
     task_failure_reasons: list[str] = field(default_factory=list)
     recent_memory_guard_status: str = "not_run"
     recent_memory_guard_reason_codes: list[str] = field(default_factory=list)
@@ -1484,6 +1488,15 @@ def validate_node4_gatekeeper_frame(frame: Node4GatekeeperFrame) -> None:
         raise ValueError(
             "unknown Node4 grounding_consistency_status: "
             f"{frame.grounding_consistency_status}"
+        )
+    if frame.gate_evidence_scope != "supplied_evidence_bundle":
+        raise ValueError(
+            "Node4GatekeeperFrame.gate_evidence_scope must be "
+            "supplied_evidence_bundle"
+        )
+    if frame.project_currentness_check_status != "not_run":
+        raise ValueError(
+            "Node4GatekeeperFrame.project_currentness_check_status must be not_run"
         )
     if frame.recent_memory_guard_status not in {"not_run", "pass", "needs_revision"}:
         raise ValueError(
@@ -6342,7 +6355,7 @@ L3_PRESERVED_INFO_FRAME_SCHEMA_NAME = "L3PreservedInfoFrame"
 L3_PRESERVED_INFO_FRAME_SCHEMA_VERSION = "0.1"
 L3_JUDGEMENT_STATUSES = {"not_judged"}
 L3_ACHIEVEMENT_FRAME_SCHEMA_NAME = "L3AchievementFrame"
-L3_ACHIEVEMENT_FRAME_SCHEMA_VERSION = "0.5"
+L3_ACHIEVEMENT_FRAME_SCHEMA_VERSION = "0.6"
 L3_ACHIEVEMENT_STATUSES = {"achieved", "partial", "failed"}
 L3_GOAL_MATCH_STATUSES = {"matched", "partial", "missing", "not_applicable"}
 L3_SEMANTIC_GOAL_MATCH_STATUSES = {"matched", "partial", "missing", "not_run"}
@@ -6602,6 +6615,35 @@ class L3AchievementFrame:
     original_material_required_count: int = 0
     # 절대 정보: L1 요구량과 실제 원문 수를 비교한 상태.
     original_material_requirement_status: str = "not_required"
+    # 절대 정보: 최초 frame, 정상 비교, 이전 frame 누락을 구분한다.
+    revision_evidence_delta_status: str = "initial_not_applicable"
+    # 절대 정보: revision delta를 비교한 직전 L3 achievement frame ID.
+    # 최초 L3 또는 이전 frame 누락 시 None이다.
+    previous_achievement_frame_id: str | None = None
+    # 절대 정보: 직전 L3의 최종 achievement 상태 복사값.
+    previous_achievement_status: str | None = None
+    # 절대 정보: 직전 L3의 semantic goal match 상태 복사값.
+    previous_semantic_goal_match_status: str | None = None
+    # 절대 정보: 이번 revision에서 직전 frame보다 새로 늘어난 read_doc ID.
+    new_read_doc_ids: list[str] = field(default_factory=list)
+    # 절대 정보: new_read_doc_ids 길이의 복사값.
+    new_read_doc_count: int = 0
+    # 절대 정보: 이번 revision에서 직전 frame보다 새로 늘어난 code 원문 경로.
+    new_read_code_file_paths: list[str] = field(default_factory=list)
+    # 절대 정보: new_read_code_file_paths 길이의 복사값.
+    new_read_code_file_count: int = 0
+    # 절대 정보: 새 문서·코드 원문 수 합계.
+    new_original_material_count: int = 0
+    # 절대 정보: 여기서 evidence set은 read_doc ID와 read_code_file path 원문 집합을 뜻한다.
+    evidence_set_changed: bool = False
+    # 절대 정보: search result 문서 ID 집합이 직전 L3와 달라졌는지.
+    candidate_set_changed: bool = False
+    # 절대 정보: achievement 상태가 직전 L3와 달라졌는지.
+    achievement_status_changed: bool = False
+    # 절대 정보: semantic goal match 상태가 직전 L3와 달라졌는지.
+    semantic_goal_match_status_changed: bool = False
+    # 절대 정보: 새 원문 없이 achievement 상태만 바뀌었는지.
+    achievement_changed_without_new_original_material: bool = False
     # 절대 정보: 적용된 스키마 이름.
     schema_name: str = L3_ACHIEVEMENT_FRAME_SCHEMA_NAME
     # 절대 정보: 적용된 스키마 버전.
@@ -6774,10 +6816,113 @@ def validate_l3_achievement_frame(frame: L3AchievementFrame) -> None:
         raise ValueError(
             "L3AchievementFrame.original_material_requirement_status does not match counts"
         )
+    if frame.previous_achievement_status is not None:
+        if frame.previous_achievement_status not in L3_ACHIEVEMENT_STATUSES:
+            raise ValueError(
+                "unknown L3 previous_achievement_status: "
+                f"{frame.previous_achievement_status}"
+            )
+    if frame.previous_semantic_goal_match_status is not None:
+        if (
+            frame.previous_semantic_goal_match_status
+            not in L3_SEMANTIC_GOAL_MATCH_STATUSES
+        ):
+            raise ValueError(
+                "unknown L3 previous_semantic_goal_match_status: "
+                f"{frame.previous_semantic_goal_match_status}"
+            )
+    if frame.new_read_doc_count != len(frame.new_read_doc_ids):
+        raise ValueError(
+            "L3AchievementFrame.new_read_doc_count must mirror new_read_doc_ids"
+        )
+    if frame.new_read_code_file_count != len(frame.new_read_code_file_paths):
+        raise ValueError(
+            "L3AchievementFrame.new_read_code_file_count must mirror new code paths"
+        )
+    if frame.new_original_material_count != (
+        frame.new_read_doc_count + frame.new_read_code_file_count
+    ):
+        raise ValueError(
+            "L3AchievementFrame.new_original_material_count must mirror new original IDs"
+        )
+    if frame.evidence_set_changed != (frame.new_original_material_count > 0):
+        raise ValueError(
+            "L3AchievementFrame.evidence_set_changed must mirror new original count"
+        )
+    if frame.revision_evidence_delta_status not in {
+        "initial_not_applicable",
+        "recorded",
+        "previous_frame_missing",
+    }:
+        raise ValueError(
+            "unknown L3 revision_evidence_delta_status: "
+            f"{frame.revision_evidence_delta_status}"
+        )
+    if frame.previous_achievement_frame_id is None:
+        if frame.revision_evidence_delta_status == "recorded":
+            raise ValueError("recorded L3 revision delta requires previous frame")
+        if (
+            frame.previous_achievement_status is not None
+            or frame.previous_semantic_goal_match_status is not None
+            or frame.new_original_material_count != 0
+            or frame.evidence_set_changed
+            or frame.candidate_set_changed
+            or frame.achievement_status_changed
+            or frame.semantic_goal_match_status_changed
+            or frame.achievement_changed_without_new_original_material
+        ):
+            raise ValueError(
+                "initial L3 achievement frame must not claim revision delta"
+            )
+    else:
+        if frame.revision_evidence_delta_status != "recorded":
+            raise ValueError("L3 previous achievement frame requires recorded delta status")
+        if frame.previous_achievement_status is None:
+            raise ValueError("revision L3 delta requires previous achievement status")
+        if frame.previous_semantic_goal_match_status is None:
+            raise ValueError("revision L3 delta requires previous semantic status")
+        if frame.achievement_status_changed != (
+            frame.previous_achievement_status != frame.achievement_status
+        ):
+            raise ValueError(
+                "L3 achievement_status_changed must match previous/current statuses"
+            )
+        if frame.semantic_goal_match_status_changed != (
+            frame.previous_semantic_goal_match_status
+            != frame.semantic_goal_match_status
+        ):
+            raise ValueError(
+                "L3 semantic_goal_match_status_changed must match previous/current statuses"
+            )
+        expected_without_new_original = (
+            frame.achievement_status_changed
+            and frame.new_original_material_count == 0
+        )
+        if (
+            frame.achievement_changed_without_new_original_material
+            != expected_without_new_original
+        ):
+            raise ValueError(
+                "L3 changed-without-new-original flag must match status delta and count"
+            )
 
     for doc_id in frame.read_doc_ids:
         if not doc_id:
             raise ValueError("L3AchievementFrame.read_doc_ids must not contain empty values")
+    for doc_id in frame.new_read_doc_ids:
+        if not doc_id:
+            raise ValueError("L3AchievementFrame.new_read_doc_ids must not contain empty values")
+        if doc_id not in frame.read_doc_ids:
+            raise ValueError("new L3 read_doc id must exist in cumulative read_doc_ids")
+    for path in frame.new_read_code_file_paths:
+        if not path:
+            raise ValueError(
+                "L3AchievementFrame.new_read_code_file_paths must not contain empty values"
+            )
+        if path not in frame.read_code_file_paths:
+            raise ValueError(
+                "new L3 read_code_file path must exist in cumulative read_code_file_paths"
+            )
     for file_path in frame.read_code_file_paths:
         if not file_path:
             raise ValueError("L3AchievementFrame.read_code_file_paths must not contain empty values")

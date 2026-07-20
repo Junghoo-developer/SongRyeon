@@ -302,6 +302,12 @@ def run_l3_revision_result_keeper(
             user_query=user_query,
             target_goal_data_id=l1_goal_data_id,
         )
+    achievement_frame = _annotate_revision_evidence_delta(
+        frame=achievement_frame,
+        data_store=data_store,
+        attempt_index=attempt_index,
+        id_namespace=id_namespace,
+    )
     validate_l3_achievement_frame(achievement_frame)
 
     event = trace_store.create_event(
@@ -1079,6 +1085,103 @@ def _promote_revision_semantic_match(
             f"{frame.achievement_generation_source}"
             "+CODE:REVISION_SEMANTIC_MATCH_COMPLETION_POLICY"
         ),
+    )
+
+
+def _annotate_revision_evidence_delta(
+    *,
+    frame: L3AchievementFrame,
+    data_store: DataStore,
+    attempt_index: int,
+    id_namespace: LRunIds | None,
+) -> L3AchievementFrame:
+    """직전 L3와 현재 revision L3 사이의 절대 근거·상태 차이만 기록한다."""
+
+    previous_frame_id = (
+        id_namespace.l3_achievement_data_id
+        if attempt_index == 1 and id_namespace is not None
+        else L3_ACHIEVEMENT_FRAME_DATA_ID
+        if attempt_index == 1
+        else l3_revision_achievement_frame_data_id(
+            attempt_index - 1,
+            id_namespace=id_namespace,
+        )
+    )
+    previous_record = data_store.get_record(previous_frame_id)
+    if previous_record is None or not isinstance(previous_record.payload, dict):
+        return replace(
+            frame,
+            revision_evidence_delta_status="previous_frame_missing",
+        )
+
+    previous = previous_record.payload
+    previous_achievement_status = str(previous.get("achievement_status") or "")
+    previous_semantic_status = str(
+        previous.get("semantic_goal_match_status") or "not_run"
+    )
+    previous_read_doc_ids = _payload_string_list(previous, "read_doc_ids")
+    previous_code_paths = _payload_string_list(previous, "read_code_file_paths")
+    previous_candidate_ids = _payload_string_list(previous, "search_result_doc_ids")
+
+    previous_read_doc_set = set(previous_read_doc_ids)
+    previous_code_path_set = set(previous_code_paths)
+    new_read_doc_ids = [
+        doc_id for doc_id in frame.read_doc_ids if doc_id not in previous_read_doc_set
+    ]
+    new_code_paths = [
+        path
+        for path in frame.read_code_file_paths
+        if path not in previous_code_path_set
+    ]
+    new_original_material_count = len(new_read_doc_ids) + len(new_code_paths)
+    achievement_status_changed = previous_achievement_status != frame.achievement_status
+    semantic_status_changed = previous_semantic_status != frame.semantic_goal_match_status
+
+    previous_trace_id = previous_record.source_trace_id
+    return replace(
+        frame,
+        revision_evidence_delta_status="recorded",
+        previous_achievement_frame_id=previous_frame_id,
+        previous_achievement_status=previous_achievement_status,
+        previous_semantic_goal_match_status=previous_semantic_status,
+        new_read_doc_ids=new_read_doc_ids,
+        new_read_doc_count=len(new_read_doc_ids),
+        new_read_code_file_paths=new_code_paths,
+        new_read_code_file_count=len(new_code_paths),
+        new_original_material_count=new_original_material_count,
+        evidence_set_changed=new_original_material_count > 0,
+        candidate_set_changed=(
+            set(previous_candidate_ids) != set(frame.search_result_doc_ids)
+        ),
+        achievement_status_changed=achievement_status_changed,
+        semantic_goal_match_status_changed=semantic_status_changed,
+        achievement_changed_without_new_original_material=(
+            achievement_status_changed and new_original_material_count == 0
+        ),
+        evidence_trace_ids=_unique_strings(
+            [*frame.evidence_trace_ids, previous_trace_id]
+        ),
+        evidence_data_ids=_unique_strings(
+            [*frame.evidence_data_ids, previous_frame_id]
+        ),
+        source_trace_ids=_unique_strings(
+            [*frame.source_trace_ids, previous_trace_id]
+        ),
+        source_data_ids=_unique_strings(
+            [*frame.source_data_ids, previous_frame_id]
+        ),
+    )
+
+
+def _payload_string_list(
+    payload: dict[str, object],
+    field_name: str,
+) -> list[str]:
+    value = payload.get(field_name)
+    if not isinstance(value, list):
+        return []
+    return _unique_strings(
+        [item for item in value if isinstance(item, str) and item]
     )
 
 

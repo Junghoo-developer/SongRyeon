@@ -1354,6 +1354,37 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
             semantic_goal_reason = achievement.get("semantic_goal_match_reason")
             if isinstance(semantic_goal_reason, str) and semantic_goal_reason:
                 lines.append(f"  - reason: {semantic_goal_reason}")
+        delta_status = achievement.get("revision_evidence_delta_status")
+        if isinstance(delta_status, str) and delta_status != "initial_not_applicable":
+            lines.append(
+                "- L3 revision 근거 변화 [CODE]: "
+                f"status={delta_status} / "
+                f"new_read_doc={achievement.get('new_read_doc_count', 0)} / "
+                f"new_read_code={achievement.get('new_read_code_file_count', 0)} / "
+                f"new_originals={achievement.get('new_original_material_count', 0)} / "
+                f"evidence_changed={achievement.get('evidence_set_changed', False)} / "
+                f"candidates_changed={achievement.get('candidate_set_changed', False)}"
+            )
+            lines.append(
+                "  - 판정 변화: "
+                f"achievement={achievement.get('previous_achievement_status')}"
+                f"->{achievement.get('achievement_status')} / "
+                "semantic="
+                f"{achievement.get('previous_semantic_goal_match_status')}"
+                f"->{achievement.get('semantic_goal_match_status')} / "
+                "changed_without_new_original="
+                f"{achievement.get('achievement_changed_without_new_original_material', False)}"
+            )
+            new_read_doc_ids = achievement.get("new_read_doc_ids")
+            new_code_paths = achievement.get("new_read_code_file_paths")
+            if isinstance(new_read_doc_ids, list) and new_read_doc_ids:
+                lines.append(
+                    f"  - new_read_doc_ids: {_format_source_ids(new_read_doc_ids)}"
+                )
+            if isinstance(new_code_paths, list) and new_code_paths:
+                lines.append(
+                    f"  - new_read_code_file_paths: {_format_source_ids(new_code_paths)}"
+                )
         lines.extend(
             _metainfo_lines(
                 indent=2,
@@ -1832,6 +1863,12 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
             f"task={node4_gate.get('task_fulfillment_status', 'not_checkable')} / "
             "grounding_consistency="
             f"{node4_gate.get('grounding_consistency_status', 'not_checkable')}"
+        )
+        lines.append(
+            "  - 검사 범위 [CODE]: "
+            f"evidence={node4_gate.get('gate_evidence_scope', 'unknown')} / "
+            "project_currentness="
+            f"{node4_gate.get('project_currentness_check_status', 'unknown')}"
         )
         task_failure_reasons = node4_gate.get("task_failure_reasons")
         if isinstance(task_failure_reasons, list) and task_failure_reasons:

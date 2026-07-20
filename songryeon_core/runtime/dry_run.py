@@ -1632,6 +1632,9 @@ def run_dry_turn(
         final_state_record = data_store.get_record(l_loop_final_state_index_data_id)
         if final_state_record is not None and isinstance(final_state_record.payload, dict):
             l_loop_final_state_index_payload = final_state_record.payload
+    latest_l3_achievement_data_id = str(
+        l_loop_final_state_index_payload.get("latest_l3_achievement_data_id") or ""
+    )
 
     result = {
         "turn_id": turn_id,
@@ -2095,6 +2098,33 @@ def run_dry_turn(
         "l_loop_latest_l3_achievement_data_id": l_loop_final_state_index_payload.get(
             "latest_l3_achievement_data_id"
         ),
+        "l_loop_latest_revision_evidence_delta_status": _read_payload_text(
+            data_store,
+            latest_l3_achievement_data_id,
+            "revision_evidence_delta_status",
+        ),
+        "l_loop_latest_new_original_material_count": _read_payload_int(
+            data_store,
+            latest_l3_achievement_data_id,
+            "new_original_material_count",
+        ),
+        "l_loop_latest_evidence_set_changed": _read_payload_bool(
+            data_store,
+            latest_l3_achievement_data_id,
+            "evidence_set_changed",
+        ),
+        "l_loop_latest_candidate_set_changed": _read_payload_bool(
+            data_store,
+            latest_l3_achievement_data_id,
+            "candidate_set_changed",
+        ),
+        "l_loop_latest_achievement_changed_without_new_original_material": (
+            _read_payload_bool(
+                data_store,
+                latest_l3_achievement_data_id,
+                "achievement_changed_without_new_original_material",
+            )
+        ),
         "l_loop_final_status": l_loop_final_state_index_payload.get(
             "latest_l3_achievement_status"
         ),
@@ -2246,6 +2276,18 @@ def run_dry_turn(
             data_store,
             "node_4:gatekeeper_frame",
             "grounding_consistency_status",
+            data_type="node_output:node4_gatekeeper_frame",
+        ),
+        "node4_gate_evidence_scope": _read_payload_text(
+            data_store,
+            "node_4:gatekeeper_frame",
+            "gate_evidence_scope",
+            data_type="node_output:node4_gatekeeper_frame",
+        ),
+        "node4_project_currentness_check_status": _read_payload_text(
+            data_store,
+            "node_4:gatekeeper_frame",
+            "project_currentness_check_status",
             data_type="node_output:node4_gatekeeper_frame",
         ),
         "node4_recent_memory_guard_status": _read_payload_text(
