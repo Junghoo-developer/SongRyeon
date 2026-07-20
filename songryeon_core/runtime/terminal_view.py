@@ -1071,6 +1071,47 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
                 f"L2={frame.get('source_l2_query_frame_id', '')}"
             )
 
+    final_state_frames = _payloads_with_type(
+        result,
+        "node_output:L_loop_final_state_index_frame",
+    )
+    if final_state_frames:
+        frame = final_state_frames[-1]
+        lines.append("- L 최종 상태 색인 [CODE]:")
+        lines.append(
+            "  - 최초 도구 종료 판단: "
+            f"{frame.get('pre_revision_terminal_control_decision', 'not_recorded')} "
+            f"/ scope={frame.get('pre_revision_terminal_control_scope', 'unknown')} "
+            f"/ source={frame.get('pre_revision_terminal_control_data_id', '')}"
+        )
+        lines.append(
+            "  - revision 포함 최신 상태: "
+            f"{frame.get('latest_l3_achievement_status', 'unknown')} "
+            f"/ source={frame.get('final_status_source_data_id', '')} "
+            f"/ kind={frame.get('final_status_source_kind', 'unknown')}"
+        )
+        lines.append(
+            "  - 최종 continuation: "
+            f"{frame.get('final_continuation_status', 'not_recorded')} "
+            f"/ source={frame.get('final_continuation_data_id', '')}"
+        )
+        lines.extend(
+            _metainfo_lines(
+                indent=2,
+                generated_by=str(
+                    frame.get("generated_by") or "CODE:L_LOOP_FINAL_STATE_INDEXER"
+                ),
+                info_class=str(frame.get("info_class") or "absolute"),
+                source_data_ids=_source_data_ids(
+                    frame,
+                    fallback=[str(frame.get("frame_id") or "L:final_state_index_frame")],
+                ),
+                semantic_judgement_status=str(
+                    frame.get("semantic_judgement_status") or "not_run"
+                ),
+            )
+        )
+
     return_summaries = _payloads_with_type(result, "node_output:l_loop_return_summary_frame")
     if return_summaries:
         frame = return_summaries[-1]

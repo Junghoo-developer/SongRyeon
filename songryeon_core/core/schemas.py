@@ -137,8 +137,16 @@ from songryeon_core.core.schema_parts.loop_activity import (
     L_LOOP_ACTIVITY_LEDGER_FRAME_SCHEMA_VERSION,
     L_LOOP_ACTIVITY_LEDGER_GENERATOR,
     L_LOOP_ACTIVITY_STAGES,
+    L_LOOP_FINAL_STATE_INDEX_DATA_TYPE,
+    L_LOOP_FINAL_STATE_INDEX_FRAME_SCHEMA_NAME,
+    L_LOOP_FINAL_STATE_INDEX_FRAME_SCHEMA_VERSION,
+    L_LOOP_FINAL_STATE_INDEX_GENERATOR,
+    L_LOOP_FINAL_STATUS_SOURCE_KIND,
+    L_LOOP_PRE_REVISION_CONTROL_SCOPE,
     LLoopActivityLedgerFrame,
+    LLoopFinalStateIndexFrame,
     validate_l_loop_activity_ledger_frame,
+    validate_l_loop_final_state_index_frame,
 )
 from songryeon_core.core.schema_parts.task_ledger import (
     TASK_FRAME_SCHEMA_NAME,

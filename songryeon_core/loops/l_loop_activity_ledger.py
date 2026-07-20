@@ -96,6 +96,7 @@ def record_l_loop_activity_ledger(
         document_context_pack_data_ids=list(l_result.document_context_pack_data_ids),
         preserved_data_ids=list(l_result.preserved_data_ids),
         achievement_data_ids=list(l_result.achievement_data_ids),
+        final_state_index_data_ids=list(l_result.final_state_index_data_ids),
         return_summary_frame_id=return_summary_frame_id,
         document_material_packet_frame_id=document_material_packet_frame_id,
         output_data_ids=output_data_ids,
@@ -167,6 +168,7 @@ def _build_activity_records(
         "document_context_pack": l_result.document_context_pack_data_ids,
         "l3_preserved": l_result.preserved_data_ids,
         "l3_achievement": l_result.achievement_data_ids,
+        "final_state_index": l_result.final_state_index_data_ids,
     }
     for stage, data_ids in field_map.items():
         for data_id in data_ids:

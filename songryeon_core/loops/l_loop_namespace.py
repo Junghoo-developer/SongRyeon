@@ -127,6 +127,9 @@ class LRunIds:
     def activity_ledger_frame_id(self) -> str:
         return self.scoped_data_id("L:activity_ledger_frame")
 
+    def final_state_index_frame_id(self) -> str:
+        return self.scoped_data_id("L:final_state_index_frame")
+
     def loop_return_memory_packet_id(self) -> str:
         return self.scoped_data_id("memory_packet:node_1:loop_return_summary")
 

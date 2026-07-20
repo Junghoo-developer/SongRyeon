@@ -20,6 +20,7 @@ from songryeon_core.loops.l_loop_budget import (
     record_l_loop_budget_plan,
 )
 from songryeon_core.loops.l_loop_continuation import record_l_loop_continuation_decision
+from songryeon_core.loops.l_loop_final_state import record_l_loop_final_state_index
 from songryeon_core.loops.l_loop_namespace import (
     L_REROUTE_PLANNED_NEXT_STEP,
     L_REROUTE_REMAINING_BLOCK_REASON,
@@ -126,6 +127,8 @@ class LLoopResult:
     document_context_pack_data_ids: list[str] = field(default_factory=list)
     preserved_data_ids: list[str] = field(default_factory=list)
     achievement_data_ids: list[str] = field(default_factory=list)
+    final_state_index_trace_ids: list[str] = field(default_factory=list)
+    final_state_index_data_ids: list[str] = field(default_factory=list)
     output_data_ids: list[str] = field(default_factory=list)
     source_trace_ids: list[str] = field(default_factory=list)
     final_control_data_id: str | None = None
@@ -1557,6 +1560,21 @@ def run_l_loop(
             l3 = revision_l3_event
             continuation_attempt_index += 1
 
+    # 최초 tool control의 종료 판단과 revision까지 포함한 최신 L3 상태는
+    # 서로 다른 시점의 사실이다. 둘 중 하나를 덮어쓰지 않고 마지막에
+    # code-owned 색인으로 묶어 downstream이 최신 상태의 출처를 찾게 한다.
+    final_state_trace_id, final_state_data_id, _ = record_l_loop_final_state_index(
+        trace_store=trace_store,
+        data_store=data_store,
+        turn_id=turn_id,
+        latest_l3_achievement_data_id=current_l3_achievement_id,
+        pre_revision_terminal_control_data_id=final_control_data_id,
+        final_continuation_data_id=final_continuation_data_id,
+        id_namespace=run_ids,
+    )
+    final_state_index_trace_ids = [final_state_trace_id]
+    final_state_index_data_ids = [final_state_data_id]
+
     pack_trace_id, pack_data_id, _ = record_document_context_pack_frame(
         trace_store=trace_store,
         data_store=data_store,
@@ -1619,6 +1637,7 @@ def run_l_loop(
             *failure_trace_ids,
             *l3_per_document_summary_trace_ids,
             l3.event_id,
+            *final_state_index_trace_ids,
         ]
     )
     output_data_ids = _unique_strings(
@@ -1646,6 +1665,7 @@ def run_l_loop(
             l3_achievement_data_id,
             *revision_preserved_data_ids,
             *revision_achievement_data_ids,
+            *final_state_index_data_ids,
             *l3_per_document_summary_data_ids,
             *document_context_pack_data_ids,
         ]
@@ -1690,6 +1710,8 @@ def run_l_loop(
         document_context_pack_data_ids=document_context_pack_data_ids,
         preserved_data_ids=[l3_preserved_data_id, *revision_preserved_data_ids],
         achievement_data_ids=[l3_achievement_data_id, *revision_achievement_data_ids],
+        final_state_index_trace_ids=final_state_index_trace_ids,
+        final_state_index_data_ids=final_state_index_data_ids,
         output_data_ids=output_data_ids,
         source_trace_ids=source_trace_ids,
         final_control_data_id=final_control_data_id,

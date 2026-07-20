@@ -5523,11 +5523,32 @@ def _run_live_l_loop_continuation_smoke() -> dict[str, object]:
         raise AssertionError("live continuation should stop when the smoke budget is exhausted")
     if not revision_query_frames:
         raise AssertionError("live L loop revision query frame list is empty")
+    final_state_id = result.get("l_loop_final_state_index_data_id")
+    if final_state_id != "L:final_state_index_frame":
+        raise AssertionError("live L loop final-state index was not exported")
+    final_state = records.get(final_state_id)
+    if not isinstance(final_state, dict):
+        raise AssertionError("live L loop final-state index payload is missing")
+    if final_state.get("latest_l3_achievement_data_id") != (
+        "L3:revision_achievement:0001"
+    ):
+        raise AssertionError("final-state index must point to the latest revision L3")
+    if result.get("l_loop_final_status_source_data_id") != (
+        final_state.get("latest_l3_achievement_data_id")
+    ):
+        raise AssertionError("exported final L status must preserve its latest L3 source")
+    if result.get("l_loop_final_decision_scope") != (
+        "legacy_pre_revision_terminal_control"
+    ):
+        raise AssertionError("legacy L control decision scope must be explicit")
 
     return {
         "continuation_count": result.get("l_loop_continuation_count"),
         "revision_query_count": result.get("l_loop_revision_query_count"),
         "final_continuation_status": result.get("l_loop_final_continuation_status"),
+        "final_status": result.get("l_loop_final_status"),
+        "final_status_source": result.get("l_loop_final_status_source_data_id"),
+        "legacy_control_scope": result.get("l_loop_final_decision_scope"),
     }
 
 

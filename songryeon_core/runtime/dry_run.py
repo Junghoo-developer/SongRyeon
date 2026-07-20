@@ -1622,6 +1622,17 @@ def run_dry_turn(
         l_loop_activity_ledger_data_ids=l_activity_ledger_data_ids,
     )
 
+    l_loop_final_state_index_data_id = (
+        last_l_result.final_state_index_data_ids[-1]
+        if last_l_result is not None and last_l_result.final_state_index_data_ids
+        else None
+    )
+    l_loop_final_state_index_payload: dict[str, object] = {}
+    if l_loop_final_state_index_data_id is not None:
+        final_state_record = data_store.get_record(l_loop_final_state_index_data_id)
+        if final_state_record is not None and isinstance(final_state_record.payload, dict):
+            l_loop_final_state_index_payload = final_state_record.payload
+
     result = {
         "turn_id": turn_id,
         "trace_count": len(trace_store.list_events()),
@@ -2067,6 +2078,32 @@ def run_dry_turn(
             else None
         ),
         "l_loop_final_decision": last_l_result.final_control_decision if last_l_result is not None else None,
+        "l_loop_final_decision_scope": l_loop_final_state_index_payload.get(
+            "pre_revision_terminal_control_scope"
+        ),
+        "l_loop_final_state_index_data_id": l_loop_final_state_index_data_id,
+        "l_loop_pre_revision_terminal_control_data_id": (
+            l_loop_final_state_index_payload.get(
+                "pre_revision_terminal_control_data_id"
+            )
+        ),
+        "l_loop_pre_revision_terminal_control_decision": (
+            l_loop_final_state_index_payload.get(
+                "pre_revision_terminal_control_decision"
+            )
+        ),
+        "l_loop_latest_l3_achievement_data_id": l_loop_final_state_index_payload.get(
+            "latest_l3_achievement_data_id"
+        ),
+        "l_loop_final_status": l_loop_final_state_index_payload.get(
+            "latest_l3_achievement_status"
+        ),
+        "l_loop_final_status_source_data_id": l_loop_final_state_index_payload.get(
+            "final_status_source_data_id"
+        ),
+        "l_loop_final_status_source_kind": l_loop_final_state_index_payload.get(
+            "final_status_source_kind"
+        ),
         "l_loop_final_continuation_status": last_l_result.final_continuation_status if last_l_result is not None else None,
         "l_loop_continuation_count": len(last_l_result.continuation_data_ids) if last_l_result is not None else 0,
         "l_loop_revision_query_count": len(last_l_result.revision_query_data_ids) if last_l_result is not None else 0,

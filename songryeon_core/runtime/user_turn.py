@@ -854,6 +854,26 @@ def _turn_response(
             or _has_record_type(result, "node_output:L2_query_plan_frame")
         ),
         "l_loop_final_decision": result.get("l_loop_final_decision"),
+        "l_loop_final_decision_scope": result.get("l_loop_final_decision_scope"),
+        "l_loop_final_state_index_data_id": result.get(
+            "l_loop_final_state_index_data_id"
+        ),
+        "l_loop_pre_revision_terminal_control_data_id": result.get(
+            "l_loop_pre_revision_terminal_control_data_id"
+        ),
+        "l_loop_pre_revision_terminal_control_decision": result.get(
+            "l_loop_pre_revision_terminal_control_decision"
+        ),
+        "l_loop_latest_l3_achievement_data_id": result.get(
+            "l_loop_latest_l3_achievement_data_id"
+        ),
+        "l_loop_final_status": result.get("l_loop_final_status"),
+        "l_loop_final_status_source_data_id": result.get(
+            "l_loop_final_status_source_data_id"
+        ),
+        "l_loop_final_status_source_kind": result.get(
+            "l_loop_final_status_source_kind"
+        ),
         "l_loop_final_continuation_status": result.get("l_loop_final_continuation_status"),
         "l_loop_continuation_count": result.get("l_loop_continuation_count"),
         "l_loop_revision_query_count": result.get("l_loop_revision_query_count"),
