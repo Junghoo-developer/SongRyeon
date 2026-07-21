@@ -3692,7 +3692,7 @@ def _validate_node3_brief_runtime_task(runtime_task: Node3BriefRuntimeTask) -> N
 
 
 L1_GOAL_FRAME_SCHEMA_NAME = "L1GoalFrame"
-L1_GOAL_FRAME_SCHEMA_VERSION = "0.3"
+L1_GOAL_FRAME_SCHEMA_VERSION = "0.4"
 L1_GOAL_SOURCES = {"rule_based_l_route", "llm_l_route"}
 L1_TARGET_LOOPS = {"L"}
 L1_EVIDENCE_REQUIREMENT_KINDS = {
@@ -3715,6 +3715,23 @@ L1_ARTIFACT_REQUIREMENT_MODES = {
     "any_of",
     "ordered_fallback",
 }
+L1_TEMPORAL_REQUIREMENT_STATUSES = {
+    "required",
+    "not_required",
+    "uncertain",
+}
+L1_TEMPORAL_REQUIREMENT_INFO_CLASSES = {
+    "relative",
+    "absolute_status",
+}
+L1_TEMPORAL_REQUIREMENT_SEMANTIC_STATUSES = {
+    "ran",
+    "failed",
+}
+L1_TEMPORAL_FALLBACK_GOAL = "CODE_STATUS:temporal_evidence_goal_not_set"
+L1_TEMPORAL_FALLBACK_REASON = (
+    "CODE_STATUS:l1_temporal_requirement_judgement_not_run"
+)
 
 
 @dataclass
@@ -3751,6 +3768,19 @@ class L1GoalFrame:
     randomness_mode: str = "not_random"
     # 혼합 정보: L루프가 node_1로 돌아가기 전에 어떤 재료를 갖추면 성공인지 적는다.
     l_loop_success_condition: str = ""
+    # 상대 정보: L1이 현재 사용자 질문 하나를 보고 시간 근거가 필요한지 판단한 결과.
+    # LLM 판단 실패 시에는 의미 판단이 아니라 CODE 상태인 uncertain으로 닫힌다.
+    temporal_requirement_status: str = "uncertain"
+    # 상대 정보: 시간 근거가 필요하다면 무엇을 확보해야 하는지 적는다.
+    temporal_evidence_goal: str = L1_TEMPORAL_FALLBACK_GOAL
+    # 상대 정보: 위 시간 요구 판단의 이유. 실패 경로에서는 CODE 상태만 기록한다.
+    temporal_requirement_reason: str = L1_TEMPORAL_FALLBACK_REASON
+    # 절대 정보: CODE가 L1 입력의 현재 user_query를 그대로 복사한 판단 기준 문자열.
+    temporal_requirement_basis_text: str = ""
+    # 절대 정보: 시간 판단의 정보 분류. 성공은 relative, 실패 상태는 absolute_status다.
+    temporal_requirement_info_class: str = "absolute_status"
+    # 절대 정보: LLM 시간 의미 판단이 실행·검증되었는지 나타낸다.
+    temporal_requirement_semantic_judgement_status: str = "failed"
     # 절대 정보: code가 사용자 입력에서 순서대로 추출해 L1에 공급한 명시 artifact 수.
     explicit_artifact_reference_count: int = 0
     # 혼합 정보: L1이 판단한 명시 artifact 사이의 성공 요구 관계.
@@ -3799,6 +3829,13 @@ def validate_l1_goal_frame(frame: L1GoalFrame) -> None:
         "evidence_requirement_kind": frame.evidence_requirement_kind,
         "randomness_mode": frame.randomness_mode,
         "l_loop_success_condition": frame.l_loop_success_condition,
+        "temporal_requirement_status": frame.temporal_requirement_status,
+        "temporal_evidence_goal": frame.temporal_evidence_goal,
+        "temporal_requirement_reason": frame.temporal_requirement_reason,
+        "temporal_requirement_info_class": frame.temporal_requirement_info_class,
+        "temporal_requirement_semantic_judgement_status": (
+            frame.temporal_requirement_semantic_judgement_status
+        ),
         "artifact_requirement_mode": frame.artifact_requirement_mode,
         "artifact_requirement_reason": frame.artifact_requirement_reason,
         "schema_name": frame.schema_name,
@@ -3827,6 +3864,57 @@ def validate_l1_goal_frame(frame: L1GoalFrame) -> None:
             "unknown L1 artifact_requirement_mode: "
             f"{frame.artifact_requirement_mode}"
         )
+    if frame.temporal_requirement_status not in L1_TEMPORAL_REQUIREMENT_STATUSES:
+        raise ValueError(
+            "unknown L1 temporal_requirement_status: "
+            f"{frame.temporal_requirement_status}"
+        )
+    if (
+        frame.temporal_requirement_info_class
+        not in L1_TEMPORAL_REQUIREMENT_INFO_CLASSES
+    ):
+        raise ValueError(
+            "unknown L1 temporal_requirement_info_class: "
+            f"{frame.temporal_requirement_info_class}"
+        )
+    if (
+        frame.temporal_requirement_semantic_judgement_status
+        not in L1_TEMPORAL_REQUIREMENT_SEMANTIC_STATUSES
+    ):
+        raise ValueError(
+            "unknown L1 temporal_requirement_semantic_judgement_status: "
+            f"{frame.temporal_requirement_semantic_judgement_status}"
+        )
+    if frame.temporal_requirement_semantic_judgement_status == "ran":
+        if frame.temporal_requirement_info_class != "relative":
+            raise ValueError(
+                "ran L1 temporal requirement judgement must be relative"
+            )
+        if frame.llm_goal_judgement_status != "ran":
+            raise ValueError(
+                "ran L1 temporal requirement judgement requires LLM goal judgement"
+            )
+        if not frame.temporal_requirement_basis_text:
+            raise ValueError(
+                "ran L1 temporal requirement judgement requires basis text"
+            )
+    else:
+        if frame.temporal_requirement_info_class != "absolute_status":
+            raise ValueError(
+                "failed L1 temporal requirement judgement must be absolute_status"
+            )
+        if frame.temporal_requirement_status != "uncertain":
+            raise ValueError(
+                "failed L1 temporal requirement judgement must remain uncertain"
+            )
+        if frame.temporal_evidence_goal != L1_TEMPORAL_FALLBACK_GOAL:
+            raise ValueError(
+                "failed L1 temporal requirement judgement must use CODE fallback goal"
+            )
+        if frame.temporal_requirement_reason != L1_TEMPORAL_FALLBACK_REASON:
+            raise ValueError(
+                "failed L1 temporal requirement judgement must use CODE fallback reason"
+            )
     if not isinstance(frame.requires_cross_document_analysis, bool):
         raise TypeError("L1GoalFrame.requires_cross_document_analysis must be a boolean")
 

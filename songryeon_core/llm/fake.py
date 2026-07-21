@@ -410,6 +410,9 @@ class SongRyeonAllNodesFakeLLMAdapter:
             "requires_cross_document_analysis": True,
             "randomness_mode": "semantic_exploration",
             "l_loop_success_condition": "최소 2개 이상의 읽은 문서 추출본이나 그 부족 신호가 있어야 L루프가 정직하게 반환할 수 있다.",
+            "temporal_requirement_status": "not_required",
+            "temporal_evidence_goal": "시간 근거가 별도 성공 조건으로 요구되지 않는다.",
+            "temporal_requirement_reason": "fake adapter의 결정론적 비시간 계약이다.",
             "artifact_requirement_mode": (
                 "exact_one"
                 if reference_count == 1

@@ -6,6 +6,8 @@ from pathlib import Path
 from songryeon_core.core.data_store import DataStore
 from songryeon_core.core.schemas import (
     L1GoalFrame,
+    L1_TEMPORAL_FALLBACK_GOAL,
+    L1_TEMPORAL_FALLBACK_REASON,
     MemoryPacketFrom0,
     TraceEvent,
     validate_l1_goal_frame,
@@ -32,7 +34,7 @@ def run_l1_goal_setter(
     adapter: LLMAdapter | None = None,
     goal_frame_data_id: str = L1_GOAL_FRAME_DATA_ID,
 ) -> TraceEvent:
-    """L1 목표 설정 노드의 규칙 기반 드라이런 실행.
+    """L1 목표 설정 노드를 실행하고 실패 시 정직한 규칙 상태로 닫는다.
 
     goal_frame_data_id를 인자로 받는 이유:
     첫 L루프는 `L1:goal_frame`을 유지하지만, 같은 턴에서 L을 다시 돌릴 때는
@@ -59,6 +61,7 @@ def run_l1_goal_setter(
                 memory_packet=memory_packet,
                 source_data_ids=source_data_ids or [],
                 explicit_artifact_references=explicit_artifact_references,
+                user_query=user_query,
                 goal_frame_data_id=goal_frame_data_id,
             )
     else:
@@ -67,6 +70,7 @@ def run_l1_goal_setter(
             memory_packet=memory_packet,
             source_data_ids=source_data_ids or [],
             explicit_artifact_references=explicit_artifact_references,
+            user_query=user_query,
             goal_frame_data_id=goal_frame_data_id,
         )
     validate_l1_goal_frame(frame)
@@ -97,6 +101,7 @@ def _rule_stub_goal_frame(
     memory_packet: MemoryPacketFrom0,
     source_data_ids: list[str],
     explicit_artifact_references: list[str],
+    user_query: str,
     goal_frame_data_id: str,
 ) -> L1GoalFrame:
     # RULE_STUB 경로도 LLM 경로와 같은 frame_id를 써야 한다.
@@ -115,6 +120,12 @@ def _rule_stub_goal_frame(
         requires_cross_document_analysis=False,
         randomness_mode="not_random",
         l_loop_success_condition="CODE_STATUS:rule_stub_requires_evidence_material_or_insufficiency_signal",
+        temporal_requirement_status="uncertain",
+        temporal_evidence_goal=L1_TEMPORAL_FALLBACK_GOAL,
+        temporal_requirement_reason=L1_TEMPORAL_FALLBACK_REASON,
+        temporal_requirement_basis_text=user_query,
+        temporal_requirement_info_class="absolute_status",
+        temporal_requirement_semantic_judgement_status="failed",
         explicit_artifact_reference_count=len(explicit_artifact_references),
         artifact_requirement_mode="not_applicable",
         artifact_reference_occurrence_indices=[],
@@ -166,6 +177,9 @@ def _run_l1_goal_llm(
             "requires_cross_document_analysis",
             "randomness_mode",
             "l_loop_success_condition",
+            "temporal_requirement_status",
+            "temporal_evidence_goal",
+            "temporal_requirement_reason",
             "artifact_requirement_mode",
             "artifact_reference_occurrence_indices",
             "artifact_requirement_reason",
@@ -189,6 +203,7 @@ def _run_l1_goal_llm(
         payload_validator=lambda payload: _validate_l1_goal_payload(
             payload,
             explicit_artifact_reference_count=len(explicit_artifact_references),
+            user_query=user_query,
         ),
     )
     if llm_result.failure_type != "none" or llm_result.validation.payload is None:
@@ -218,6 +233,16 @@ def _run_l1_goal_llm(
         ),
         randomness_mode=str(payload.get("randomness_mode") or "").strip(),
         l_loop_success_condition=str(payload.get("l_loop_success_condition") or "").strip(),
+        temporal_requirement_status=str(
+            payload.get("temporal_requirement_status") or ""
+        ).strip(),
+        temporal_evidence_goal=str(payload.get("temporal_evidence_goal") or "").strip(),
+        temporal_requirement_reason=str(
+            payload.get("temporal_requirement_reason") or ""
+        ).strip(),
+        temporal_requirement_basis_text=user_query,
+        temporal_requirement_info_class="relative",
+        temporal_requirement_semantic_judgement_status="ran",
         explicit_artifact_reference_count=len(explicit_artifact_references),
         artifact_requirement_mode=_artifact_requirement_mode(
             payload,
@@ -243,6 +268,7 @@ def _validate_l1_goal_payload(
     payload: dict[str, object],
     *,
     explicit_artifact_reference_count: int = 0,
+    user_query: str = "validation user query",
 ) -> None:
     frame = L1GoalFrame(
         frame_id=L1_GOAL_FRAME_DATA_ID,
@@ -260,6 +286,16 @@ def _validate_l1_goal_payload(
         ),
         randomness_mode=str(payload.get("randomness_mode") or "").strip(),
         l_loop_success_condition=str(payload.get("l_loop_success_condition") or "").strip(),
+        temporal_requirement_status=str(
+            payload.get("temporal_requirement_status") or ""
+        ).strip(),
+        temporal_evidence_goal=str(payload.get("temporal_evidence_goal") or "").strip(),
+        temporal_requirement_reason=str(
+            payload.get("temporal_requirement_reason") or ""
+        ).strip(),
+        temporal_requirement_basis_text=user_query,
+        temporal_requirement_info_class="relative",
+        temporal_requirement_semantic_judgement_status="ran",
         explicit_artifact_reference_count=explicit_artifact_reference_count,
         artifact_requirement_mode=_artifact_requirement_mode(
             payload,

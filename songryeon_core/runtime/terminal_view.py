@@ -646,6 +646,29 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
         success_condition = l1_goal.get("l_loop_success_condition")
         if isinstance(success_condition, str) and success_condition:
             lines.append(f"    성공 조건: {success_condition}")
+        temporal_requirement_status = l1_goal.get("temporal_requirement_status")
+        if (
+            isinstance(temporal_requirement_status, str)
+            and temporal_requirement_status
+        ):
+            lines.append(
+                "  - 시간 근거 요구: "
+                f"status={temporal_requirement_status} / "
+                "basis=current_user_query_copy / "
+                "info_class="
+                f"{l1_goal.get('temporal_requirement_info_class', 'unknown')} / "
+                "semantic="
+                f"{l1_goal.get('temporal_requirement_semantic_judgement_status', 'unknown')}"
+            )
+            temporal_evidence_goal = l1_goal.get("temporal_evidence_goal")
+            if isinstance(temporal_evidence_goal, str) and temporal_evidence_goal:
+                lines.append(f"    시간 근거 목표: {temporal_evidence_goal}")
+            temporal_requirement_reason = l1_goal.get("temporal_requirement_reason")
+            if (
+                isinstance(temporal_requirement_reason, str)
+                and temporal_requirement_reason
+            ):
+                lines.append(f"    판단 이유: {temporal_requirement_reason}")
         artifact_requirement_mode = l1_goal.get("artifact_requirement_mode")
         if isinstance(artifact_requirement_mode, str) and artifact_requirement_mode:
             lines.append(

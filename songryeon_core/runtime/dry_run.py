@@ -2144,7 +2144,42 @@ def run_dry_turn(
         "node1_llm_routing_failed_count": _count_node1_llm_failed_routes(data_store),
         "node1_router_fallback_count": _count_node1_router_fallbacks(data_store),
         "node1_router_fallback_policy": node_1_router_fallback_policy,
-        "l1_goal_generation_source": _read_payload_text(data_store, "L1:goal_frame", "goal_generation_source"),
+        "l1_goal_generation_source": _read_payload_text(
+            data_store,
+            "L1:goal_frame",
+            "goal_generation_source",
+            data_type="node_output:L1_goal_frame",
+        ),
+        "l1_temporal_requirement_status": _read_payload_text(
+            data_store,
+            "L1:goal_frame",
+            "temporal_requirement_status",
+            data_type="node_output:L1_goal_frame",
+        ),
+        "l1_temporal_evidence_goal": _read_payload_text(
+            data_store,
+            "L1:goal_frame",
+            "temporal_evidence_goal",
+            data_type="node_output:L1_goal_frame",
+        ),
+        "l1_temporal_requirement_reason": _read_payload_text(
+            data_store,
+            "L1:goal_frame",
+            "temporal_requirement_reason",
+            data_type="node_output:L1_goal_frame",
+        ),
+        "l1_temporal_requirement_info_class": _read_payload_text(
+            data_store,
+            "L1:goal_frame",
+            "temporal_requirement_info_class",
+            data_type="node_output:L1_goal_frame",
+        ),
+        "l1_temporal_requirement_semantic_judgement_status": _read_payload_text(
+            data_store,
+            "L1:goal_frame",
+            "temporal_requirement_semantic_judgement_status",
+            data_type="node_output:L1_goal_frame",
+        ),
         "l3_achievement_generation_source": _read_payload_text(
             data_store,
             "L3:achievement_frame",

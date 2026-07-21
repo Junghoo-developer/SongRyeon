@@ -351,7 +351,7 @@ def build_default_schema_registry() -> SchemaRegistry:
             ),
             SchemaRecord(
                 schema_name="L1GoalFrame",
-                version="0.3",
+                version="0.4",
                 target_node="L1",
                 required=True,
                 fields=[
@@ -368,6 +368,12 @@ def build_default_schema_registry() -> SchemaRegistry:
                     "requires_cross_document_analysis",
                     "randomness_mode",
                     "l_loop_success_condition",
+                    "temporal_requirement_status",
+                    "temporal_evidence_goal",
+                    "temporal_requirement_reason",
+                    "temporal_requirement_basis_text",
+                    "temporal_requirement_info_class",
+                    "temporal_requirement_semantic_judgement_status",
                     "explicit_artifact_reference_count",
                     "artifact_requirement_mode",
                     "artifact_reference_occurrence_indices",

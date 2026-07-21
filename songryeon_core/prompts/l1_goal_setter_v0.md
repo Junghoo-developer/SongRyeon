@@ -24,6 +24,9 @@ Return only one JSON object with these keys:
   "requires_cross_document_analysis": false,
   "randomness_mode": "not_random",
   "l_loop_success_condition": "what evidence must exist before this L loop can honestly return",
+  "temporal_requirement_status": "required",
+  "temporal_evidence_goal": "what time evidence must be secured, or why no separate time evidence is needed",
+  "temporal_requirement_reason": "why the current user query does or does not require time evidence",
   "artifact_requirement_mode": "exact_one",
   "artifact_reference_occurrence_indices": [1],
   "artifact_requirement_reason": "why the selected explicit references have this requirement relationship",
@@ -63,6 +66,15 @@ Rules:
 - `randomness_mode` must be one of `not_random`, `semantic_exploration`, or `true_random_required`.
 - `l_loop_success_condition` must state the concrete evidence condition that should be true before returning from L, such as "at least two read document extracts are available for relationship analysis".
 - For multi-document/exploratory requests, `l_loop_success_condition` should be about evidence readiness, for example "at least two original document extracts are available so node 3 can attempt relationship analysis".
+- Judge the temporal requirement from `user_query` only. Do not use memory packet IDs, source data IDs, file timestamps, or unstated project history for this judgement.
+- `temporal_requirement_status` must be one of:
+  - `required`: the user's request needs time-sensitive evidence, such as recency, order, change, or a before/after distinction.
+  - `not_required`: the request can be completed without a separate time-evidence condition.
+  - `uncertain`: the current user query alone does not support a stable temporal-requirement judgement.
+- `temporal_evidence_goal` describes the time evidence the L loop would need to secure. If time evidence is not required, say that no separate time-evidence success condition is needed.
+- `temporal_requirement_reason` is your interpretation of the current user query. Do not present it as a CODE fact.
+- You are not given verified file timestamps or Git history here. Never invent a latest file, date, observation time, or change order.
+- Do not return `temporal_requirement_basis_text`, `temporal_requirement_info_class`, or `temporal_requirement_semantic_judgement_status`. CODE owns those fields and copies the current `user_query` as the basis text.
 - `explicit_artifact_references` is a CODE-extracted list in user-text order. Each item has a fixed `occurrence_index` and visible `raw_ref`.
 - Do not invent, rewrite, or renumber explicit artifact references. Select only supplied occurrence indices.
 - `artifact_requirement_mode` must be one of:
