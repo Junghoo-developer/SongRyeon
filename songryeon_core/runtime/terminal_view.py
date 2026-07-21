@@ -717,6 +717,12 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
         purpose = selected_candidate.get("purpose")
         if isinstance(purpose, str) and purpose:
             lines.append(f"  - LLM 목적: {purpose}")
+        if selected_candidate.get("target_tool_name") == "inspect_source_time_metadata":
+            lines.append(
+                "  - 시간 메타데이터 대상: "
+                f"scope={selected_candidate.get('source_scope', 'unknown')} / "
+                f"path={selected_candidate.get('query_text', '')}"
+            )
         lines.extend(
             _metainfo_lines(
                 indent=2,
@@ -751,6 +757,31 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
                     semantic_judgement_status="LLM_PLAN=not_available",
                 )
             )
+
+    temporal_record = _latest_record_with_type_prefix(
+        result,
+        "tool_result:inspect_source_time_metadata",
+    )
+    temporal_payload = _payload_from_record(temporal_record)
+    if temporal_payload:
+        temporal_data_id = str(
+            temporal_record.get("data_id")
+            or "tool_result:inspect_source_time_metadata"
+        )
+        lines.append(
+            f"- 시간 메타데이터 [CODE 절대정보 | source={temporal_data_id}]: "
+            f"status={temporal_payload.get('inspection_status', 'unknown')} / "
+            f"scope={temporal_payload.get('source_scope', 'unknown')} / "
+            f"path={temporal_payload.get('relative_path') or temporal_payload.get('requested_source_path', '')}"
+        )
+        lines.append(
+            "  - 원문 읽기와 분리: read_doc/read_code_file count에 포함되지 않음"
+        )
+        lines.append(
+            "  - observed_at_utc="
+            f"{temporal_payload.get('observed_at_utc', '')} / "
+            f"modified_at_utc={temporal_payload.get('modified_at_utc', '')}"
+        )
 
     search_record = _latest_record_with_type_prefix(result, "tool_result:search_docs")
     search_payload = _payload_from_record(search_record)

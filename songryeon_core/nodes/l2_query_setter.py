@@ -61,6 +61,7 @@ def run_l2_query_setter(
     query_text: str,
     query_source: str = "user_input_fallback",
     target_tool_name: str = "search_docs",
+    source_scope: str = "not_applicable",
     read_code_file_start_char: int = 0,
     source_data_ids: list[str] | None = None,
     extra_input_trace_ids: list[str] | None = None,
@@ -81,6 +82,7 @@ def run_l2_query_setter(
         query_source=query_source,
         query_mode=_query_mode_for_tool(target_tool_name),
         target_tool_name=target_tool_name,
+        source_scope=source_scope,
         read_code_file_start_char=read_code_file_start_char,
         source_trace_ids=input_ref,
         source_data_ids=source_data_ids or [],
@@ -118,6 +120,7 @@ def run_l2_query_planner(
     source_data_ids: list[str],
     available_tools: list[dict[str, object]] | None = None,
     available_explicit_code_file_paths: list[str] | None = None,
+    available_temporal_source_paths: list[dict[str, str]] | None = None,
     l_tool_scope: dict[str, object] | None = None,
     budget_partition: dict[str, object] | None = None,
     max_retries: int = 0,
@@ -139,6 +142,9 @@ def run_l2_query_planner(
     supplied_explicit_code_paths = _unique_strings(
         available_explicit_code_file_paths or []
     )
+    supplied_temporal_source_paths = _normalized_temporal_source_paths(
+        available_temporal_source_paths or []
+    )
     input_payload = {
         "user_input": user_input,
         "l1_goal": l1_goal,
@@ -153,6 +159,9 @@ def run_l2_query_planner(
         # 절대정보: 사용자 입력에 문자 그대로 있었고 workspace에 실제 존재한 경로만 넣는다.
         # L2는 이 목록 밖의 문자열을 read_code_file 경로로 만들 권한이 없다.
         "available_explicit_code_file_paths": supplied_explicit_code_paths,
+        # 절대정보: 사용자 입력에 정확한 경로가 있고 실제 workspace 파일인 좌표만 공급한다.
+        # L2는 이 목록을 복사할 수 있을 뿐 최신 파일을 새로 발명하거나 정렬할 수 없다.
+        "available_temporal_source_paths": supplied_temporal_source_paths,
     }
     llm_result = LLMNodeExecutor(adapter).run(
         node_id="L2",
@@ -169,6 +178,10 @@ def run_l2_query_planner(
             payload,
             allowed_target_tools=allowed_target_tools,
             available_explicit_code_file_paths=supplied_explicit_code_paths,
+            available_temporal_source_paths=supplied_temporal_source_paths,
+            temporal_requirement_status=str(
+                l1_goal.get("temporal_requirement_status") or "uncertain"
+            ),
         ),
     )
     if llm_result.failure_type != "none" or llm_result.validation.payload is None:
@@ -192,6 +205,13 @@ def run_l2_query_planner(
     _validate_l2_initial_query_plan_against_explicit_code_paths(
         frame,
         available_explicit_code_file_paths=supplied_explicit_code_paths,
+    )
+    _validate_l2_initial_temporal_candidates(
+        frame,
+        available_temporal_source_paths=supplied_temporal_source_paths,
+        temporal_requirement_status=str(
+            l1_goal.get("temporal_requirement_status") or "uncertain"
+        ),
     )
     validate_l2_query_plan_frame(frame)
     event = trace_store.create_event(
@@ -471,11 +491,32 @@ def selected_read_code_file_start_char_from_plan(payload: object) -> int:
     raise ValueError("selected L2 query candidate start_char was not found")
 
 
+def selected_source_scope_from_plan(payload: object) -> str:
+    """선택된 L2 후보의 시간 메타데이터 root 종류를 꺼낸다."""
+
+    if not isinstance(payload, dict):
+        raise TypeError("L2 query plan payload must be a dict")
+    selected_candidate_id = payload.get("selected_candidate_id")
+    candidates = payload.get("candidates")
+    if not isinstance(selected_candidate_id, str) or not isinstance(candidates, list):
+        raise ValueError("L2 query plan payload is incomplete")
+    for candidate in candidates:
+        if not isinstance(candidate, dict):
+            continue
+        if candidate.get("candidate_id") == selected_candidate_id:
+            source_scope = candidate.get("source_scope", "not_applicable")
+            if isinstance(source_scope, str) and source_scope:
+                return source_scope
+    raise ValueError("selected L2 query candidate source_scope was not found")
+
+
 def _validate_l2_query_plan_payload(
     payload: dict[str, object],
     *,
     allowed_target_tools: set[str] | None = None,
     available_explicit_code_file_paths: list[str] | None = None,
+    available_temporal_source_paths: list[dict[str, str]] | None = None,
+    temporal_requirement_status: str = "uncertain",
 ) -> None:
     """LLM raw payload가 L2QueryPlanFrame으로 바뀔 수 있는지 확인한다."""
 
@@ -491,6 +532,11 @@ def _validate_l2_query_plan_payload(
         available_explicit_code_file_paths=(
             available_explicit_code_file_paths or []
         ),
+    )
+    _validate_l2_initial_temporal_candidates(
+        frame,
+        available_temporal_source_paths=(available_temporal_source_paths or []),
+        temporal_requirement_status=temporal_requirement_status,
     )
     validate_l2_query_plan_frame(frame)
 
@@ -533,6 +579,31 @@ def _validate_l2_initial_query_plan_against_explicit_code_paths(
         if candidate.query_text not in allowed_paths:
             raise ValueError(
                 "L2 initial read_code_file candidate must use an available explicit code file path"
+            )
+
+
+def _validate_l2_initial_temporal_candidates(
+    frame: L2QueryPlanFrame,
+    *,
+    available_temporal_source_paths: list[dict[str, str]],
+    temporal_requirement_status: str,
+) -> None:
+    """시간 도구 후보가 L1 판단과 CODE 공급 좌표를 벗어나지 않는지 확인한다."""
+
+    allowed_pairs = {
+        (item["source_scope"], item["source_path"])
+        for item in _normalized_temporal_source_paths(available_temporal_source_paths)
+    }
+    for candidate in frame.candidates:
+        if candidate.target_tool_name != "inspect_source_time_metadata":
+            continue
+        if temporal_requirement_status != "required":
+            raise ValueError(
+                "L2 temporal metadata candidate requires L1 temporal_requirement_status=required"
+            )
+        if (candidate.source_scope, candidate.query_text) not in allowed_pairs:
+            raise ValueError(
+                "L2 temporal metadata candidate must use an available exact source path"
             )
 
 
@@ -583,6 +654,9 @@ def _build_query_plan_frame_from_payload(
                 expected_signal=str(raw_candidate.get("expected_signal") or ""),
                 priority=int(raw_candidate.get("priority") or len(candidates) + 1),
                 target_tool_name=target_tool_name,
+                source_scope=str(
+                    raw_candidate.get("source_scope") or "not_applicable"
+                ),
                 read_code_file_start_char=_non_negative_int_field(
                     raw_candidate,
                     "read_code_file_start_char",
@@ -608,6 +682,8 @@ def _build_query_plan_frame_from_payload(
 
 
 def _query_mode_for_tool(target_tool_name: str) -> str:
+    if target_tool_name == "inspect_source_time_metadata":
+        return "source_time_metadata"
     if target_tool_name == "read_doc":
         return "direct_doc_read"
     if target_tool_name == "read_artifact":
@@ -642,6 +718,28 @@ def _default_l2_available_tools(*, revision: bool = False) -> list[dict[str, obj
     if revision:
         tools.append({"tool_name": "read_doc", "read_only": True})
     return tools
+
+
+def _normalized_temporal_source_paths(
+    values: list[dict[str, str]],
+) -> list[dict[str, str]]:
+    result: list[dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for item in values:
+        if not isinstance(item, dict):
+            continue
+        source_scope = item.get("source_scope")
+        source_path = item.get("source_path")
+        if source_scope not in {"document", "code"}:
+            continue
+        if not isinstance(source_path, str) or not source_path:
+            continue
+        key = (source_scope, source_path)
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append({"source_scope": source_scope, "source_path": source_path})
+    return result
 
 
 def _validate_l2_revision_query_plan_against_input(

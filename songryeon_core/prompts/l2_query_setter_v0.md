@@ -23,6 +23,7 @@ Use this exact shape:
       "expected_signal": "what kind of document chunk should match",
       "priority": 1,
       "target_tool_name": "search_docs",
+      "source_scope": "not_applicable",
       "read_code_file_start_char": 0,
       "source_data_ids": ["L1:goal_frame"]
     }
@@ -39,12 +40,17 @@ Create 1-3 candidates. The selected candidate ID must match one candidate.
 - Choose `list_code_files` when the user asks about the repository/code file layout, module map, or source tree structure.
 - Choose `search_code` when the user asks where a function, class, schema, field, constant, prompt reference, or runtime hook appears in source code.
 - Choose `read_code_file` only when the user gives an explicit source/config file path to inspect.
+- Choose `inspect_source_time_metadata` only when `l1_goal.temporal_requirement_status` is `required` and `available_temporal_source_paths` contains an exact matching source coordinate.
 - `search_docs` is semantic search: write a concise description of the wanted content.
 - `read_artifact` is exact reference reading: write only the explicit artifact reference, such as `CODE_STRUCTURE_MAP_v1` or `ORDER_084_NODE4_REMAND_BLOCKING`.
 - `search_code` is literal source-code substring search: write the exact identifier, path fragment, field name, or short code phrase to find.
 - `available_explicit_code_file_paths` is a code-supplied absolute list made from paths that both exist in the workspace and appear literally in the user input.
 - `read_code_file` is exact file reading: copy one whole path from `available_explicit_code_file_paths` into `query_text` without adding any words.
 - If `available_explicit_code_file_paths` is empty, do not choose `read_code_file`.
+- For `inspect_source_time_metadata`, copy one `available_temporal_source_paths` item's `source_path` into `query_text` and its `source_scope` into `source_scope` exactly.
+- If `available_temporal_source_paths` is empty, do not choose `inspect_source_time_metadata`.
+- Do not invent a temporal path, sort files by recency, or claim which source is latest.
+- Candidates other than `inspect_source_time_metadata` must use `source_scope=not_applicable`.
 - Initial L2 planning must always use `read_code_file_start_char=0`. Nonzero continuation is revision-only.
 - Candidates for tools other than `read_code_file` must also use `read_code_file_start_char=0`.
 - `list_code_files` ignores `query_text` semantically; use a concise label such as `codebase file layout`.

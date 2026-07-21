@@ -164,15 +164,28 @@ def filter_available_tools_for_scope(
     available_tools: list[dict[str, object]],
     tool_scope_frame: LToolScopeFrame,
 ) -> list[dict[str, object]]:
-    """LToolScopeFrame이 허용한 tool group에 속한 도구만 L2에 노출한다."""
+    """허용 group 도구와 group 공통 capability 도구만 L2에 노출한다.
+
+    `temporal_metadata`는 문서와 코드 모두에 적용되는 읽기 전용 기능이다. 이 capability를
+    보존하는 것은 도구를 사용하라는 의미 판단이 아니라, L2가 L1의 시간 판단에 따라
+    선택할 수 있게 하는 가시성 정책이다.
+    """
 
     allowed_names = allowed_tool_names_for_groups(tool_scope_frame.allowed_tool_groups)
     return [
         tool
         for tool in available_tools
         if isinstance(tool.get("tool_name") or tool.get("name"), str)
-        and str(tool.get("tool_name") or tool.get("name")) in allowed_names
+        and (
+            str(tool.get("tool_name") or tool.get("name")) in allowed_names
+            or _tool_has_capability(tool, "temporal_metadata")
+        )
     ]
+
+
+def _tool_has_capability(tool: dict[str, object], capability: str) -> bool:
+    capabilities = tool.get("capabilities")
+    return isinstance(capabilities, list) and capability in capabilities
 
 
 def allowed_tool_names_for_groups(groups: list[str]) -> set[str]:

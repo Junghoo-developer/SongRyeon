@@ -43,6 +43,7 @@ from songryeon_core.nodes.l2_query_setter import (
     run_l2_revision_query_setter,
     selected_query_from_plan,
     selected_read_code_file_start_char_from_plan,
+    selected_source_scope_from_plan,
     selected_target_tool_from_plan,
 )
 from songryeon_core.nodes.l3_result_keeper import (
@@ -75,6 +76,7 @@ from songryeon_core.tools.document_context_pack import (
     record_explicit_artifact_reference_frame,
 )
 from songryeon_core.tools.code_tools import explicit_code_file_paths_from_text
+from songryeon_core.tools.source_time_tools import explicit_source_time_paths_from_text
 from songryeon_core.tools.tool_efficiency_policy import (
     cache_status_from_search_payload,
     distilled_input_size,
@@ -116,6 +118,7 @@ class LLoopResult:
     query_data_ids: list[str] = field(default_factory=list)
     control_data_ids: list[str] = field(default_factory=list)
     tool_result_data_ids: list[str] = field(default_factory=list)
+    temporal_metadata_result_data_ids: list[str] = field(default_factory=list)
     tool_distillation_data_ids: list[str] = field(default_factory=list)
     tool_budget_data_ids: list[str] = field(default_factory=list)
     continuation_data_ids: list[str] = field(default_factory=list)
@@ -302,6 +305,11 @@ def run_l_loop(
         root=codebase_root,
         text=search_query,
     )
+    explicit_temporal_source_paths = explicit_source_time_paths_from_text(
+        document_root=document_root,
+        code_root=codebase_root,
+        text=search_query,
+    )
 
     query_text = search_query
     query_source = "user_input_fallback"
@@ -316,6 +324,7 @@ def run_l_loop(
     l2_plan_trace_ids: list[str] = []
     selected_tool_name = _fallback_l2_tool_for_available_tools(scoped_available_tools)
     selected_read_code_file_start_char = 0
+    selected_source_scope = "not_applicable"
     if l2_query_planner_adapter is not None:
         try:
             plan_event = run_l2_query_planner(
@@ -334,6 +343,7 @@ def run_l_loop(
                 ],
                 available_tools=scoped_available_tools,
                 available_explicit_code_file_paths=explicit_code_file_paths,
+                available_temporal_source_paths=explicit_temporal_source_paths,
                 l_tool_scope=asdict(tool_scope_frame),
                 budget_partition=asdict(tool_budget_partition_frame),
                 query_plan_frame_data_id=l2_query_plan_data_id,
@@ -343,6 +353,9 @@ def run_l_loop(
             selected_tool_name = selected_target_tool_from_plan(plan_record.payload)
             selected_read_code_file_start_char = (
                 selected_read_code_file_start_char_from_plan(plan_record.payload)
+            )
+            selected_source_scope = selected_source_scope_from_plan(
+                plan_record.payload
             )
             query_source = "llm_query_plan"
             query_source_data_ids = [
@@ -361,6 +374,7 @@ def run_l_loop(
             # 사용자 입력에 실제 workspace 경로가 정확히 하나 있었고 도구 범위가 허용할 때만
             # code가 그 절대정보 문자열을 복사한다. 여러 경로 중 중요도를 고르지는 않는다.
             selected_read_code_file_start_char = 0
+            selected_source_scope = "not_applicable"
             if (
                 len(explicit_code_file_paths) == 1
                 and _tool_is_available(scoped_available_tools, "read_code_file")
@@ -383,6 +397,7 @@ def run_l_loop(
         query_text=query_text,
         query_source=query_source,
         target_tool_name=selected_tool_name,
+        source_scope=selected_source_scope,
         read_code_file_start_char=selected_read_code_file_start_char,
         source_data_ids=query_source_data_ids,
         extra_input_trace_ids=query_extra_trace_ids,
@@ -442,6 +457,7 @@ def run_l_loop(
     read_doc_id_list: list[str] = []
     original_read_doc_id_list: list[str] = []
     read_code_file_ranges: list[CodeReadRangeRecord] = []
+    temporal_metadata_result_data_ids: list[str] = []
     cache_status_records = []
     current_query = query_text
     tool_call_count = 0
@@ -755,6 +771,78 @@ def run_l_loop(
         control_trace_ids.append(control_trace_id)
         control_data_ids.append(control_data_id)
         next_iteration_index += 1
+
+        if selected_tool_name == "inspect_source_time_metadata":
+            temporal_result = tool_runner.run(
+                tool_name="inspect_source_time_metadata",
+                trace_store=trace_store,
+                data_store=data_store,
+                turn_id=turn_id,
+                input_ref=[l2.event_id, tool_choice_trace_id, control_trace_id],
+                id_namespace=run_ids,
+                source_scope=selected_source_scope,
+                source_path=current_query,
+            )
+            tool_call_count += 1
+            input_chars_used += len(current_query)
+            tool_call_trace_ids.append(temporal_result.trace_event_id)
+            tool_result_data_ids.append(temporal_result.data_ref.data_id)
+            temporal_metadata_result_data_ids.append(temporal_result.data_ref.data_id)
+            temporal_completed = (
+                isinstance(temporal_result.payload, dict)
+                and temporal_result.payload.get("inspection_status") == "ok"
+            )
+            temporal_stop_reason = "completed" if temporal_completed else "low_yield_stop"
+            temporal_budget_trace_id, temporal_budget_data_id = record_budget(
+                stop_reason=temporal_stop_reason,
+                reason=(
+                    "CODE_STATUS:source_time_metadata_inspection_completed"
+                    if temporal_completed
+                    else "CODE_STATUS:source_time_metadata_inspection_not_available"
+                ),
+                condition_flags=[
+                    "inspect_source_time_metadata",
+                    temporal_stop_reason,
+                    "not_original_material_read",
+                ],
+                source_trace_ids=[temporal_result.trace_event_id],
+                source_data_ids=[temporal_result.data_ref.data_id],
+            )
+            stop_control_trace_id, stop_control_data_id = _record_l_loop_control(
+                trace_store=trace_store,
+                data_store=data_store,
+                turn_id=turn_id,
+                iteration_index=next_iteration_index,
+                decision="stop_success" if temporal_completed else "stop_failed",
+                reason=(
+                    "CODE_STATUS:stop_success_source_time_metadata_inspected"
+                    if temporal_completed
+                    else "CODE_STATUS:stop_failed_source_time_metadata_not_available"
+                ),
+                max_iterations=max_iterations,
+                max_tool_calls=max_tool_calls,
+                tool_call_count=tool_call_count,
+                source_trace_ids=_unique_strings(
+                    [
+                        control_trace_id,
+                        temporal_result.trace_event_id,
+                        temporal_budget_trace_id,
+                    ]
+                ),
+                source_data_ids=_unique_strings(
+                    [
+                        control_data_id,
+                        temporal_result.data_ref.data_id,
+                        temporal_budget_data_id,
+                    ]
+                ),
+                id_namespace=run_ids,
+            )
+            control_trace_ids.append(stop_control_trace_id)
+            control_data_ids.append(stop_control_data_id)
+            final_control_data_id = stop_control_data_id
+            final_control_decision = "stop_success" if temporal_completed else "stop_failed"
+            break
 
         if _is_code_inspection_tool(selected_tool_name):
             if (
@@ -1700,6 +1788,7 @@ def run_l_loop(
         query_data_ids=[l2_query_data_id, *revision_query_data_ids],
         control_data_ids=control_data_ids,
         tool_result_data_ids=tool_result_data_ids,
+        temporal_metadata_result_data_ids=temporal_metadata_result_data_ids,
         tool_distillation_data_ids=tool_distillation_data_ids,
         tool_budget_data_ids=tool_budget_data_ids,
         continuation_data_ids=continuation_data_ids,
@@ -1896,6 +1985,8 @@ def _control_condition_flags(
 
 
 def _initial_control_decision_for_tool(tool_name: str) -> str:
+    if tool_name == "inspect_source_time_metadata":
+        return "inspect_source_time_metadata"
     if tool_name == "read_artifact":
         return "continue_read_artifact"
     if tool_name == "list_code_files":
@@ -1908,6 +1999,8 @@ def _initial_control_decision_for_tool(tool_name: str) -> str:
 
 
 def _initial_control_reason_for_tool(tool_name: str) -> str:
+    if tool_name == "inspect_source_time_metadata":
+        return "CODE_STATUS:inspect_source_time_metadata"
     if tool_name == "read_artifact":
         return "CODE_STATUS:continue_read_artifact"
     if tool_name == "list_code_files":

@@ -2140,6 +2140,25 @@ def run_dry_turn(
         "l_loop_activity_ledger_data_ids": l_activity_ledger_data_ids,
         "l_loop_activity_ledger_count": len(l_activity_ledger_data_ids),
         "l2_query_source": _read_l2_query_source(data_store),
+        "l_temporal_metadata_result_count": _count_records_by_type(
+            data_store,
+            "tool_result:inspect_source_time_metadata",
+        ),
+        "l_temporal_metadata_latest_status": _read_latest_payload_field_by_type(
+            data_store,
+            "tool_result:inspect_source_time_metadata",
+            "inspection_status",
+        ),
+        "l_temporal_metadata_latest_source_scope": _read_latest_payload_field_by_type(
+            data_store,
+            "tool_result:inspect_source_time_metadata",
+            "source_scope",
+        ),
+        "l_temporal_metadata_latest_source_path": _read_latest_payload_field_by_type(
+            data_store,
+            "tool_result:inspect_source_time_metadata",
+            "relative_path",
+        ),
         "node1_llm_routing_count": _count_node1_llm_routes(data_store),
         "node1_llm_routing_failed_count": _count_node1_llm_failed_routes(data_store),
         "node1_router_fallback_count": _count_node1_router_fallbacks(data_store),
@@ -2497,6 +2516,17 @@ def _read_l2_query_source(data_store: DataStore) -> str | None:
         return None
     query_source = record.payload.get("query_source")
     return query_source if isinstance(query_source, str) else None
+
+
+def _read_latest_payload_field_by_type(
+    data_store: DataStore,
+    data_type: str,
+    field_name: str,
+) -> object | None:
+    record = _latest_record_by_type(data_store, data_type)
+    if record is None or not isinstance(record.payload, dict):
+        return None
+    return record.payload.get(field_name)
 
 
 def _count_node1_llm_routes(data_store: DataStore) -> int:

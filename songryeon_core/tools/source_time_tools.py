@@ -7,6 +7,7 @@ from pathlib import Path
 from songryeon_core.tools.workspace_policy import (
     WORKSPACE_CODE_EXTENSIONS,
     WORKSPACE_DOCUMENT_EXTENSIONS,
+    iter_workspace_files,
     workspace_file_rejection_reason,
     workspace_source_kind,
 )
@@ -14,6 +15,52 @@ from songryeon_core.tools.workspace_policy import (
 
 SOURCE_TIME_METADATA_GENERATOR = "CODE:SOURCE_TIME_METADATA_INSPECTOR"
 SOURCE_TIME_SCOPES = {"document", "code"}
+
+
+def explicit_source_time_paths_from_text(
+    *,
+    document_root: str | Path,
+    code_root: str | Path,
+    text: str,
+) -> list[dict[str, str]]:
+    """사용자 문장에 정확히 적힌 실제 문서/코드 좌표만 복사한다.
+
+    이 함수는 파일의 시간이나 중요도를 비교하지 않는다. 현재 workspace에 실제로 있는
+    허용 파일의 상대경로를 사용자 입력과 문자 그대로 대조해 L2가 선택 가능한 절대 좌표
+    목록만 만든다.
+    """
+
+    normalized_text = text.replace("\\", "/")
+    matches: list[tuple[int, int, str, str]] = []
+    for source_scope, root_value, extensions in (
+        ("document", document_root, WORKSPACE_DOCUMENT_EXTENSIONS),
+        ("code", code_root, WORKSPACE_CODE_EXTENSIONS),
+    ):
+        root = Path(root_value).resolve()
+        for path in iter_workspace_files(root=root, allowed_extensions=extensions):
+            source_path = path.resolve().relative_to(root).as_posix()
+            aliases = [source_path, f"{root.name}/{source_path}"]
+            reference_indices = [
+                index
+                for alias in aliases
+                if (index := _exact_path_reference_index(normalized_text, alias)) is not None
+            ]
+            if not reference_indices:
+                continue
+            matches.append(
+                (min(reference_indices), -len(source_path), source_scope, source_path)
+            )
+
+    matches.sort()
+    result: list[dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for _, _, source_scope, source_path in matches:
+        key = (source_scope, source_path)
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append({"source_scope": source_scope, "source_path": source_path})
+    return result
 
 
 def inspect_source_time_metadata(
@@ -100,8 +147,31 @@ def inspect_source_time_metadata(
     }
 
 
+def _exact_path_reference_index(text: str, path_reference: str) -> int | None:
+    """긴 경로 속 부분문자열을 별도 파일 좌표로 오인하지 않게 경계를 검사한다."""
+
+    search_start = 0
+    while True:
+        index = text.find(path_reference, search_start)
+        if index < 0:
+            return None
+        end = index + len(path_reference)
+        before_ok = index == 0 or not _is_path_token_character(text[index - 1])
+        after_ok = end == len(text) or not _is_path_token_character(text[end])
+        if before_ok and after_ok:
+            return index
+        search_start = index + 1
+
+
+def _is_path_token_character(character: str) -> bool:
+    return character.isascii() and (
+        character.isalnum() or character in {"_", "-", ".", "/"}
+    )
+
+
 __all__ = [
     "SOURCE_TIME_METADATA_GENERATOR",
     "SOURCE_TIME_SCOPES",
+    "explicit_source_time_paths_from_text",
     "inspect_source_time_metadata",
 ]

@@ -4337,9 +4337,9 @@ def validate_l_tool_budget_partition_frame(frame: LToolBudgetPartitionFrame) -> 
 
 
 L2_QUERY_FRAME_SCHEMA_NAME = "L2QueryFrame"
-L2_QUERY_FRAME_SCHEMA_VERSION = "0.1"
+L2_QUERY_FRAME_SCHEMA_VERSION = "0.2"
 L2_QUERY_PLAN_FRAME_SCHEMA_NAME = "L2QueryPlanFrame"
-L2_QUERY_PLAN_FRAME_SCHEMA_VERSION = "0.1"
+L2_QUERY_PLAN_FRAME_SCHEMA_VERSION = "0.2"
 L2_REVISION_INPUT_FRAME_SCHEMA_NAME = "L2RevisionInputFrame"
 L2_REVISION_INPUT_FRAME_SCHEMA_VERSION = "0.1"
 L2_QUERY_SOURCES = {
@@ -4356,6 +4356,7 @@ L2_QUERY_MODES = {
     "code_file_list",
     "code_search",
     "code_file_read",
+    "source_time_metadata",
 }
 L2_TARGET_TOOL_NAMES = {
     "search_docs",
@@ -4363,6 +4364,7 @@ L2_TARGET_TOOL_NAMES = {
     "list_code_files",
     "search_code",
     "read_code_file",
+    "inspect_source_time_metadata",
 }
 L2_REVISION_TARGET_TOOL_NAMES = {
     "search_docs",
@@ -4403,6 +4405,8 @@ class L2QueryFrame:
     query_mode: str
     # 절대 정보: 이 query frame이 대상으로 삼는 도구 이름.
     target_tool_name: str
+    # 절대 정보: 시간 메타데이터 도구가 읽을 root 종류. 그 외 도구는 not_applicable.
+    source_scope: str = "not_applicable"
     # 절대 정보: read_code_file 실행 시 L2가 선택한 시작 문자 위치.
     # 다른 도구와 일반 최초 L2 read에서는 0이어야 한다.
     read_code_file_start_char: int = 0
@@ -4426,6 +4430,7 @@ def validate_l2_query_frame(frame: L2QueryFrame) -> None:
         "query_source": frame.query_source,
         "query_mode": frame.query_mode,
         "target_tool_name": frame.target_tool_name,
+        "source_scope": frame.source_scope,
         "schema_name": frame.schema_name,
         "schema_version": frame.schema_version,
     }
@@ -4464,6 +4469,27 @@ def validate_l2_query_frame(frame: L2QueryFrame) -> None:
         raise ValueError("read_code_file L2 query must use code_file_read mode")
     if frame.query_mode == "code_file_read" and frame.target_tool_name != "read_code_file":
         raise ValueError("code_file_read mode must target read_code_file")
+    if (
+        frame.target_tool_name == "inspect_source_time_metadata"
+        and frame.query_mode != "source_time_metadata"
+    ):
+        raise ValueError(
+            "inspect_source_time_metadata L2 query must use source_time_metadata mode"
+        )
+    if (
+        frame.query_mode == "source_time_metadata"
+        and frame.target_tool_name != "inspect_source_time_metadata"
+    ):
+        raise ValueError(
+            "source_time_metadata mode must target inspect_source_time_metadata"
+        )
+    if frame.target_tool_name == "inspect_source_time_metadata":
+        if frame.source_scope not in {"document", "code"}:
+            raise ValueError(
+                "inspect_source_time_metadata L2 query requires document or code source_scope"
+            )
+    elif frame.source_scope != "not_applicable":
+        raise ValueError("non-temporal L2 query must use source_scope=not_applicable")
     if not isinstance(frame.read_code_file_start_char, int) or isinstance(
         frame.read_code_file_start_char,
         bool,
@@ -4504,6 +4530,8 @@ class L2QueryPlanCandidate:
     priority: int
     # 절대 정보: 이 후보가 대상으로 삼는 도구.
     target_tool_name: str = "search_docs"
+    # 절대 정보: 시간 메타데이터 후보의 root 종류. 그 외 후보는 not_applicable.
+    source_scope: str = "not_applicable"
     # 절대 정보: read_code_file 후보가 선택한 시작 문자 위치.
     read_code_file_start_char: int = 0
     # 절대 정보: 이 후보 생성의 근거 DataStore record ID 목록.
@@ -4586,6 +4614,7 @@ def _validate_l2_query_plan_candidate(
         "purpose": candidate.purpose,
         "expected_signal": candidate.expected_signal,
         "target_tool_name": candidate.target_tool_name,
+        "source_scope": candidate.source_scope,
     }
     for field_name, value in required_text_fields.items():
         if not value:
@@ -4614,6 +4643,13 @@ def _validate_l2_query_plan_candidate(
         candidate.read_code_file_start_char != 0
     ):
         raise ValueError("initial L2 read_code_file candidate must use start_char=0")
+    if candidate.target_tool_name == "inspect_source_time_metadata":
+        if candidate.source_scope not in {"document", "code"}:
+            raise ValueError(
+                "inspect_source_time_metadata L2 candidate requires document or code source_scope"
+            )
+    elif candidate.source_scope != "not_applicable":
+        raise ValueError("non-temporal L2 candidate must use source_scope=not_applicable")
     if not candidate.source_data_ids:
         raise ValueError("L2QueryPlanCandidate.source_data_ids must not be empty")
     for data_id in candidate.source_data_ids:
@@ -5816,7 +5852,7 @@ def _validate_tool_cache_status_record(record: ToolCacheStatusRecord) -> None:
 
 
 L_LOOP_CONTROL_FRAME_SCHEMA_NAME = "LLoopControlFrame"
-L_LOOP_CONTROL_FRAME_SCHEMA_VERSION = "0.1"
+L_LOOP_CONTROL_FRAME_SCHEMA_VERSION = "0.2"
 L_LOOP_CONTINUATION_FRAME_SCHEMA_NAME = "LLoopContinuationFrame"
 L_LOOP_CONTINUATION_FRAME_SCHEMA_VERSION = "0.1"
 L_LOOP_RETURN_SUMMARY_FRAME_SCHEMA_NAME = "LLoopReturnSummaryFrame"
@@ -5837,6 +5873,7 @@ L_LOOP_CONTROL_DECISIONS = {
     "continue_code_search",
     "list_code_files",
     "read_code_file",
+    "inspect_source_time_metadata",
     "read_document",
     "stop_candidate_only",
     "stop_success",
@@ -5972,6 +6009,15 @@ def validate_l_loop_control_frame(frame: LLoopControlFrame) -> None:
         raise ValueError("read_code_file must select read_code_file")
     if frame.decision == "read_code_file" and frame.query_text is None:
         raise ValueError("read_code_file must include query_text")
+    if (
+        frame.decision == "inspect_source_time_metadata"
+        and frame.selected_tool_name != "inspect_source_time_metadata"
+    ):
+        raise ValueError(
+            "inspect_source_time_metadata decision must select inspect_source_time_metadata"
+        )
+    if frame.decision == "inspect_source_time_metadata" and frame.query_text is None:
+        raise ValueError("inspect_source_time_metadata must include query_text")
     if frame.decision == "read_document" and frame.selected_tool_name != "read_doc":
         raise ValueError("read_document must select read_doc")
     if frame.decision == "read_document" and frame.doc_id is None:
