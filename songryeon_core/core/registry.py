@@ -317,7 +317,7 @@ def build_default_schema_registry() -> SchemaRegistry:
             ),
             SchemaRecord(
                 schema_name="ToolCatalogFrame",
-                version="0.1",
+                version="0.2",
                 target_node="tool_catalog",
                 required=True,
                 fields=[

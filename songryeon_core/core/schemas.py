@@ -5186,7 +5186,7 @@ def _validate_document_context_pack_excluded_document(
 
 
 TOOL_CATALOG_FRAME_SCHEMA_NAME = "ToolCatalogFrame"
-TOOL_CATALOG_FRAME_SCHEMA_VERSION = "0.1"
+TOOL_CATALOG_FRAME_SCHEMA_VERSION = "0.2"
 TOOL_CHOICE_FRAME_SCHEMA_NAME = "ToolChoiceFrame"
 TOOL_CHOICE_FRAME_SCHEMA_VERSION = "0.1"
 
@@ -5205,6 +5205,8 @@ class ToolCatalogItem:
     input_fields: list[str] = field(default_factory=list)
     # 절대 정보: 도구 실행 결과가 저장될 data_type.
     output_data_type: str = ""
+    # 절대 정보: 도구가 실제로 제공하는 기능 표지. 선택 결과나 의미 평가는 아니다.
+    capabilities: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -5274,6 +5276,15 @@ def _validate_tool_catalog_item(item: ToolCatalogItem) -> None:
     for input_field in item.input_fields:
         if not input_field:
             raise ValueError("ToolCatalogItem.input_fields must not contain empty values")
+    if not isinstance(item.capabilities, list):
+        raise TypeError("ToolCatalogItem.capabilities must be a list")
+    if any(
+        not isinstance(value, str) or not value.strip()
+        for value in item.capabilities
+    ):
+        raise ValueError("ToolCatalogItem.capabilities must not contain empty values")
+    if len(item.capabilities) != len(set(item.capabilities)):
+        raise ValueError("ToolCatalogItem.capabilities must be unique")
 
 
 @dataclass

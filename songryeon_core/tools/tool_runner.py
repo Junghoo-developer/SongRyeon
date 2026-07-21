@@ -17,6 +17,7 @@ from songryeon_core.core.trace_store import TraceStore
 from songryeon_core.loops.l_loop_namespace import LRunIds
 from songryeon_core.tools.code_tools import list_code_files, read_code_file, search_code
 from songryeon_core.tools.document_tools import list_docs, read_artifact, read_doc, search_docs
+from songryeon_core.tools.source_time_tools import inspect_source_time_metadata
 
 
 ToolFunction = Callable[..., object]
@@ -32,6 +33,7 @@ class ToolSpec:
     output_data_type: str
     function: ToolFunction
     input_fields: list[str] = field(default_factory=list)
+    capabilities: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -74,6 +76,7 @@ class ToolRegistry:
                 read_only=spec.read_only,
                 input_fields=list(spec.input_fields),
                 output_data_type=spec.output_data_type,
+                capabilities=list(spec.capabilities),
             )
             for spec in self.list_specs()
         ]
@@ -152,6 +155,7 @@ def build_document_tool_registry(
                 output_data_type="tool_result:list_docs",
                 function=lambda: list_docs(root=root),
                 input_fields=[],
+                capabilities=["document_listing"],
             ),
             ToolSpec(
                 name="read_doc",
@@ -160,6 +164,7 @@ def build_document_tool_registry(
                 output_data_type="tool_result:read_doc",
                 function=lambda doc_id: read_doc(root=root, doc_id=doc_id),
                 input_fields=["doc_id"],
+                capabilities=["document_original_read"],
             ),
             ToolSpec(
                 name="read_artifact",
@@ -168,6 +173,7 @@ def build_document_tool_registry(
                 output_data_type="tool_result:read_artifact",
                 function=lambda artifact_ref: read_artifact(root=root, artifact_ref=artifact_ref),
                 input_fields=["artifact_ref"],
+                capabilities=["document_original_read", "exact_artifact_resolution"],
             ),
             ToolSpec(
                 name="search_docs",
@@ -176,6 +182,7 @@ def build_document_tool_registry(
                 output_data_type="tool_result:search_docs",
                 function=lambda query, top_k=5: search_docs(root=root, query=query, top_k=top_k),
                 input_fields=["query", "top_k"],
+                capabilities=["document_semantic_search"],
             ),
             ToolSpec(
                 name="list_code_files",
@@ -184,6 +191,7 @@ def build_document_tool_registry(
                 output_data_type="tool_result:list_code_files",
                 function=lambda max_files=500: list_code_files(root=codebase_root, max_files=max_files),
                 input_fields=["max_files"],
+                capabilities=["code_listing"],
             ),
             ToolSpec(
                 name="search_code",
@@ -196,6 +204,7 @@ def build_document_tool_registry(
                     max_results=max_results,
                 ),
                 input_fields=["query", "max_results"],
+                capabilities=["code_text_search"],
             ),
             ToolSpec(
                 name="read_code_file",
@@ -209,6 +218,25 @@ def build_document_tool_registry(
                     start_char=start_char,
                 ),
                 input_fields=["file_path", "start_char", "max_chars"],
+                capabilities=["code_original_read"],
+            ),
+            ToolSpec(
+                name="inspect_source_time_metadata",
+                description="정확한 문서/코드 상대경로 하나의 관측 시각, 수정 시각, 크기, hash를 읽는다.",
+                read_only=True,
+                output_data_type="tool_result:inspect_source_time_metadata",
+                function=lambda source_scope, source_path: inspect_source_time_metadata(
+                    document_root=root,
+                    code_root=codebase_root,
+                    source_scope=source_scope,
+                    source_path=source_path,
+                ),
+                input_fields=["source_scope", "source_path"],
+                capabilities=[
+                    "temporal_metadata",
+                    "content_hash",
+                    "exact_source_path",
+                ],
             ),
         ]
     )
