@@ -166,6 +166,11 @@ def build_node3_grounding_block(
             f"- 실제 read_code_file 호출/구간: {len(brief_frame.code_read_boundaries)}개",
             f"- node_3 공급 문서 context: {brief_frame.supplied_document_context_count}개",
             f"- node_3 공급 source-code context: {brief_frame.supplied_source_code_context_count}개",
+            (
+                "- 파일 시간 메타데이터 검사: "
+                f"{brief_frame.temporal_metadata_inspection_count}개 / "
+                f"성공 {brief_frame.successful_temporal_metadata_count}개"
+            ),
             f"- source-code 구조 목록: {len(brief_frame.source_code_outlines)}개",
             f"- node_3 LLM 원문 text: {total_raw_text_count}개",
             f"- node_3 LLM 코드 구간 text: {code_range_text_count}개",
@@ -359,7 +364,8 @@ def _l_loop_grounding_lines(brief_frame: Node3InputBriefFrame) -> list[str]:
             f"{brief_frame.l_loop_task_status} / {brief_frame.l_loop_failure_level} "
             f"/ semantic={brief_frame.l3_semantic_goal_match_status} "
             f"/ semantic_execution={brief_frame.l3_semantic_execution_status} "
-            f"/ semantic_failure={brief_frame.l3_semantic_failure_type}"
+            f"/ semantic_failure={brief_frame.l3_semantic_failure_type} "
+            f"/ temporal={brief_frame.l_temporal_evidence_requirement_status}"
         )
     ]
 

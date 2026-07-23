@@ -63,6 +63,17 @@ Rules:
 - For `exploratory_multi_doc`, set `minimum_read_documents` to at least 2. Use `randomness_mode=semantic_exploration` unless a true random document tool is available.
 - When using `randomness_mode=semantic_exploration`, do not describe the documents as truly random or randomly selected. Say that they are semantic exploration candidates or arbitrary-looking internal-document samples.
 - For `exact_artifact_lookup` or `single_doc_lookup`, `minimum_read_documents=1` is usually enough.
+- If the user asks only for CODE-checkable file metadata such as modified time, observation time,
+  size, or hash and does not require the file contents, set `minimum_read_documents=0`.
+  In that metadata-only case, the explicit path identifies the inspection target but does not create
+  an original-content reading contract: use `artifact_requirement_mode=not_applicable` and an empty
+  `artifact_reference_occurrence_indices` list. The separate temporal tool path still receives the
+  exact CODE-extracted source coordinate.
+- Contract consistency rule: never combine `minimum_read_documents=0` with `exact_one`,
+  `all_of`, `any_of`, or `ordered_fallback`. Those modes explicitly require original-content reads.
+  A metadata-only named path must use `not_applicable` even though the path is explicit.
+- If the user also asks to quote, summarize, explain, or verify the file contents, keep the matching
+  original-content requirement and a positive `minimum_read_documents`.
 - `randomness_mode` must be one of `not_random`, `semantic_exploration`, or `true_random_required`.
 - `l_loop_success_condition` must state the concrete evidence condition that should be true before returning from L, such as "at least two read document extracts are available for relationship analysis".
 - For multi-document/exploratory requests, `l_loop_success_condition` should be about evidence readiness, for example "at least two original document extracts are available so node 3 can attempt relationship analysis".
@@ -93,6 +104,12 @@ Rules:
 - `artifact_reference_occurrence_indices` must contain only indices from `explicit_artifact_references`.
 - `artifact_requirement_reason` is your interpretation of the user's requirement relationship. Do not present it as a CODE fact.
 - When no explicit references are supplied, return `not_applicable`, an empty index list, and a short not-applicable reason.
+- An explicit reference may still use `not_applicable` when it is only the target coordinate for a
+  metadata inspection and the user does not require original document/code content. Explain that
+  distinction in `artifact_requirement_reason`.
+- Metadata-only example: "A.md의 수정 시각만 확인하고 원문을 읽었는지 구분해라" means
+  `temporal_requirement_status=required`, `minimum_read_documents=0`,
+  `artifact_requirement_mode=not_applicable`, and an empty occurrence-index list.
 - Budget request fields are requests only. CODE:BUDGET_POLICY will approve, reduce, or ignore them.
 - Keep budget requests small and operational. Do not request unlimited tool use.
 - For a single-document lookup or summary, request about `requested_max_read_doc_calls=1`.

@@ -1340,6 +1340,14 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
             "requirement="
             f"{achievement.get('original_material_requirement_status', 'unknown')}"
         )
+        lines.append(
+            "- L3 시간 근거 절대상태: "
+            f"requirement={achievement.get('temporal_requirement_status', 'uncertain')} / "
+            "evidence="
+            f"{achievement.get('temporal_evidence_requirement_status', 'uncertain')} / "
+            f"inspections={achievement.get('temporal_metadata_inspection_count', 0)} / "
+            f"successful={achievement.get('successful_temporal_metadata_count', 0)}"
+        )
         macro_status = achievement.get("macro_achievement_status")
         macro_reason = achievement.get("macro_achievement_reason")
         micro_status = achievement.get("micro_achievement_status")
@@ -1744,7 +1752,7 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
             f"supplied_contexts={supplied_context_count} / "
             f"source_code_contexts={supplied_source_code_context_count} / "
             f"source_code_outlines={source_code_outline_count} / "
-            f"llm_raw_text={llm_raw_document_text_count} / "
+            f"material_policy_raw_text={llm_raw_document_text_count} / "
             f"llm_l3_summaries={llm_l3_summary_context_count} / "
             f"search_candidates_final={final_search_candidate_count} / "
             f"search_candidates_accumulated={accumulated_search_candidate_count} / "
@@ -1806,6 +1814,10 @@ def render_runtime_view(result: dict[str, object], *, user_input: str) -> str:
                 f"failure={node3_brief.get('l_loop_failure_level', 'unknown')} / "
                 f"acquisition={node3_brief.get('l_evidence_acquisition_status', 'unknown')} / "
                 f"originals={node3_brief.get('l_original_material_count', 0)} / "
+                "temporal="
+                f"{node3_brief.get('l_temporal_evidence_requirement_status', 'not_recorded')} / "
+                "temporal_inspections="
+                f"{node3_brief.get('temporal_metadata_inspection_count', 0)} / "
                 f"semantic={node3_brief.get('l3_semantic_goal_match_status', 'unknown')} / "
                 "semantic_execution="
                 f"{node3_brief.get('l3_semantic_execution_status', 'not_run')} / "

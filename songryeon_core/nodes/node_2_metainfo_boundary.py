@@ -720,6 +720,24 @@ def _answer_material_record_metadata(
             channel="answer_ready",
             preview=_code_range_catalog_material(payload),
         )
+    if data_type == "tool_result:inspect_source_time_metadata":
+        source_path = str(
+            payload.get("relative_path")
+            or payload.get("requested_source_path")
+            or "시간 검사 대상"
+        ).strip()
+        return _catalog_row(
+            data_id=data_id,
+            label=f"파일 시간 메타데이터: {source_path}",
+            kind="source_time_metadata",
+            channel="answer_ready",
+            preview=_catalog_preview(
+                f"status={payload.get('inspection_status')}",
+                f"modified_at_utc={payload.get('modified_at_utc')}",
+                f"observed_at_utc={payload.get('observed_at_utc')}",
+                f"size_bytes={payload.get('size_bytes')}",
+            ),
+        )
     if data_type == "node_output:selected_recent_memory_context_frame":
         items = payload.get("items") if isinstance(payload.get("items"), list) else []
         if not items:
@@ -1030,6 +1048,8 @@ def _answer_basis_source_kind(source_data_id: str) -> str:
         return "l_loop_return_summary"
     if "read_doc" in source_data_id or "read_artifact" in source_data_id:
         return "read_document"
+    if "source_time_metadata" in source_data_id:
+        return "source_time_metadata"
     if "document_material_packet" in source_data_id:
         return "document_material_packet"
     if "document_context_pack" in source_data_id:
@@ -1058,6 +1078,7 @@ def _answer_basis_material_channel(source_data_id: str) -> str:
     if source_kind in {
         "read_document",
         "read_code_file",
+        "source_time_metadata",
     }:
         return "answer_ready"
     if source_kind in {"l_loop_return_summary"}:

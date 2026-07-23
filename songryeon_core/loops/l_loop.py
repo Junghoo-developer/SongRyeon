@@ -1465,6 +1465,9 @@ def run_l_loop(
             *tool_choice_ids,
             *control_data_ids,
             *l3_original_material_result_data_ids,
+            # 시간 metadata는 원문 extract가 아니지만 L3가 별도 시간 요구를
+            # 대조할 수 있도록 현재 L run의 절대근거로 직접 공급한다.
+            *temporal_metadata_result_data_ids,
             *tool_distillation_data_ids,
             *tool_budget_data_ids,
             *failure_signal_data_ids,

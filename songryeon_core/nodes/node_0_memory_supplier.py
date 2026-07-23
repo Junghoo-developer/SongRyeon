@@ -986,6 +986,28 @@ def build_l_loop_return_summary_frame(
         if original_material_count >= required_min_read_documents
         else "unsatisfied"
     )
+    temporal_requirement_status = _text(
+        l3_payload,
+        "temporal_requirement_status",
+        fallback=_text(
+            l1_payload,
+            "temporal_requirement_status",
+            fallback="uncertain",
+        ),
+    )
+    temporal_metadata_result_data_ids = _string_list(
+        l3_payload.get("temporal_metadata_result_data_ids")
+    )
+    temporal_metadata_inspection_count = len(temporal_metadata_result_data_ids)
+    successful_temporal_metadata_count = _int(
+        l3_payload,
+        "successful_temporal_metadata_count",
+    )
+    temporal_evidence_requirement_status = _text(
+        l3_payload,
+        "temporal_evidence_requirement_status",
+        fallback="uncertain",
+    )
 
     l_loop_task_status = _text(l3_payload, "achievement_status", fallback="unknown")
     l3_goal_match_status = _text(l3_payload, "goal_match_status", fallback="not_applicable")
@@ -1088,6 +1110,13 @@ def build_l_loop_return_summary_frame(
         original_material_requirement_status=(
             original_material_requirement_status
         ),
+        temporal_requirement_status=temporal_requirement_status,
+        temporal_evidence_requirement_status=(
+            temporal_evidence_requirement_status
+        ),
+        temporal_metadata_inspection_count=temporal_metadata_inspection_count,
+        successful_temporal_metadata_count=successful_temporal_metadata_count,
+        temporal_metadata_result_data_ids=temporal_metadata_result_data_ids,
         read_doc_ids=read_doc_ids,
         read_code_file_paths=read_code_file_paths,
         read_code_file_ranges=read_code_file_ranges,
@@ -1143,6 +1172,21 @@ def build_l_loop_return_summary_items(frame: LLoopReturnSummaryFrame) -> list[Me
                 "remaining_read_code_file_calls="
                 f"{frame.remaining_read_code_file_calls};"
                 f"remaining_query_attempts={frame.remaining_query_attempts}"
+            ),
+            source_data_ids=source_data_ids,
+        ),
+        _memory_item(
+            packet_source_id=frame.frame_id,
+            item_type="l_loop_temporal_evidence_status",
+            text=(
+                "COPIED_FIELDS:"
+                f"temporal_requirement_status={frame.temporal_requirement_status};"
+                "temporal_evidence_requirement_status="
+                f"{frame.temporal_evidence_requirement_status};"
+                "temporal_metadata_inspection_count="
+                f"{frame.temporal_metadata_inspection_count};"
+                "successful_temporal_metadata_count="
+                f"{frame.successful_temporal_metadata_count}"
             ),
             source_data_ids=source_data_ids,
         ),

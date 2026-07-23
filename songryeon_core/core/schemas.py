@@ -2194,7 +2194,7 @@ def validate_node2_handoff_frame(frame: Node2HandoffFrame) -> None:
 
 
 NODE3_INPUT_BRIEF_FRAME_SCHEMA_NAME = "Node3InputBriefFrame"
-NODE3_INPUT_BRIEF_FRAME_SCHEMA_VERSION = "0.3"
+NODE3_INPUT_BRIEF_FRAME_SCHEMA_VERSION = "0.4"
 NODE3_INPUT_BRIEF_STATUSES = {"ready", "insufficient"}
 NODE3_DOCUMENT_CONTEXT_PACK_STATUSES = {
     "not_recorded",
@@ -2508,6 +2508,27 @@ class Node3SourceCodeOutline:
 
 
 @dataclass
+class Node3TemporalMetadataMaterial:
+    """node_3에게 공급하는 파일 시간 검사 절대정보."""
+
+    # 내부 DataStore 좌표는 frame에만 보존하고 LLM에는 안전한 번호로 바꿔 준다.
+    source_data_id: str
+    source_scope: str
+    requested_source_path: str
+    relative_path: str | None
+    inspection_status: str
+    exists: bool
+    observed_at_utc: str
+    modified_at_utc: str | None
+    size_bytes: int | None
+    content_hash_sha256: str | None
+    source_kind: str | None
+    generated_by: str
+    info_class: str
+    semantic_judgement_status: str
+
+
+@dataclass
 class Node3InputBriefFrame:
     """node_3에게 내부 ID 장부 대신 의미 단위 입력을 제공하기 위한 브리프."""
 
@@ -2589,6 +2610,14 @@ class Node3InputBriefFrame:
     l_evidence_acquisition_status: str = "not_recorded"
     l_original_material_count: int = 0
     l_original_material_requirement_status: str = "not_recorded"
+    # 시간 검사는 원문 읽기와 다른 절대근거이므로 별도 count로 보존한다.
+    l_temporal_requirement_status: str = "not_recorded"
+    l_temporal_evidence_requirement_status: str = "not_recorded"
+    temporal_metadata_inspection_count: int = 0
+    successful_temporal_metadata_count: int = 0
+    temporal_metadata_materials: list[Node3TemporalMetadataMaterial] = field(
+        default_factory=list
+    )
     remaining_query_attempts: int = 0
     remaining_read_doc_calls: int = 0
     l_loop_result_attitude_hint: str = "not_recorded"
@@ -2930,6 +2959,39 @@ def _validate_node3_source_code_symbol(symbol: Node3SourceCodeSymbol) -> None:
         raise TypeError("Node3SourceCodeSymbol.docstring_present must be a boolean")
 
 
+def _validate_node3_temporal_metadata_material(
+    material: Node3TemporalMetadataMaterial,
+) -> None:
+    for field_name, value in {
+        "source_data_id": material.source_data_id,
+        "source_scope": material.source_scope,
+        "requested_source_path": material.requested_source_path,
+        "inspection_status": material.inspection_status,
+        "observed_at_utc": material.observed_at_utc,
+        "generated_by": material.generated_by,
+        "info_class": material.info_class,
+        "semantic_judgement_status": material.semantic_judgement_status,
+    }.items():
+        if not value:
+            raise ValueError(
+                f"Node3TemporalMetadataMaterial.{field_name} must not be empty"
+            )
+    if material.source_scope not in {"document", "code"}:
+        raise ValueError(
+            f"unknown Node3TemporalMetadataMaterial.source_scope: {material.source_scope}"
+        )
+    if not isinstance(material.exists, bool):
+        raise TypeError("Node3TemporalMetadataMaterial.exists must be a boolean")
+    if material.size_bytes is not None and material.size_bytes < 0:
+        raise ValueError("Node3TemporalMetadataMaterial.size_bytes must not be negative")
+    if material.info_class != "absolute":
+        raise ValueError("Node3 temporal metadata material must be absolute")
+    if material.semantic_judgement_status != "not_run":
+        raise ValueError(
+            "Node3 temporal metadata material semantic judgement must not run"
+        )
+
+
 def _validate_node3_l_loop_result_fields(frame: Node3InputBriefFrame) -> None:
     if frame.l_loop_return_summary_frame_id is not None:
         if not frame.l_loop_return_summary_frame_id:
@@ -3006,10 +3068,52 @@ def _validate_node3_l_loop_result_fields(frame: Node3InputBriefFrame) -> None:
             "unknown Node3InputBriefFrame.l_original_material_requirement_status: "
             f"{frame.l_original_material_requirement_status}"
         )
+    if frame.l_temporal_requirement_status not in {
+        "not_recorded",
+        *L1_TEMPORAL_REQUIREMENT_STATUSES,
+    }:
+        raise ValueError(
+            "unknown Node3InputBriefFrame.l_temporal_requirement_status: "
+            f"{frame.l_temporal_requirement_status}"
+        )
+    if frame.l_temporal_evidence_requirement_status not in {
+        "not_recorded",
+        *L_TEMPORAL_EVIDENCE_REQUIREMENT_STATUSES,
+    }:
+        raise ValueError(
+            "unknown Node3InputBriefFrame.l_temporal_evidence_requirement_status: "
+            f"{frame.l_temporal_evidence_requirement_status}"
+        )
+    if frame.temporal_metadata_inspection_count != len(
+        frame.temporal_metadata_materials
+    ):
+        raise ValueError(
+            "Node3InputBriefFrame.temporal_metadata_inspection_count must mirror materials"
+        )
+    expected_successful_temporal_count = sum(
+        1
+        for material in frame.temporal_metadata_materials
+        if material.inspection_status == "ok"
+    )
+    if (
+        frame.successful_temporal_metadata_count
+        != expected_successful_temporal_count
+    ):
+        raise ValueError(
+            "Node3InputBriefFrame.successful_temporal_metadata_count must mirror ok materials"
+        )
+    for material in frame.temporal_metadata_materials:
+        _validate_node3_temporal_metadata_material(material)
+        if material.source_data_id not in frame.source_data_ids:
+            raise ValueError(
+                "Node3InputBriefFrame.source_data_ids must include temporal material source"
+            )
     for field_name, value in {
         "remaining_query_attempts": frame.remaining_query_attempts,
         "remaining_read_doc_calls": frame.remaining_read_doc_calls,
         "l_original_material_count": frame.l_original_material_count,
+        "temporal_metadata_inspection_count": frame.temporal_metadata_inspection_count,
+        "successful_temporal_metadata_count": frame.successful_temporal_metadata_count,
     }.items():
         if not isinstance(value, int):
             raise TypeError(f"Node3InputBriefFrame.{field_name} must be an integer")
@@ -5856,7 +5960,7 @@ L_LOOP_CONTROL_FRAME_SCHEMA_VERSION = "0.2"
 L_LOOP_CONTINUATION_FRAME_SCHEMA_NAME = "LLoopContinuationFrame"
 L_LOOP_CONTINUATION_FRAME_SCHEMA_VERSION = "0.1"
 L_LOOP_RETURN_SUMMARY_FRAME_SCHEMA_NAME = "LLoopReturnSummaryFrame"
-L_LOOP_RETURN_SUMMARY_FRAME_SCHEMA_VERSION = "0.3"
+L_LOOP_RETURN_SUMMARY_FRAME_SCHEMA_VERSION = "0.4"
 L_EVIDENCE_ACQUISITION_STATUSES = {
     "none",
     "candidates_only",
@@ -5866,6 +5970,12 @@ L_ORIGINAL_MATERIAL_REQUIREMENT_STATUSES = {
     "not_required",
     "satisfied",
     "unsatisfied",
+}
+L_TEMPORAL_EVIDENCE_REQUIREMENT_STATUSES = {
+    "not_required",
+    "satisfied",
+    "unsatisfied",
+    "uncertain",
 }
 L_LOOP_CONTROL_DECISIONS = {
     "continue_search",
@@ -6218,6 +6328,12 @@ class LLoopReturnSummaryFrame:
     original_material_count: int = 0
     # 절대 정보: L1 최소 원문 요구량과 실제 원문 수를 코드가 대조한 상태.
     original_material_requirement_status: str = "not_required"
+    # 절대 정보: L1 시간 요구와 실제 시간 tool result를 원문 요구와 별도로 대조한다.
+    temporal_requirement_status: str = "uncertain"
+    temporal_evidence_requirement_status: str = "uncertain"
+    temporal_metadata_inspection_count: int = 0
+    successful_temporal_metadata_count: int = 0
+    temporal_metadata_result_data_ids: list[str] = field(default_factory=list)
     # 절대 정보: 실제 읽은 문서 ID 목록.
     read_doc_ids: list[str] = field(default_factory=list)
     # 절대 정보: 실제 read_code_file로 읽은 source/config 파일 경로 목록.
@@ -6265,6 +6381,8 @@ def validate_l_loop_return_summary_frame(frame: LLoopReturnSummaryFrame) -> None
         "route_hint_reason": frame.route_hint_reason,
         "evidence_acquisition_status": frame.evidence_acquisition_status,
         "original_material_requirement_status": frame.original_material_requirement_status,
+        "temporal_requirement_status": frame.temporal_requirement_status,
+        "temporal_evidence_requirement_status": frame.temporal_evidence_requirement_status,
         "schema_name": frame.schema_name,
         "schema_version": frame.schema_version,
     }
@@ -6325,6 +6443,59 @@ def validate_l_loop_return_summary_frame(frame: LLoopReturnSummaryFrame) -> None
             "unknown L loop original_material_requirement_status: "
             f"{frame.original_material_requirement_status}"
         )
+    if frame.temporal_requirement_status not in L1_TEMPORAL_REQUIREMENT_STATUSES:
+        raise ValueError(
+            "unknown L loop temporal_requirement_status: "
+            f"{frame.temporal_requirement_status}"
+        )
+    if (
+        frame.temporal_evidence_requirement_status
+        not in L_TEMPORAL_EVIDENCE_REQUIREMENT_STATUSES
+    ):
+        raise ValueError(
+            "unknown L loop temporal_evidence_requirement_status: "
+            f"{frame.temporal_evidence_requirement_status}"
+        )
+    if frame.temporal_metadata_inspection_count != len(
+        frame.temporal_metadata_result_data_ids
+    ):
+        raise ValueError(
+            "LLoopReturnSummaryFrame temporal inspection count must mirror result IDs"
+        )
+    if (
+        frame.successful_temporal_metadata_count < 0
+        or frame.successful_temporal_metadata_count
+        > frame.temporal_metadata_inspection_count
+    ):
+        raise ValueError(
+            "LLoopReturnSummaryFrame successful temporal count is outside inspection count"
+        )
+    expected_temporal_requirement_status = (
+        "not_required"
+        if frame.temporal_requirement_status == "not_required"
+        else "satisfied"
+        if frame.temporal_requirement_status == "required"
+        and frame.successful_temporal_metadata_count > 0
+        else "unsatisfied"
+        if frame.temporal_requirement_status == "required"
+        else "uncertain"
+    )
+    if (
+        frame.temporal_evidence_requirement_status
+        != expected_temporal_requirement_status
+    ):
+        raise ValueError(
+            "LLoopReturnSummaryFrame temporal evidence status does not match requirement/count"
+        )
+    for data_id in frame.temporal_metadata_result_data_ids:
+        if not data_id:
+            raise ValueError(
+                "LLoopReturnSummaryFrame temporal result IDs must not contain empty values"
+            )
+        if data_id not in frame.source_data_ids:
+            raise ValueError(
+                "LLoopReturnSummaryFrame source_data_ids must include temporal result IDs"
+            )
 
     for field_name, value in {
         "required_min_read_documents": frame.required_min_read_documents,
@@ -6338,6 +6509,8 @@ def validate_l_loop_return_summary_frame(frame: LLoopReturnSummaryFrame) -> None
         "read_code_file_call_count": frame.read_code_file_call_count,
         "remaining_read_code_file_calls": frame.remaining_read_code_file_calls,
         "original_material_count": frame.original_material_count,
+        "temporal_metadata_inspection_count": frame.temporal_metadata_inspection_count,
+        "successful_temporal_metadata_count": frame.successful_temporal_metadata_count,
     }.items():
         if not isinstance(value, int):
             raise TypeError(f"LLoopReturnSummaryFrame.{field_name} must be an integer")
@@ -6500,7 +6673,7 @@ L3_PRESERVED_INFO_FRAME_SCHEMA_NAME = "L3PreservedInfoFrame"
 L3_PRESERVED_INFO_FRAME_SCHEMA_VERSION = "0.1"
 L3_JUDGEMENT_STATUSES = {"not_judged"}
 L3_ACHIEVEMENT_FRAME_SCHEMA_NAME = "L3AchievementFrame"
-L3_ACHIEVEMENT_FRAME_SCHEMA_VERSION = "0.6"
+L3_ACHIEVEMENT_FRAME_SCHEMA_VERSION = "0.7"
 L3_ACHIEVEMENT_STATUSES = {"achieved", "partial", "failed"}
 L3_GOAL_MATCH_STATUSES = {"matched", "partial", "missing", "not_applicable"}
 L3_SEMANTIC_GOAL_MATCH_STATUSES = {"matched", "partial", "missing", "not_run"}
@@ -6760,6 +6933,12 @@ class L3AchievementFrame:
     original_material_required_count: int = 0
     # 절대 정보: L1 요구량과 실제 원문 수를 비교한 상태.
     original_material_requirement_status: str = "not_required"
+    # 절대 정보: 시간 요구와 시간 tool result는 원문 요구와 별도로 계산한다.
+    temporal_requirement_status: str = "uncertain"
+    temporal_evidence_requirement_status: str = "uncertain"
+    temporal_metadata_inspection_count: int = 0
+    successful_temporal_metadata_count: int = 0
+    temporal_metadata_result_data_ids: list[str] = field(default_factory=list)
     # 절대 정보: 최초 frame, 정상 비교, 이전 frame 누락을 구분한다.
     revision_evidence_delta_status: str = "initial_not_applicable"
     # 절대 정보: revision delta를 비교한 직전 L3 achievement frame ID.
@@ -6911,6 +7090,55 @@ def validate_l3_achievement_frame(frame: L3AchievementFrame) -> None:
             "unknown L3 original_material_requirement_status: "
             f"{frame.original_material_requirement_status}"
         )
+    if frame.temporal_requirement_status not in L1_TEMPORAL_REQUIREMENT_STATUSES:
+        raise ValueError(
+            "unknown L3 temporal_requirement_status: "
+            f"{frame.temporal_requirement_status}"
+        )
+    if (
+        frame.temporal_evidence_requirement_status
+        not in L_TEMPORAL_EVIDENCE_REQUIREMENT_STATUSES
+    ):
+        raise ValueError(
+            "unknown L3 temporal_evidence_requirement_status: "
+            f"{frame.temporal_evidence_requirement_status}"
+        )
+    if frame.temporal_metadata_inspection_count != len(
+        frame.temporal_metadata_result_data_ids
+    ):
+        raise ValueError("L3 temporal inspection count must mirror temporal result IDs")
+    if (
+        frame.successful_temporal_metadata_count < 0
+        or frame.successful_temporal_metadata_count
+        > frame.temporal_metadata_inspection_count
+    ):
+        raise ValueError(
+            "L3 successful temporal count is outside temporal inspection count"
+        )
+    expected_temporal_requirement_status = (
+        "not_required"
+        if frame.temporal_requirement_status == "not_required"
+        else "satisfied"
+        if frame.temporal_requirement_status == "required"
+        and frame.successful_temporal_metadata_count > 0
+        else "unsatisfied"
+        if frame.temporal_requirement_status == "required"
+        else "uncertain"
+    )
+    if (
+        frame.temporal_evidence_requirement_status
+        != expected_temporal_requirement_status
+    ):
+        raise ValueError(
+            "L3 temporal evidence status does not match requirement/count"
+        )
+    for data_id in frame.temporal_metadata_result_data_ids:
+        if not data_id:
+            raise ValueError("L3 temporal result IDs must not contain empty values")
+        if data_id not in frame.source_data_ids:
+            raise ValueError(
+                "L3 temporal result IDs must exist in frame.source_data_ids"
+            )
     for field_name, status in {
         "macro_achievement_status": frame.macro_achievement_status,
         "micro_achievement_status": frame.micro_achievement_status,
@@ -6925,6 +7153,12 @@ def validate_l3_achievement_frame(frame: L3AchievementFrame) -> None:
         raise TypeError("L3AchievementFrame.actual_read_code_file_count must be an integer")
     if frame.actual_read_code_file_count < 0:
         raise ValueError("L3AchievementFrame.actual_read_code_file_count must not be negative")
+    for field_name, value in {
+        "temporal_metadata_inspection_count": frame.temporal_metadata_inspection_count,
+        "successful_temporal_metadata_count": frame.successful_temporal_metadata_count,
+    }.items():
+        if not isinstance(value, int) or isinstance(value, bool):
+            raise TypeError(f"L3AchievementFrame.{field_name} must be an integer")
     if frame.actual_read_code_file_count != len(frame.read_code_file_paths):
         raise ValueError(
             "L3AchievementFrame.actual_read_code_file_count must mirror read_code_file_paths length"

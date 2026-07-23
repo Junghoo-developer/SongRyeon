@@ -105,6 +105,8 @@ Material catalog guidance:
 - An L2 query plan is a search-process record, not the content answer for a document-summary request.
 - A runtime task sequence is a process ledger, not a default answer substitute.
 - A `read_code_file` answer-ready row contains CODE-owned file/range facts. Its exact code text is intentionally withheld from node_2 and is delivered to node_3 only after node_2 selects that evidence ref.
+- A `source_time_metadata` answer-ready row contains CODE-owned file time, size, and hash facts.
+  Select the matching row when the user asks about those metadata fields. It is not an original-text read.
 - node_2 chooses code evidence coordinates; it does not analyze the full code body. Compare the user's exact file request with `source_label`, range facts, and `answer_ready_evidence_refs`.
 - `truncated_before=true` or `truncated_after=true` means the row is a partial file range, not that the file has a syntax or indentation error.
 - If the user asks about an explicitly named file and matching `read_code_file` rows are supplied, select the needed matching range refs as primary or supporting answer material even when an L3 status row remains partial.

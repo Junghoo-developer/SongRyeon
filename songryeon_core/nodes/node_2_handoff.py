@@ -24,6 +24,7 @@ from songryeon_core.core.schemas import (
     Node3VesselRMaterialItem,
     Node3SourceCodeOutline,
     Node3SourceCodeSymbol,
+    Node3TemporalMetadataMaterial,
     Node3SelectedRecentMemoryContext,
     Node3InputBriefFrame,
     Node3BriefRuntimeTask,
@@ -528,6 +529,10 @@ def record_node3_input_brief(
         data_store=data_store,
         id_namespace=id_namespace,
     )
+    temporal_metadata_materials = _node3_temporal_metadata_materials(
+        data_store=data_store,
+        id_namespace=id_namespace,
+    )
     runtime_tasks = _runtime_tasks(
         runtime_movements or [],
         assigned_model_by_node or {},
@@ -757,6 +762,23 @@ def record_node3_input_brief(
             "original_material_requirement_status",
             fallback="not_recorded",
         ),
+        l_temporal_requirement_status=_text(
+            l_loop_return_summary,
+            "temporal_requirement_status",
+            fallback="not_recorded",
+        ),
+        l_temporal_evidence_requirement_status=_text(
+            l_loop_return_summary,
+            "temporal_evidence_requirement_status",
+            fallback="not_recorded",
+        ),
+        temporal_metadata_inspection_count=len(temporal_metadata_materials),
+        successful_temporal_metadata_count=sum(
+            1
+            for material in temporal_metadata_materials
+            if material.inspection_status == "ok"
+        ),
+        temporal_metadata_materials=temporal_metadata_materials,
         remaining_query_attempts=_int(l_loop_return_summary, "remaining_query_attempts"),
         remaining_read_doc_calls=_int(l_loop_return_summary, "remaining_read_doc_calls"),
         l_loop_result_attitude_hint=_l_loop_result_attitude_hint(l_loop_return_summary),
@@ -819,6 +841,9 @@ def record_node3_input_brief(
             "답변 첫머리의 '근거 기준:' 블록은 code가 Node3InputBriefFrame의 절대 count로 고정 생성한다.",
             "node_3 LLM은 읽은 문서 수, 검색 후보 문서 수, 현재 턴 실행 순서 자료 수를 직접 쓰지 않고 본문만 작성한다.",
             "실제 read_doc 도구 원문 읽기 수와 node_3 공급 문서 context 수는 다른 count다.",
+            "시간 metadata 검사 수는 read_doc/read_code_file 원문 읽기 수와 다른 count다.",
+            "시간 metadata material의 수정 시각, 관측 시각, 크기, hash는 CODE가 검사한 절대정보다.",
+            "read_doc=0이어도 supplied_document_context_count가 1 이상이면 원문 text가 별도 context로 공급된 사실을 숨기지 않는다.",
             "actual_tool_read_code_file_count는 read_code_file 고유 파일 수이고 code_read_boundaries 길이는 호출/구간 수다.",
             "사용자가 read_doc 수를 물으면 actual_tool_read_doc_count만 기준으로 답하고, supplied_document_context_count를 read_doc 수로 말하지 않는다.",
             "사용자가 코드 파일 원문 읽기 여부를 물으면 고유 파일 수와 호출/구간 수를 분리해 답한다.",
@@ -901,6 +926,11 @@ def record_node3_input_brief(
                     summary.source_data_id
                     for summary in l3_document_summaries
                     if summary.source_data_id
+                ],
+                *[
+                    material.source_data_id
+                    for material in temporal_metadata_materials
+                    if material.source_data_id
                 ],
                 r_loop_result_material.source_data_id
                 if r_loop_result_material is not None
@@ -1382,6 +1412,54 @@ def _safe_vessel_r_display_name(display_name: str, *, fallback_label: str) -> st
     return safe_name
 
 
+def _node3_temporal_metadata_llm_payload(
+    frame: Node3InputBriefFrame,
+    *,
+    selected_source_ids: set[str] | None = None,
+) -> dict[str, object]:
+    """내부 ID 없이 시간 검사 절대정보를 node_3용 안전 번호표로 만든다."""
+
+    materials = [
+        material
+        for material in frame.temporal_metadata_materials
+        if selected_source_ids is None
+        or material.source_data_id in selected_source_ids
+    ]
+    return {
+        "temporal_requirement_status": frame.l_temporal_requirement_status,
+        "temporal_evidence_requirement_status": (
+            frame.l_temporal_evidence_requirement_status
+        ),
+        "inspection_count": len(materials),
+        "successful_inspection_count": sum(
+            1 for material in materials if material.inspection_status == "ok"
+        ),
+        "boundary": (
+            "CODE-owned file metadata inspection results. These are not read_doc or "
+            "read_code_file original-text reads."
+        ),
+        "items": [
+            {
+                "material_ref": f"temporal_material_{index:03d}",
+                "source_scope": material.source_scope,
+                "requested_source_path": material.requested_source_path,
+                "relative_path": material.relative_path,
+                "inspection_status": material.inspection_status,
+                "exists": material.exists,
+                "observed_at_utc": material.observed_at_utc,
+                "modified_at_utc": material.modified_at_utc,
+                "size_bytes": material.size_bytes,
+                "content_hash_sha256": material.content_hash_sha256,
+                "source_kind": material.source_kind,
+                "generated_by": material.generated_by,
+                "info_class": material.info_class,
+                "semantic_judgement_status": material.semantic_judgement_status,
+            }
+            for index, material in enumerate(materials, start=1)
+        ],
+    }
+
+
 def node3_brief_llm_payload(frame: Node3InputBriefFrame) -> dict[str, object]:
     """내부 ID를 제거한 node_3 LLM용 payload를 만든다."""
 
@@ -1407,6 +1485,7 @@ def node3_brief_llm_payload(frame: Node3InputBriefFrame) -> dict[str, object]:
     return {
         "user_question": frame.user_question,
         "brief_status": frame.brief_status,
+        "temporal_metadata": _node3_temporal_metadata_llm_payload(frame),
         "actual_tool_read_doc": {
             "count": frame.actual_tool_read_doc_count,
             "document_names": list(frame.actual_tool_read_doc_documents),
@@ -1819,6 +1898,10 @@ def _node3_task_focused_llm_payload(
     selected_total_raw_text_count = (
         len(selected_document_payloads) + selected_code_range_text_count
     )
+    selected_temporal_metadata = _node3_temporal_metadata_llm_payload(
+        frame,
+        selected_source_ids=selected_source_ids,
+    )
 
     payload: dict[str, object] = {
         "user_question": frame.user_question,
@@ -1838,6 +1921,7 @@ def _node3_task_focused_llm_payload(
             "Do not substitute runtime inventory for the requested answer.",
         ],
         "brief_status": frame.brief_status,
+        "temporal_metadata": selected_temporal_metadata,
         "absolute_grounding_facts": {
             "actual_tool_read_doc_count": frame.actual_tool_read_doc_count,
             "actual_tool_read_code_file_count": frame.actual_tool_read_code_file_count,
@@ -1853,6 +1937,11 @@ def _node3_task_focused_llm_payload(
             "final_search_candidate_count": frame.final_search_candidate_count,
             "accumulated_search_candidate_count": frame.accumulated_search_candidate_count,
             "runtime_task_count": len(frame.runtime_tasks),
+            "temporal_metadata_inspection_count": frame.temporal_metadata_inspection_count,
+            "successful_temporal_metadata_count": frame.successful_temporal_metadata_count,
+            "selected_temporal_metadata_inspection_count": selected_temporal_metadata[
+                "inspection_count"
+            ],
             "boundary": "CODE-owned counts. The final grounding block is assembled separately by CODE.",
         },
         "answer_basis": {
@@ -2917,6 +3006,77 @@ def _node3_l3_document_summary_materials(
                 generated_by=generated_by,
                 semantic_judgement_status=semantic_status,
                 source_data_id=source_data_id,
+            )
+        )
+    return materials
+
+
+def _node3_temporal_metadata_materials(
+    *,
+    data_store: DataStore,
+    id_namespace: LRunIds | None,
+) -> list[Node3TemporalMetadataMaterial]:
+    """현재 L run의 시간 검사 결과를 의미 변형 없이 node_3 재료로 복사한다."""
+
+    materials: list[Node3TemporalMetadataMaterial] = []
+    for record in data_store.list_records():
+        if not _record_in_namespace(record.data_id, id_namespace=id_namespace):
+            continue
+        if record.data_type != "tool_result:inspect_source_time_metadata":
+            continue
+        if not isinstance(record.payload, dict):
+            continue
+        payload = record.payload
+        source_scope = _text(payload, "source_scope", fallback="")
+        requested_source_path = _text(
+            payload,
+            "requested_source_path",
+            fallback="",
+        )
+        inspection_status = _text(payload, "inspection_status", fallback="")
+        observed_at_utc = _text(payload, "observed_at_utc", fallback="")
+        generated_by = _text(payload, "generated_by", fallback="")
+        info_class = _text(payload, "info_class", fallback="")
+        semantic_status = _text(
+            payload,
+            "semantic_judgement_status",
+            fallback="",
+        )
+        if not all(
+            (
+                source_scope,
+                requested_source_path,
+                inspection_status,
+                observed_at_utc,
+                generated_by,
+                info_class,
+                semantic_status,
+            )
+        ):
+            continue
+        materials.append(
+            Node3TemporalMetadataMaterial(
+                source_data_id=record.data_id,
+                source_scope=source_scope,
+                requested_source_path=requested_source_path,
+                relative_path=_optional_text(payload.get("relative_path")),
+                inspection_status=inspection_status,
+                exists=payload.get("exists") is True,
+                observed_at_utc=observed_at_utc,
+                modified_at_utc=_optional_text(payload.get("modified_at_utc")),
+                size_bytes=(
+                    payload.get("size_bytes")
+                    if isinstance(payload.get("size_bytes"), int)
+                    and not isinstance(payload.get("size_bytes"), bool)
+                    else None
+                ),
+                content_hash_sha256=_optional_text(
+                    payload.get("content_hash_sha256")
+                ),
+                source_kind=_optional_text(payload.get("source_kind")),
+                generated_by=generated_by,
+                info_class=info_class,
+                semantic_judgement_status=semantic_status,
             )
         )
     return materials

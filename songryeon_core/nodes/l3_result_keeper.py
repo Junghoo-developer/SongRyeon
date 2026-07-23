@@ -664,22 +664,53 @@ def _build_achievement_frame(
         required_count=original_material_required_count,
         original_material_count=original_material_count,
     )
+    temporal_requirement_status = str(
+        l1_goal.get("temporal_requirement_status") or "uncertain"
+    )
+    (
+        temporal_metadata_result_data_ids,
+        successful_temporal_metadata_count,
+    ) = _temporal_metadata_result_summary(
+        data_store=data_store,
+        input_data_ids=input_data_ids,
+    )
+    temporal_metadata_inspection_count = len(temporal_metadata_result_data_ids)
+    temporal_evidence_requirement_status = _temporal_evidence_requirement_status(
+        temporal_requirement_status=temporal_requirement_status,
+        successful_temporal_metadata_count=successful_temporal_metadata_count,
+    )
 
     if controller_decision == "stop_failed":
         achievement_status = "failed"
-    elif controller_decision == "stop_success" and original_material_count > 0:
+    elif controller_decision == "stop_success" and (
+        original_material_count > 0
+        or (
+            temporal_evidence_requirement_status == "satisfied"
+            and original_material_required_count == 0
+        )
+    ):
         achievement_status = "achieved"
-    elif candidate_count > 0 or original_material_count > 0:
+    elif (
+        candidate_count > 0
+        or original_material_count > 0
+        or successful_temporal_metadata_count > 0
+    ):
         achievement_status = "partial"
     else:
         achievement_status = "failed"
 
     if achievement_status == "achieved":
-        reason = "CODE_STATUS:original_material_acquired_and_controller_stop_success"
+        reason = (
+            "CODE_STATUS:temporal_evidence_satisfied_and_controller_stop_success"
+            if original_material_count == 0
+            else "CODE_STATUS:original_material_acquired_and_controller_stop_success"
+        )
     elif achievement_status == "partial":
         reason = (
             "CODE_STATUS:candidates_only_without_original_material"
             if evidence_acquisition_status == "candidates_only"
+            else "CODE_STATUS:temporal_evidence_acquired_without_full_requirement"
+            if successful_temporal_metadata_count > 0
             else "CODE_STATUS:original_material_acquired_without_controller_stop_success"
         )
     else:
@@ -687,7 +718,11 @@ def _build_achievement_frame(
 
     macro_status = achievement_status
     if achievement_status == "achieved":
-        macro_reason = "CODE_STATUS:macro_operation_original_material_and_stop_success"
+        macro_reason = (
+            "CODE_STATUS:macro_operation_temporal_evidence_and_stop_success"
+            if original_material_count == 0
+            else "CODE_STATUS:macro_operation_original_material_and_stop_success"
+        )
     elif achievement_status == "partial":
         macro_reason = (
             "CODE_STATUS:macro_operation_candidates_only"
@@ -697,7 +732,11 @@ def _build_achievement_frame(
     else:
         macro_reason = "CODE_STATUS:macro_operation_no_candidates_or_stop_failed"
 
-    if has_query_frame and (candidate_count > 0 or original_material_count > 0):
+    if has_query_frame and (
+        candidate_count > 0
+        or original_material_count > 0
+        or successful_temporal_metadata_count > 0
+    ):
         micro_status = "achieved"
         micro_reason = "CODE_STATUS:micro_operation_query_frame_and_candidates_present"
     elif has_query_frame:
@@ -806,7 +845,51 @@ def _build_achievement_frame(
         evidence_acquisition_status=evidence_acquisition_status,
         original_material_required_count=original_material_required_count,
         original_material_requirement_status=original_material_requirement_status,
+        temporal_requirement_status=temporal_requirement_status,
+        temporal_evidence_requirement_status=temporal_evidence_requirement_status,
+        temporal_metadata_inspection_count=temporal_metadata_inspection_count,
+        successful_temporal_metadata_count=successful_temporal_metadata_count,
+        temporal_metadata_result_data_ids=temporal_metadata_result_data_ids,
     )
+
+
+def _temporal_metadata_result_summary(
+    *,
+    data_store: DataStore | None,
+    input_data_ids: list[str],
+) -> tuple[list[str], int]:
+    """현재 L3 입력에 실제 포함된 시간 검사 record와 성공 수만 센다."""
+
+    if data_store is None:
+        return [], 0
+    result_data_ids: list[str] = []
+    successful_count = 0
+    for data_id in _unique_strings(input_data_ids):
+        record = data_store.get_record(data_id)
+        if (
+            record is None
+            or record.data_type != "tool_result:inspect_source_time_metadata"
+            or not isinstance(record.payload, dict)
+        ):
+            continue
+        result_data_ids.append(record.data_id)
+        if record.payload.get("inspection_status") == "ok":
+            successful_count += 1
+    return result_data_ids, successful_count
+
+
+def _temporal_evidence_requirement_status(
+    *,
+    temporal_requirement_status: str,
+    successful_temporal_metadata_count: int,
+) -> str:
+    """L1 요구값과 CODE tool 성공 count만 대조한다."""
+
+    if temporal_requirement_status == "not_required":
+        return "not_required"
+    if temporal_requirement_status == "required":
+        return "satisfied" if successful_temporal_metadata_count > 0 else "unsatisfied"
+    return "uncertain"
 
 
 def _build_llm_achievement_frame(
@@ -858,9 +941,14 @@ def _build_llm_achievement_frame(
         data_store,
         allowed_source_data_ids=allowed_source_data_ids,
     )
+    temporal_metadata_previews = _temporal_metadata_previews_from_data_store(
+        data_store,
+        allowed_source_data_ids=allowed_source_data_ids,
+    )
     semantic_materials = _l3_semantic_materials(
         read_document_previews=read_document_previews,
         read_code_file_previews=read_code_file_previews,
+        temporal_metadata_previews=temporal_metadata_previews,
     )
     semantic_material_by_ref = {
         material.material_ref: material
@@ -890,6 +978,16 @@ def _build_llm_achievement_frame(
             "original_material_requirement_status": (
                 operation_frame.original_material_requirement_status
             ),
+            "temporal_requirement_status": operation_frame.temporal_requirement_status,
+            "temporal_evidence_requirement_status": (
+                operation_frame.temporal_evidence_requirement_status
+            ),
+            "temporal_metadata_inspection_count": (
+                operation_frame.temporal_metadata_inspection_count
+            ),
+            "successful_temporal_metadata_count": (
+                operation_frame.successful_temporal_metadata_count
+            ),
         },
         "specific_document_request": _l3_specific_request_semantic_payload(goal_match),
         "read_document_previews": [
@@ -917,6 +1015,23 @@ def _build_llm_achievement_frame(
                 ),
             }
             for preview in read_code_file_previews
+        ],
+        "temporal_metadata_previews": [
+            {
+                "material_ref": preview.get("material_ref"),
+                "source_scope": preview.get("source_scope"),
+                "relative_path": preview.get("relative_path"),
+                "inspection_status": preview.get("inspection_status"),
+                "modified_at_utc": preview.get("modified_at_utc"),
+                "observed_at_utc": preview.get("observed_at_utc"),
+                "size_bytes": preview.get("size_bytes"),
+                "content_hash_sha256": preview.get("content_hash_sha256"),
+                "evidence_excerpt_candidates": _l3_evidence_candidate_payloads(
+                    semantic_evidence_candidates,
+                    material_ref=str(preview.get("material_ref") or ""),
+                ),
+            }
+            for preview in temporal_metadata_previews
         ],
         "candidate_previews": [
             {
@@ -1313,9 +1428,14 @@ def _l3_semantic_materials(
     *,
     read_document_previews: list[dict[str, object]],
     read_code_file_previews: list[dict[str, object]],
+    temporal_metadata_previews: list[dict[str, object]],
 ) -> list[_L3SemanticMaterial]:
     materials: list[_L3SemanticMaterial] = []
-    for preview in [*read_document_previews, *read_code_file_previews]:
+    for preview in [
+        *read_document_previews,
+        *read_code_file_previews,
+        *temporal_metadata_previews,
+    ]:
         material_ref = str(preview.get("material_ref") or "").strip()
         source_data_id = str(preview.get("source_data_id") or "").strip()
         text = str(preview.get("text_preview") or "")
@@ -1328,6 +1448,59 @@ def _l3_semantic_materials(
                 )
             )
     return materials
+
+
+def _temporal_metadata_previews_from_data_store(
+    data_store: DataStore | None,
+    *,
+    allowed_source_data_ids: set[str],
+) -> list[dict[str, object]]:
+    """시간 tool result를 L3 의미 대응용 안전 번호표와 절대 필드로 포장한다."""
+
+    if data_store is None:
+        return []
+    previews: list[dict[str, object]] = []
+    for record in data_store.list_records():
+        if record.data_id not in allowed_source_data_ids:
+            continue
+        if record.data_type != "tool_result:inspect_source_time_metadata":
+            continue
+        payload = record.payload
+        if not isinstance(payload, dict):
+            continue
+        source_path = str(
+            payload.get("relative_path")
+            or payload.get("requested_source_path")
+            or ""
+        ).strip()
+        if not source_path:
+            continue
+        # 이 문자열은 의미 요약이 아니라 아래 절대 필드를 고정 순서로 직렬화한 복사본이다.
+        text_preview = (
+            f"source_scope={payload.get('source_scope')};"
+            f"relative_path={source_path};"
+            f"inspection_status={payload.get('inspection_status')};"
+            f"exists={payload.get('exists')};"
+            f"observed_at_utc={payload.get('observed_at_utc')};"
+            f"modified_at_utc={payload.get('modified_at_utc')};"
+            f"size_bytes={payload.get('size_bytes')};"
+            f"content_hash_sha256={payload.get('content_hash_sha256')}"
+        )
+        previews.append(
+            {
+                "material_ref": f"TIME_MATERIAL_{len(previews) + 1:04d}",
+                "source_data_id": record.data_id,
+                "source_scope": payload.get("source_scope"),
+                "relative_path": source_path,
+                "inspection_status": payload.get("inspection_status"),
+                "modified_at_utc": payload.get("modified_at_utc"),
+                "observed_at_utc": payload.get("observed_at_utc"),
+                "size_bytes": payload.get("size_bytes"),
+                "content_hash_sha256": payload.get("content_hash_sha256"),
+                "text_preview": text_preview,
+            }
+        )
+    return previews
 
 
 def _l3_semantic_evidence_candidates(
@@ -1527,12 +1700,17 @@ def _build_goal_match_context(
         data_store,
         allowed_source_data_ids=allowed_source_data_ids,
     )
+    successful_temporal_source_paths = _successful_temporal_source_paths_from_data_store(
+        data_store,
+        allowed_source_data_ids=allowed_source_data_ids,
+    )
     search_result_doc_ids = _unique_strings(
         [candidate.doc_id for candidate in preserved_frame.candidates if candidate.doc_id]
     )
     base_context: dict[str, object] = {
         "read_doc_ids": read_doc_ids,
         "read_code_file_paths": read_code_file_paths,
+        "successful_temporal_source_paths": successful_temporal_source_paths,
         "search_result_doc_ids": search_result_doc_ids,
         "artifact_requirement_mode": "not_applicable",
         "artifact_requirement_target_doc_ids": [],
@@ -1587,6 +1765,22 @@ def _build_goal_match_context(
             "requested_doc_hint_source": requested_doc_hint_source,
             "goal_match_status": "matched",
             "goal_match_reason": "CODE_STATUS:requested_source_code_file_read_code_file_matched",
+        }
+
+    if (
+        str((l1_goal or {}).get("temporal_requirement_status") or "uncertain")
+        == "required"
+        and any(
+            _doc_matches_hint(source_path, requested_doc_hint)
+            for source_path in successful_temporal_source_paths
+        )
+    ):
+        return {
+            **base_context,
+            "requested_doc_hint": requested_doc_hint,
+            "requested_doc_hint_source": requested_doc_hint_source,
+            "goal_match_status": "matched",
+            "goal_match_reason": "CODE_STATUS:requested_source_temporal_metadata_matched",
         }
 
     if any(_doc_matches_hint(doc_id, requested_doc_hint) for doc_id in search_result_doc_ids):
@@ -2154,6 +2348,32 @@ def _read_code_file_paths_from_data_store(
         file_path = payload.get("file_path")
         if isinstance(file_path, str) and file_path:
             paths.append(file_path)
+    return _unique_strings(paths)
+
+
+def _successful_temporal_source_paths_from_data_store(
+    data_store: DataStore | None,
+    *,
+    allowed_source_data_ids: set[str],
+) -> list[str]:
+    """성공한 시간 검사 record에 CODE가 확정한 상대경로만 복사한다."""
+
+    if data_store is None:
+        return []
+    paths: list[str] = []
+    for record in data_store.list_records():
+        if record.data_id not in allowed_source_data_ids:
+            continue
+        if record.data_type != "tool_result:inspect_source_time_metadata":
+            continue
+        payload = record.payload
+        if not isinstance(payload, dict) or payload.get("inspection_status") != "ok":
+            continue
+        source_path = payload.get("relative_path") or payload.get(
+            "requested_source_path"
+        )
+        if isinstance(source_path, str) and source_path:
+            paths.append(source_path)
     return _unique_strings(paths)
 
 

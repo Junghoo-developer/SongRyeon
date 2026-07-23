@@ -41,7 +41,10 @@ Rules:
 - Do not use implementation claims found inside a read document as the reason why this L loop achieved its current goal.
 - If a read document is about an old order, implementation, or execution record, that content may be evidence for node 3 later, but it is not by itself proof that this turn's L1 goal succeeded.
 - Use only the supplied user query, L1 goals, code operation status, preserved candidate previews,
-  read document evidence excerpt candidates, and read code file evidence excerpt candidates.
+  read document evidence excerpt candidates, read code file evidence excerpt candidates, and
+  temporal metadata evidence excerpt candidates.
+- `temporal_metadata_previews` contain CODE-checked file metadata, not original document/code text.
+  They may support a request about file modification time, observation time, size, or hash.
 - Treat `code_operation_status` as code-owned operational state. You may only downgrade its semantic usefulness through `semantic_goal_match_status`; you do not rewrite it.
 - `code_operation_status.evidence_acquisition_status=candidates_only` means code found search candidates but no non-empty original document/code text was acquired. Never describe that state as original material read or operationally achieved.
 - `original_material_acquired` confirms only that non-empty original text exists in tool records. It does not prove that the text is relevant or sufficient for the user's request.
@@ -71,7 +74,8 @@ Rules:
 - `all_of` requires every selected target, while `any_of` requires at least one selected target.
 - If the structured artifact requirement is `not_applicable` and
   `specific_document_request.requested_doc_hint` is present, do not call semantic fit `matched`
-  unless the requested document/source file was directly read through the matching evidence channel.
+  unless the requested document/source file was directly read through the matching evidence channel,
+  or the request is metadata-only and a matching successful temporal metadata preview is supplied.
 - If the requested document appeared only in search results but was not read, use `partial`.
 - If the requested document did not appear in either read documents or search results, use `partial`
   when other evidence exists and `missing` when there is no evidence.

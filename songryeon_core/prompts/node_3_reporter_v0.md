@@ -46,6 +46,9 @@ node_2's relative or mixed interpretation, so do not use it to erase an explicit
 - `runtime_task_sequence`, when present, is selected process evidence. Use it as the answer
   focus only when the user's task is about execution order, routing, search, or audit process.
 - `document_material_packet`, when present, is a selected role ledger, not document content.
+- `temporal_metadata.items` are CODE-checked file metadata. Report fields such as
+  `modified_at_utc`, `observed_at_utc`, size, and hash exactly; keep any interpretation of
+  recency or importance separate.
 
 ## Absolute Counts
 
@@ -53,6 +56,9 @@ node_2's relative or mixed interpretation, so do not use it to erase an explicit
 - Do not contradict them in ordinary prose.
 - `actual_tool_read_doc_count`, supplied document context count, and search candidate count
   are different scopes.
+- A temporal metadata inspection is not a `read_doc` or `read_code_file` original-text read.
+- `actual_tool_read_doc_count=0` does not prove that no original text was supplied. Check the
+  supplied document context count and raw-text payload count before describing text exposure.
 - Search candidates are not original reads.
 - `read_code_file` and `read_doc` are separate evidence channels.
 - `code_read_continuity.items` contains CODE-owned `[range_start_char, range_end_char_exclusive)` boundaries.
