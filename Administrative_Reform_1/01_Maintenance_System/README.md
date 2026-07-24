@@ -4,6 +4,7 @@
 
 ## 현재 문서
 
+- [SONGRYEON_CORE_CODE_READING_GUIDE_FOR_JUNGHOO_V0.md](SONGRYEON_CORE_CODE_READING_GUIDE_FOR_JUNGHOO_V0.md): 실제 코드로 한 턴의 trace/data, 0/1/L/2/3/4 흐름을 배우는 정후용 한글 독해 교재.
 - [ADMIN_RULES_v0.md](ADMIN_RULES_v0.md): 문서 관리와 작업 진행의 기본 규칙.
 - [SCHEMA_METAINFO_POLICY_v0.md](SCHEMA_METAINFO_POLICY_v0.md): 절대/상대/혼합 정보, 코드 비서술 원칙, provenance, LLM/node stub 정직성 규칙.
 - [LOOP_AUTHORITY_AND_W_POLICY_v0.md](LOOP_AUTHORITY_AND_W_POLICY_v0.md): 루프별 권한, W 문제감지 루프, 포기/보류/루프경제성 원칙.
