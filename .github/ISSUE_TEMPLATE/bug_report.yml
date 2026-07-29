@@ -1,0 +1,54 @@
+name: Bug report
+description: Report one reproducible SongRyeon failure.
+title: "[Bug] "
+labels:
+  - bug
+body:
+  - type: textarea
+    id: observed
+    attributes:
+      label: Observed behavior
+      description: Include the smallest input and observable output.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: Describe a result that a test could verify.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Include commands and use a synthetic or temporary memory file.
+      placeholder: |
+        python -m demo --memory .\tmp\repro.jsonl "..."
+    validations:
+      required: true
+  - type: dropdown
+    id: boundary
+    attributes:
+      label: A/R boundary involved
+      options:
+        - A execution fact
+        - R model or user judgment
+        - A/R interaction
+        - Not yet known
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Python, Ollama, model tag and model ID.
+    validations:
+      required: true
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy check
+      options:
+        - label: I removed credentials, private conversations and the real memory log.
+          required: true
