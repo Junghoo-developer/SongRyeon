@@ -36,12 +36,16 @@ def save_model_exchange(
     validation_error,
     metrics,
     turn_id,
+    provider="unspecified",
+    execution_mode="unspecified",
     memory_path=DEFAULT_MEMORY_PATH,
 ):
     """모델 호출 한 번의 입출력과 코드가 확인한 실행 상태를 저장한다."""
 
     _require_nonempty_text(node_name, "node_name")
     _require_nonempty_text(model_name, "model_name")
+    _require_nonempty_text(provider, "provider")
+    _require_nonempty_text(execution_mode, "execution_mode")
     _require_nonempty_text(status, "status")
     _require_nonempty_text(turn_id, "turn_id")
     _require_text(system_prompt, "system_prompt")
@@ -80,6 +84,18 @@ def save_model_exchange(
             model_name,
             "absolute",
             "model_raw_model",
+            turn_id,
+        ),
+        new_audit_record(
+            provider,
+            "absolute",
+            "model_raw_provider",
+            turn_id,
+        ),
+        new_audit_record(
+            execution_mode,
+            "absolute",
+            "model_raw_execution_mode",
             turn_id,
         ),
         new_audit_record(

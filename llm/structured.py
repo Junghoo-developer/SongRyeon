@@ -14,10 +14,28 @@ from .client import ModelClient
 
 
 DEFAULT_NODE_OUTPUT_ATTEMPTS = 3
+TRANSPORT_ERROR_AUDIT_CODE = "MODEL_TRANSPORT_ERROR"
 
 
 class NodeOutputError(RuntimeError):
     """모델이 정해진 횟수 안에 유효한 노드 출력을 만들지 못했다."""
+
+
+def _client_audit_value(client, attribute):
+    """가짜 client도 깨지 않게 안전한 실행 식별자만 감사에 넘긴다."""
+
+    try:
+        value = getattr(client, attribute, "unspecified")
+    except Exception:
+        return "unspecified"
+    if not isinstance(value, str) or not value.strip():
+        return "unspecified"
+    if not value.isascii() or len(value) > 80 or any(
+        not (character.isalnum() or character in "._-")
+        for character in value
+    ):
+        return "unspecified"
+    return value
 
 
 def _reject_json_constant(value):
@@ -104,6 +122,8 @@ def request_structured_output(
         raise ValueError("max_attempts는 1 이상의 정수여야 합니다.")
 
     validation_error = ""
+    provider = _client_audit_value(client, "provider")
+    execution_mode = _client_audit_value(client, "execution_mode")
 
     for attempt in range(1, max_attempts + 1):
         current_user_prompt = (
@@ -122,7 +142,7 @@ def request_structured_output(
                 response_schema=response_schema,
                 num_predict=num_predict,
             )
-        except Exception as error:
+        except Exception:
             # 전송 실패를 형식 오류처럼 재요청하지 않는다. 실패 사실만 숨김 원본에 남긴다.
             save_model_exchange(
                 node_name=node_name,
@@ -133,9 +153,11 @@ def request_structured_output(
                 thinking="",
                 status="transport_error",
                 attempt=attempt,
-                validation_error=str(error),
+                validation_error=TRANSPORT_ERROR_AUDIT_CODE,
                 metrics={},
                 turn_id=record_turn_id,
+                provider=provider,
+                execution_mode=execution_mode,
                 memory_path=memory_path,
             )
             raise
@@ -157,6 +179,8 @@ def request_structured_output(
                 validation_error=validation_error,
                 metrics=reply.metrics,
                 turn_id=record_turn_id,
+                provider=provider,
+                execution_mode=execution_mode,
                 memory_path=memory_path,
             )
             continue
@@ -173,6 +197,8 @@ def request_structured_output(
             validation_error="",
             metrics=reply.metrics,
             turn_id=record_turn_id,
+            provider=provider,
+            execution_mode=execution_mode,
             memory_path=memory_path,
         )
         return parsed_output

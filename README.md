@@ -4,7 +4,8 @@
 그 기록을 제한된 에이전트 시야로 제공하는 구조**를 먼저 만드는 중입니다.
 
 현재 단계에는 기억, 외부 지식 색인, 읽기 전용 파일 도구, 네 노드 라우팅과
-로컬 Ollama `qwen3:14b`로 한 턴을 끝까지 실행하는 데모가 있습니다.
+로컬 Ollama의 오픈웨이트 모델로 한 턴을 끝까지 실행하는 데모가 있습니다.
+대회 제출·시연용 대형 모델은 `gemma4:26b`, 비교 기준선은 `qwen3:14b`입니다.
 
 송련이 보장하려는 범위는 세상 모든 정보의 진실성이 아닙니다. 내장 실행
 경로에서 **LLM이 코드로 확인 가능한 실행 사실을 직접 작성하거나 바꾸지
@@ -13,7 +14,10 @@
 
 프로젝트는 [MIT License](LICENSE)로 공개합니다. 모델과 로컬 런타임의
 출처는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md), 재현 환경은
-[`docs/reproducibility.md`](docs/reproducibility.md)에 기록합니다.
+[`docs/reproducibility.md`](docs/reproducibility.md)에 기록합니다. 대회 규정에
+따른 모델 실행 경계는
+[`docs/contest_model_policy.md`](docs/contest_model_policy.md)에 따로
+고정했습니다.
 
 ## 폴더 구조
 
@@ -73,6 +77,7 @@ SongRyeon_Core_v1/
 │  ├─ minimal_agent_loop.md # 결정론적 기반의 자세한 설명
 │  ├─ demo_walkthrough.md   # 실제 데모를 읽는 학습 순서
 │  ├─ evaluation_plan.md    # 비교 실험의 고정 규칙
+│  ├─ contest_model_policy.md # 대회용 모델과 외부 API 실행 경계
 │  └─ reproducibility.md    # 실행 환경과 모델 식별 정보
 ├─ metadata/            # 예전 import가 깨지지 않게 남긴 호환 파일
 ├─ pyproject.toml       # 패키지·CLI·pytest 설정
@@ -161,15 +166,50 @@ python -m pip install -e ".[test]"
 python -m pytest -q
 ```
 
-로컬 Ollama와 설치된 `qwen3:14b`로 한 턴을 실행합니다.
+로컬 Ollama와 설치된 대회용 대형 모델 `gemma4:26b`로 한 턴을 실행합니다.
 
 ```powershell
-python -m demo "nodes/review.py를 실제 도구로 읽고 역할을 설명해 줘."
+python -m demo --model gemma4:26b `
+  "nodes/review.py를 실제 도구로 읽고 역할을 설명해 줘."
 ```
 
 질문을 생략하면 대화형 화면이 열립니다. 기본 실행은 실제
 `memory/memory.jsonl`에 모든 원본을 추가합니다. 별도 시험 로그를 쓰려면
 `--memory .\tmp\demo-memory.jsonl`을 지정합니다.
+
+더 작은 비교 기준선으로 같은 입력을 실행하려면 모델만 바꿉니다.
+
+```powershell
+python -m demo --model qwen3:14b `
+  --memory .\tmp\baseline-memory.jsonl `
+  "nodes/review.py를 실제 도구로 읽고 역할을 설명해 줘."
+```
+
+대회 제출·시연의 기본 경로는 **로컬 또는 자체 호스팅 Ollama에서 직접
+실행하는 오픈웨이트 모델**입니다. 외부 상용 API는 자동 대체 경로로
+연결하지 않습니다. 에이전트 프레임워크의 모델 연동 시험이 꼭 필요할 때만
+운영규정 제9조 Q&A의 예외 범위에서 별도 통합시험으로 실행하며, 실제
+`memory.jsonl`이나 비공개 코드를 보내지 않고 결과도 공식 성능 집계에서
+제외합니다. API 키 처리까지 포함한 정확한 기준은
+[`docs/contest_model_policy.md`](docs/contest_model_policy.md)를 확인합니다.
+
+외부 OpenAI-compatible API 연결부는 계정의 이메일·비밀번호나 브라우저
+로그인을 사용하지 않습니다. 공급자의 개발자 콘솔에서 발급한 API 키를
+환경 변수에 넣고, 명시적인 단발 통합시험으로만 실행합니다.
+
+```powershell
+$env:OPENAI_API_KEY = "<개발자 콘솔에서 발급한 키>"
+python -m demo `
+  --external-api-integration `
+  --external-api-base-url "https://provider.example/v1" `
+  --external-api-model "provider/model-name" `
+  "공개 또는 인공 입력으로 연결만 검사해 줘."
+```
+
+위 주소와 모델명은 사용하는 공급자의 공식 값으로 바꿔야 합니다. `--memory`
+를 생략하면 감사 로그는 임시 폴더에만 생겼다가 종료 시 삭제됩니다. 보존이
+필요할 때도 실제 원본 대신 `--memory .\.tmp\external-memory.jsonl`처럼
+격리된 경로만 사용합니다.
 
 실제 소스 코드와 `knowledge/documents/`의 문서를 동기화할 때만 아래 명령을
 사용합니다. 이 명령은 실제 `knowledge.db`와 `memory.jsonl`을 갱신합니다.

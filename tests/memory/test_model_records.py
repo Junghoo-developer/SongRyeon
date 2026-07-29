@@ -33,6 +33,8 @@ def test_model_exchange_is_exactly_recorded_and_hidden(tmp_path):
         validation_error=None,
         metrics=metrics,
         turn_id="turn-model-1",
+        provider="ollama",
+        execution_mode="contest_local_or_self_hosted",
         memory_path=memory_path,
     )
     by_type = {
@@ -40,7 +42,7 @@ def test_model_exchange_is_exactly_recorded_and_hidden(tmp_path):
         for record in records
     }
 
-    assert len(records) == 10
+    assert len(records) == 12
     assert all(
         record["information_type"].startswith(
             MODEL_RAW_INFORMATION_TYPE_PREFIX
@@ -59,6 +61,8 @@ def test_model_exchange_is_exactly_recorded_and_hidden(tmp_path):
     for information_type in {
         "model_raw_node",
         "model_raw_model",
+        "model_raw_provider",
+        "model_raw_execution_mode",
         "model_raw_status",
         "model_raw_attempt",
         "model_raw_validation_error",
@@ -71,6 +75,10 @@ def test_model_exchange_is_exactly_recorded_and_hidden(tmp_path):
     assert by_type["model_raw_user_prompt"]["information"] == user_prompt
     assert by_type["model_raw_response"]["information"] == response
     assert by_type["model_raw_thinking"]["information"] == thinking
+    assert by_type["model_raw_provider"]["information"] == "ollama"
+    assert by_type["model_raw_execution_mode"]["information"] == (
+        "contest_local_or_self_hosted"
+    )
     assert json.loads(by_type["model_raw_attempt"]["information"]) == {
         "attempt": 2
     }

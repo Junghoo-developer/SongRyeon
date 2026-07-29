@@ -194,4 +194,32 @@ def test_transport_error_is_audited_once_and_not_retried(tmp_path):
     )
     assert status["information"] == "transport_error"
     assert status["information_class"] == "absolute"
-    assert error["information"] == "local Ollama is offline"
+    assert error["information"] == "MODEL_TRANSPORT_ERROR"
+    assert "offline" not in error["information"]
+
+
+def test_client_execution_identity_is_audited_as_absolute(tmp_path):
+    memory_path = tmp_path / "memory.jsonl"
+    client = ScriptedClient(
+        ['{"verdict":"permit","reason":"증거가 충분하다."}']
+    )
+    client.provider = "openai_compatible"
+    client.execution_mode = "external_api_integration"
+
+    _request(client, memory_path)
+
+    raw = _raw_records(memory_path)
+    provider = next(
+        record
+        for record in raw
+        if record["information_type"] == "model_raw_provider"
+    )
+    execution_mode = next(
+        record
+        for record in raw
+        if record["information_type"] == "model_raw_execution_mode"
+    )
+    assert provider["information"] == "openai_compatible"
+    assert execution_mode["information"] == "external_api_integration"
+    assert provider["information_class"] == "absolute"
+    assert execution_mode["information_class"] == "absolute"

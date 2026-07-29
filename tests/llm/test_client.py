@@ -32,7 +32,7 @@ class FakeHTTPResponse:
 
 def valid_chat_payload():
     return {
-        "model": "qwen3:14b",
+        "model": "gemma4:26b",
         "message": {
             "role": "assistant",
             "content": '{"verdict":"permit","reason":"충분함"}',
@@ -78,7 +78,7 @@ def test_complete_sends_deterministic_nonstream_json_schema_request(
     assert request.get_method() == "POST"
     assert captured["timeout"] == 180
     assert sent == {
-        "model": "qwen3:14b",
+        "model": "gemma4:26b",
         "messages": [
             {"role": "system", "content": "검토 노드다."},
             {"role": "user", "content": "입력을 검토하라."},
@@ -96,7 +96,7 @@ def test_complete_sends_deterministic_nonstream_json_schema_request(
     }
     assert reply.content == '{"verdict":"permit","reason":"충분함"}'
     assert reply.thinking == ""
-    assert reply.model == "qwen3:14b"
+    assert reply.model == "gemma4:26b"
     assert reply.done_reason == "stop"
     assert reply.metrics == {
         "total_duration": 100,
@@ -203,7 +203,10 @@ def test_check_ready_reads_version_and_confirms_installed_model(
             {
                 "models": [
                     {"name": "gemma3:12b"},
-                    {"name": "qwen3:14b"},
+                    {
+                        "name": "gemma4:26b",
+                        "digest": "A" * 64,
+                    },
                 ]
             },
         ]
@@ -220,7 +223,8 @@ def test_check_ready_reads_version_and_confirms_installed_model(
 
     assert status == {
         "server_version": "0.32.4",
-        "model_name": "qwen3:14b",
+        "model_name": "gemma4:26b",
+        "model_digest": "a" * 64,
     }
     assert requested_urls == [
         "http://127.0.0.1:11434/api/version",
@@ -240,7 +244,34 @@ def test_check_ready_rejects_missing_model(monkeypatch):
         lambda request, timeout: FakeHTTPResponse(next(replies)),
     )
 
-    with pytest.raises(ModelResponseError, match="설치되어 있지"):
+    with pytest.raises(ModelResponseError, match="대상 Ollama 서버에 설치되어 있지"):
+        OllamaClient().check_ready()
+
+
+@pytest.mark.parametrize("digest", [None, "", "abc", "z" * 64])
+def test_check_ready_rejects_invalid_selected_model_digest(
+    monkeypatch,
+    digest,
+):
+    replies = iter(
+        [
+            {"version": "0.32.4"},
+            {
+                "models": [
+                    {
+                        "name": "gemma4:26b",
+                        "digest": digest,
+                    }
+                ]
+            },
+        ]
+    )
+    monkeypatch.setattr(
+        "llm.client.urllib.request.urlopen",
+        lambda request, timeout: FakeHTTPResponse(next(replies)),
+    )
+
+    with pytest.raises(ModelResponseError, match="SHA-256 digest"):
         OllamaClient().check_ready()
 
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -10,7 +11,7 @@ from typing import Protocol, runtime_checkable
 
 
 DEFAULT_BASE_URL = "http://127.0.0.1:11434"
-DEFAULT_MODEL_NAME = "qwen3:14b"
+DEFAULT_MODEL_NAME = "gemma4:26b"
 DEFAULT_TIMEOUT_SECONDS = 180
 DEFAULT_NUM_CTX = 16_384
 DEFAULT_KEEP_ALIVE = "10m"
@@ -86,6 +87,9 @@ class ModelClient(Protocol):
 
 class OllamaClient:
     """로컬 Ollama의 ``/api/chat``을 호출하는 작은 HTTP client."""
+
+    provider = "ollama"
+    execution_mode = "contest_local_or_self_hosted"
 
     def __init__(
         self,
@@ -187,7 +191,7 @@ class OllamaClient:
         return self._parse_chat_reply(payload)
 
     def check_ready(self) -> dict[str, str]:
-        """서버 응답과 요청 모델의 로컬 설치 여부를 확인한다.
+        """서버 응답과 요청 모델의 대상 Ollama 서버 설치 여부를 확인한다.
 
         이 함수는 추론을 실행하지 않는다. 버전과 설치 모델 목록만 읽는다.
         """
@@ -206,24 +210,36 @@ class OllamaClient:
                 "Ollama 모델 목록 응답에 models 배열이 없습니다."
             )
 
-        installed_names: set[str] = set()
+        selected_model: dict | None = None
         for model in models:
             if not isinstance(model, dict):
                 raise ModelResponseError(
                     "Ollama 모델 목록에 객체가 아닌 항목이 있습니다."
                 )
             name = model.get("name")
-            if isinstance(name, str) and name:
-                installed_names.add(name)
+            if name == self.model_name:
+                selected_model = model
 
-        if self.model_name not in installed_names:
+        if selected_model is None:
             raise ModelResponseError(
-                f"요청 모델이 로컬에 설치되어 있지 않습니다: {self.model_name}"
+                "요청 모델이 대상 Ollama 서버에 설치되어 있지 않습니다: "
+                f"{self.model_name}"
+            )
+
+        digest = selected_model.get("digest")
+        if not isinstance(digest, str) or re.fullmatch(
+            r"[0-9a-fA-F]{64}",
+            digest,
+        ) is None:
+            raise ModelResponseError(
+                "대상 Ollama 서버의 선택 모델에 유효한 SHA-256 digest가 "
+                "없습니다."
             )
 
         return {
             "server_version": version,
             "model_name": self.model_name,
+            "model_digest": digest.lower(),
         }
 
     def _get_json(self, path: str) -> dict:

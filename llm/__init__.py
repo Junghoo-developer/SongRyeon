@@ -12,6 +12,7 @@ from .client import (
     ModelResponseError,
     OllamaClient,
 )
+from .openai_compatible import OpenAICompatibleIntegrationClient
 
 __all__ = [
     "ModelCallError",
@@ -20,4 +21,5 @@ __all__ = [
     "ModelReply",
     "ModelResponseError",
     "OllamaClient",
+    "OpenAICompatibleIntegrationClient",
 ]
