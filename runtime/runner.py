@@ -47,6 +47,8 @@ class DemoTurnResult:
     node2_rejections: int
     node3_drafts: int
     node4_rejections: int
+    node2_limit_exhausted: bool
+    node4_limit_exhausted: bool
     final_outcome: str
 
 
@@ -299,5 +301,7 @@ def run_demo_turn(
         node2_rejections=state.node2_rejections,
         node3_drafts=node3_drafts,
         node4_rejections=state.node4_rejections,
+        node2_limit_exhausted=state.node2_limit_exhausted,
+        node4_limit_exhausted=state.node4_limit_exhausted,
         final_outcome=final_outcome,
     )

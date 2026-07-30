@@ -8,6 +8,16 @@ from .schema import (
     FactMatchMetrics,
     RecordedRun,
 )
+from .runner import (
+    BenchmarkManifest,
+    RunArtifact,
+    RunBundle,
+    build_report,
+    load_manifest,
+    load_run_bundle,
+    run_evaluation,
+    write_report,
+)
 from .summary import (
     EvaluationSummary,
     compare_systems,
@@ -15,14 +25,22 @@ from .summary import (
 )
 
 __all__ = [
+    "BenchmarkManifest",
     "EvaluationCase",
     "EvaluationResult",
     "EvaluationSummary",
     "ExecutionFact",
     "FactMatchMetrics",
     "RecordedRun",
+    "RunArtifact",
+    "RunBundle",
+    "build_report",
     "compare_systems",
     "evaluate_run",
     "evaluate_runs",
+    "load_manifest",
+    "load_run_bundle",
+    "run_evaluation",
     "summarize_results",
+    "write_report",
 ]

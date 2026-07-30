@@ -1,6 +1,7 @@
 """실제 Ollama를 호출하지 않는 데모 CLI 설정 테스트."""
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -23,6 +24,43 @@ def test_parser_uses_large_local_model_defaults():
     assert args.num_ctx == DEFAULT_NUM_CTX
     assert args.timeout_seconds == DEFAULT_TIMEOUT_SECONDS
     assert args.keep_alive == DEFAULT_KEEP_ALIVE
+
+
+def test_run_one_discloses_each_exhausted_review_gate(
+    monkeypatch,
+    capsys,
+    tmp_path,
+):
+    monkeypatch.setattr(
+        cli,
+        "run_demo_turn",
+        lambda *args, **kwargs: SimpleNamespace(
+            answer="검증 한도 뒤 전달된 답변",
+            total_tool_calls=0,
+            node2_rejections=3,
+            node4_rejections=3,
+            node2_limit_exhausted=True,
+            node4_limit_exhausted=True,
+        ),
+    )
+
+    cli._run_one(
+        "질문",
+        client=object(),
+        toolbox=object(),
+        memory_path=tmp_path / "memory.jsonl",
+    )
+
+    output = capsys.readouterr().out
+    assert "Node2 반려 한도를 넘어" in output
+    assert "증거 검증이 완료되지 않은 채" in output
+    assert "Node4 반려 한도를 넘어" in output
+    assert "검열 permit을 받지 못한 상태" in output
+    assert "[검증 미완료]" in output
+    assert "송련 (검증 미완료)>" in output
+    assert output.index("[검증 미완료]") < output.index(
+        "검증 한도 뒤 전달된 답변"
+    )
 
 
 def test_main_passes_self_hosted_runtime_options_to_client(

@@ -52,6 +52,8 @@ def test_node2_first_three_rejects_start_new_node1_rounds(
     assert fourth.rejection_count == 3
     assert fourth.rejection_ignored is True
     assert state.node1_round == 4
+    assert state.node2_limit_exhausted is True
+    assert state.node4_limit_exhausted is False
 
 
 def test_node2_permit_advances_without_a_rejection(tmp_path):
@@ -98,6 +100,8 @@ def test_node4_counter_is_independent_and_fourth_reject_finishes(
     assert fourth.rejection_ignored is True
     assert state.node4_rejections == 3
     assert state.node2_rejections == 2
+    assert state.node4_limit_exhausted is True
+    assert state.node2_limit_exhausted is False
 
 
 def test_gate_log_separates_relative_judgement_from_absolute_action(

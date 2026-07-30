@@ -11,7 +11,14 @@ maximum runtime budget.
 
 ## Initial case groups
 
-Start with five cases in each group and expand only after the runner is stable.
+The current frozen manifest is a **P0 pilot**: it has ten cases total and at
+least one case for every group below. Its purpose is to validate the manifest,
+capture and normalization contracts. It is not large enough to support a
+public comparative performance claim.
+
+Before publishing comparative results, expand every group to at least five
+cases, freeze the expanded manifest under a new ID and SHA-256, and rerun every
+system on the complete expanded matrix.
 
 | Group | Observable failure |
 |---|---|

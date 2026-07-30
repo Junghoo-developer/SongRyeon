@@ -122,7 +122,27 @@ def _run_one(question, *, client, toolbox, memory_path):
         memory_path=memory_path,
         on_event=_progress,
     )
-    print("\n송련>\n" + result.answer)
+    warning_messages = []
+    if result.node2_limit_exhausted:
+        warning_messages.append(
+            "주의: Node2 반려 한도를 넘어 증거 검증이 완료되지 않은 채 "
+            "답변 단계로 진행했습니다."
+        )
+    if result.node4_limit_exhausted:
+        warning_messages.append(
+            "주의: Node4 반려 한도를 넘어 최종 답변은 검열 permit을 "
+            "받지 못한 상태로 전달됐습니다."
+        )
+
+    if warning_messages:
+        print("\n[검증 미완료]")
+        for message in warning_messages:
+            print(message)
+        answer_label = "송련 (검증 미완료)>"
+    else:
+        answer_label = "송련>"
+
+    print(f"\n{answer_label}\n" + result.answer)
     print(
         "\n"
         f"(도구 {result.total_tool_calls}회, "

@@ -154,36 +154,119 @@ memory/agent_view.py
 
 ## 실행 방법
 
-먼저 프로젝트와 테스트 도구를 설치합니다.
+### 1. Ollama와 모델 준비
+
+Ollama를 [공식 설치 페이지](https://ollama.com/download)에서 설치한 뒤 서버를
+실행하고 기본 모델을 받습니다. Windows PowerShell에서는 다음 순서입니다.
 
 ```powershell
-python -m pip install -e ".[test]"
+ollama serve
+# 위 창을 열어 둔 채 새 PowerShell에서 실행
+ollama pull gemma4:26b
 ```
 
-프로젝트 폴더에서 전체 테스트를 실행합니다.
+Linux의 Bash에서는 공식 설치 스크립트를 사용한 뒤 같은 방식으로 준비합니다.
+
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+ollama serve
+# 위 프로세스를 유지한 채 새 터미널에서 실행
+ollama pull gemma4:26b
+```
+
+Ollama 앱이 이미 백그라운드에서 실행 중이면 `ollama serve`를 다시 실행할
+필요가 없습니다. `gemma4:26b` 다운로드는 약 17 GB지만, 이는 다운로드
+크기일 뿐 최소 RAM 요구량을 뜻하지 않습니다. 검증에 사용한 PC의 64 GB
+메모리도 최소 사양이 아닙니다. 실제 실행 가능 여부와 속도는 운영체제,
+CPU·GPU, 메모리 구성에 따라 달라집니다.
+
+### 2. 프로젝트와 테스트 준비
+
+PowerShell:
 
 ```powershell
+git clone --branch refoundation/songryeon-v1 --single-branch https://github.com/Junghoo-developer/SongRyeon.git SongRyeon_Core_v1
+Set-Location SongRyeon_Core_v1
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -e ".[test]"
 python -m pytest -q
 ```
 
-로컬 Ollama와 설치된 대회용 대형 모델 `gemma4:26b`로 한 턴을 실행합니다.
+Bash:
+
+```bash
+git clone --branch refoundation/songryeon-v1 --single-branch https://github.com/Junghoo-developer/SongRyeon.git SongRyeon_Core_v1
+cd SongRyeon_Core_v1
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e ".[test]"
+python -m pytest -q
+```
+
+이미 프로젝트를 내려받았다면 `git clone`과 폴더 이동만 생략하면 됩니다.
+
+### 3. 데모 실행
+
+기본값이 `gemma4:26b`이므로 `--model`을 반복해서 적지 않아도 됩니다.
 
 ```powershell
-python -m demo --model gemma4:26b `
+python -m demo `
   "nodes/review.py를 실제 도구로 읽고 역할을 설명해 줘."
 ```
 
-질문을 생략하면 대화형 화면이 열립니다. 기본 실행은 실제
-`memory/memory.jsonl`에 모든 원본을 추가합니다. 별도 시험 로그를 쓰려면
-`--memory .\tmp\demo-memory.jsonl`을 지정합니다.
-
-더 작은 비교 기준선으로 같은 입력을 실행하려면 모델만 바꿉니다.
+editable 설치 후에는 아래 명령도 같은 CLI를 실행합니다.
 
 ```powershell
+songryeon "nodes/review.py를 실제 도구로 읽고 역할을 설명해 줘."
+```
+
+`songryeon`을 찾지 못하면 가상환경이 활성화됐는지 확인하거나
+`python -m demo`를 사용합니다. 질문을 생략하면 대화형 화면이 열립니다.
+기본 실행은 실제 `memory/memory.jsonl`에 모든 원본을 추가하므로, 단순
+시험에서는 별도 로그를 지정하는 편이 안전합니다.
+
+```powershell
+python -m demo --memory .\tmp\demo-memory.jsonl
+```
+
+Bash에서는 경로 구분자만 바꿉니다.
+
+```bash
+python -m demo --memory ./tmp/demo-memory.jsonl \
+  "nodes/review.py를 실제 도구로 읽고 역할을 설명해 줘."
+```
+
+더 작은 `qwen3:14b`는 기본 모델이나 저사양 대체 모델이 아니라 **비교평가
+기준선**입니다. 기준선 결과를 재현할 때만 별도로 받아 모델을 명시합니다.
+
+```powershell
+ollama pull qwen3:14b
 python -m demo --model qwen3:14b `
   --memory .\tmp\baseline-memory.jsonl `
   "nodes/review.py를 실제 도구로 읽고 역할을 설명해 줘."
 ```
+
+주요 로컬·자체 호스팅 옵션은 다음과 같습니다.
+
+```text
+--model             Ollama 모델 태그 (기본 gemma4:26b)
+--base-url          Ollama 서버 주소 (기본 http://127.0.0.1:11434)
+--num-ctx           요청 컨텍스트 크기 (기본 16384)
+--timeout-seconds   HTTP 요청 제한 시간, 초 (기본 180)
+--keep-alive        Ollama가 모델을 메모리에 유지할 시간 (기본 10m)
+--memory            원본 JSONL 경로
+--project-root      Node1이 읽을 수 있는 프로젝트 루트
+```
+
+전체 옵션과 현재 기본값은 `python -m demo --help`로 확인합니다.
+
+Node2 또는 Node4가 세 번의 반려 뒤에도 다시 reject하면 코드가 실행을
+끝내기 위해 다음 단계로 진행하지만, 이를 permit으로 가장하지 않습니다.
+CLI는 각각 증거 검증 또는 최종 답변 검열이 완료되지 않았다는 주의를
+명시합니다.
 
 대회 제출·시연의 기본 경로는 **로컬 또는 자체 호스팅 Ollama에서 직접
 실행하는 오픈웨이트 모델**입니다. 외부 상용 API는 자동 대체 경로로

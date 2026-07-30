@@ -42,6 +42,14 @@ include = [
     "runtime*",
 ]
 
+[tool.setuptools.package-data]
+evals = [
+    "cases/*.json",
+    "cases/*.py",
+    "cases/project/*.py",
+    "cases/project/nested/*.py",
+]
+
 [tool.pytest.ini_options]
 # 어느 폴더에서 테스트를 시작해도 프로젝트 패키지를 찾게 한다.
 pythonpath = ["."]

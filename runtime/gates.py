@@ -92,11 +92,15 @@ def apply_gate_decision(
 
     if reviewer == NODE2:
         state.node2_rejections = resolution.rejection_count
+        if resolution.rejection_ignored:
+            state.node2_limit_exhausted = True
 
         if resolution.outcome == "reject_applied":
             state.node1_round += 1
             state.node1_tool_calls_in_round = 0
     else:
         state.node4_rejections = resolution.rejection_count
+        if resolution.rejection_ignored:
+            state.node4_limit_exhausted = True
 
     return resolution

@@ -1,29 +1,54 @@
 # 송련 네 노드 데모 읽는 순서
 
 이 문서는 `python -m demo`가 사용자 입력 하나를 어떻게 처리하는지 코드
-순서대로 따라가기 위한 학습 안내서다. 데모는 로컬 Ollama의 `qwen3:14b`를
-사용하며 모델 다운로드나 외부 API key가 필요하지 않다.
+순서대로 따라가기 위한 학습 안내서다. 기본 데모는 로컬 또는 자체 호스팅
+Ollama의 오픈웨이트 `gemma4:26b`를 사용한다. 외부 API key는 필요 없지만,
+Ollama 설치와 모델 다운로드는 먼저 해야 한다.
 
 ## 가장 먼저 실행하기
 
-프로젝트 폴더에서 다음 명령을 실행한다.
+먼저 README의 `실행 방법`에 따라 Ollama, `gemma4:26b`, 가상환경을
+준비한다. 깨끗한 복제부터 PowerShell·Bash별 전체 명령이 필요하면
+[`reproducibility.md`](reproducibility.md)를 따른다. 준비가 끝나면 프로젝트
+폴더에서 다음 명령을 실행한다.
 
 ```powershell
-python -m demo "nodes/review.py를 실제 도구로 읽고 역할을 세 문장으로 설명해 줘."
+python -m demo --memory .\tmp\demo-memory.jsonl `
+  "nodes/review.py를 실제 도구로 읽고 역할을 세 문장으로 설명해 줘."
 ```
 
-질문을 생략하면 여러 번 입력할 수 있는 대화형 화면이 열린다.
+`gemma4:26b`가 기본값이므로 `--model`은 생략했다. editable 설치로 생성된
+`songryeon` 명령도 같은 CLI다.
 
 ```powershell
-python -m demo
+songryeon --memory .\tmp\demo-memory.jsonl `
+  "nodes/review.py를 실제 도구로 읽고 역할을 세 문장으로 설명해 줘."
 ```
 
-기본 실행은 실제 원본인 `memory/memory.jsonl`에 기록한다. 원본과 분리해
-시험하고 싶다면 다른 경로를 명시한다.
+`songryeon`을 찾지 못하면 가상환경을 다시 활성화하거나 `python -m demo`를
+사용한다. 질문을 생략하면 여러 번 입력할 수 있는 대화형 화면이 열린다.
 
 ```powershell
-python -m demo --memory .\tmp\demo-memory.jsonl "nodes/review.py를 설명해 줘."
+python -m demo --memory .\tmp\demo-memory.jsonl
 ```
+
+`--memory`를 생략한 로컬 실행은 실제 원본인 `memory/memory.jsonl`에
+기록한다. 따라서 학습·시험 중에는 위처럼 격리된 경로를 권장한다.
+
+Linux Bash에서는 같은 명령을 다음처럼 실행한다.
+
+```bash
+python -m demo --memory ./tmp/demo-memory.jsonl \
+  "nodes/review.py를 실제 도구로 읽고 역할을 세 문장으로 설명해 줘."
+```
+
+`qwen3:14b`는 이전 기본값이나 자동 대체 모델이 아니라 비교평가 기준선이다.
+기준선을 재현할 때만 `ollama pull qwen3:14b` 후
+`--model qwen3:14b`를 명시한다.
+
+현재 모델·서버·컨텍스트·제한 시간 설정은 각각 `--model`, `--base-url`,
+`--num-ctx`, `--timeout-seconds`, `--keep-alive`로 바꿀 수 있다. 정확한
+기본값은 `python -m demo --help`에서 확인한다.
 
 ## 한 턴의 전체 흐름
 
@@ -47,7 +72,10 @@ Node4: 답변이 A를 왜곡했는지 permit / reject
 
 Node2가 reject하면 Node1의 새 라운드로 돌아간다. Node4가 reject하면
 Node3가 답변을 다시 쓴다. 두 검토 노드의 처음 세 reject만 적용되고 네 번째
-reject는 원본에 기록한 뒤 코드가 무시한다.
+reject는 원본에 기록한 뒤 코드가 한도를 초과한 reject로 처리한다. 이 경우
+실행을 끝내기 위해 다음 단계로 진행하지만 permit으로 바꾸지는 않는다.
+최종 화면에는 Node2라면 증거 검증 미완료, Node4라면 검열 permit 미획득
+경고가 명시된다.
 
 ## 파일을 읽는 추천 순서
 

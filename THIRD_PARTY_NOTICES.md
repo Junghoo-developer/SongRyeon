@@ -8,7 +8,8 @@ They are installed separately by the user.
 - Project: Gemma 4 26B
 - Provider: Google
 - Source: https://ollama.com/library/gemma4:26b
-- Ollama tag and model ID: `gemma4:26b` / `5571076f3d70`
+- Ollama tag and digest: `gemma4:26b` /
+  `5571076f3d70050487b26b341705799e0ab29b808164f90d20d4cf84f699d251`
 - Parameters and quantization: 25.8B / `Q4_K_M`
 - License: Apache License 2.0
 - Use in SongRyeon: contest-large model executed locally or on a self-hosted
@@ -19,6 +20,8 @@ They are installed separately by the user.
 - Project: Qwen3-14B
 - Provider: Qwen / Alibaba Cloud
 - Source: https://huggingface.co/Qwen/Qwen3-14B
+- Ollama tag and digest: `qwen3:14b` /
+  `bdbd181c33f2ed1b31c972991882db3cf4d192569092138a7d29e973cd9debe8`
 - License: Apache License 2.0
 - Use in SongRyeon: smaller locally executed comparison baseline
 

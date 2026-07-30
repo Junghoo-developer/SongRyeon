@@ -56,6 +56,8 @@ class TurnState:
     node2_rejections: int = 0
     node4_rejections: int = 0
     node1_omit_recovery_used: bool = False
+    node2_limit_exhausted: bool = False
+    node4_limit_exhausted: bool = False
 
 
 @dataclass(frozen=True)

@@ -366,6 +366,8 @@ def test_happy_path_uses_two_tools_and_preserves_visibility_boundaries(
     assert result.node2_rejections == 0
     assert result.node3_drafts == 1
     assert result.node4_rejections == 0
+    assert result.node2_limit_exhausted is False
+    assert result.node4_limit_exhausted is False
     assert result.final_outcome == "permit_applied"
 
     first_tool_prompt = model.calls[1]["user_prompt"]
@@ -1326,3 +1328,71 @@ def test_invalid_excerpt_retries_decision_without_reexecuting_tool(
         record["information"]
         for record in _records_of_type(raw, "model_raw_status")
     ].count("invalid") == 1
+
+
+def test_node2_fourth_reject_is_returned_as_unverified_state(tmp_path):
+    model = ScriptedModel(
+        [
+            ("node1_action", _route_action()),
+            ("node2", _review("reject", "첫 증거 반려")),
+            ("node1_action", _route_action()),
+            ("node2", _review("reject", "둘째 증거 반려")),
+            ("node1_action", _route_action()),
+            ("node2", _review("reject", "셋째 증거 반려")),
+            ("node1_action", _route_action()),
+            ("node2", _review("reject", "한도 뒤 넷째 반려")),
+            ("node3", _answer("검증 미완료 답변")),
+            ("node4", _review("permit", "답변 자체는 A를 왜곡하지 않음")),
+        ]
+    )
+    toolbox = RecordingToolbox([])
+
+    result = run_demo_turn(
+        "현재 기록으로 답해줘.",
+        client=model,
+        toolbox=toolbox,
+        memory_path=tmp_path / "memory.jsonl",
+    )
+
+    model.assert_finished()
+    toolbox.assert_finished()
+    assert result.answer == "검증 미완료 답변"
+    assert result.node1_rounds == 4
+    assert result.node2_rejections == 3
+    assert result.node2_limit_exhausted is True
+    assert result.node4_limit_exhausted is False
+    assert result.final_outcome == "permit_applied"
+
+
+def test_node4_fourth_reject_marks_delivered_answer_unpermitted(tmp_path):
+    model = ScriptedModel(
+        [
+            ("node1_action", _route_action()),
+            ("node2", _review("permit", "증거 충분")),
+            ("node3", _answer("첫 답변")),
+            ("node4", _review("reject", "첫 답변 반려")),
+            ("node3", _answer("둘째 답변")),
+            ("node4", _review("reject", "둘째 답변 반려")),
+            ("node3", _answer("셋째 답변")),
+            ("node4", _review("reject", "셋째 답변 반려")),
+            ("node3", _answer("넷째 미허가 답변")),
+            ("node4", _review("reject", "한도 뒤 넷째 반려")),
+        ]
+    )
+    toolbox = RecordingToolbox([])
+
+    result = run_demo_turn(
+        "현재 기록으로 답해줘.",
+        client=model,
+        toolbox=toolbox,
+        memory_path=tmp_path / "memory.jsonl",
+    )
+
+    model.assert_finished()
+    toolbox.assert_finished()
+    assert result.answer == "넷째 미허가 답변"
+    assert result.node3_drafts == 4
+    assert result.node4_rejections == 3
+    assert result.node2_limit_exhausted is False
+    assert result.node4_limit_exhausted is True
+    assert result.final_outcome == "reject_ignored_limit"
