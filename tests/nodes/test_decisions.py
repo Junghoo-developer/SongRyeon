@@ -10,7 +10,6 @@ from nodes import (
     build_text_chunks,
     select_retained_content,
 )
-from nodes.decisions import MAX_REVIEW_CHARACTERS
 
 
 def test_full_and_omit_keep_the_exact_contract():
@@ -139,7 +138,7 @@ def test_full_and_omit_reject_unnecessary_positions():
         )
 
 
-def test_decisions_require_known_values_and_short_reasons():
+def test_decisions_require_known_values_and_nonempty_reasons():
     with pytest.raises(ValueError):
         RetentionDecision("unknown", "이유")
 
@@ -149,11 +148,8 @@ def test_decisions_require_known_values_and_short_reasons():
     with pytest.raises(ValueError):
         ReviewDecision("reject", " ")
 
-    with pytest.raises(ValueError):
-        ReviewDecision(
-            "permit",
-            "가" * (MAX_REVIEW_CHARACTERS + 1),
-        )
+    long_reason = "가" * 5_000
+    assert ReviewDecision("permit", long_reason).reason == long_reason
 
 
 def test_node1_action_requires_tool_fields_only_for_tool_use():

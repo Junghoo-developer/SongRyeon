@@ -2,7 +2,11 @@
 
 ``runner.py``는 노드 이동만 읽을 수 있게 하고, 모델에게 무엇을 보내는지는
 이 파일에서 확인할 수 있게 분리했다. 매 메서드는 호출 직전에 턴 시작 때
-고정한 기준점부터 현재 끝까지의 같은 시야를 다시 읽는다.
+고정한 같은 기억 구간을 읽되, Node1·3은 A+R을 보고 Node2·4는 A만 본다.
+
+학습할 때 각 ``ask_*`` 메서드를 같은 네 칸으로 읽는다.
+``prompt builder → JSON schema → parser → token budget``. 모델은 문자열을
+내지만, 이 경계를 통과한 뒤 런타임에는 검증된 domain 객체만 돌아간다.
 """
 
 from functools import partial
@@ -51,7 +55,8 @@ from .state import (
 
 
 NODE1_NUM_PREDICT = 1_024
-REVIEW_NUM_PREDICT = 256
+NODE1_RECOVERY_CHOICE_NUM_PREDICT = 256
+REVIEW_NUM_PREDICT = 768
 NODE3_NUM_PREDICT = 2_048
 
 
@@ -82,15 +87,38 @@ class NodeCaller:
         self.memory_floor = memory_floor
         self.turn_memory_context = turn_memory_context
 
-    def _shared_memory(self):
-        """원본이 아니라 가공된 공통 에이전트 시야만 문자열로 만든다."""
+    def _memory_records(self):
+        """이번 턴에 고정된 같은 공개 기억 구간을 다시 읽는다."""
 
-        return format_agent_memory(
-            load_frozen_agent_memory(
-                self.memory_floor,
-                self.memory_path,
-            )
+        return load_frozen_agent_memory(
+            self.memory_floor,
+            self.memory_path,
         )
+
+    def _shared_memory(self):
+        """Node1·Node3가 사용할 A+R 공개 기억을 문자열로 만든다."""
+
+        return format_agent_memory(self._memory_records())
+
+    def _absolute_memory(self):
+        """Node2·Node4가 사용할 같은 구간의 A 원자만 남긴다."""
+
+        absolute_records = []
+
+        for record in self._memory_records():
+            is_absolute = record["information_class"] == "absolute"
+            is_code_verifiable = record["code_verifiable"] is True
+
+            if is_absolute != is_code_verifiable:
+                raise RuntimeError(
+                    "에이전트 시야의 정보 분류와 코드 검증 여부가 "
+                    "일치하지 않습니다."
+                )
+
+            if is_absolute:
+                absolute_records.append(record)
+
+        return format_agent_memory(absolute_records)
 
     def _ask(
         self,
@@ -132,6 +160,8 @@ class NodeCaller:
     def ask_node1_after_tool(self, observation):
         """이번 도구 원문만 일시적으로 보여주고 보존·다음 행동을 묻는다."""
 
+        # 숨김 raw 원문을 모든 노드의 공통 기억에 넣지 않는다. 이 호출의
+        # Node1만 잠시 보고, 이후에는 Node1이 고른 정확한 본문만 공개된다.
         raw_text = observation.result.observation_text
         allow_full = (
             len(raw_text) <= DEFAULT_MAX_SELECTED_CHARACTERS
@@ -216,7 +246,7 @@ class NodeCaller:
                 parse_node1_recovery_choice,
                 candidate_count=len(candidates),
             ),
-            num_predict=REVIEW_NUM_PREDICT,
+            num_predict=NODE1_RECOVERY_CHOICE_NUM_PREDICT,
         )
 
     def ask_node1_recovery_retention(
@@ -272,13 +302,13 @@ class NodeCaller:
         )
 
     def ask_node2_review(self):
-        """Node2에게 현재 공개 증거의 충분성을 묻는다."""
+        """Node2에게 A-only 시야로 공개 증거의 충분성을 묻는다."""
 
         return self._ask(
             node_name=NODE2,
             prompts=build_node2_prompts(
                 self.user_input,
-                self._shared_memory(),
+                self._absolute_memory(),
                 turn_memory_context=self.turn_memory_context,
             ),
             schema=REVIEW_DECISION_SCHEMA,
@@ -302,13 +332,13 @@ class NodeCaller:
         )
 
     def ask_node4_review(self, candidate_answer):
-        """Node4에게 현재 답변과 A 기록의 일치 여부를 묻는다."""
+        """Node4에게 A-only 시야와 현재 답변의 일치 여부를 묻는다."""
 
         return self._ask(
             node_name=NODE4,
             prompts=build_node4_prompts(
                 self.user_input,
-                self._shared_memory(),
+                self._absolute_memory(),
                 candidate_answer,
                 turn_memory_context=self.turn_memory_context,
             ),

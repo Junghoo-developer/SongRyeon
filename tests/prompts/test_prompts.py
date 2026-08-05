@@ -2,6 +2,7 @@
 
 from memory.agent_view import TurnMemoryContext
 from prompts import (
+    build_node1_action_prompts,
     build_node1_recovery_choice_prompts,
     build_node1_recovery_retention_prompts,
     build_node1_tool_prompts,
@@ -16,6 +17,26 @@ TURN_MEMORY_CONTEXT = TurnMemoryContext(
     previous_user_input_index=7,
     previous_user_input="직전 파일을 더 확인해 줘.",
 )
+
+
+def test_node1_directly_checks_a_user_specified_python_path():
+    system_prompt, _ = build_node1_action_prompts(
+        "../outside_root.py를 읽어 줘.",
+        "",
+        turn_memory_context=TURN_MEMORY_CONTEXT,
+    )
+
+    assert "사용자가 확인하라고 명시한 정확한 `.py` 경로" in system_prompt
+    assert "파일 목록에서 확인되지\n않았더라도" in system_prompt
+    assert "성공·실패 결과와\n오류 문구 자체가 다음 노드가 사용할 공개 A" in (
+        system_prompt
+    )
+    assert "미리 추측하지 말고 도구의 실제 결과로 확인" in system_prompt
+    assert (
+        'arguments={"path":"사용자가 명시한 정확한 .py 경로 또는 '
+        '목록에서 확인한 상대경로.py"}'
+        in system_prompt
+    )
 
 
 def test_only_node1_tool_prompt_receives_transient_raw_text():
@@ -51,34 +72,94 @@ def test_only_node1_tool_prompt_receives_transient_raw_text():
     assert secret_raw not in node4_prompt
 
 
-def test_node2_explicitly_reviews_evidence_not_final_answer_format():
-    system_prompt, _ = build_node2_prompts(
+def test_all_nodes_see_omit_review_as_r_without_source_authority():
+    builders = [
+        lambda: build_node1_tool_prompts(
+            "파일을 설명해 줘.",
+            "",
+            tool_name="read_python_file",
+            tool_success=True,
+            raw_text="VALUE = 1\n",
+            turn_memory_context=TURN_MEMORY_CONTEXT,
+        ),
+        lambda: build_node2_prompts(
+            "파일을 설명해 줘.",
+            "",
+            turn_memory_context=TURN_MEMORY_CONTEXT,
+        ),
+        lambda: build_node3_prompts(
+            "파일을 설명해 줘.",
+            "",
+            turn_memory_context=TURN_MEMORY_CONTEXT,
+        ),
+        lambda: build_node4_prompts(
+            "파일을 설명해 줘.",
+            "",
+            "답변 후보",
+            turn_memory_context=TURN_MEMORY_CONTEXT,
+        ),
+    ]
+
+    for builder in builders:
+        system_prompt, _ = builder()
+        assert "`node1_tool_review_<mode>`의 본문은 언제나" in (
+            system_prompt
+        )
+        assert "`node1_tool_review_omit`은 해당 원문이 공개 A로" in (
+            system_prompt
+        )
+        assert "review 자체는 A가 아니다" in system_prompt
+        assert "사실 권한은\n  실제 공개된 `tool_result_content`에만" in (
+            system_prompt
+        )
+        assert "코드·파일 사실의 근거로 쓰지 마라" in system_prompt
+
+
+def test_node2_uses_answerability_as_its_stop_rule():
+    system_prompt, user_prompt = build_node2_prompts(
         "x.py를 세 문장으로 설명해 줘.",
         "",
         turn_memory_context=TURN_MEMORY_CONTEXT,
     )
 
-    assert "최종 답변이 아니라 증거만 검사한다" in system_prompt
-    assert "세 문장 설명이 아직 없다는 것은 reject 이유가 아니다" in (
+    assert "증거 수집 종료 심사 노드" in system_prompt
+    assert "`absolute` 원자만 골라 전달" in system_prompt
+    assert "목표 해석용 R일 뿐 증거가 아니다" in system_prompt
+    assert "현재 공개 A를 왜곡하거나 없는 사실을 지어내지 않고" in (
         system_prompt
     )
-    assert "필요한 파일 또는 구현 범위가 빠졌다면 reject" in system_prompt
-    assert "주관적·창작·" in system_prompt
-    assert "A 증거가 없어도 즉시 permit" in system_prompt
-    assert "증거를 모을 수 없다는 말은 그 자체로 reject" in system_prompt
-    assert "파일의 일반\n   역할만 확인됐다는 이유" in system_prompt
-    assert "바꿀 대상을 판단할 수 있는 완결된 구현 단위" in system_prompt
-    assert "함수나 메서드의 처음부터\n   끝" in system_prompt
-    assert "본문이 중간에서 잘렸다면 개선·비평 근거로 불충분" in system_prompt
-    assert "개선안 자체는 Node3가 새로 만드는 R" in system_prompt
-    assert "일부 본문만 보고 기능·검사·예외 처리가\n   없거나 부족하거나 미구현" in (
+    assert "사용자의 현재 입력에 유용하게 답할 수 있다" in system_prompt
+    assert "A와 충돌하는 전제나 결론을 요구하더라도" in system_prompt
+    assert "이를 바로잡아 답할 수 있으면 permit한다" in system_prompt
+    assert "현재 A로 사용자의 명시적인 요구를 지어내지 않고" not in (
         system_prompt
     )
-    assert "가장 좋은 파일이나 저장소 전체는\n   필요 없지만" in system_prompt
-    assert "서로 떨어진 여러 `chunk`와 Node1의 R review" in system_prompt
-    assert "비평 대상의 시작과 끝을 둘 다 직접" in system_prompt
-    assert "아무 코드나 읽고 개선점을 알려줘" not in system_prompt
-    assert "비평할 함수의 완결된 본문이 없으므로" in system_prompt
+    assert "명시적인 요구를 답하는 데 반드시 필요한 A가 빠져 있고" in (
+        system_prompt
+    )
+    assert "그 A를 다음 Node1 라운드에서 실제로 구할 수 있다" in (
+        system_prompt
+    )
+    assert "더 읽으면 답변이 조금 좋아지거나 자세해진다는 이유만으로" in (
+        system_prompt
+    )
+    assert "명시적인 요구에 필수가 아니면 reject하지 마라" in system_prompt
+    assert "읽기 전용 도구로 실제로 구할 수 없으면 reject하지 마라" in (
+        system_prompt
+    )
+    assert "`read_python_file`의 실패 결과와 오류 문구도 코드가 확인한 A" in (
+        system_prompt
+    )
+    assert "내용이 없다는 이유로 reject하지 말고 현재 한계를" in system_prompt
+    assert "도구 실패 A가 이미 접근 불가를 확정했고" in user_prompt
+    assert "같은 내용을 다시 구하려고 reject하지 마라" in user_prompt
+    assert "빠진 필수 A, 그것이 필요한 이유" in system_prompt
+    assert "지금 답변할 수 있는지" in user_prompt
+
+    schema_section = system_prompt.split("반환 JSON 스키마:", 1)[1]
+    assert schema_section.index('"reason"') < schema_section.index(
+        '"verdict"'
+    )
 
 
 def test_node3_knows_its_user_facing_identity_and_node_boundaries():
@@ -100,7 +181,12 @@ def test_node3_knows_its_user_facing_identity_and_node_boundaries():
     assert "내부\n  라우팅 기록" in system_prompt
     assert "현재 턴의 Node4 reject\n  reason만 수정 지시" in system_prompt
     assert "과거 node3_answer를 답변으로" in system_prompt
-    assert "현재 턴의 Node1 review는 R 분석 단서" in system_prompt
+    assert "현재 턴의 `node1_tool_review_<mode>`는 R 분석 단서" in (
+        system_prompt
+    )
+    assert "`node1_tool_review_omit`의 내용은 답변의 코드 사실로" in (
+        system_prompt
+    )
     assert "선택 보존된 A 본문과 직접 대조" in system_prompt
 
 
@@ -169,30 +255,36 @@ def test_node2_rechecks_latest_a_after_a_repeated_reason():
         turn_memory_context=TURN_MEMORY_CONTEXT,
     )
 
-    assert user_prompt.rfind("이전 reason이나 시스템 예시를 복사하지 말고") > (
+    assert user_prompt.rfind(
+        "현재 턴의 이전 Node2 decision/reason은 보완 이력인 R"
+    ) > (
         user_prompt.index(repeated_reason_marker)
     )
     assert user_prompt.rfind(
-        "비평 대상의 완결된 구현 근거가 있는지는 엄격히 검사하라"
+        "가장 최근까지 공개된 A"
     ) > user_prompt.index(repeated_reason_marker)
-    assert "비연속 청크나 Node1 review를 이어 붙여 전체를" in user_prompt
+    assert "지금 답변할 수 있는지" in user_prompt
 
 
 def test_node4_does_not_enforce_a_past_task_on_the_current_answer():
-    system_prompt, _ = build_node4_prompts(
-        "너는 무슨 일을 할 수 있을 것 같아?",
+    current_input = "CURRENT_USER_INPUT_MUST_BE_HIDDEN"
+    system_prompt, user_prompt = build_node4_prompts(
+        current_input,
         "",
         "저는 질문에 답하고 문제 해결을 도울 수 있습니다.",
         turn_memory_context=TURN_MEMORY_CONTEXT,
     )
 
-    assert "과거 사용자 요청을 수행하지 않았다는 이유로 reject하지 마라" in (
-        system_prompt
-    )
+    assert "현재·직전 사용자\n입력은 Node4에 전달되지 않는다" in system_prompt
+    assert "사용자 요구 충족 여부를 추측하거나 판정하지 마라" in system_prompt
     assert "어떤 문장이 없다는 사실은 A와의 모순이나 변형이 아니다" in (
         system_prompt
     )
-    assert "과거 코드 요청을 수행하지 않았다는 것은" in system_prompt
+    assert current_input not in user_prompt
+    assert TURN_MEMORY_CONTEXT.previous_user_input not in user_prompt
+    assert "[현재 사용자 요청" not in user_prompt
+    assert "[직전 사용자 입력" not in user_prompt
+    assert "[현재 검열할 Node3 답변]" in user_prompt
 
 
 def test_node4_does_not_treat_a_past_node3_answer_as_absolute_truth():
@@ -204,10 +296,14 @@ def test_node4_does_not_treat_a_past_node3_answer_as_absolute_truth():
     )
 
     assert "`node3_answer`의 내용은 R" in system_prompt
+    assert "`absolute` 원자만 골라 전달" in system_prompt
+    assert "사실 근거가 아니다" in system_prompt
     assert "현재 답변과 다르다는 이유만으로" in system_prompt
     assert "과거 R과 현재 R이 다르다는 것은 A 왜곡이 아니다" in system_prompt
     assert "현재 턴과 과거 턴을 불문하고" in system_prompt
-    assert "reason, node1_tool_review의 내용은 R" in system_prompt
+    assert "`node1_tool_review` 및 `node1_tool_review_<mode>`의 내용은 R" in (
+        system_prompt
+    )
     assert "Node2의 decision과 reason은\n라우팅 기록" in system_prompt
     assert "Node4의 판정 이유로\n복사하거나 반복하지 마라" in system_prompt
     assert "개선 제안은 R" in system_prompt
@@ -215,7 +311,10 @@ def test_node4_does_not_treat_a_past_node3_answer_as_absolute_truth():
     assert "A에 기록된 개선점" in system_prompt
     assert "허용 가능한 새 R" in system_prompt
     assert "구체적인 현재 코드 주장을\n하나씩 찾고" in system_prompt
-    assert "`node1_tool_review`는 R이므로 대신 쓸 수 없다" in system_prompt
+    assert "`node1_tool_review_<mode>`는 R이므로 대신 쓸 수 없다" in (
+        system_prompt
+    )
+    assert "`node1_tool_review_omit`만 뒷받침하고" in system_prompt
     assert "이를 뒷받침할 A가 없거나 공개 범위가 일부뿐" in system_prompt
     assert "`A와 모순되지 않는다`는 것도 A가\n직접 뒷받침한다는 뜻이 아니므로" in (
         system_prompt
@@ -271,7 +370,12 @@ def test_partial_code_scope_and_unsupported_claim_rules_are_deterministic():
 
     node2_system, _ = builders[0]()
     node4_system, _ = builders[2]()
-    assert "비평할 함수의 완결된 본문이 없으므로" in node2_system
+    assert "명시적인 요구를 답하는 데 반드시 필요한 A가 빠져 있고" in (
+        node2_system
+    )
+    assert "그 A를 다음 Node1 라운드에서 실제로 구할 수 있다" in (
+        node2_system
+    )
     assert "일부 청크는 그 부재를 직접 뒷받침하지 않는다" in (
         node4_system
     )
@@ -282,7 +386,7 @@ def test_partial_code_scope_and_unsupported_claim_rules_are_deterministic():
     _, node2_user = builders[0]()
     _, node3_user = builders[1]()
     _, node4_user = builders[2]()
-    assert "대상 구현의 시작과 끝을 둘 다 지목" in node2_user
+    assert "빠진 필수 A를 다음 Node1" in node2_user
     assert "`없다`, `부족하다`, `미구현이다`처럼 파일 전체 상태" in (
         node3_user
     )
@@ -310,7 +414,7 @@ def test_node4_final_instruction_follows_repeated_internal_reason_and_answer():
     )
 
     final_instruction_index = user_prompt.rfind(
-        "decision, reason, node1_tool_review 문구를 복사하지 말고"
+        "decision, reason, node1_tool_review 계열 문구를 복사하지 말고"
     )
     assert final_instruction_index > user_prompt.index(repeated_reason_marker)
     assert final_instruction_index > user_prompt.index(answer_marker)
@@ -378,6 +482,42 @@ def test_node4_pairs_current_turn_retention_metadata_with_its_content():
     )
 
 
+def test_node4_does_not_treat_a_declaration_as_applied_behavior():
+    system_prompt, _ = build_node4_prompts(
+        "이 코드의 제한이 실제로 구현됐는지 설명해 줘.",
+        "",
+        "MAX_SIZE 상수가 있으므로 크기 제한이 구현되어 있습니다.",
+        turn_memory_context=TURN_MEMORY_CONTEXT,
+    )
+
+    assert "상수·이름·import가 보인다는 사실만으로" in system_prompt
+    assert "기능이 실제 적용되거나 실행된다고\n판단하지 마라" in system_prompt
+    assert "실제 조건 검사·분기·호출·상태 변경이\n공개 A에 보여야 한다" in (
+        system_prompt
+    )
+    assert "주석·docstring·문서에 기능 설명이 존재한다는 것만 A" in (
+        system_prompt
+    )
+    assert "실제 구현·적용됐다는 근거로 사용하지 마라" in system_prompt
+
+
+def test_node4_rejects_visibly_incomplete_answers_without_punctuation_heuristics():
+    system_prompt, user_prompt = build_node4_prompts(
+        "제한이 실제로 구현됐는지 설명해 줘.",
+        "",
+        "제한을 넘기면 ValueError(",
+        turn_memory_context=TURN_MEMORY_CONTEXT,
+    )
+
+    assert "눈에 띄게 중간에서 끊겼거나 문장이 완성되지 않아" in system_prompt
+    assert "사실 주장에 문제가 없어도 눈에 띄게 중단되거나" in system_prompt
+    assert "특정 괄호·백틱·문장부호의 존재나 개수만으로" in system_prompt
+    assert "코드 사실 주장 유무와 관계없이 reject" in system_prompt
+    assert "완결성 문제는 코드 사실 주장이 없어도 reject" in system_prompt
+    assert "문장이 완성되지 않았으면 사실성에 문제가 없어도 reject" in user_prompt
+    assert "특정 괄호·백틱·문장부호의 존재나 개수만으로는" in user_prompt
+
+
 def test_node1_recovery_prompts_choose_metadata_then_show_one_raw():
     first_secret = "FIRST_SECRET_RAW"
     second_secret = "SECOND_SECRET_RAW"
@@ -420,8 +560,10 @@ def test_node1_recovery_prompts_choose_metadata_then_show_one_raw():
     assert "second.py" in choice_prompt
     assert second_secret in recovery_prompt
     assert first_secret not in recovery_prompt
-    assert '"enum":["full","excerpt"]' in recovery_system
+    assert '"enum":["full"]' in recovery_system
+    assert '"enum":["excerpt"]' in recovery_system
     assert "omit은 사용할 수 없다" in recovery_prompt
+    assert "full이면 start와 end를 모두 null" in recovery_prompt
 
 
 def test_node1_tool_prompt_has_no_list_specific_omit_example():
@@ -444,6 +586,7 @@ def test_node1_tool_prompt_has_no_list_specific_omit_example():
     assert "현재 기능을 개선점이라고 부르지 말고" in user_prompt
     assert "현재 동작: ...; 개선 후보: ...; 이유: ..." in user_prompt
     assert "첫 청크를 자동 선택하지 말고" in user_prompt
+    assert "full 또는 omit이면 start와 end를 모두 null" in user_prompt
 
 
 def test_long_tool_raw_uses_deterministic_chunk_ids_in_the_prompt_schema():
@@ -457,9 +600,10 @@ def test_long_tool_raw_uses_deterministic_chunk_ids_in_the_prompt_schema():
         turn_memory_context=TURN_MEMORY_CONTEXT,
     )
 
-    assert '"enum":["chunk","omit"]' in system_prompt
+    assert '"enum":["chunk"]' in system_prompt
+    assert '"enum":["omit"]' in system_prompt
     assert '"enum":["full","excerpt","omit"]' not in system_prompt
-    assert '"chunk-0001","chunk-0002",null' in system_prompt
+    assert '"enum":["chunk-0001","chunk-0002"]' in system_prompt
     assert '<TOOL_CHUNK id="chunk-0001"' in user_prompt
     assert '<TOOL_CHUNK id="chunk-0002"' in user_prompt
     assert "문자 start/end를 계산하거나" in user_prompt
@@ -490,7 +634,7 @@ def test_long_recovery_raw_allows_only_a_deterministic_chunk():
     assert "문자 start/end를 계산하거나" in user_prompt
 
 
-def test_all_nodes_receive_the_same_turn_boundary_and_previous_input():
+def test_node2_and_node3_receive_the_same_turn_boundary_and_previous_input():
     builders = [
         lambda: build_node2_prompts(
             "더 읽어봐",
@@ -500,12 +644,6 @@ def test_all_nodes_receive_the_same_turn_boundary_and_previous_input():
         lambda: build_node3_prompts(
             "더 읽어봐",
             "",
-            turn_memory_context=TURN_MEMORY_CONTEXT,
-        ),
-        lambda: build_node4_prompts(
-            "더 읽어봐",
-            "",
-            "답변 후보",
             turn_memory_context=TURN_MEMORY_CONTEXT,
         ),
     ]
@@ -520,6 +658,18 @@ def test_all_nodes_receive_the_same_turn_boundary_and_previous_input():
             user_prompt
         )
         assert "번호 공백은 비공개 감사 기록" in user_prompt
+
+    _, node4_prompt = build_node4_prompts(
+        "더 읽어봐",
+        "",
+        "답변 후보",
+        turn_memory_context=TURN_MEMORY_CONTEXT,
+    )
+    assert "current_turn_start_index=20" in node4_prompt
+    assert "더 읽어봐" not in node4_prompt
+    assert "직전 파일을 더 확인해 줘." not in node4_prompt
+    assert "[현재 사용자 요청" not in node4_prompt
+    assert "[직전 사용자 입력" not in node4_prompt
 
 
 def test_first_turn_has_no_previous_user_input():

@@ -202,8 +202,13 @@ def parse_node1_recovery_retention(
             "max_selected_characters는 1 이상의 정수여야 합니다."
         )
 
-    return _parse_retention(
+    response_payload = _require_exact_object(
         payload,
+        {"retention"},
+        "Node1RecoveryRetention",
+    )
+    return _parse_retention(
+        response_payload["retention"],
         raw_text,
         max_selected_characters,
         allow_omit=False,

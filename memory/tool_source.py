@@ -243,8 +243,6 @@ def verify_omitted_tool_source(
         turn_records,
         "tool_retention_applied",
     )
-    _one_record(turn_records, "node1_tool_review")
-
     request = _load_json_object(
         request_record,
         "node1_retention_request",
@@ -263,6 +261,8 @@ def verify_omitted_tool_source(
         or applied.get("arguments") != arguments
     ):
         raise ValueError("최초 보존 결정이 정확한 omit 기록이 아닙니다.")
+
+    _one_record(turn_records, "node1_tool_review_omit")
 
     if (
         applied_record.get("information_class") != "absolute"

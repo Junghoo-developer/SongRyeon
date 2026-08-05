@@ -12,6 +12,7 @@ from .client import (
     ModelResponseError,
     OllamaClient,
 )
+from .codex_account import CodexAccountIntegrationClient
 from .openai_compatible import OpenAICompatibleIntegrationClient
 
 __all__ = [
@@ -21,5 +22,6 @@ __all__ = [
     "ModelReply",
     "ModelResponseError",
     "OllamaClient",
+    "CodexAccountIntegrationClient",
     "OpenAICompatibleIntegrationClient",
 ]

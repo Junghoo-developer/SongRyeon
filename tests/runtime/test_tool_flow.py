@@ -11,11 +11,12 @@ from agent_tools import (
     READ_PYTHON_FILE,
     FileToolbox,
 )
-from nodes import Node1Action, RetentionDecision
+from nodes import Node1Action, RetentionDecision, ReviewDecision
 from runtime import (
     NODE2,
     OmittedToolCandidate,
     ToolCallLimitExceeded,
+    apply_gate_decision,
     begin_node1_omit_recovery,
     create_turn_state,
     execute_node1_tool,
@@ -158,6 +159,117 @@ def test_node1_route_request_and_applied_route_are_both_logged(
     assert by_type["runtime_route"]["information_class"] == "absolute"
 
 
+def test_same_tool_request_is_blocked_for_the_whole_turn(tmp_path):
+    toolbox, _ = _make_toolbox(tmp_path)
+    memory_path = tmp_path / "memory.jsonl"
+    state = create_turn_state("turn-duplicate-tool")
+    repeated_action = Node1Action(
+        action="use_tool",
+        reason="같은 목록을 다시 요청했다.",
+        tool_name=LIST_PYTHON_FILES,
+        arguments={},
+    )
+
+    execute_node1_tool(
+        state,
+        toolbox,
+        LIST_PYTHON_FILES,
+        {},
+        memory_path,
+    )
+    first_resolution = route_after_node1(
+        state,
+        repeated_action,
+        memory_path,
+    )
+
+    assert first_resolution.next_node == NODE2
+    assert first_resolution.outcome == "tool_request_blocked_duplicate"
+    assert state.node1_tool_calls_in_round == 1
+
+    apply_gate_decision(
+        state,
+        NODE2,
+        ReviewDecision(
+            verdict="reject",
+            reason="다른 파일의 근거가 더 필요하다.",
+        ),
+        memory_path,
+    )
+    second_resolution = route_after_node1(
+        state,
+        repeated_action,
+        memory_path,
+    )
+
+    assert state.node1_round == 2
+    assert state.node1_tool_calls_in_round == 0
+    assert second_resolution.next_node == NODE2
+    assert second_resolution.outcome == "tool_request_blocked_duplicate"
+
+
+def test_same_tool_with_different_arguments_is_not_a_duplicate(tmp_path):
+    toolbox, _ = _make_toolbox(tmp_path)
+    memory_path = tmp_path / "memory.jsonl"
+    state = create_turn_state("turn-different-tool-arguments")
+
+    execute_node1_tool(
+        state,
+        toolbox,
+        READ_PYTHON_FILE,
+        {"path": "main.py"},
+        memory_path,
+    )
+    resolution = route_after_node1(
+        state,
+        Node1Action(
+            action="use_tool",
+            reason="다른 파일을 읽는다.",
+            tool_name=READ_PYTHON_FILE,
+            arguments={"path": "other.py"},
+        ),
+        memory_path,
+    )
+
+    assert resolution.next_node != NODE2
+    assert resolution.outcome == "tool_request_allowed"
+
+
+def test_turn_tool_limit_blocks_a_new_request_after_round_reset(tmp_path):
+    memory_path = tmp_path / "memory.jsonl"
+    state = create_turn_state("turn-total-tool-limit")
+    action = Node1Action(
+        action="use_tool",
+        reason="다음 파일을 읽는다.",
+        tool_name=READ_PYTHON_FILE,
+        arguments={"path": "other.py"},
+    )
+
+    resolution = route_after_node1(
+        state,
+        action,
+        memory_path,
+        total_tool_calls=3,
+        maximum_total_tool_calls=3,
+    )
+
+    assert resolution.next_node == NODE2
+    assert resolution.outcome == "tool_request_blocked_total_limit"
+    assert resolution.forced_by_tool_limit is True
+
+    route_record = next(
+        record
+        for record in (
+            json.loads(line)
+            for line in memory_path.read_text(encoding="utf-8").splitlines()
+        )
+        if record["information_type"] == "runtime_route"
+    )
+    assert json.loads(route_record["information"])["outcome"] == (
+        "tool_request_blocked_total_limit"
+    )
+
+
 def test_retention_cannot_be_written_to_a_different_memory_log(
     tmp_path,
 ):
@@ -244,6 +356,12 @@ def test_omit_recovery_does_not_reexecute_or_increment_tool_budget(
         action="route_node2",
         reason="도구 확인을 마쳤다.",
     )
+    repeated_action = Node1Action(
+        action="use_tool",
+        reason="같은 파일을 다시 요청했다.",
+        tool_name=READ_PYTHON_FILE,
+        arguments={"path": "main.py"},
+    )
 
     assert selected is None
     assert should_recover_omitted_results(
@@ -251,6 +369,25 @@ def test_omit_recovery_does_not_reexecute_or_increment_tool_budget(
         route_action,
         [candidate],
         round_has_retained_content=False,
+    )
+    assert should_recover_omitted_results(
+        state,
+        repeated_action,
+        [candidate],
+        round_has_retained_content=False,
+    )
+    assert should_recover_omitted_results(
+        state,
+        Node1Action(
+            action="use_tool",
+            reason="전체 도구 예산의 마지막 요청입니다.",
+            tool_name=READ_PYTHON_FILE,
+            arguments={"path": "other.py"},
+        ),
+        [candidate],
+        round_has_retained_content=False,
+        total_tool_calls=3,
+        maximum_total_tool_calls=3,
     )
     begin_node1_omit_recovery(
         state,

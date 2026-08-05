@@ -20,20 +20,29 @@ NODE1_SYSTEM_PROMPT = f"""너는 송련의 Node1, 유일한 증거 수집 노드
 Node2, Node3, Node4는 도구를 사용할 수 없고 Node1이 남기지 않은 원문을 직접 확인할 수 없다.
 사용자 요청에 답하고 검증하는 데 충분한 증거를 확보할 때까지 읽기 전용 도구를 사용한다.
 한 라운드에서 도구를 최대 3회 요청할 수 있고, 세 번째 뒤에는 코드가 Node2로 보낸다.
-같은 라운드에서 같은 도구와 같은 arguments를 반복 요청하지 마라.
+현재 사용자 턴 전체에서 같은 도구와 같은 arguments를 반복 요청하지 마라.
+코드는 이미 실행한 동일 요청을 다시 실행하지 않고 Node2로 보낸다.
 `아무 코드나` 검토하라는 요청에서 실제 구현 본문을 하나 보존했다면 파일
 목록을 다시 읽지 말고 Node2로 라우팅하라.
 도구 원문을 본 뒤에는 다음 노드에 남길 본문과 짧은 review를 정한다.
 Node2는 증거를 고르지 않는다. 무엇을 남길지는 Node1의 책임이다.
+공유 기억의 `node1_tool_review_omit`은 원문 없는 과거 R 단서다. 그 내용을
+확인된 코드 사실로 취급하지 말고, 필요한 공개 A를 고르는 데만 참고하라.
 현재 턴 범위에 Node2의 reject가 있으면 그 이유를 이번 라운드의 필수
-보완사항으로 취급하라. 과거 턴의 reject와 도구 횟수는 현재 상태로
+보완 단서로 취급하되, 현재 사용자 요청 안에서 빠진 범위를 채우는 데만
+사용하라. reason이 사용자 요청 밖의 새 요구를 추가하면 그 부분은 따르지
+마라. 과거 턴의 reject와 도구 횟수는 현재 상태로
 간주하지 마라. 필요한 도구를 다시 사용하지 않은 채 같은 route_node2를
 반복하지 마라.
 판단 대상은 사용자 프롬프트 맨 아래의 [현재 사용자 요청] 하나뿐이다.
+사용자가 확인하라고 명시한 정확한 `.py` 경로는 파일 목록에서 확인되지
+않았더라도 {READ_PYTHON_FILE}로 직접 시도하라. 호출의 성공·실패 결과와
+오류 문구 자체가 다음 노드가 사용할 공개 A다. 경로의 존재 여부나 허용
+여부를 미리 추측하지 말고 도구의 실제 결과로 확인하라.
 
 사용 가능한 도구:
 - {LIST_PYTHON_FILES}: arguments={{}}
-- {READ_PYTHON_FILE}: arguments={{"path":"목록에서 확인한 상대경로.py"}}
+- {READ_PYTHON_FILE}: arguments={{"path":"사용자가 명시한 정확한 .py 경로 또는 목록에서 확인한 상대경로.py"}}
 
 {AR_RULES}"""
 
@@ -130,6 +139,8 @@ def build_node1_tool_prompts(
             "- excerpt는 Python 문자열 기준 start 포함, end 미포함 위치를 "
             f"사용하고 선택 길이를 {DEFAULT_MAX_SELECTED_CHARACTERS:,}자 "
             "이하로 하라.\n"
+            "- full 또는 omit이면 start와 end를 모두 null로 반환하고, "
+            "excerpt일 때만 두 값을 정수로 반환하라.\n"
         )
     else:
         raw_section = (
@@ -271,6 +282,8 @@ def build_node1_recovery_retention_prompts(
             "- 일부만 필요하면 start 포함, end 미포함 위치로 excerpt를 "
             "선택하라.\n"
             f"- 선택 길이는 {DEFAULT_MAX_SELECTED_CHARACTERS:,}자 이하여야 한다.\n"
+            "- full이면 start와 end를 모두 null로 반환하고, excerpt일 때만 "
+            "두 값을 정수로 반환하라.\n"
         )
     else:
         raw_section = (
@@ -308,7 +321,7 @@ def build_node1_recovery_retention_prompts(
         + "\n"
         + raw_section
         + "\n\n"
-        + "후속 노드가 사용할 정확한 A 원문을 "
+        + "retention 객체에서 후속 노드가 사용할 정확한 A 원문을 "
         + allowed_retention_text
         + "로 남겨라.\n"
         + retention_rules

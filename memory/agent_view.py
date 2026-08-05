@@ -4,6 +4,14 @@
 턴 시작 전에는 최신 글자 예산을 적용하고, 턴 중에는 그때 선택된 가장
 오래된 원자를 기준점으로 고정한다. 따라서 같은 턴의 뒤쪽 노드가 앞쪽
 노드가 본 원자를 잃지 않는다.
+
+처음 읽을 때는 아래 세 단계만 구분하면 된다.
+
+1. ``load_agent_memory``: 원자를 자르지 않고 최신 기록부터 예산에 맞춘다.
+2. ``freeze_agent_memory_floor``: 선택 구간의 가장 오래된 내부 ID를 고정한다.
+3. ``load_frozen_agent_memory``: 고정 ID부터 턴 중 새로 생긴 기록까지 읽는다.
+
+``memory_index``는 모델의 시간 감각을 위한 줄 번호일 뿐 원본 7필드가 아니다.
 """
 
 import json
@@ -266,6 +274,8 @@ def _select_latest_records(visible_records, max_characters):
                 "원자 기록 하나가 에이전트 기억의 글자 수 제한보다 큽니다."
             )
 
+        # 예산에 걸린 원자를 반으로 자르지 않는다. 이 원자보다 오래된
+        # 기록도 선택하지 않고 여기서 멈춰 연속된 최신 구간을 유지한다.
         if used_characters + required_characters > max_characters:
             break
 
@@ -323,6 +333,8 @@ def freeze_agent_memory_floor(
     if not selected_records:
         return AgentMemoryFloor(anchor_information_id=None)
 
+    # 모델에는 UUID를 숨기지만 런타임은 UUID를 안정적인 책갈피로 쓴다.
+    # 줄 번호는 파일 내용이 다시 쓰이면 달라질 수 있어 내부 기준으로 쓰지 않는다.
     oldest_selected_index = len(visible_records) - len(selected_records)
     anchor_information_id = indexed_records[
         oldest_selected_index

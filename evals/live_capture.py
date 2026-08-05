@@ -90,7 +90,8 @@ class _DeadlineClient:
             "provider",
             "execution_mode",
         ):
-            setattr(self, attribute, getattr(client, attribute))
+            if hasattr(client, attribute):
+                setattr(self, attribute, getattr(client, attribute))
 
     def _timeout_targets(self):
         targets = []

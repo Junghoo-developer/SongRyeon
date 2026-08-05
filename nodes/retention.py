@@ -4,11 +4,15 @@
 결정론적으로 만든 청크의 ID를 Node1이 고르게 한다. 따라서 모델은 Python
 문자 위치를 계산하지 않고, 코드는 선택된 청크의 정확한 범위를 다시 계산해
 원문을 복사한다.
+
+이 파일이 송련의 중요한 권한 경계다. Node1은 **무엇을 남길지** R로
+선택하지만, 실제 A 본문을 새로 쓰지는 못한다. ``select_retained_content``가
+숨김 원문에서 선택 범위를 그대로 복사해 모델의 요약·수정을 끼우지 않는다.
 """
 
 from dataclasses import dataclass
 
-from .common import validate_short_reason
+from .common import validate_relative_text
 
 
 DEFAULT_CHUNK_CHARACTERS = 2_000
@@ -143,7 +147,7 @@ class RetentionDecision:
         if self.mode not in RETENTION_MODES:
             raise ValueError(f"알 수 없는 본문 보존 방식입니다: {self.mode}")
 
-        validate_short_reason(self.review, "review")
+        validate_relative_text(self.review, "review")
 
         if self.mode == "excerpt":
             if not (
@@ -172,7 +176,8 @@ class RetentionDecision:
             or self.chunk_id is not None
         ):
             raise ValueError(
-                "full과 omit에는 선택 위치를 지정할 수 없습니다."
+                "full과 omit에서는 제공되는 선택 필드 값을 모두 JSON "
+                "null로 반환해야 합니다."
             )
 
 
@@ -189,6 +194,8 @@ def select_retained_content(
     if not isinstance(decision, RetentionDecision):
         raise TypeError("decision은 RetentionDecision이어야 합니다.")
 
+    # 아래 모든 반환은 raw_text 자체 또는 그 정확한 slice다. review처럼
+    # 모델이 새로 쓴 문자열은 이 함수의 A 결과가 될 수 없다.
     if decision.mode == "full":
         return raw_text
 

@@ -166,10 +166,12 @@ def save_node1_retention(
             "tool_raw_selection_source_id",
             turn_id,
         ),
+        # review 본문은 계속 R이다. 다만 코드가 실제 적용한 보존 모드를
+        # information_type에 찍어, 원문 공개 여부를 같은 원자에서 보게 한다.
         new_audit_record(
             decision.review,
             "relative",
-            "node1_tool_review",
+            f"node1_tool_review_{decision.mode}",
             turn_id,
         ),
         new_audit_record(

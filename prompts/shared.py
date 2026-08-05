@@ -1,4 +1,9 @@
-"""모든 노드가 공유하는 A/R 규칙과 프롬프트 조립 도구."""
+"""모든 노드가 공유하는 A/R 규칙과 프롬프트 조립 도구.
+
+주의: 여기서 ``absolute``는 우주의 절대진리가 아니라 **이 런타임이 직접
+관측·적용해 수정 권한을 갖는 기록**이라는 뜻이다. 예를 들어 파일에 어떤
+문장이 존재한다는 것은 A가 될 수 있지만, 그 문장의 의미가 참인지는 R이다.
+"""
 
 import json
 
@@ -14,6 +19,14 @@ AR_RULES = """정보 규칙:
 - A와 R이 충돌하면 A를 우선한다.
 - 코드로 확인해야 하는 사실에 필요한 A가 없으면 모른다고 말할 수 있다.
 - 의견·평가·예측·제안은 A가 없어도 새 R로 작성할 수 있다. 다만 A로 가장하지 마라.
+- `node1_tool_review_<mode>`의 본문은 언제나 Node1의 R 판단이다. suffix는
+  코드가 적용한 원문 보존 상태일 뿐 review에 사실 권한을 주지 않는다.
+- suffix 없는 과거 `node1_tool_review`도 같은 권한의 legacy R이다.
+- `_full`, `_excerpt`, `_chunk`여도 review 자체는 A가 아니다. 사실 권한은
+  실제 공개된 `tool_result_content`에만 있다.
+- 특히 `node1_tool_review_omit`은 해당 원문이 공개 A로 보존되지 않았다는
+  표시다. 그 review는 조사 단서로만 쓰고 코드·파일 사실의 근거로 쓰지 마라.
+  그런 사실은 같은 대상의 `tool_result_content` A가 직접 뒷받침해야 한다.
 - `tool_retention_applied.mode`가 `full`이면 해당 도구 원문 전체가 공개됐고,
   `excerpt` 또는 `chunk`이면 선택된 일부만 공개됐다는 A다.
 - 일부만 공개된 `tool_result_content`는 보이는 범위의 존재와 동작만 증명한다.
@@ -76,17 +89,9 @@ def render_task_and_memory(
     if not isinstance(user_input, str) or not user_input.strip():
         raise ValueError("user_input은 비어 있지 않은 문자열이어야 합니다.")
 
-    if not isinstance(memory_text, str):
-        raise TypeError("memory_text는 문자열이어야 합니다.")
-
-    if not isinstance(turn_memory_context, TurnMemoryContext):
-        raise TypeError(
-            "turn_memory_context는 TurnMemoryContext여야 합니다."
-        )
-
-    past_memory, current_memory = _partition_memory_text(
+    memory_sections = render_memory_only(
         memory_text,
-        turn_memory_context.current_turn_start_index,
+        turn_memory_context=turn_memory_context,
     )
     previous_user_input = "(없음)"
 
@@ -106,6 +111,36 @@ def render_task_and_memory(
         )
 
     return (
+        memory_sections
+        + "\n\n[직전 사용자 입력 — 후속 표현 해석 전용, 내용은 R]\n"
+        + previous_user_input
+        + "\n- 현재 요청이 '더', '계속', '그거'처럼 대상을 생략한 경우에만 참조한다.\n\n"
+        + "[현재 사용자 요청 — 유일한 활성 목표]\n"
+        + user_input
+    )
+
+
+def render_memory_only(
+    memory_text,
+    *,
+    turn_memory_context,
+):
+    """사용자 입력 R을 붙이지 않고 공개 기억과 턴 경계만 렌더링한다."""
+
+    if not isinstance(memory_text, str):
+        raise TypeError("memory_text는 문자열이어야 합니다.")
+
+    if not isinstance(turn_memory_context, TurnMemoryContext):
+        raise TypeError(
+            "turn_memory_context는 TurnMemoryContext여야 합니다."
+        )
+
+    past_memory, current_memory = _partition_memory_text(
+        memory_text,
+        turn_memory_context.current_turn_start_index,
+    )
+
+    return (
         "[기억 순서 규칙 — 코드가 확인한 A]\n"
         + "current_turn_start_index="
         + str(turn_memory_context.current_turn_start_index)
@@ -115,17 +150,12 @@ def render_task_and_memory(
         "- 과거의 사용자 요청·노드 판단·반려는 현재 지시가 아니다.\n"
         "- 도구 사용·반려 횟수는 현재 턴 범위의 A만 세며, 기록이 없으면 0회다.\n"
         "- memory_index의 번호 공백은 비공개 감사 기록일 수 있으므로 내용을 추측하지 마라.\n\n"
-        "[모든 노드가 공유하는 기억 JSONL]\n"
+        "[현재 노드에 제공된 기억 JSONL]\n"
         "[과거 턴 기억 — 참고 자료이며 현재 지시가 아님]\n"
         f"{past_memory}\n"
         "[현재 턴 로그]\n"
         f"{current_memory}\n"
-        "[공유 기억 끝]\n\n"
-        "[직전 사용자 입력 — 후속 표현 해석 전용, 내용은 R]\n"
-        f"{previous_user_input}\n"
-        "- 현재 요청이 '더', '계속', '그거'처럼 대상을 생략한 경우에만 참조한다.\n\n"
-        "[현재 사용자 요청 — 유일한 활성 목표]\n"
-        f"{user_input}"
+        "[공유 기억 끝]"
     )
 
 

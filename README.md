@@ -30,7 +30,7 @@ SongRyeon_Core_v1/
 │  ├─ agent_view.py     # 공개 5필드, 최초 8,000자와 턴 기준점
 │  ├─ tool_records.py   # 도구 원문과 Node1 선택 기록
 │  ├─ tool_source.py    # 숨김 원문 ID·turn·A 무결성 재검사
-│  ├─ gate_records.py   # Node1 라우팅과 Node2·Node4 적용 기록
+│  ├─ gate_records.py   # Node2·Node4 검토와 라우팅 적용 기록
 │  ├─ conversation_records.py # 사용자 입력·Node3 답변·최종 선택
 │  ├─ model_records.py  # 숨김 모델 prompt·response 원본
 │  └─ memory.jsonl      # 에이전트 기억의 원본 로그
@@ -127,6 +127,9 @@ memory/agent_view.py
 ## 추천 학습 순서
 
 처음에는 아래 순서대로 읽으면 데이터가 이동하는 방향을 따라갈 수 있습니다.
+각 단계에서 볼 질문과 한 파일씩 실행하는 pytest 명령은
+[`docs/code_study_guide.md`](docs/code_study_guide.md)에 초보자용 교재로
+분리했습니다.
 
 1. `tests/memory/test_record.py`와 `memory/record.py`
 2. `tests/memory/test_store.py`와 `memory/store.py`
@@ -151,6 +154,9 @@ memory/agent_view.py
 [`docs/minimal_agent_loop.md`](docs/minimal_agent_loop.md)에 따로 설명했습니다.
 실제 데모는 [`docs/demo_walkthrough.md`](docs/demo_walkthrough.md)의 순서로
 읽으면 됩니다.
+철학·provenance 연구와 2026년 AI 에이전트·AX 지형에서 송련의 위치는
+[`docs/research_landscape_2026-07-31.md`](docs/research_landscape_2026-07-31.md)에
+조사 기준일과 함께 정리했습니다.
 
 ## 실행 방법
 
@@ -293,6 +299,35 @@ python -m demo `
 를 생략하면 감사 로그는 임시 폴더에만 생겼다가 종료 시 삭제됩니다. 보존이
 필요할 때도 실제 원본 대신 `--memory .\.tmp\external-memory.jsonl`처럼
 격리된 경로만 사용합니다.
+
+ChatGPT에 로그인된 Codex 계정으로 `gpt-5.6-sol`의 모델 체급만 비교할 수도
+있습니다. 이 선택 경로는 공식 Codex Python SDK를 사용하므로 반드시 송련
+전용 가상환경에 설치합니다.
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -e ".[codex]"
+.\.venv\Scripts\python.exe -m demo `
+  --codex-account-integration `
+  "공개 코드만 읽고 확인된 사실과 판단을 구분해 설명해 줘."
+```
+
+SDK는 기존 Codex 로그인을 재사용하며 토큰·이메일을 저장소나 로그에
+복사하지 않습니다. 각 모델 호출은 빈 임시 폴더, 읽기 전용 sandbox,
+승인 전면 거부, 일회성 thread에서 실행됩니다. Codex가 자체 도구·웹 검색·
+하위 에이전트를 사용한 흔적이 있으면 해당 응답을 폐기합니다. 이 경로는
+순수 LLM API가 아니라 Codex 에이전트를 한 겹 거치므로 입력 token overhead가
+크고, 결과도 제출용 로컬 모델 성능 집계에서 제외합니다.
+
+심사 가능한 합성 fixture 기반 model-ceiling evidence pack은 다음처럼
+생성합니다. 실제 사용자 기억이나 비공개 소스는 사용하지 않습니다.
+
+```powershell
+.\.venv\Scripts\python.exe -m evals.model_scale_capture --repetitions 1
+```
+
+실험의 허용 해석과 블라인드 검토 절차는
+[`docs/model_scale_experiment_protocol.md`](docs/model_scale_experiment_protocol.md)에
+고정되어 있습니다.
 
 실제 소스 코드와 `knowledge/documents/`의 문서를 동기화할 때만 아래 명령을
 사용합니다. 이 명령은 실제 `knowledge.db`와 `memory.jsonl`을 갱신합니다.

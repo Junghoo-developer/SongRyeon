@@ -97,18 +97,20 @@ def _recovery_retention(
     chunk_id=_LEGACY_RETENTION,
 ):
     if chunk_id is not _LEGACY_RETENTION:
-        return {
+        retention = {
             "mode": mode,
             "review": review,
             "chunk_id": chunk_id,
         }
+    else:
+        retention = {
+            "mode": mode,
+            "review": review,
+            "start": start,
+            "end": end,
+        }
 
-    return {
-        "mode": mode,
-        "review": review,
-        "start": start,
-        "end": end,
-    }
+    return {"retention": retention}
 
 
 def _review(verdict, reason):
@@ -135,10 +137,7 @@ def _request_label(system_prompt, response_schema):
             return "node1_tool"
         if schema_properties == {"candidate_number"}:
             return "node1_recovery_choice"
-        assert schema_properties in (
-            {"mode", "review", "start", "end"},
-            {"mode", "review", "chunk_id"},
-        )
+        assert schema_properties == {"retention"}
         return "node1_recovery_retention"
     if system_prompt.startswith("너는 송련의 Node2"):
         assert response_schema is REVIEW_DECISION_SCHEMA
@@ -249,7 +248,7 @@ def _visible_memory_from_prompt(user_prompt):
     """프롬프트의 공통 기억 구역에서 다섯 필드 JSON 원자만 꺼낸다."""
 
     records = []
-    memory_heading = "[모든 노드가 공유하는 기억 JSONL]\n"
+    memory_heading = "[현재 노드에 제공된 기억 JSONL]\n"
     _, memory_and_rest = user_prompt.split(memory_heading, maxsplit=1)
     memory_text, _ = memory_and_rest.split(
         "[공유 기억 끝]",
@@ -373,6 +372,8 @@ def test_happy_path_uses_two_tools_and_preserves_visibility_boundaries(
     first_tool_prompt = model.calls[1]["user_prompt"]
     second_tool_prompt = model.calls[2]["user_prompt"]
     node2_prompt = model.calls[3]["user_prompt"]
+    node3_prompt = model.calls[4]["user_prompt"]
+    node4_prompt = model.calls[5]["user_prompt"]
     assert list_raw in first_tool_prompt
     assert code_raw in second_tool_prompt
     assert "<TOOL_RAW_TEXT>" in first_tool_prompt
@@ -380,7 +381,30 @@ def test_happy_path_uses_two_tools_and_preserves_visibility_boundaries(
     assert "<TOOL_RAW_TEXT>" not in node2_prompt
     # 공개 기억은 JSONL이므로 원문의 줄바꿈은 ``\n``으로 escape된다.
     assert code_raw.strip() in node2_prompt
-    assert "VALUE의 정확한 값을 확인했다." in node2_prompt
+    assert code_raw.strip() in node4_prompt
+    assert "VALUE의 정확한 값을 확인했다." not in node2_prompt
+    assert "VALUE의 정확한 값을 확인했다." in node3_prompt
+    assert "VALUE의 정확한 값을 확인했다." not in node4_prompt
+
+    for evidence_prompt in (node2_prompt, node4_prompt):
+        evidence_memory = _visible_memory_from_prompt(evidence_prompt)
+        assert evidence_memory
+        assert all(
+            record["information_class"] == "absolute"
+            and record["code_verifiable"] is True
+            for record in evidence_memory
+        )
+        assert not any(
+            record["information_type"].startswith(
+                "node1_tool_review"
+            )
+            for record in evidence_memory
+        )
+
+    assert any(
+        record["information_class"] == "relative"
+        for record in _visible_memory_from_prompt(node3_prompt)
+    )
 
     raw = _raw_records(memory_path)
     visible = load_agent_memory(
@@ -400,9 +424,11 @@ def test_happy_path_uses_two_tools_and_preserves_visibility_boundaries(
     assert _records_of_type(raw, "user_input")[0][
         "information_class"
     ] == "relative"
-    assert _records_of_type(raw, "node1_tool_review")[0][
+    assert _records_of_type(raw, "node1_tool_review_full")[0][
         "information_class"
     ] == "relative"
+    assert "node1_tool_review_omit" in visible_types
+    assert "node1_tool_review_full" in visible_types
     assert _records_of_type(raw, "tool_result_content")[0][
         "information_class"
     ] == "absolute"
@@ -603,14 +629,19 @@ def test_long_tool_result_selects_one_deterministic_chunk_id(
     model.assert_finished()
     toolbox.assert_finished()
     assert result.total_tool_calls == 1
-    retention_modes = model.calls[1]["response_schema"]["properties"][
+    retention_branches = model.calls[1]["response_schema"]["properties"][
         "retention"
-    ]["properties"]["mode"]["enum"]
+    ]["anyOf"]
+    retention_modes = [
+        branch["properties"]["mode"]["enum"][0]
+        for branch in retention_branches
+    ]
     assert retention_modes == ["chunk", "omit"]
-    assert '"enum":["chunk","omit"]' in model.calls[1]["system_prompt"]
-    chunk_id_values = model.calls[1]["response_schema"]["properties"][
-        "retention"
-    ]["properties"]["chunk_id"]["enum"]
+    assert '"enum":["chunk"]' in model.calls[1]["system_prompt"]
+    assert '"enum":["omit"]' in model.calls[1]["system_prompt"]
+    chunk_id_values = retention_branches[0]["properties"]["chunk_id"][
+        "enum"
+    ]
     assert selected_chunk.chunk_id in chunk_id_values
 
     raw = _raw_records(memory_path)
@@ -701,9 +732,9 @@ def test_long_omit_recovery_schema_allows_only_chunk_id(tmp_path):
         for call in model.calls
         if call["label"] == "node1_recovery_retention"
     )
-    assert recovery_call["response_schema"]["properties"]["mode"][
-        "enum"
-    ] == ["chunk"]
+    assert recovery_call["response_schema"]["properties"]["retention"][
+        "properties"
+    ]["mode"]["enum"] == ["chunk"]
     assert '"enum":["chunk"]' in recovery_call["system_prompt"]
 
     raw = _raw_records(memory_path)
@@ -1086,10 +1117,17 @@ def test_demo_pins_previous_input_and_exposes_current_turn_boundary(
         f"current_turn_start_index={expected_turn_start}"
     )
 
-    for call in model.calls:
+    for call in model.calls[:3]:
         prompt = call["user_prompt"]
         assert expected_boundary in prompt
         assert previous_input in prompt
+
+    node4_prompt = model.calls[3]["user_prompt"]
+    assert expected_boundary in node4_prompt
+    assert previous_input not in node4_prompt
+    assert "더 읽어봐" not in node4_prompt
+    assert "[현재 사용자 요청" not in node4_prompt
+    assert "[직전 사용자 입력" not in node4_prompt
 
     first_prompt = model.calls[0]["user_prompt"]
     first_memory = _visible_memory_from_prompt(first_prompt)
@@ -1168,25 +1206,40 @@ def test_third_tool_result_forces_node2_before_a_fourth_execution(
     tmp_path,
 ):
     memory_path = tmp_path / "memory.jsonl"
-    next_tool = _tool_action(
-        LIST_PYTHON_FILES,
-        {},
-        "한 번 더 목록을 확인하고 싶다.",
-    )
+    tool_actions = [
+        _tool_action(
+            READ_PYTHON_FILE,
+            {"path": f"file-{number}.py"},
+            f"{number}번 파일을 확인한다.",
+        )
+        for number in range(1, 5)
+    ]
     model = ScriptedModel(
         [
-            ("node1_action", next_tool),
+            ("node1_action", tool_actions[0]),
             (
                 "node1_tool",
-                _tool_decision("omit", "첫 결과를 확인했다.", next_tool),
+                _tool_decision(
+                    "omit",
+                    "첫 결과를 확인했다.",
+                    tool_actions[1],
+                ),
             ),
             (
                 "node1_tool",
-                _tool_decision("omit", "둘째 결과를 확인했다.", next_tool),
+                _tool_decision(
+                    "omit",
+                    "둘째 결과를 확인했다.",
+                    tool_actions[2],
+                ),
             ),
             (
                 "node1_tool",
-                _tool_decision("omit", "셋째 결과를 확인했다.", next_tool),
+                _tool_decision(
+                    "omit",
+                    "셋째 결과를 확인했다.",
+                    tool_actions[3],
+                ),
             ),
             ("node1_recovery_choice", _recovery_choice(3)),
             (
@@ -1204,9 +1257,13 @@ def test_third_tool_result_forces_node2_before_a_fourth_execution(
     toolbox = RecordingToolbox(
         [
             (
-                LIST_PYTHON_FILES,
-                {},
-                _success(LIST_PYTHON_FILES, {}, f"result-{number}"),
+                READ_PYTHON_FILE,
+                {"path": f"file-{number}.py"},
+                _success(
+                    READ_PYTHON_FILE,
+                    {"path": f"file-{number}.py"},
+                    f"result-{number}",
+                ),
             )
             for number in range(1, 4)
         ]
@@ -1239,6 +1296,191 @@ def test_third_tool_result_forces_node2_before_a_fourth_execution(
         "next_node": "node2",
         "outcome": "tool_request_blocked_limit",
     }
+
+
+def test_optional_turn_tool_limit_applies_across_node1_rounds(tmp_path):
+    memory_path = tmp_path / "memory.jsonl"
+    tool_actions = [
+        _tool_action(
+            READ_PYTHON_FILE,
+            {"path": f"file-{number}.py"},
+            f"{number}번 파일을 확인한다.",
+        )
+        for number in range(1, 5)
+    ]
+    model = ScriptedModel(
+        [
+            ("node1_action", tool_actions[0]),
+            (
+                "node1_tool",
+                _tool_decision(
+                    "full",
+                    "첫 파일을 확인했다.",
+                    _route_action(),
+                ),
+            ),
+            ("node2", _review("reject", "다른 파일도 필요하다.")),
+            ("node1_action", tool_actions[1]),
+            (
+                "node1_tool",
+                _tool_decision(
+                    "full",
+                    "둘째 파일을 확인했다.",
+                    tool_actions[2],
+                ),
+            ),
+            (
+                "node1_tool",
+                _tool_decision(
+                    "full",
+                    "셋째 파일을 확인했다.",
+                    tool_actions[3],
+                ),
+            ),
+            ("node2", _review("permit", "현재 근거로 답할 수 있다.")),
+            ("node3", _answer("턴 전체에서 세 파일만 읽었습니다.")),
+            ("node4", _review("permit", "실행 기록과 일치한다.")),
+        ]
+    )
+    toolbox = RecordingToolbox(
+        [
+            (
+                READ_PYTHON_FILE,
+                {"path": f"file-{number}.py"},
+                _success(
+                    READ_PYTHON_FILE,
+                    {"path": f"file-{number}.py"},
+                    f"result-{number}",
+                ),
+            )
+            for number in range(1, 4)
+        ]
+    )
+
+    result = run_demo_turn(
+        "여러 파일을 확인해줘.",
+        client=model,
+        toolbox=toolbox,
+        memory_path=memory_path,
+        maximum_total_tool_calls=3,
+    )
+
+    model.assert_finished()
+    toolbox.assert_finished()
+    assert result.total_tool_calls == 3
+    assert result.node1_rounds == 2
+    assert result.node2_rejections == 1
+    routes = [
+        json.loads(record["information"])
+        for record in _records_of_type(
+            _raw_records(memory_path),
+            "runtime_route",
+        )
+    ]
+    assert routes[-1]["outcome"] == "tool_request_blocked_total_limit"
+
+
+def test_turn_tool_limit_recovers_all_omitted_current_round_results(
+    tmp_path,
+):
+    memory_path = tmp_path / "memory.jsonl"
+    tool_actions = [
+        _tool_action(
+            READ_PYTHON_FILE,
+            {"path": f"file-{number}.py"},
+            f"Read file {number}.",
+        )
+        for number in range(1, 5)
+    ]
+    model = ScriptedModel(
+        [
+            ("node1_action", tool_actions[0]),
+            (
+                "node1_tool",
+                _tool_decision(
+                    "full",
+                    "Keep the first-round evidence.",
+                    _route_action(),
+                ),
+            ),
+            ("node2", _review("reject", "Read more evidence.")),
+            ("node1_action", tool_actions[1]),
+            (
+                "node1_tool",
+                _tool_decision(
+                    "omit",
+                    "Omit the second result.",
+                    tool_actions[2],
+                ),
+            ),
+            (
+                "node1_tool",
+                _tool_decision(
+                    "omit",
+                    "Omit the third result.",
+                    tool_actions[3],
+                ),
+            ),
+            ("node1_recovery_choice", _recovery_choice(2)),
+            (
+                "node1_recovery_retention",
+                _recovery_retention(
+                    "full",
+                    "Recover the final result before routing.",
+                ),
+            ),
+            ("node2", _review("permit", "Current evidence is enough.")),
+            ("node3", _answer("Three tool calls were recorded.")),
+            ("node4", _review("permit", "The answer matches A.")),
+        ]
+    )
+    toolbox = RecordingToolbox(
+        [
+            (
+                READ_PYTHON_FILE,
+                {"path": f"file-{number}.py"},
+                _success(
+                    READ_PYTHON_FILE,
+                    {"path": f"file-{number}.py"},
+                    f"result-{number}",
+                ),
+            )
+            for number in range(1, 4)
+        ]
+    )
+
+    result = run_demo_turn(
+        "Read several files.",
+        client=model,
+        toolbox=toolbox,
+        memory_path=memory_path,
+        maximum_total_tool_calls=3,
+    )
+
+    model.assert_finished()
+    toolbox.assert_finished()
+    assert result.total_tool_calls == 3
+    assert result.node1_rounds == 2
+    assert [call["label"] for call in model.calls[6:8]] == [
+        "node1_recovery_choice",
+        "node1_recovery_retention",
+    ]
+    routes = [
+        json.loads(record["information"])
+        for record in _records_of_type(
+            _raw_records(memory_path),
+            "runtime_route",
+        )
+    ]
+    assert routes[-1]["outcome"] == "tool_request_blocked_total_limit"
+    retained_contents = [
+        record["information"]
+        for record in _records_of_type(
+            _raw_records(memory_path),
+            "tool_result_content",
+        )
+    ]
+    assert "result-3" in retained_contents
 
 
 def test_invalid_excerpt_retries_decision_without_reexecuting_tool(
@@ -1312,7 +1554,7 @@ def test_invalid_excerpt_retries_decision_without_reexecuting_tool(
     toolbox.assert_finished()
     assert result.total_tool_calls == 1
     assert len(toolbox.calls) == 1
-    assert [call["label"] for call in model.calls[:3]] == [
+    assert [call["label"] for call in model.calls[0:3]] == [
         "node1_action",
         "node1_tool",
         "node1_tool",
@@ -1324,6 +1566,89 @@ def test_invalid_excerpt_retries_decision_without_reexecuting_tool(
     assert len(_records_of_type(raw, "tool_raw_content")) == 1
     assert len(_records_of_type(raw, "tool_retention_applied")) == 1
     assert len(_records_of_type(raw, "node1_retention_request")) == 1
+    assert [
+        record["information"]
+        for record in _records_of_type(raw, "model_raw_status")
+    ].count("invalid") == 1
+
+
+def test_full_with_start_retries_without_reexecuting_tool(tmp_path):
+    """실제 회귀 사례인 full + start=0도 도구 재실행 없이 복구한다."""
+
+    memory_path = tmp_path / "memory.jsonl"
+    raw_text = "SHORT\n"
+    model = ScriptedModel(
+        [
+            (
+                "node1_action",
+                _tool_action(
+                    READ_PYTHON_FILE,
+                    {"path": "main.py"},
+                    "원문을 확인한다.",
+                ),
+            ),
+            (
+                "node1_tool",
+                _tool_decision(
+                    "full",
+                    "전체 원문을 남긴다.",
+                    _route_action(),
+                    start=0,
+                    end=None,
+                ),
+            ),
+            (
+                "node1_tool",
+                _tool_decision(
+                    "full",
+                    "전체 원문을 올바른 위치 계약으로 남긴다.",
+                    _route_action(),
+                ),
+            ),
+            ("node2", _review("permit", "보존된 코드 A가 충분하다.")),
+            ("node3", _answer("도구 원문을 확인했습니다.")),
+            ("node4", _review("permit", "답변이 보존된 A와 일치한다.")),
+        ]
+    )
+    toolbox = RecordingToolbox(
+        [
+            (
+                READ_PYTHON_FILE,
+                {"path": "main.py"},
+                _success(
+                    READ_PYTHON_FILE,
+                    {"path": "main.py"},
+                    raw_text,
+                ),
+            )
+        ]
+    )
+
+    result = run_demo_turn(
+        "main.py를 확인해줘.",
+        client=model,
+        toolbox=toolbox,
+        memory_path=memory_path,
+    )
+
+    model.assert_finished()
+    toolbox.assert_finished()
+    assert result.total_tool_calls == 1
+    assert len(toolbox.calls) == 1
+    assert [call["label"] for call in model.calls[0:3]] == [
+        "node1_action",
+        "node1_tool",
+        "node1_tool",
+    ]
+    retry_prompt = model.calls[2]["user_prompt"]
+    assert "[직전 출력 검증 실패]" in retry_prompt
+    assert "선택 필드 값을 모두 JSON null" in retry_prompt
+
+    raw = _raw_records(memory_path)
+    assert [
+        record["information"]
+        for record in _records_of_type(raw, "tool_result_content")
+    ] == [raw_text]
     assert [
         record["information"]
         for record in _records_of_type(raw, "model_raw_status")
@@ -1395,4 +1720,5 @@ def test_node4_fourth_reject_marks_delivered_answer_unpermitted(tmp_path):
     assert result.node4_rejections == 3
     assert result.node2_limit_exhausted is False
     assert result.node4_limit_exhausted is True
+    assert result.last_node4_reject_reason == "한도 뒤 넷째 반려"
     assert result.final_outcome == "reject_ignored_limit"

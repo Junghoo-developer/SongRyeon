@@ -3,7 +3,6 @@
 import pytest
 
 from nodes import (
-    MAX_NODE3_ANSWER_CHARACTERS,
     NODE1_ACTION_SCHEMA,
     NODE1_RECOVERY_CHOICE_SCHEMA,
     NODE1_RECOVERY_RETENTION_SCHEMA,
@@ -47,6 +46,50 @@ def _tool_decision_payload():
     }
 
 
+def _assert_strict_object_contract(schema):
+    """OpenAI strict output이 요구하는 모든 object 계약을 재귀 검사한다."""
+
+    if isinstance(schema, dict):
+        schema_type = schema.get("type")
+        object_schema = schema_type == "object" or (
+            isinstance(schema_type, list) and "object" in schema_type
+        )
+        if object_schema:
+            properties = schema.get("properties", {})
+            assert schema.get("additionalProperties") is False
+            assert set(schema.get("required", [])) == set(properties)
+
+        for value in schema.values():
+            _assert_strict_object_contract(value)
+        return
+
+    if isinstance(schema, list):
+        for value in schema:
+            _assert_strict_object_contract(value)
+
+
+def test_all_model_response_schemas_keep_strict_object_contracts():
+    schemas = [
+        NODE1_ACTION_SCHEMA,
+        NODE1_TOOL_DECISION_SCHEMA,
+        NODE1_RECOVERY_CHOICE_SCHEMA,
+        NODE1_RECOVERY_RETENTION_SCHEMA,
+        REVIEW_DECISION_SCHEMA,
+        NODE3_ANSWER_SCHEMA,
+        node1_tool_decision_schema(
+            allow_full=False,
+            chunk_ids=["chunk-0001", "chunk-0002"],
+        ),
+        node1_recovery_retention_schema(
+            allow_full=False,
+            chunk_ids=["chunk-0001", "chunk-0002"],
+        ),
+    ]
+
+    for schema in schemas:
+        _assert_strict_object_contract(schema)
+
+
 def test_schemas_require_exact_top_level_keys():
     schemas_and_keys = [
         (
@@ -63,7 +106,7 @@ def test_schemas_require_exact_top_level_keys():
         ),
         (
             NODE1_RECOVERY_RETENTION_SCHEMA,
-            {"mode", "review", "start", "end"},
+            {"retention"},
         ),
         (REVIEW_DECISION_SCHEMA, {"verdict", "reason"}),
         (NODE3_ANSWER_SCHEMA, {"answer"}),
@@ -75,28 +118,80 @@ def test_schemas_require_exact_top_level_keys():
         assert set(schema["properties"]) == expected_keys
 
     retention_schema = NODE1_TOOL_DECISION_SCHEMA["properties"]["retention"]
-    assert retention_schema["additionalProperties"] is False
-    assert set(retention_schema["required"]) == {
-        "mode",
-        "review",
-        "start",
-        "end",
-    }
-    assert NODE1_RECOVERY_RETENTION_SCHEMA["properties"]["mode"][
-        "enum"
+    recovery_retention_schema = NODE1_RECOVERY_RETENTION_SCHEMA[
+        "properties"
+    ]["retention"]
+    assert [
+        branch["properties"]["mode"]["enum"][0]
+        for branch in retention_schema["anyOf"]
+    ] == ["full", "excerpt", "omit"]
+    assert [
+        branch["properties"]["mode"]["enum"][0]
+        for branch in recovery_retention_schema["anyOf"]
     ] == ["full", "excerpt"]
 
+    for schema in (
+        retention_schema,
+        recovery_retention_schema,
+    ):
+        for branch in schema["anyOf"]:
+            assert branch["additionalProperties"] is False
+            assert set(branch["required"]) == {
+                "mode",
+                "review",
+                "start",
+                "end",
+            }
+            assert set(branch["properties"]) == {
+                "mode",
+                "review",
+                "start",
+                "end",
+            }
 
-def test_schemas_make_optional_values_explicitly_nullable():
+
+def test_schemas_make_position_types_depend_on_retention_mode():
     action_properties = NODE1_ACTION_SCHEMA["properties"]
-    retention_properties = NODE1_TOOL_DECISION_SCHEMA[
-        "properties"
-    ]["retention"]["properties"]
+    argument_branches = action_properties["arguments"]["anyOf"]
+    retention_branches = NODE1_TOOL_DECISION_SCHEMA["properties"][
+        "retention"
+    ]["anyOf"]
+    branches_by_mode = {
+        branch["properties"]["mode"]["enum"][0]: branch
+        for branch in retention_branches
+    }
 
     assert action_properties["tool_name"]["type"] == ["string", "null"]
-    assert action_properties["arguments"]["type"] == ["object", "null"]
-    assert retention_properties["start"]["type"] == ["integer", "null"]
-    assert retention_properties["end"]["type"] == ["integer", "null"]
+    assert argument_branches == [
+        {
+            "type": "object",
+            "properties": {},
+            "required": [],
+            "additionalProperties": False,
+        },
+        {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "minLength": 1,
+                },
+            },
+            "required": ["path"],
+            "additionalProperties": False,
+        },
+        {"type": "null"},
+    ]
+    assert branches_by_mode["excerpt"]["properties"]["start"]["type"] == (
+        "integer"
+    )
+    assert branches_by_mode["excerpt"]["properties"]["end"]["type"] == (
+        "integer"
+    )
+
+    for mode in ("full", "omit"):
+        assert branches_by_mode[mode]["properties"]["start"]["type"] == "null"
+        assert branches_by_mode[mode]["properties"]["end"]["type"] == "null"
 
 
 def test_node1_schemas_remove_full_when_the_current_raw_is_too_long():
@@ -116,16 +211,25 @@ def test_node1_schemas_remove_full_when_the_current_raw_is_too_long():
 
     assert short_tool_schema is NODE1_TOOL_DECISION_SCHEMA
     assert short_recovery_schema is NODE1_RECOVERY_RETENTION_SCHEMA
-    assert long_tool_schema["properties"]["retention"]["properties"][
-        "mode"
-    ]["enum"] == ["chunk", "omit"]
-    assert long_tool_schema["properties"]["retention"]["properties"][
-        "chunk_id"
-    ]["enum"] == [*chunk_ids, None]
-    assert long_recovery_schema["properties"]["mode"]["enum"] == [
+    long_tool_branches = long_tool_schema["properties"]["retention"][
+        "anyOf"
+    ]
+    assert [
+        branch["properties"]["mode"]["enum"][0]
+        for branch in long_tool_branches
+    ] == ["chunk", "omit"]
+    assert long_tool_branches[0]["properties"]["chunk_id"]["enum"] == (
+        chunk_ids
+    )
+    assert long_tool_branches[1]["properties"]["chunk_id"]["type"] == "null"
+
+    long_recovery_retention = long_recovery_schema["properties"][
+        "retention"
+    ]
+    assert long_recovery_retention["properties"]["mode"]["enum"] == [
         "chunk"
     ]
-    assert long_recovery_schema["properties"]["chunk_id"]["enum"] == (
+    assert long_recovery_retention["properties"]["chunk_id"]["enum"] == (
         chunk_ids
     )
 
@@ -273,19 +377,23 @@ def test_parse_recovery_choice_and_full_or_excerpt_retention():
     )
     full = parse_node1_recovery_retention(
         {
-            "mode": "full",
-            "review": "전체 원문이 필요하다.",
-            "start": None,
-            "end": None,
+            "retention": {
+                "mode": "full",
+                "review": "전체 원문이 필요하다.",
+                "start": None,
+                "end": None,
+            },
         },
         raw_text,
     )
     excerpt = parse_node1_recovery_retention(
         {
-            "mode": "excerpt",
-            "review": "둘째 줄을 보존한다.",
-            "start": 6,
-            "end": 12,
+            "retention": {
+                "mode": "excerpt",
+                "review": "둘째 줄을 보존한다.",
+                "start": 6,
+                "end": 12,
+            },
         },
         raw_text,
     )
@@ -323,7 +431,10 @@ def test_parse_recovery_retention_rejects_omit_and_bad_range(
     error,
 ):
     with pytest.raises(ValueError, match=error):
-        parse_node1_recovery_retention(payload, "SHORT")
+        parse_node1_recovery_retention(
+            {"retention": payload},
+            "SHORT",
+        )
 
 
 def test_parse_recovery_choice_rejects_out_of_range_candidate():
@@ -339,9 +450,11 @@ def test_parse_recovery_retention_rejects_large_selection():
     chunks = build_text_chunks(raw_text, max_characters=10)
     selected = parse_node1_recovery_retention(
         {
-            "mode": "chunk",
-            "review": "둘째 청크를 복구한다.",
-            "chunk_id": chunks[1].chunk_id,
+            "retention": {
+                "mode": "chunk",
+                "review": "둘째 청크를 복구한다.",
+                "chunk_id": chunks[1].chunk_id,
+            },
         },
         raw_text,
         max_selected_characters=10,
@@ -353,9 +466,11 @@ def test_parse_recovery_retention_rejects_large_selection():
     with pytest.raises(ValueError, match="청크 목록"):
         parse_node1_recovery_retention(
             {
-                "mode": "chunk",
-                "review": "없는 청크를 요청한다.",
-                "chunk_id": "chunk-9999",
+                "retention": {
+                    "mode": "chunk",
+                    "review": "없는 청크를 요청한다.",
+                    "chunk_id": "chunk-9999",
+                },
             },
             raw_text,
             max_selected_characters=10,
@@ -412,9 +527,14 @@ def test_parse_review_rejects_invalid_objects(payload):
         {"answer": ""},
         {"answer": 123},
         {"answer": "정상", "extra": "허용하지 않음"},
-        {"answer": "x" * (MAX_NODE3_ANSWER_CHARACTERS + 1)},
     ],
 )
 def test_parse_node3_answer_rejects_invalid_objects(payload):
     with pytest.raises(ValueError):
         parse_node3_answer(payload)
+
+
+def test_parse_node3_answer_does_not_apply_a_character_limit():
+    long_answer = "x" * 10_000
+
+    assert parse_node3_answer({"answer": long_answer}).answer == long_answer

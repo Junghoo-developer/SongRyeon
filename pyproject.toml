@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=65"]
+requires = ["setuptools>=65", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -22,10 +22,15 @@ dependencies = []
 
 [project.optional-dependencies]
 test = ["pytest>=8"]
+codex = ["openai-codex==0.144.4"]
 
 [project.scripts]
 songryeon = "demo.cli:main"
 songryeon-index = "knowledge.build_knowledge:main"
+songryeon-model-scale = "evals.model_scale_capture:main"
+songryeon-model-scale-verify = "evals.model_scale_verify:main"
+songryeon-model-scale-review = "evals.model_scale_review_bundle:main"
+songryeon-model-scale-review-verify = "evals.model_scale_review_verify:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
@@ -48,6 +53,9 @@ evals = [
     "cases/*.py",
     "cases/project/*.py",
     "cases/project/nested/*.py",
+    "model_ceiling_cases/*.json",
+    "model_ceiling_cases/*.py",
+    "model_ceiling_cases/project/*.py",
 ]
 
 [tool.pytest.ini_options]

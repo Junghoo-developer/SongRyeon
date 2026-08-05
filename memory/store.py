@@ -2,6 +2,10 @@
 
 이 파일은 에이전트 시야를 만들지 않는다. 여기서 저장하는 파일은 ID와
 시각까지 보존하는 원본 로그이며, 시야 가공은 ``agent_view.py``에서 한다.
+
+학습 포인트는 ``create → encode → append → flush → rollback`` 순서다.
+여기에는 A/R 판단이 없다. 이미 완성된 기록을 잃지 않고 덧붙이는 저장
+책임만 맡기 때문에 분류 철학이 바뀌어도 파일 쓰기 코드는 거의 그대로다.
 """
 
 import json
@@ -38,7 +42,9 @@ def append_information_records(
         for record in completed_records
     ).encode("utf-8")
 
-    # 단일 프로세스 데모를 전제로, 실패하면 쓰기 전 byte 크기로 되돌린다.
+    # JSONL 줄마다 따로 쓰지 않고 payload 전체를 한 번에 쓴다. 그래도 디스크
+    # 오류로 일부 byte만 써질 수 있으므로 실패하면 쓰기 전 크기로 되돌린다.
+    # 이것은 프로세스 간 잠금이 아니라 단일 writer의 부분 쓰기 복구다.
     with path.open(
         "a+b",
     ) as file:

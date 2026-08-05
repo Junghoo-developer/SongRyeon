@@ -245,6 +245,7 @@ def run_single_tool_agent_turn(
         node4_rejections=0,
         node2_limit_exhausted=False,
         node4_limit_exhausted=False,
+        last_node4_reject_reason=None,
         final_outcome="eval_single_agent_answer",
     )
 

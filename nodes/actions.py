@@ -3,7 +3,7 @@
 import json
 from dataclasses import dataclass
 
-from .common import validate_short_reason
+from .common import validate_relative_text
 from .retention import RetentionDecision
 
 
@@ -40,7 +40,7 @@ class Node1Action:
         if self.action not in NODE1_ACTIONS:
             raise ValueError(f"알 수 없는 Node1 행동입니다: {self.action}")
 
-        validate_short_reason(self.reason, "reason")
+        validate_relative_text(self.reason, "reason")
 
         if self.action == "use_tool":
             if not isinstance(self.tool_name, str) or not self.tool_name:

@@ -63,9 +63,14 @@ def test_excerpt_records_relative_request_and_exact_absolute_copy(
         for record in selection_records
     }
 
-    assert records_by_type["node1_tool_review"]["information_class"] == (
+    assert records_by_type["node1_tool_review_excerpt"][
+        "information_class"
+    ] == (
         "relative"
     )
+    assert records_by_type["node1_tool_review_excerpt"][
+        "code_verifiable"
+    ] is False
     assert records_by_type["node1_retention_request"][
         "code_verifiable"
     ] is False
@@ -166,6 +171,9 @@ def test_chunk_id_is_relative_but_applied_range_and_copy_are_absolute(
     assert by_type["tool_retention_applied"]["information_class"] == (
         "absolute"
     )
+    assert by_type["node1_tool_review_chunk"]["information_class"] == (
+        "relative"
+    )
     assert by_type["tool_result_content"]["information"] == (
         raw_text[selected_chunk.start:selected_chunk.end]
     )
@@ -207,6 +215,14 @@ def test_omit_does_not_create_a_visible_content_record(tmp_path):
         record["information_type"]
         for record in records
     }
+    review_record = next(
+        record
+        for record in records
+        if record["information_type"] == "node1_tool_review_omit"
+    )
+    assert review_record["information"] == "관련 없는 결과다."
+    assert review_record["information_class"] == "relative"
+    assert review_record["code_verifiable"] is False
 
 
 def test_visible_budget_failure_writes_no_partial_selection_records(

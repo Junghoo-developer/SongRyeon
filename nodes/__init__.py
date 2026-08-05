@@ -1,7 +1,7 @@
 """Ollama의 노드별 JSON을 코드가 검증할 수 있는 작은 결정 계약."""
 
 from .actions import Node1Action, Node1ToolDecision
-from .answer import MAX_NODE3_ANSWER_CHARACTERS, Node3Answer
+from .answer import Node3Answer
 from .parsing import (
     DEFAULT_MAX_SELECTED_CHARACTERS,
     parse_node1_action,
@@ -35,7 +35,6 @@ from .schemas import (
 __all__ = [
     "DEFAULT_MAX_SELECTED_CHARACTERS",
     "DEFAULT_CHUNK_CHARACTERS",
-    "MAX_NODE3_ANSWER_CHARACTERS",
     "NODE1_ACTION_SCHEMA",
     "NODE1_RECOVERY_CHOICE_SCHEMA",
     "NODE1_RECOVERY_RETENTION_SCHEMA",

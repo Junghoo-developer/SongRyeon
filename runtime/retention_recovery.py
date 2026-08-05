@@ -3,6 +3,7 @@
 from pathlib import Path
 from uuid import uuid4
 
+from memory.audit import canonical_json
 from memory.settings import DEFAULT_MEMORY_PATH
 from memory.tool_records import (
     save_node1_all_omit_detection,
@@ -23,6 +24,8 @@ def should_recover_omitted_results(
     candidates,
     *,
     round_has_retained_content,
+    total_tool_calls=0,
+    maximum_total_tool_calls=None,
 ):
     """현재 행동이 Node2로 향할 때 전부 omit 복구가 필요한지 판정한다."""
 
@@ -38,6 +41,20 @@ def should_recover_omitted_results(
     if not isinstance(round_has_retained_content, bool):
         raise TypeError("round_has_retained_content는 bool이어야 합니다.")
 
+    if (
+        not isinstance(total_tool_calls, int)
+        or isinstance(total_tool_calls, bool)
+        or total_tool_calls < 0
+    ):
+        raise ValueError("전체 도구 호출 수는 0 이상의 정수여야 합니다.")
+
+    if maximum_total_tool_calls is not None and (
+        not isinstance(maximum_total_tool_calls, int)
+        or isinstance(maximum_total_tool_calls, bool)
+        or maximum_total_tool_calls < 1
+    ):
+        raise ValueError("전체 도구 호출 상한은 1 이상의 정수여야 합니다.")
+
     if any(
         not isinstance(candidate, OmittedToolCandidate)
         for candidate in candidates
@@ -48,6 +65,21 @@ def should_recover_omitted_results(
         action.action == "route_node2"
         or state.node1_tool_calls_in_round
         >= MAX_NODE1_TOOL_CALLS_PER_ROUND
+        or (
+            action.action == "use_tool"
+            and maximum_total_tool_calls is not None
+            and total_tool_calls >= maximum_total_tool_calls
+        )
+        or (
+            action.action == "use_tool"
+            and canonical_json(
+                {
+                    "arguments": action.arguments,
+                    "tool_name": action.tool_name,
+                }
+            )
+            in state.node1_tool_request_signatures
+        )
     )
     return (
         will_route_to_node2

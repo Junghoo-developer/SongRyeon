@@ -8,9 +8,15 @@ from pathlib import Path
 
 from agent_tools import FileToolbox
 from llm import (
+    CodexAccountIntegrationClient,
     ModelCallError,
     OllamaClient,
     OpenAICompatibleIntegrationClient,
+)
+from llm.codex_account import (
+    CODEX_REASONING_EFFORTS,
+    DEFAULT_CODEX_ACCOUNT_MODEL,
+    DEFAULT_CODEX_REASONING_EFFORT,
 )
 from llm.client import (
     DEFAULT_BASE_URL,
@@ -107,6 +113,31 @@ def _build_parser():
             f"(기본값: {DEFAULT_EXTERNAL_API_KEY_ENV})"
         ),
     )
+    parser.add_argument(
+        "--codex-account-integration",
+        action="store_true",
+        help=(
+            "저장된 ChatGPT/Codex 로그인을 재사용하는 모델 체급 비교를 "
+            "단발로 실행합니다. 대회 기본 경로가 아닙니다."
+        ),
+    )
+    parser.add_argument(
+        "--codex-account-model",
+        default=None,
+        help=(
+            "Codex 계정 통합시험 모델 "
+            f"(기본값: {DEFAULT_CODEX_ACCOUNT_MODEL})"
+        ),
+    )
+    parser.add_argument(
+        "--codex-reasoning-effort",
+        choices=CODEX_REASONING_EFFORTS,
+        default=None,
+        help=(
+            "Codex 계정 통합시험 reasoning effort "
+            f"(기본값: {DEFAULT_CODEX_REASONING_EFFORT})"
+        ),
+    )
     return parser
 
 
@@ -143,6 +174,10 @@ def _run_one(question, *, client, toolbox, memory_path):
         answer_label = "송련>"
 
     print(f"\n{answer_label}\n" + result.answer)
+    if result.node4_limit_exhausted:
+        print("\n[Node4 최종 검열]")
+        print("판정: reject")
+        print(f"사유: {result.last_node4_reject_reason}")
     print(
         "\n"
         f"(도구 {result.total_tool_calls}회, "
@@ -152,7 +187,7 @@ def _run_one(question, *, client, toolbox, memory_path):
 
 
 def _external_memory_path(memory_path):
-    """대회용 실제 원본 memory.jsonl을 외부 API 실행에서 차단한다."""
+    """대회용 실제 원본 memory.jsonl을 모든 외부 실행에서 차단한다."""
 
     resolved = Path(memory_path).resolve()
     default_resolved = DEFAULT_MEMORY_PATH.resolve()
@@ -164,7 +199,7 @@ def _external_memory_path(memory_path):
             same_file = False
     if resolved == default_resolved or same_file:
         raise ValueError(
-            "외부 API 통합시험은 실제 memory/memory.jsonl을 사용할 수 없습니다."
+            "외부 통합시험은 실제 memory/memory.jsonl을 사용할 수 없습니다."
         )
     return resolved
 
@@ -225,11 +260,84 @@ def _run_external_integration(args):
     return 0
 
 
+def _run_codex_account_integration(args):
+    """실제 기억과 분리해 ChatGPT 계정 모델을 한 번만 비교한다."""
+
+    if not args.question:
+        raise ValueError("Codex 계정 통합시험에는 단발 질문이 반드시 필요합니다.")
+
+    external_memory = (
+        None
+        if args.memory is None
+        else _external_memory_path(args.memory)
+    )
+    client = CodexAccountIntegrationClient(
+        model_name=(
+            args.codex_account_model or DEFAULT_CODEX_ACCOUNT_MODEL
+        ),
+        reasoning_effort=(
+            args.codex_reasoning_effort
+            or DEFAULT_CODEX_REASONING_EFFORT
+        ),
+    )
+
+    try:
+        ready = client.check_configuration()
+        toolbox = FileToolbox(
+            allowed_root=args.project_root,
+            max_file_bytes=DEMO_MAX_PYTHON_FILE_BYTES,
+        )
+        question = " ".join(args.question)
+        print(
+            "backend=OpenAI Codex ChatGPT account / "
+            f"model={ready['model_name']} / "
+            f"effort={ready['reasoning_effort']} / "
+            f"SDK={ready['sdk_version']} / "
+            f"mode={ready['execution_mode']}"
+        )
+
+        if external_memory is not None:
+            _run_one(
+                question,
+                client=client,
+                toolbox=toolbox,
+                memory_path=external_memory,
+            )
+            return 0
+
+        print("감사 로그는 격리된 임시 경로를 사용하며 실행 후 삭제됩니다.")
+        with tempfile.TemporaryDirectory(
+            prefix="songryeon-codex-account-log-",
+        ) as temporary_directory:
+            _run_one(
+                question,
+                client=client,
+                toolbox=toolbox,
+                memory_path=Path(temporary_directory) / "memory.jsonl",
+            )
+        return 0
+    finally:
+        client.close()
+
+
 def main(argv=None):
     """명령행 인자를 읽고 한 번 또는 대화형으로 데모를 실행한다."""
 
     args = _build_parser().parse_args(argv)
     try:
+        if args.external_api_integration and args.codex_account_integration:
+            raise ValueError(
+                "외부 API와 Codex 계정 통합시험을 동시에 실행할 수 없습니다."
+            )
+        if args.codex_account_integration:
+            if (
+                args.external_api_base_url is not None
+                or args.external_api_model is not None
+            ):
+                raise ValueError(
+                    "외부 API 옵션은 Codex 계정 통합시험과 함께 사용할 수 없습니다."
+                )
+            return _run_codex_account_integration(args)
         if args.external_api_integration:
             return _run_external_integration(args)
         if (
@@ -238,6 +346,14 @@ def main(argv=None):
         ):
             raise ValueError(
                 "외부 API 옵션은 --external-api-integration과 함께 사용해야 합니다."
+            )
+        if (
+            args.codex_account_model is not None
+            or args.codex_reasoning_effort is not None
+        ):
+            raise ValueError(
+                "Codex 계정 옵션은 --codex-account-integration과 함께 "
+                "사용해야 합니다."
             )
 
         client = OllamaClient(

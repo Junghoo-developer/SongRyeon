@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from .common import validate_short_reason
+from .common import validate_relative_text
 
 
 REVIEW_VERDICTS = {"permit", "reject"}
@@ -19,4 +19,4 @@ class ReviewDecision:
         if self.verdict not in REVIEW_VERDICTS:
             raise ValueError(f"알 수 없는 검토 결정입니다: {self.verdict}")
 
-        validate_short_reason(self.reason, "reason")
+        validate_relative_text(self.reason, "reason")

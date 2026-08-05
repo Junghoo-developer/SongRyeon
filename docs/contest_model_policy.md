@@ -84,6 +84,39 @@ python -m demo `
 기억을 사용하며, 로그를 보존할 때도 `--memory .\.tmp\external-memory.jsonl`
 같은 격리 경로를 지정합니다.
 
+## Codex 계정 모델 체급 비교
+
+`codex_account_integration`은 저장된 ChatGPT/Codex 로그인을 공식 Codex
+Python SDK가 재사용하여 `gpt-5.6-sol`을 호출하는 별도 개발 시험입니다.
+이는 API key를 쓰는 `external_api_integration`과 인증 방식만 다를 뿐,
+대회 제출·시연·공식 성능 집계에는 포함되지 않는 외부 실행입니다.
+
+- `--codex-account-integration`을 명시한 단발 실행만 허용합니다.
+- 실제 `memory/memory.jsonl`을 거부하고 폐기되는 임시 로그를 씁니다.
+- SDK에 토큰·이메일·브라우저 session을 전달하거나 저장하지 않고, 로컬에
+  이미 저장된 Codex 인증은 SDK 자체가 처리합니다.
+- 각 호출은 빈 임시 폴더의 ephemeral thread와 읽기 전용 sandbox에서
+  실행하며 모든 승인을 거부합니다.
+- 결과 trace에 shell, 파일 변경, MCP, 웹 검색, image, 하위 agent 같은
+  부가 작업이 나타나면 그 모델 응답을 폐기합니다.
+- Codex SDK는 순수 text model client가 아니라 agent runtime이므로, 이
+  결과를 Ollama나 직접 API 결과와 같은 조건의 성능 비교로 주장하지
+  않습니다.
+- 심사 자료용 model-ceiling 실험은 `evals/model_ceiling_cases/`의 공개
+  합성 fixture만 사용하고, 별도 evidence pack에서 `publishable: false`와
+  `official_contest_score: false`를 강제합니다.
+
+송련 전용 가상환경에서 선택 의존성을 설치한 뒤 실행합니다.
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -e ".[codex]"
+.\.venv\Scripts\python.exe -m demo `
+  --codex-account-integration `
+  --codex-account-model "gpt-5.6-sol" `
+  --codex-reasoning-effort "medium" `
+  "공개 또는 인공 입력으로 모델 체급 차이만 검사해 줘."
+```
+
 ## 제출 전 확인표
 
 - [ ] 시연 명령이 로컬 또는 자체 호스팅 Ollama만 호출한다.
@@ -92,5 +125,6 @@ python -m demo `
 - [ ] 모델 출처·라이선스·양자화가 결과보고서 기술명세와 일치한다.
 - [ ] 상용 API 자동 fallback 코드가 없다.
 - [ ] 외부 API 통합시험 산출물이 공식 평가 집계에 섞이지 않는다.
+- [ ] Codex 계정 통합시험 산출물이 공식 평가 집계에 섞이지 않는다.
 - [ ] 저장소와 로그에 API 키·비밀번호·브라우저 세션이 없다.
 - [ ] 실제 기억과 비공개 코드가 외부 API에 전달되지 않는다.

@@ -27,3 +27,10 @@ memory/memory.jsonl
 /.tmp/
 /.codex-remote-attachments/
 *.log
+
+# 평가 산출물에는 전체 프롬프트, 원시 응답, thinking이 포함될 수 있다.
+**/capture.json
+**/transcripts/
+**/blind_key.json
+*.memory.jsonl
+*.tmp

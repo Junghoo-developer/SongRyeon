@@ -6,7 +6,6 @@ from .actions import (
     Node1Action,
     Node1ToolDecision,
 )
-from .common import MAX_REVIEW_CHARACTERS
 from .retention import (
     RETENTION_MODES,
     RetentionDecision,
@@ -16,7 +15,6 @@ from .review import REVIEW_VERDICTS, ReviewDecision
 
 __all__ = [
     "MAX_NODE1_ACTION_ARGUMENT_CHARACTERS",
-    "MAX_REVIEW_CHARACTERS",
     "NODE1_ACTIONS",
     "RETENTION_MODES",
     "REVIEW_VERDICTS",

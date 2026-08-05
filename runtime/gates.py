@@ -1,4 +1,9 @@
-"""Node2·Node4의 permit/reject를 3회 제한과 라우팅에 적용한다."""
+"""Node2·Node4의 permit/reject를 3회 제한과 라우팅에 적용한다.
+
+Node2·Node4가 반환하는 판정은 R 요청이고, 실제 라우팅은 이 파일의 A다.
+첫 세 번의 reject는 재시도를 만들고, 이미 세 번이 적용된 뒤 들어온 네 번째
+reject만 무시한다. 무시된 reject를 permit으로 바꾸지는 않는다.
+"""
 
 from uuid import uuid4
 
@@ -41,6 +46,7 @@ def _plan_gate_resolution(state, reviewer, decision):
             rejection_ignored=False,
         )
 
+    # current_rejections가 0, 1, 2일 때 각각 1·2·3번째 반려를 적용한다.
     if current_rejections < MAX_REJECTIONS_PER_GATE:
         return GateResolution(
             reviewer=reviewer,
@@ -50,6 +56,8 @@ def _plan_gate_resolution(state, reviewer, decision):
             rejection_ignored=False,
         )
 
+    # current_rejections가 이미 3이면 이번(네 번째) reject는 기록하되
+    # 유한 종료를 위해 다음 단계로 이동한다.
     return GateResolution(
         reviewer=reviewer,
         next_node=advance_node,

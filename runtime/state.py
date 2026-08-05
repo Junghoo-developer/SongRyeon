@@ -1,10 +1,15 @@
-"""한 사용자 턴 동안 코드가 보존하는 카운터와 결과 형식."""
+"""한 사용자 턴 동안 코드가 보존하는 카운터와 결과 형식.
 
-from dataclasses import dataclass
+이 파일에는 모델 호출이나 파일 저장이 없다. 런타임이 기억해야 할 상태를
+작은 dataclass로 이름 붙이는 층이다. 먼저 이 자료형을 읽고 ``runner.py``를
+보면 각 분기에서 무엇이 변하는지 추적하기 쉽다.
+"""
+
+from dataclasses import dataclass, field
 from uuid import uuid4
 
 from agent_tools import ToolResult
-from nodes.common import validate_short_reason
+from nodes.common import validate_relative_text
 
 
 NODE1 = "node1"
@@ -43,16 +48,19 @@ class OmittedToolCandidate:
         if not self.observation.result.success:
             raise ValueError("성공한 도구 결과만 복구 후보가 될 수 있습니다.")
 
-        validate_short_reason(self.review, "review")
+        validate_relative_text(self.review, "review")
 
 
 @dataclass
 class TurnState:
     """사용자 입력 하나를 처리하는 동안 코드가 보존할 카운터."""
 
+    # Node1 라운드는 Node2가 reject를 실제 적용할 때만 증가한다.
     turn_id: str
     node1_round: int = 1
     node1_tool_calls_in_round: int = 0
+    # 실행이 끝난 정확한 도구 요청은 라운드가 바뀌어도 턴 동안 유지한다.
+    node1_tool_request_signatures: set[str] = field(default_factory=set)
     node2_rejections: int = 0
     node4_rejections: int = 0
     node1_omit_recovery_used: bool = False

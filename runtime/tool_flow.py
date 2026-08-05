@@ -1,9 +1,15 @@
-"""Node1 도구 실행과 짧은 원문·긴 원문 청크 보존 적용 흐름."""
+"""Node1 도구 실행과 짧은 원문·긴 원문 청크 보존 적용 흐름.
+
+읽을 때 ``요청 → 실행 → 숨김 저장 → 선택 적용 → 라우팅``으로 나눈다.
+Node1의 행동은 요청(R)이고, 허용 여부·실제 결과·실제 다음 노드는 코드가
+적용한 사실(A)이다. 이 둘을 같은 값으로 취급하지 않는 것이 핵심이다.
+"""
 
 from pathlib import Path
 from uuid import uuid4
 
 from agent_tools import ToolResult
+from memory.audit import canonical_json
 from memory.gate_records import save_node1_route
 from memory.settings import DEFAULT_MEMORY_PATH
 from memory.tool_records import (
@@ -24,6 +30,17 @@ from .state import (
 
 class ToolCallLimitExceeded(RuntimeError):
     """Node1이 현재 라운드의 네 번째 도구를 요청했다."""
+
+
+def _tool_request_signature(tool_name, arguments):
+    """같은 도구와 논리적으로 같은 JSON 인자를 한 값으로 만든다."""
+
+    return canonical_json(
+        {
+            "arguments": arguments,
+            "tool_name": tool_name,
+        }
+    )
 
 
 def execute_node1_tool(
@@ -49,7 +66,8 @@ def execute_node1_tool(
             "Node1은 한 라운드에 도구를 최대 3회 사용할 수 있습니다."
         )
 
-    # 잘못된 도구 이름이나 실패한 파일도 저장 성공 시 1회로 센다.
+    # 모델의 의도가 아니라 실제 시도를 센다. 잘못된 도구 이름이나 실패한
+    # 파일도 저장에 성공했다면 실행 예산을 소비한 1회다.
     attempt_number = state.node1_tool_calls_in_round + 1
     result = toolbox.execute(tool_name, arguments)
 
@@ -70,6 +88,9 @@ def execute_node1_tool(
         maximum_attempts=MAX_NODE1_TOOL_CALLS_PER_ROUND,
         turn_id=record_turn_id,
         memory_path=memory_path,
+    )
+    state.node1_tool_request_signatures.add(
+        _tool_request_signature(tool_name, arguments)
     )
     state.node1_tool_calls_in_round = attempt_number
     source_type = (
@@ -131,8 +152,11 @@ def route_after_node1(
     state,
     action,
     memory_path=DEFAULT_MEMORY_PATH,
+    *,
+    total_tool_calls=0,
+    maximum_total_tool_calls=None,
 ):
-    """Node1 행동 요청과 세 번째 도구 도달 여부를 기록·적용한다."""
+    """Node1 행동 요청과 라운드·턴 도구 상한을 기록·적용한다."""
 
     if not isinstance(state, TurnState):
         raise TypeError("state는 TurnState여야 합니다.")
@@ -140,11 +164,39 @@ def route_after_node1(
     if not isinstance(action, Node1Action):
         raise TypeError("action은 Node1Action이어야 합니다.")
 
+    if (
+        not isinstance(total_tool_calls, int)
+        or isinstance(total_tool_calls, bool)
+        or total_tool_calls < 0
+    ):
+        raise ValueError("전체 도구 호출 수는 0 이상의 정수여야 합니다.")
+
+    if maximum_total_tool_calls is not None and (
+        not isinstance(maximum_total_tool_calls, int)
+        or isinstance(maximum_total_tool_calls, bool)
+        or maximum_total_tool_calls < 1
+    ):
+        raise ValueError("전체 도구 호출 상한은 1 이상의 정수여야 합니다.")
+
     reached_tool_limit = (
         state.node1_tool_calls_in_round
         >= MAX_NODE1_TOOL_CALLS_PER_ROUND
     )
+    reached_total_tool_limit = (
+        maximum_total_tool_calls is not None
+        and total_tool_calls >= maximum_total_tool_calls
+    )
+    repeated_tool_request = (
+        action.action == "use_tool"
+        and _tool_request_signature(
+            action.tool_name,
+            action.arguments,
+        )
+        in state.node1_tool_request_signatures
+    )
 
+    # 모델의 route 요청은 그대로 적용할 수 있지만, 네 번째 도구 요청은
+    # 모델이 원해도 코드가 막고 Node2로 보낸다.
     if action.action == "route_node2":
         resolution = RouteResolution(
             requested_action=action.action,
@@ -152,12 +204,26 @@ def route_after_node1(
             outcome="route_requested",
             forced_by_tool_limit=False,
         )
+    elif reached_total_tool_limit:
+        resolution = RouteResolution(
+            requested_action=action.action,
+            next_node=NODE2,
+            outcome="tool_request_blocked_total_limit",
+            forced_by_tool_limit=True,
+        )
     elif reached_tool_limit:
         resolution = RouteResolution(
             requested_action=action.action,
             next_node=NODE2,
             outcome="tool_request_blocked_limit",
             forced_by_tool_limit=True,
+        )
+    elif repeated_tool_request:
+        resolution = RouteResolution(
+            requested_action=action.action,
+            next_node=NODE2,
+            outcome="tool_request_blocked_duplicate",
+            forced_by_tool_limit=False,
         )
     else:
         resolution = RouteResolution(

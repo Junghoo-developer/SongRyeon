@@ -40,6 +40,19 @@ the corresponding raw evaluation result.
 The current SongRyeon runtime has no mandatory third-party Python package.
 `pytest` is an optional development dependency used only for tests.
 
+## OpenAI Codex Python SDK (optional)
+
+- Project: OpenAI Codex Python SDK
+- Package: `openai-codex==0.144.4`
+- Source: https://github.com/openai/codex/tree/main/sdk/python
+- License: Apache License 2.0
+- Use in SongRyeon: an explicitly enabled, one-shot ChatGPT-account model-size
+  integration test; never the contest execution default or an automatic
+  fallback
+
+The SDK and its pinned CLI runtime are installed separately in a project
+virtual environment and are not redistributed by SongRyeon Core.
+
 ## Optional commercial AI APIs
 
 No commercial AI API is redistributed, required, or used as an automatic
