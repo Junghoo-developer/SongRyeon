@@ -61,6 +61,7 @@ evals = [
     "contest_holdout_v1/project/*.py",
     "contest_holdout_v1/frozen/*/FREEZE.json",
     "contest_holdout_v1/frozen/*/BLINDING_COMMITMENT.json",
+    "contest_holdout_v1/frozen/*/INVALIDATION.md",
     "contest_holdout_v1/frozen/*/BLIND_PACKET.json",
     "contest_holdout_v1/frozen/*/BLIND_SCORES.json",
     "contest_holdout_v1/frozen/*/SCORE_LOCK.json",

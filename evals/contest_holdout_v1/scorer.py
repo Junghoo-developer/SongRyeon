@@ -166,31 +166,31 @@ def _verify_raw_artifact(
     if answer is not None:
         _require(isinstance(answer, str) and answer, "capture answer는 문자열 또는 null이어야 합니다.")
         _require(isinstance(turn_id, str) and turn_id, "answer가 있는 capture turn_id가 없습니다.")
-        answer_records = [
-            event
-            for event in events
-            if event.get("information_type") == "node3_answer"
-            and event.get("information") == answer
-            and isinstance(event.get("information_id"), str)
-            and isinstance(event.get("turn_id"), str)
-            and event["turn_id"].startswith(turn_id)
-        ]
-        _require(
-            len(answer_records) == 1,
-            "raw JSONL에서 capture answer의 node3_answer가 정확히 하나가 아닙니다.",
-        )
-        answer_id = answer_records[0]["information_id"]
         deliveries = [
             event
             for event in events
             if event.get("information_type") == "final_delivery"
             and isinstance(event.get("turn_id"), str)
             and event["turn_id"].startswith(f"{turn_id}-final")
-            and _final_delivery_answer_id(event) == answer_id
         ]
         _require(
             len(deliveries) == 1,
-            "raw JSONL final_delivery가 capture answer를 유일하게 가리키지 않습니다.",
+            "raw JSONL final_delivery가 현재 턴에 정확히 하나가 아닙니다.",
+        )
+        answer_id = _final_delivery_answer_id(deliveries[0])
+        _require(isinstance(answer_id, str), "final_delivery에 answer information ID가 없습니다.")
+        delivered_answer_records = [
+            event
+            for event in events
+            if event.get("information_type") == "node3_answer"
+            and event.get("information_id") == answer_id
+            and event.get("information") == answer
+            and isinstance(event.get("turn_id"), str)
+            and event["turn_id"].startswith(turn_id)
+        ]
+        _require(
+            len(delivered_answer_records) == 1,
+            "raw JSONL final_delivery가 capture answer의 유일한 node3 기록을 가리키지 않습니다.",
         )
     elif not events:
         _require(not completed and isinstance(error, dict), "빈 raw artifact는 명시적 실패에서만 허용됩니다.")

@@ -25,6 +25,7 @@ REQUIRED_HOLDOUT_FILES = {
     "evals/contest_holdout_v1/manifest.json",
     "evals/contest_holdout_v1/project/acorn.py",
     "evals/contest_holdout_v1/project/zephyr.py",
+    "evals/contest_holdout_v1/frozen/contest-20260806-v1/INVALIDATION.md",
 }
 PRIVATE_FILENAMES = {
     ".env",

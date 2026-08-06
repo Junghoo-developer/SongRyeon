@@ -315,6 +315,60 @@ def test_end_to_end_chain_recomputes_and_publication_uses_it(tmp_path: Path) -> 
     assert decision["whole_output_explanation_claim_allowed"] is False
 
 
+def test_packet_uses_final_delivery_id_when_retries_repeat_same_answer(
+    tmp_path: Path,
+) -> None:
+    """같은 답변 문자열을 재생성해도 최종 delivery ID로 한 기록을 고른다."""
+
+    private = tmp_path / "private"
+    freeze_experiment(private, secret=b"R" * 32, now=FIXED_TIME)
+    _write_capture_matrix(private)
+
+    capture_path = private / "block-001" / "capture.json"
+    capture = read_json_object(capture_path, "capture")
+    row = capture["captures"][0]
+    raw_path = private / "block-001" / row["raw_memory_artifact"]["path"]
+    events = [
+        json.loads(line)
+        for line in raw_path.read_text(encoding="utf-8").splitlines()
+    ]
+    first_answer = next(
+        event for event in events
+        if event["information_type"] == "node3_answer"
+    )
+    retry = {
+        **first_answer,
+        "information_id": f"{first_answer['information_id']}-retry",
+        "turn_id": f"{row['turn_id']}-node3-retry",
+    }
+    delivery = next(
+        event for event in events
+        if event["information_type"] == "final_delivery"
+    )
+    delivery["information"] = json.dumps(
+        {"answer_information_id": retry["information_id"]},
+        ensure_ascii=False,
+        sort_keys=True,
+    )
+    events.insert(events.index(delivery), retry)
+    payload = _jsonl_bytes(events)
+    raw_path.write_bytes(payload)
+    artifact = row["raw_memory_artifact"]
+    artifact["sha256"] = hashlib.sha256(payload).hexdigest()
+    artifact["byte_count"] = len(payload)
+    artifact["event_count"] = len(events)
+    artifact["information_type_counts"] = dict(sorted(Counter(
+        event["information_type"] for event in events
+    ).items()))
+    capture_path.write_text(
+        json.dumps(capture, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    packet = build_blind_packet(private)
+    assert len(packet["items"]) == EXECUTION_COUNT
+
+
 def test_cross_secret_public_proof_is_rejected_before_reveal_write(tmp_path: Path) -> None:
     private, _ = _prepare_locked_experiment(tmp_path / "right", public=False)
     wrong_public = tmp_path / "wrong-public"
