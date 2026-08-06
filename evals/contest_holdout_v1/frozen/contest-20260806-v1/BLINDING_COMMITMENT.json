@@ -1,0 +1,32 @@
+{
+  "commitment_status": "mapping_committed_before_live_outputs",
+  "created_at": "2026-08-06T03:31:52.213976+00:00",
+  "experiment_id": "songryeon-contest-evidence-authority-holdout-2026-08-v1",
+  "identity_universe_sha256": "b2d41ba811204f3d55354991fa7855c97a6f79929698f7ccdf534f4a97729ea2",
+  "live_output_count_at_creation": 0,
+  "mapping_sha256": "c414eed2864402d9cc0e171fe2750a7ea9d86b6bc149ef5e8901ae25a669098a",
+  "planned_execution_count": 216,
+  "publishable": false,
+  "required_human_audit_blind_ids": [
+    "blind-0022adbb9fc3de4599432e2026d256f7380e95c210012721a490301aedd73914",
+    "blind-02d8bbe87cff7d9eecb959ad09ad4e5c0624d43e399554b134270f9bca59709b",
+    "blind-04a3b253c8498260ddb8448733eaa66b714261a55f089fc2ddaedd0b3bf70491",
+    "blind-074869c394f18f885cef2ece18ee9a8eb022407243662faab810ef19347439c9",
+    "blind-082346256f775f2aad837f5af4337d3ad93d2f290bdb39c80d3e5edb458138d7",
+    "blind-08502925c59400a223ddab1981853a0403f7461f3567310edc03769eea61867e",
+    "blind-08a5f01ae34cdd07fa8c401596d82370494022318bd6853d2ec429dfa0243fd4",
+    "blind-09d5061e1685085a034a66577c8a054e1957782f7b990abfc7012b5e2a42d2e5",
+    "blind-1036518eb5c12e232be8b7a17de5b303e0442c8b7d4125d931c0d49bbf08ef0d",
+    "blind-136ff100947fe1de3f8f4cce9938a723de8ac2d7d4b264e8b18db82e23cc8f74",
+    "blind-13cbce306a99c283b5f3de9ee311851443be2c8b89bbfc70de127702c99ba70c",
+    "blind-146f11a2752d38c5404560894bd9e4fe246a4de8bce1a58e73bac6f3fdbd2948",
+    "blind-146f11b3d66cec74072253852ff4e46423b047b16229d7b761f181b2be7de7b2",
+    "blind-16b4707805a7e717f4e5eac69d273f5d59f6c2823ea3abe5bd0fcf60eda0de71",
+    "blind-1867ad866a34d2254907fb16a0743dfec600a0a70bf53682ec5ba54b317980db",
+    "blind-19c32ea030d507e0fe5cc6888ab76040fd302f617ebf7048f68d97d5afcf9b3c",
+    "blind-1a00978b88193910f5df66c38c18e0dedaf2b09035ff99005648659e24375027",
+    "blind-1b07b506caa404d20b3dd905ef36224eab605a98d1128bcdaa96c138d66e3d2f"
+  ],
+  "schema_version": 1,
+  "secret_sha256": "e9d086f3022feb6d4267b37362a5c0b078f0caff881c2108abe507ff8a55bce9"
+}
