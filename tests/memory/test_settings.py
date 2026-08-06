@@ -3,20 +3,31 @@
 from memory.settings import (
     DEFAULT_AGENT_VIEW_CHARACTER_LIMIT,
     DEFAULT_MEMORY_PATH,
+    PROJECT_ROOT,
+)
+from knowledge.settings import (
+    DEFAULT_DB_PATH,
+    DEFAULT_DOCUMENTS_DIRECTORY,
 )
 
 
-def test_default_memory_path_does_not_follow_working_directory(
+def test_default_data_paths_use_process_starting_project_root(
     tmp_path,
     monkeypatch,
 ):
+    starting_root = PROJECT_ROOT
     original_path = DEFAULT_MEMORY_PATH
 
     monkeypatch.chdir(tmp_path)
 
+    assert starting_root != tmp_path
+    assert PROJECT_ROOT == starting_root
     assert DEFAULT_MEMORY_PATH == original_path
-    assert DEFAULT_MEMORY_PATH.name == "memory.jsonl"
-    assert DEFAULT_MEMORY_PATH.parent.name == "memory"
+    assert DEFAULT_MEMORY_PATH == starting_root / "memory" / "memory.jsonl"
+    assert DEFAULT_DB_PATH == starting_root / "knowledge" / "knowledge.db"
+    assert DEFAULT_DOCUMENTS_DIRECTORY == (
+        starting_root / "knowledge" / "documents"
+    )
 
 
 def test_all_nodes_share_an_8000_character_view_budget():

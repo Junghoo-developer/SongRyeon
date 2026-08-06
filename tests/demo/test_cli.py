@@ -286,6 +286,55 @@ def test_external_integration_rejects_real_memory_before_client_creation(
     assert "실제 memory/memory.jsonl" in capsys.readouterr().err
 
 
+def test_external_integration_rejects_selected_project_real_memory(
+    tmp_path,
+    monkeypatch,
+    capsys,
+):
+    project_root = tmp_path / "selected-project"
+    real_memory = project_root / "memory" / "memory.jsonl"
+    real_memory.parent.mkdir(parents=True)
+    real_memory.write_text("", encoding="utf-8")
+    monkeypatch.setattr(
+        cli,
+        "OpenAICompatibleIntegrationClient",
+        lambda **kwargs: pytest.fail("client를 만들면 안 됩니다."),
+    )
+
+    exit_code = cli.main(
+        [
+            "--external-api-integration",
+            "--external-api-base-url",
+            "https://provider.example/v1",
+            "--external-api-model",
+            "provider/large-model",
+            "--project-root",
+            str(project_root),
+            "--memory",
+            str(real_memory),
+            "질문",
+        ]
+    )
+
+    assert exit_code == 1
+    assert "실제 memory/memory.jsonl" in capsys.readouterr().err
+
+
+def test_external_memory_rejects_symlink_alias_of_project_memory(tmp_path):
+    project_root = tmp_path / "selected-project"
+    real_memory = project_root / "memory" / "memory.jsonl"
+    real_memory.parent.mkdir(parents=True)
+    real_memory.write_text("", encoding="utf-8")
+    alias = tmp_path / "memory-alias.jsonl"
+    try:
+        alias.symlink_to(real_memory)
+    except OSError:
+        pytest.skip("이 환경에서는 파일 symlink를 만들 수 없습니다.")
+
+    with pytest.raises(ValueError, match="실제 memory/memory.jsonl"):
+        cli._external_memory_path(alias, project_root)
+
+
 def test_external_options_without_opt_in_are_rejected(monkeypatch, capsys):
     monkeypatch.setattr(
         cli,

@@ -142,15 +142,17 @@ default path when a different manifest is loaded.
 hard maximum of three tool calls. `songryeon-no-node4` is an explicit eval-only
 adapter: it runs the SongRyeon loop but replaces Node4's model call with a
 recorded deterministic pass-through. The capture records this bypass separately
-from actual model-call count. `songryeon-full` is the unmodified full loop.
+from actual model-call count. `songryeon-full` uses the complete four-node
+architecture. Both SongRyeon variants receive the same eval-only, turn-wide
+three-call tool budget as the single-agent baseline; the ordinary demo keeps its
+default round-based budget unless a caller explicitly supplies a total limit.
 
 The initial 8,000-character frozen memory view and replayed previous turns are
-provided to all three variants. Runtime-budget differences remain explicit in
-each system's `runtime_contract`: the single agent has at most three total tool
-calls and keeps its raw tool history in its own prompt, while SongRyeon can
-reach four Node1 rounds (up to twelve calls) after Node2 rejections and exposes
-selected evidence through its retention contract. The shared wall-clock cap is
-enforced between model calls and also bounds each remaining HTTP timeout.
+provided to all three variants. All variants receive at most three tool calls
+per case. The single agent keeps raw tool history in its prompt, while SongRyeon
+exposes selected evidence through its retention contract and Node2 reviews that
+evidence against the current user request. The shared wall-clock cap is enforced
+between model calls and also bounds each remaining HTTP timeout.
 
 Variant and backbone are separate metadata fields. A second, optional group can
 compare full SongRyeon backbones without mixing those results into the
@@ -198,3 +200,26 @@ This command does **not** create benchmark scores or `RecordedRun` claims.
 Every capture is hard-coded as `live_raw_draft`, `review_status: draft` and
 `publishable: false`. A reviewer must inspect the raw JSONL and normalize it
 before the offline evaluator can calculate any performance metric.
+
+## Contest holdout v1
+
+`contest_holdout_v1/` is the submission-oriented comparison pack. It contains
+24 new synthetic Python cases across four evidence-authority boundaries:
+declaration versus enforcement, import versus invocation, documentation versus
+runtime behavior, and prior R memory versus current code A. Each axis has
+negative traps and positive controls.
+
+The preregistered plan runs three local variants on the same `gemma4:26b`
+backbone, with three fixed seeds and rotated variant order (216 executions).
+It does not use an external API. The protocol freezes the case files, scoring
+code and system-under-test identity before the first live output, commits only a
+secret-free proof, locks mechanically parsed verdicts while condition identity
+is hidden, and requires a human audit after unblinding.
+
+Start with the preparation sequence and interpretation boundary in
+[`contest_holdout_v1/README.md`](contest_holdout_v1/README.md). Raw captures,
+blind keys and intermediate scoring artifacts belong outside Git. Only
+`FREEZE.json` and `BLINDING_COMMITMENT.json` from the public proof directory may
+be committed before live inference. Until capture, locked scoring and human
+audit are complete, every result remains `publishable=false`; the README makes
+no performance claim from this holdout.

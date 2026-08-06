@@ -21,7 +21,7 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-test = ["pytest>=8"]
+test = ["pytest>=8", "wheel>=0.40"]
 codex = ["openai-codex==0.144.4"]
 
 [project.scripts]
@@ -34,6 +34,7 @@ songryeon-model-scale-review-verify = "evals.model_scale_review_verify:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
+namespaces = false
 include = [
     "agent_tools*",
     "demo*",
@@ -53,6 +54,20 @@ evals = [
     "cases/*.py",
     "cases/project/*.py",
     "cases/project/nested/*.py",
+    "contest_holdout_v1/manifest.json",
+    "contest_holdout_v1/RUN_PLAN.json",
+    "contest_holdout_v1/HUMAN_AUDIT_TEMPLATE.json",
+    "contest_holdout_v1/*.md",
+    "contest_holdout_v1/project/*.py",
+    "contest_holdout_v1/frozen/*/FREEZE.json",
+    "contest_holdout_v1/frozen/*/BLINDING_COMMITMENT.json",
+    "contest_holdout_v1/frozen/*/BLIND_PACKET.json",
+    "contest_holdout_v1/frozen/*/BLIND_SCORES.json",
+    "contest_holdout_v1/frozen/*/SCORE_LOCK.json",
+    "contest_holdout_v1/frozen/*/REVEAL.json",
+    "contest_holdout_v1/frozen/*/SUMMARY.json",
+    "contest_holdout_v1/frozen/*/HUMAN_AUDIT.json",
+    "contest_holdout_v1/frozen/*/PUBLICATION_DECISION.json",
     "model_ceiling_cases/*.json",
     "model_ceiling_cases/*.py",
     "model_ceiling_cases/project/*.py",

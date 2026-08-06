@@ -7,8 +7,11 @@
 from pathlib import Path
 
 
-MEMORY_DIRECTORY = Path(__file__).resolve().parent
-PROJECT_ROOT = MEMORY_DIRECTORY.parent
+# 기본 데이터와 도구 경계는 설치된 패키지 폴더가 아니라 사용자가 명령을
+# 실행한 프로젝트 폴더를 따른다. 소스 저장소 루트에서 실행할 때의 기존
+# ``memory/memory.jsonl`` 위치는 그대로 유지된다.
+PROJECT_ROOT = Path.cwd().resolve()
+MEMORY_DIRECTORY = PROJECT_ROOT / "memory"
 DEFAULT_MEMORY_PATH = MEMORY_DIRECTORY / "memory.jsonl"
 
 # 사용 중인 모델의 전체 문맥 크기와 실제 기억 예산은 같은 값이 아니다.

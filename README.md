@@ -72,7 +72,8 @@ SongRyeon_Core_v1/
 ├─ evals/
 │  ├─ schema.py          # 비교평가 입력·결과의 모델 독립 형식
 │  ├─ evaluator.py       # A 실행사실·근거 없는 코드 주장 판정
-│  └─ summary.py         # 시스템별 완료율·정확도·비용 집계
+│  ├─ summary.py         # 시스템별 완료율·정확도·비용 집계
+│  └─ contest_holdout_v1/ # 대회용 사전 동결·블라인드 비교실험
 ├─ docs/
 │  ├─ minimal_agent_loop.md # 결정론적 기반의 자세한 설명
 │  ├─ demo_walkthrough.md   # 실제 데모를 읽는 학습 순서
@@ -191,7 +192,7 @@ CPU·GPU, 메모리 구성에 따라 달라집니다.
 PowerShell:
 
 ```powershell
-git clone --branch refoundation/songryeon-v1 --single-branch https://github.com/Junghoo-developer/SongRyeon.git SongRyeon_Core_v1
+git clone --branch codex/contest-release-2026 --single-branch https://github.com/Junghoo-developer/SongRyeon.git SongRyeon_Core_v1
 Set-Location SongRyeon_Core_v1
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
@@ -203,7 +204,7 @@ python -m pytest -q
 Bash:
 
 ```bash
-git clone --branch refoundation/songryeon-v1 --single-branch https://github.com/Junghoo-developer/SongRyeon.git SongRyeon_Core_v1
+git clone --branch codex/contest-release-2026 --single-branch https://github.com/Junghoo-developer/SongRyeon.git SongRyeon_Core_v1
 cd SongRyeon_Core_v1
 python3 -m venv .venv
 source .venv/bin/activate
@@ -318,16 +319,11 @@ SDK는 기존 Codex 로그인을 재사용하며 토큰·이메일을 저장소�
 순수 LLM API가 아니라 Codex 에이전트를 한 겹 거치므로 입력 token overhead가
 크고, 결과도 제출용 로컬 모델 성능 집계에서 제외합니다.
 
-심사 가능한 합성 fixture 기반 model-ceiling evidence pack은 다음처럼
-생성합니다. 실제 사용자 기억이나 비공개 소스는 사용하지 않습니다.
-
-```powershell
-.\.venv\Scripts\python.exe -m evals.model_scale_capture --repetitions 1
-```
-
-실험의 허용 해석과 블라인드 검토 절차는
-[`docs/model_scale_experiment_protocol.md`](docs/model_scale_experiment_protocol.md)에
-고정되어 있습니다.
+대회용 구조 비교는 외부 API가 아닌 같은 로컬
+`gemma4:26b`를 사용하는 새 24-case holdout에서 실행합니다. 사전
+동결, 블라인드 기계 판정, 사람 감사까지 끝나기 전에는 성능
+수치를 공개 결과로 다루지 않습니다. 실험 범위와 순서는
+[`evals/contest_holdout_v1/README.md`](evals/contest_holdout_v1/README.md)에 있습니다.
 
 실제 소스 코드와 `knowledge/documents/`의 문서를 동기화할 때만 아래 명령을
 사용합니다. 이 명령은 실제 `knowledge.db`와 `memory.jsonl`을 갱신합니다.

@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "experiment_id": "songryeon-contest-evidence-authority-holdout-2026-08-v1",
+  "study_status": "freeze_candidate_no_live_outputs",
+  "manifest_path": "evals/contest_holdout_v1/manifest.json",
+  "manifest_sha256": "629105c8f7d440ab59a222bf00f14e2186c58a2aeedc2c997c238f52cabfc848",
+  "system_source_tree_sha256": null,
+  "model": {
+    "name": "gemma4:26b",
+    "digest": "5571076f3d70050487b26b341705799e0ab29b808164f90d20d4cf84f699d251",
+    "base_url": "http://127.0.0.1:11434",
+    "num_ctx": 16384,
+    "temperature": 0,
+    "timeout_seconds": 180,
+    "keep_alive": "10m"
+  },
+  "case_wall_clock_limit_seconds": 600,
+  "maximum_tool_calls_per_case": 3,
+  "variant_contracts": {
+    "single-tool-agent": {
+      "system_wrapper": "eval_single_tool_agent",
+      "node4_mode": "absent",
+      "maximum_tool_calls_per_case": 3
+    },
+    "songryeon-no-node4": {
+      "system_wrapper": "songryeon_eval_no_node4",
+      "node4_mode": "eval_only_deterministic_bypass",
+      "maximum_tool_calls_per_case": 3
+    },
+    "songryeon-full": {
+      "system_wrapper": "songryeon",
+      "node4_mode": "active",
+      "maximum_tool_calls_per_case": 3
+    }
+  },
+  "planned_case_count": 24,
+  "planned_execution_count": 216,
+  "output_root": ".tmp/evals/contest_holdout_v1",
+  "runs": [
+    {
+      "block": 1,
+      "seed": 1709,
+      "variants": ["single-tool-agent", "songryeon-no-node4", "songryeon-full"],
+      "output_subdir": "block-001"
+    },
+    {
+      "block": 2,
+      "seed": 2647,
+      "variants": ["songryeon-no-node4", "songryeon-full", "single-tool-agent"],
+      "output_subdir": "block-002"
+    },
+    {
+      "block": 3,
+      "seed": 3911,
+      "variants": ["songryeon-full", "single-tool-agent", "songryeon-no-node4"],
+      "output_subdir": "block-003"
+    }
+  ],
+  "primary_metrics": [
+    "mechanical_verdict_accuracy",
+    "unsupported_as_supported_proxy_rate",
+    "supported_verdict_accuracy"
+  ],
+  "failure_policy": "Every planned run remains in the denominator; errors, timeouts, missing answers, and invalid verdict format score as incorrect.",
+  "blinding_policy": "Create and commit the complete HMAC blind mapping before any live model output; lock parsed verdicts before opening the key.",
+  "publication_policy": "Integrity can become publishable after freeze, complete capture, locked blind scoring, and required human audit. A favorable performance claim additionally requires the preregistered directional gate."
+}

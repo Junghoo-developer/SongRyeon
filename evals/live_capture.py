@@ -47,6 +47,7 @@ from .runner import (
     SCHEMA_VERSION,
     load_manifest,
 )
+from .source_identity import current_system_source_identity
 from .variants import (
     EVAL_NODE4_BYPASS_METRIC,
     SINGLE_TOOL_AGENT,
@@ -64,12 +65,34 @@ DEFAULT_CAPTURE_ROOT = Path(".tmp") / "evals" / "local_captures"
 CAPTURE_FILENAME = "capture.json"
 CHECKPOINT_FILENAME = "checkpoint.json"
 EVAL_MAX_PYTHON_FILE_BYTES = DEMO_MAX_PYTHON_FILE_BYTES
+EVAL_MAXIMUM_TOOL_CALLS_PER_CASE = 3
 _SAFE_NAME_PATTERN = re.compile(r"[^a-zA-Z0-9._-]+")
 _SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
+_SHA256_PREFIX_PATTERN = re.compile(r"[0-9a-f]{12,64}")
 
 
 class EvalWallClockLimitError(TimeoutError):
     """한 case에 공통 적용한 eval wall-clock 예산을 소진했다."""
+
+
+def _run_songryeon_eval_turn(
+    user_input,
+    *,
+    client,
+    toolbox,
+    memory_path,
+    on_event=None,
+):
+    """구조 비교 세 조건에 같은 턴당 도구 예산을 적용한다."""
+
+    return run_demo_turn(
+        user_input,
+        client=client,
+        toolbox=toolbox,
+        memory_path=memory_path,
+        on_event=on_event,
+        maximum_total_tool_calls=EVAL_MAXIMUM_TOOL_CALLS_PER_CASE,
+    )
 
 
 class _DeadlineClient:
@@ -228,6 +251,20 @@ def _validate_variants(variants):
     if len(set(values)) != len(values):
         raise ValueError("eval variant를 중복할 수 없습니다.")
     return values
+
+
+def _validate_expected_sha256(value, label, *, allow_prefix=False):
+    if value is None:
+        return None
+    pattern = (
+        _SHA256_PREFIX_PATTERN
+        if allow_prefix
+        else _SHA256_PATTERN
+    )
+    if not isinstance(value, str) or pattern.fullmatch(value.lower()) is None:
+        expected = "12~64자리" if allow_prefix else "64자리"
+        raise ValueError(f"{label}은 소문자 {expected} SHA-256이어야 합니다.")
+    return value.lower()
 
 
 def _prepare_output_directory(output_dir, now):
@@ -824,6 +861,9 @@ def capture_local_comparison(
     temperature=DEFAULT_TEMPERATURE,
     seed=DEFAULT_SEED,
     case_wall_clock_limit_seconds=600,
+    expected_manifest_sha256=None,
+    expected_architecture_digest_prefix=None,
+    expected_system_source_tree_sha256=None,
     output_dir=None,
     client_factory=OllamaClient,
     perf_counter_ns=time.perf_counter_ns,
@@ -834,6 +874,33 @@ def capture_local_comparison(
     """동일 조건으로 로컬 모델들을 실행하고 채점 전 raw capture를 만든다."""
 
     manifest = load_manifest(manifest_path)
+    expected_manifest_sha256 = _validate_expected_sha256(
+        expected_manifest_sha256,
+        "기대 manifest SHA-256",
+    )
+    if (
+        expected_manifest_sha256 is not None
+        and manifest.sha256 != expected_manifest_sha256
+    ):
+        raise ValueError("manifest SHA-256이 사전등록 값과 다릅니다.")
+    expected_architecture_digest_prefix = _validate_expected_sha256(
+        expected_architecture_digest_prefix,
+        "기대 architecture model digest prefix",
+        allow_prefix=True,
+    )
+    expected_system_source_tree_sha256 = _validate_expected_sha256(
+        expected_system_source_tree_sha256,
+        "기대 system source tree SHA-256",
+    )
+    system_source_identity = current_system_source_identity()
+    if (
+        expected_system_source_tree_sha256 is not None
+        and system_source_identity["tree_sha256"]
+        != expected_system_source_tree_sha256
+    ):
+        raise ValueError(
+            "system source tree SHA-256이 사전등록 값과 다릅니다."
+        )
     selected_variants = _validate_variants(variants)
     architecture_model = _validate_model_names(
         (architecture_backbone,)
@@ -881,21 +948,32 @@ def capture_local_comparison(
         if system_name in system_names:
             raise ValueError("평가 system_name이 충돌했습니다.")
         system_names.add(system_name)
+        metadata = _client_metadata(
+            client,
+            ready,
+            system_name,
+            variant=variant,
+            backbone=backbone,
+            comparison_group=comparison_group,
+            system_wrapper=system_wrapper,
+            node4_mode=node4_mode,
+            runtime_contract=runtime_contract,
+        )
+        if (
+            comparison_group == "architecture_same_backbone"
+            and expected_architecture_digest_prefix is not None
+            and not metadata["model_id"].startswith(
+                expected_architecture_digest_prefix
+            )
+        ):
+            raise ValueError(
+                "architecture model digest가 사전등록 prefix와 다릅니다."
+            )
         systems_to_run.append(
             (
                 client,
                 system_name,
-                _client_metadata(
-                    client,
-                    ready,
-                    system_name,
-                    variant=variant,
-                    backbone=backbone,
-                    comparison_group=comparison_group,
-                    system_wrapper=system_wrapper,
-                    node4_mode=node4_mode,
-                    runtime_contract=runtime_contract,
-                ),
+                metadata,
                 run_turn,
             )
         )
@@ -924,10 +1002,12 @@ def capture_local_comparison(
         SONGRYEON_NO_NODE4: {
             "system_wrapper": "songryeon_eval_no_node4",
             "node4_mode": "eval_only_deterministic_bypass",
-            "run_turn": run_demo_turn,
+            "run_turn": _run_songryeon_eval_turn,
             "bypass_node4": True,
             "runtime_contract": {
-                "maximum_tool_calls_per_case": 12,
+                "maximum_tool_calls_per_case": (
+                    EVAL_MAXIMUM_TOOL_CALLS_PER_CASE
+                ),
                 "maximum_tool_calls_per_node1_round": 3,
                 "initial_memory_view_characters": 8000,
                 "file_toolbox_max_python_file_bytes": (
@@ -936,21 +1016,23 @@ def capture_local_comparison(
                 "tool_evidence_policy": "SongRyeon retention, max 2000 chars each",
                 "num_predict": {
                     "node1": 1024,
-                    "node2": 256,
+                    "node2": 768,
                     "node3": 2048,
                     "node4_bypass": 0,
                 },
-                "node2": "active, max 3 rejections",
+                "node2": "active review with max 3 rejections",
                 "node4": "eval-only deterministic pass-through",
             },
         },
         SONGRYEON_FULL: {
             "system_wrapper": "songryeon",
             "node4_mode": "active",
-            "run_turn": run_demo_turn,
+            "run_turn": _run_songryeon_eval_turn,
             "bypass_node4": False,
             "runtime_contract": {
-                "maximum_tool_calls_per_case": 12,
+                "maximum_tool_calls_per_case": (
+                    EVAL_MAXIMUM_TOOL_CALLS_PER_CASE
+                ),
                 "maximum_tool_calls_per_node1_round": 3,
                 "initial_memory_view_characters": 8000,
                 "file_toolbox_max_python_file_bytes": (
@@ -959,11 +1041,11 @@ def capture_local_comparison(
                 "tool_evidence_policy": "SongRyeon retention, max 2000 chars each",
                 "num_predict": {
                     "node1": 1024,
-                    "node2": 256,
+                    "node2": 768,
                     "node3": 2048,
-                    "node4": 256,
+                    "node4": 768,
                 },
-                "node2": "active, max 3 rejections",
+                "node2": "active review with max 3 rejections",
                 "node4": "active, max 3 rejections",
             },
         },
@@ -987,6 +1069,16 @@ def capture_local_comparison(
                 f"backbone-{SONGRYEON_FULL}-{_safe_name(model_name)}"
             ),
             **variant_contracts[SONGRYEON_FULL],
+        )
+
+    architecture_model_ids = {
+        metadata["model_id"]
+        for _, _, metadata, _ in systems_to_run
+        if metadata["comparison_group"] == "architecture_same_backbone"
+    }
+    if len(architecture_model_ids) != 1:
+        raise ValueError(
+            "구조 비교 variant들의 architecture model digest가 다릅니다."
         )
 
     captured_at = now_factory()
@@ -1064,6 +1156,20 @@ def capture_local_comparison(
                 EVAL_MAX_PYTHON_FILE_BYTES
             ),
             "same_model_generation_configuration": True,
+            "architecture_backbone_digest_consistent": True,
+            "expected_architecture_digest_prefix": (
+                expected_architecture_digest_prefix
+            ),
+            "expected_manifest_sha256": expected_manifest_sha256,
+            "expected_system_source_tree_sha256": (
+                expected_system_source_tree_sha256
+            ),
+            "captured_system_source_tree_sha256": (
+                system_source_identity["tree_sha256"]
+            ),
+            "captured_system_source_file_count": (
+                system_source_identity["file_count"]
+            ),
             "same_case_wall_clock_limit_seconds": (
                 case_wall_clock_limit_seconds
             ),
@@ -1125,7 +1231,7 @@ def capture_local_comparison(
 def _build_parser():
     parser = argparse.ArgumentParser(
         description=(
-            "고정 10개 case를 같은 로컬 backbone의 eval variant들로 실행하고 "
+            "고정 manifest case를 같은 로컬 backbone의 eval variant들로 실행하고 "
             "선택적으로 full SongRyeon backbone 비교 raw capture를 보존합니다."
         )
     )
@@ -1170,6 +1276,21 @@ def _build_parser():
     )
     parser.add_argument("--seed", type=int, default=DEFAULT_SEED)
     parser.add_argument(
+        "--expected-manifest-sha256",
+        default=None,
+        help="실행 전에 일치해야 하는 frozen manifest canonical SHA-256",
+    )
+    parser.add_argument(
+        "--expected-architecture-digest-prefix",
+        default=None,
+        help="모든 구조 비교 variant에 강제할 Ollama model digest prefix",
+    )
+    parser.add_argument(
+        "--expected-system-source-tree-sha256",
+        default=None,
+        help="실행 전에 일치해야 하는 frozen system source tree SHA-256",
+    )
+    parser.add_argument(
         "--case-wall-clock-limit-seconds",
         type=int,
         default=600,
@@ -1201,6 +1322,13 @@ def main(argv=None):
             keep_alive=args.keep_alive,
             temperature=args.temperature,
             seed=args.seed,
+            expected_manifest_sha256=args.expected_manifest_sha256,
+            expected_architecture_digest_prefix=(
+                args.expected_architecture_digest_prefix
+            ),
+            expected_system_source_tree_sha256=(
+                args.expected_system_source_tree_sha256
+            ),
             case_wall_clock_limit_seconds=(
                 args.case_wall_clock_limit_seconds
             ),

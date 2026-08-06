@@ -9,7 +9,9 @@ from pathlib import Path
 from memory.settings import DEFAULT_MEMORY_PATH, PROJECT_ROOT
 
 
-KNOWLEDGE_DIRECTORY = Path(__file__).resolve().parent
+# 설치된 site-packages 안에 DB를 쓰지 않고 현재 프로젝트의 데이터 폴더를
+# 사용한다. 명시적인 경로를 넘기는 기존 API는 영향을 받지 않는다.
+KNOWLEDGE_DIRECTORY = PROJECT_ROOT / "knowledge"
 DEFAULT_DB_PATH = KNOWLEDGE_DIRECTORY / "knowledge.db"
 DEFAULT_DOCUMENTS_DIRECTORY = KNOWLEDGE_DIRECTORY / "documents"
 DEFAULT_PROJECT_ROOT = PROJECT_ROOT

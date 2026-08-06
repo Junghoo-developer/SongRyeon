@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "experiment_id": "songryeon-contest-evidence-authority-holdout-2026-08-v1",
+  "audit_status": "template_not_completed",
+  "reviewer_id": "",
+  "reviewer_type": "human_owner",
+  "reviewer_disclosure": "",
+  "no_cases_excluded_or_replaced": false,
+  "raw_failure_rows_preserved": false,
+  "claim_wording_reviewed": false,
+  "items": []
+}

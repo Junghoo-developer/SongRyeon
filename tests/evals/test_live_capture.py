@@ -17,6 +17,7 @@ from evals.live_capture import (
     main,
 )
 from evals.runner import load_manifest
+from evals.source_identity import current_system_source_identity
 from evals.variants import (
     SINGLE_TOOL_AGENT,
     SONGRYEON_FULL,
@@ -218,6 +219,7 @@ def test_fake_local_models_capture_all_cases_without_real_memory(tmp_path):
             tzinfo=timezone.utc,
         ),
     )
+    source_identity = current_system_source_identity()
 
     assert capture_path == output_dir / "capture.json"
     assert document["capture_status"] == "live_raw_draft"
@@ -239,6 +241,14 @@ def test_fake_local_models_capture_all_cases_without_real_memory(tmp_path):
             DEMO_MAX_PYTHON_FILE_BYTES
         ),
         "same_model_generation_configuration": True,
+        "architecture_backbone_digest_consistent": True,
+        "expected_architecture_digest_prefix": None,
+        "expected_manifest_sha256": None,
+        "expected_system_source_tree_sha256": None,
+        "captured_system_source_tree_sha256": (
+            source_identity["tree_sha256"]
+        ),
+        "captured_system_source_file_count": source_identity["file_count"],
         "same_case_wall_clock_limit_seconds": 600,
         "automatic_answer_grading": False,
         "architecture_backbone": "qwen3:14b",
@@ -276,9 +286,10 @@ def test_fake_local_models_capture_all_cases_without_real_memory(tmp_path):
         "qwen3:14b",
         "qwen3:14b",
     ]
-    assert document["systems"][0]["runtime_contract"][
-        "maximum_tool_calls_per_case"
-    ] == 3
+    assert all(
+        system["runtime_contract"]["maximum_tool_calls_per_case"] == 3
+        for system in document["systems"]
+    )
     assert all(
         system["runtime_contract"][
             "file_toolbox_max_python_file_bytes"
@@ -288,9 +299,6 @@ def test_fake_local_models_capture_all_cases_without_real_memory(tmp_path):
     assert document["systems"][1]["node4_mode"] == (
         "eval_only_deterministic_bypass"
     )
-    assert document["systems"][2]["runtime_contract"][
-        "maximum_tool_calls_per_case"
-    ] == 12
     assert {
         json.dumps(system["configuration"], sort_keys=True)
         for system in document["systems"]
@@ -542,6 +550,65 @@ def test_live_capture_cli_rejects_non_loopback_before_any_model_call(
     assert exit_code == 1
     assert "loopback" in capsys.readouterr().err
     assert not (tmp_path / "must-not-exist").exists()
+
+
+def test_frozen_manifest_and_model_digest_can_be_enforced_before_capture(
+    tmp_path,
+):
+    manifest = load_manifest()
+    expected_model_digest = hashlib.sha256(
+        b"qwen3:14b"
+    ).hexdigest()
+    source_identity = current_system_source_identity()
+
+    _, document = capture_local_comparison(
+        variants=(SONGRYEON_FULL,),
+        expected_manifest_sha256=manifest.sha256,
+        expected_architecture_digest_prefix=expected_model_digest[:12],
+        expected_system_source_tree_sha256=(
+            source_identity["tree_sha256"]
+        ),
+        output_dir=tmp_path / "accepted",
+        client_factory=FakeLocalOllama,
+        perf_counter_ns=StepTimer(),
+        now_factory=lambda: datetime.now(timezone.utc),
+    )
+    assert document["conditions"]["expected_manifest_sha256"] == (
+        manifest.sha256
+    )
+    assert document["conditions"][
+        "expected_architecture_digest_prefix"
+    ] == expected_model_digest[:12]
+    assert document["conditions"][
+        "captured_system_source_tree_sha256"
+    ] == source_identity["tree_sha256"]
+
+    with pytest.raises(ValueError, match="manifest SHA-256"):
+        capture_local_comparison(
+            variants=(SONGRYEON_FULL,),
+            expected_manifest_sha256="0" * 64,
+            output_dir=tmp_path / "wrong-manifest",
+            client_factory=FakeLocalOllama,
+        )
+    assert not (tmp_path / "wrong-manifest").exists()
+
+    with pytest.raises(ValueError, match="model digest"):
+        capture_local_comparison(
+            variants=(SONGRYEON_FULL,),
+            expected_architecture_digest_prefix="0" * 12,
+            output_dir=tmp_path / "wrong-model",
+            client_factory=FakeLocalOllama,
+        )
+    assert not (tmp_path / "wrong-model").exists()
+
+    with pytest.raises(ValueError, match="system source tree SHA-256"):
+        capture_local_comparison(
+            variants=(SONGRYEON_FULL,),
+            expected_system_source_tree_sha256="0" * 64,
+            output_dir=tmp_path / "wrong-system-source",
+            client_factory=FakeLocalOllama,
+        )
+    assert not (tmp_path / "wrong-system-source").exists()
 
 
 def test_single_agent_uses_same_toolbox_and_stops_after_three_calls(tmp_path):

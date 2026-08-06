@@ -186,18 +186,31 @@ def _run_one(question, *, client, toolbox, memory_path):
     )
 
 
-def _external_memory_path(memory_path):
+def _paths_refer_to_same_file(left, right):
+    """경로 표기나 symlink가 달라도 같은 기존 파일인지 확인한다."""
+
+    if left == right:
+        return True
+    if not left.exists() or not right.exists():
+        return False
+    try:
+        return os.path.samefile(left, right)
+    except OSError:
+        return False
+
+
+def _external_memory_path(memory_path, project_root):
     """대회용 실제 원본 memory.jsonl을 모든 외부 실행에서 차단한다."""
 
     resolved = Path(memory_path).resolve()
-    default_resolved = DEFAULT_MEMORY_PATH.resolve()
-    same_file = False
-    if resolved.exists() and default_resolved.exists():
-        try:
-            same_file = os.path.samefile(resolved, default_resolved)
-        except OSError:
-            same_file = False
-    if resolved == default_resolved or same_file:
+    protected_paths = {
+        DEFAULT_MEMORY_PATH.resolve(),
+        (Path(project_root).resolve() / "memory" / "memory.jsonl").resolve(),
+    }
+    if any(
+        _paths_refer_to_same_file(resolved, protected)
+        for protected in protected_paths
+    ):
         raise ValueError(
             "외부 통합시험은 실제 memory/memory.jsonl을 사용할 수 없습니다."
         )
@@ -218,7 +231,7 @@ def _run_external_integration(args):
     external_memory = (
         None
         if args.memory is None
-        else _external_memory_path(args.memory)
+        else _external_memory_path(args.memory, args.project_root)
     )
 
     client = OpenAICompatibleIntegrationClient(
@@ -269,7 +282,7 @@ def _run_codex_account_integration(args):
     external_memory = (
         None
         if args.memory is None
-        else _external_memory_path(args.memory)
+        else _external_memory_path(args.memory, args.project_root)
     )
     client = CodexAccountIntegrationClient(
         model_name=(

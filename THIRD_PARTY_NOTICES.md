@@ -53,6 +53,11 @@ The current SongRyeon runtime has no mandatory third-party Python package.
 The SDK and its pinned CLI runtime are installed separately in a project
 virtual environment and are not redistributed by SongRyeon Core.
 
+Its optional dependency set currently includes `pydantic>=2.12` (MIT) and
+`openai-codex-cli-bin==0.144.4` (Apache-2.0). These packages are installed only
+when the separate `[codex]` extra is selected; they are not required by the
+local contest runtime.
+
 ## Optional commercial AI APIs
 
 No commercial AI API is redistributed, required, or used as an automatic

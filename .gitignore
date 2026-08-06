@@ -30,7 +30,19 @@ memory/memory.jsonl
 
 # 평가 산출물에는 전체 프롬프트, 원시 응답, thinking이 포함될 수 있다.
 **/capture.json
+**/CAPTURE.json
+**/checkpoint.json
+**/CHECKPOINT.json
 **/transcripts/
+**/TRANSCRIPTS/
 **/blind_key.json
+**/BLIND_KEY.json
+**/blind_packet.json
+**/BLIND_PACKET.json
+# 대회용 합성 holdout의 검증 가능한 공개 packet만 예외로 둔다.
+!evals/contest_holdout_v1/frozen/*/BLIND_PACKET.json
+**/raw/
+**/RAW/
+# FREEZE.json과 BLINDING_COMMITMENT.json은 비밀이 없는 공개 동결 증명이므로 제외하지 않는다.
 *.memory.jsonl
 *.tmp
