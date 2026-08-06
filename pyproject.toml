@@ -21,7 +21,7 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-test = ["pytest>=8", "wheel>=0.40"]
+test = ["pytest>=8", "setuptools>=65", "wheel>=0.40"]
 codex = ["openai-codex==0.144.4"]
 
 [project.scripts]
