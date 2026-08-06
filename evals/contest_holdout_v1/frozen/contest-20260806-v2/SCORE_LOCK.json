@@ -1,0 +1,10 @@
+{
+  "experiment_id": "songryeon-contest-evidence-authority-holdout-2026-08-v1",
+  "item_count": 216,
+  "lock_status": "scores_locked_before_unblinding",
+  "locked_at": "2026-08-06T05:27:52.265430+00:00",
+  "packet_sha256": "4f87c04459c7b4f22e08278736b4cfee13599b0b73f754d8bb700cc60522ee44",
+  "publishable": false,
+  "schema_version": 1,
+  "scores_sha256": "8ff697c44303b229745b271a6915ee84ddc45d57f3ab7fa33828e12d6c1c2187"
+}
