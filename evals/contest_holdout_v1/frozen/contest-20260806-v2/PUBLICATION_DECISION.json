@@ -1,0 +1,46 @@
+{
+  "decision_sha256": "9d294351d82123f90bbc5a05cf6ed39cf3b3893ab28bd274db3c91bf2cf6a481",
+  "decision_status": "publication_integrity_gate_passed",
+  "experiment_id": "songryeon-contest-evidence-authority-holdout-2026-08-v1",
+  "forbidden_claims": [
+    "환각을 완전히 제거했다.",
+    "Node4 하나의 순수한 인과효과를 증명했다.",
+    "통계적 유의성이나 실제 업무 일반화를 입증했다.",
+    "216개 전체 답변 설명의 근거성과 A/R 표기가 검증됐다."
+  ],
+  "human_audit": {
+    "required_item_count": 19,
+    "reviewer_disclosure": "송련 프로젝트 소유자이자 대회 참가자가 필수 blind 19개를 직접 검수했으며, 독립된 외부 평가자는 아니다.",
+    "reviewer_id": "songryeon_project_owner",
+    "reviewer_type": "human_owner",
+    "sampled_ar_authority_accurate_for_all_required": false,
+    "sampled_explanation_supported_for_all_required": false,
+    "selection_policy": "precommitted 18 blind IDs plus every mechanically incorrect or invalid row",
+    "submitted_known_item_count": 19
+  },
+  "mechanical_performance_claim_allowed": false,
+  "permitted_claim": null,
+  "provenance": {
+    "audit_sha256": "9df5afdc6ac91b65add6f77944ad624a9b795eccb19e25b947adc200091e4b76",
+    "experiment_id": "songryeon-contest-evidence-authority-holdout-2026-08-v1",
+    "freeze_verified": true,
+    "manifest_sha256": "629105c8f7d440ab59a222bf00f14e2186c58a2aeedc2c997c238f52cabfc848",
+    "planned_execution_count": 216,
+    "protocol_tree_sha256": "f1aab1c94e1345ebb176b1d1784b1299a27ed8d3293042ae3a775ce528ef99e5",
+    "summary_sha256": "4df274b10ec209283ac4d7cbaafa560d7e6d28183ba336d188cbb1197651103a",
+    "system_source_tree_sha256": "4a7624d164f6c00e5a83d05bc309d3f67ad6435560f8646a0e3e30ee5d28f690"
+  },
+  "publishable": true,
+  "required_disclosures": [
+    "첫 verdict만 기계 채점했고 설명 전체는 별도 사람 감사다.",
+    "설명 감사는 사전 blind 표본 18개와 모든 기계 오답·실패의 합집합이며 216개 전체 설명 검증이 아니다.",
+    "seed 반복은 독립 case가 아니다.",
+    "full/no-Node4는 독립 end-to-end 실행이며 Node4 단독 인과효과가 아니다.",
+    "합성 Python fixture 결과를 실제 업무 전체나 환각 제거로 일반화하지 않는다.",
+    "사람 감사자는 human_owner이며 disclosure를 함께 공개한다."
+  ],
+  "sampled_ar_authority_labeling_passed": false,
+  "sampled_explanation_grounding_passed": false,
+  "schema_version": 1,
+  "whole_output_explanation_claim_allowed": false
+}

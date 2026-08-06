@@ -216,10 +216,19 @@ code and system-under-test identity before the first live output, commits only a
 secret-free proof, locks mechanically parsed verdicts while condition identity
 is hidden, and requires a human audit after unblinding.
 
+The completed run contains 216 executions. First-verdict mechanical scores are
+71/72 for the single-agent baseline, 72/72 for SongRyeon without Node4, and
+72/72 for full SongRyeon. The required 19-item human audit records 19/19 parser
+agreement, 18/19 fixture grounding and 18/19 A/R authority labeling; the other
+item is a `null` incomplete response. `SUMMARY.json` remains the immutable
+pre-audit summary with `publishable=false`. The later
+`PUBLICATION_DECISION.json` records that the publication-integrity gate passed.
+That gate does not permit claims of performance superiority, a Node4 effect,
+whole-output explanation accuracy, statistical significance, real-work
+generalization or hallucination removal.
+
 Start with the preparation sequence and interpretation boundary in
 [`contest_holdout_v1/README.md`](contest_holdout_v1/README.md). Raw captures,
-blind keys and intermediate scoring artifacts belong outside Git. Only
-`FREEZE.json` and `BLINDING_COMMITMENT.json` from the public proof directory may
-be committed before live inference. Until capture, locked scoring and human
-audit are complete, every result remains `publishable=false`; the README makes
-no performance claim from this holdout.
+blind keys and intermediate scoring artifacts belong outside Git. The public
+proof directory now also contains the completed `HUMAN_AUDIT.json` and its
+follow-up `PUBLICATION_DECISION.json`; it contains no raw prompts or local paths.

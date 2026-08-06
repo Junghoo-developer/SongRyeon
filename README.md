@@ -320,9 +320,14 @@ SDK는 기존 Codex 로그인을 재사용하며 토큰·이메일을 저장소�
 크고, 결과도 제출용 로컬 모델 성능 집계에서 제외합니다.
 
 대회용 구조 비교는 외부 API가 아닌 같은 로컬
-`gemma4:26b`를 사용하는 새 24-case holdout에서 실행합니다. 사전
-동결, 블라인드 기계 판정, 사람 감사까지 끝나기 전에는 성능
-수치를 공개 결과로 다루지 않습니다. 실험 범위와 순서는
+`gemma4:26b`를 사용하는 24-case holdout에서 실행했습니다. 3개 구조와
+3개 seed의 총 216회에서 단일 에이전트 71/72, Node4 제외 송련 72/72,
+전체 송련 72/72의 첫 verdict 기계 채점 결과를 얻었습니다. 필수 blind
+19개 사람 감사는 parse 19/19, fixture 근거성 18/19, A/R 권한·출처
+표기 18/19였고, 나머지 1건은 `null` 미완료였습니다. 후속
+`PUBLICATION_DECISION.json`의 publication integrity gate는 통과했지만,
+이는 성능 우월성·Node4 효과·설명 전체 검증·실제 업무 일반화 또는 환각
+제거를 뜻하지 않습니다. 실험 범위와 순서는
 [`evals/contest_holdout_v1/README.md`](evals/contest_holdout_v1/README.md)에 있습니다.
 
 실제 소스 코드와 `knowledge/documents/`의 문서를 동기화할 때만 아래 명령을

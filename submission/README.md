@@ -18,11 +18,11 @@
 | `ai_model_spec.md` | AI 모델 사용 방식과 실행 경계 | 사용 기간·최종 시연 환경 보완 필요 |
 | `demo_script_3min.md` | 3분 이하 YouTube 시연 대본 | 실제 촬영·링크 필요 |
 | `live_pilot_notes.md` | Qwen3 동일 backbone 3구조 원시 비교 기록 | 내부 검토용·정량 인용 금지 |
-| `../evals/contest_holdout_v1/frozen/contest-20260806-v2/` | 사전 동결·블라인드·점수 잠금·공개 검증 체인 | 기계 채점 완료, 사람 설명 감사 필요 |
-| `human_audit_v2_packet.md` | 정답을 숨긴 필수 19개 사람 감사 읽기 묶음 | 참가자 직접 검수 필요 |
-| `HUMAN_AUDIT_V2_TEMPLATE.json` | publication gate 입력 형식으로 미리 채운 19개 ID | 검수 뒤 복사·작성 필요 |
-| `2026 오픈소스 개발자대회 결과보고서_접수번호(팀명)_DRAFT.docx` | 공식 양식 기반 편집본 | v2·276 테스트 반영, 신원·영상·개발 소감 필요 |
-| 같은 이름의 `DRAFT.pdf` | Word에서 내보낸 대조 PDF | 본문 3쪽·전체 6쪽 전 페이지 렌더 검수 완료 |
+| `../evals/contest_holdout_v1/frozen/contest-20260806-v2/` | 사전 동결·블라인드·점수 잠금·사람 감사·공개 검증 체인 | publication integrity gate 통과 |
+| `human_audit_v2_packet.md` | 정답을 숨긴 필수 19개 사람 감사 읽기 묶음 | 참가자 직접 검수 완료 |
+| `HUMAN_AUDIT_V2_TEMPLATE.json` | publication gate 입력 형식으로 미리 채운 19개 ID | 감사 원본 작성 완료 |
+| `2026 오픈소스 개발자대회 결과보고서_접수번호(팀명)_DRAFT.docx` | 공식 양식 기반 편집본 | v2·사람 감사 반영, 신원·영상·개발 소감 필요 |
+| 같은 이름의 `DRAFT.pdf` | 감사 반영 전 대조 PDF | 신원·영상 입력 뒤 최종 DOCX에서 다시 생성 필요 |
 
 2026-08-06 대회 릴리스 작업 트리 검증은 `276 passed, 2 skipped`다. 두 skip은
 현재 Windows의 심볼릭 링크 생성 권한이 없어 건너뛴 경계 테스트다. 공개 결과
@@ -35,8 +35,17 @@
 기계 verdict는 Node2·Node4 없는 단일 에이전트 기준선 71/72, 송련 Node4 제외 72/72, 송련 전체
 72/72였다. 기준선의 1건은 JSON 형식 실패로 미완료 처리됐다. 송련 전체와
 Node4 제외 구조가 전부 동률이므로 현재 결과는 Node4의 효과를 입증하지 않는다.
-필수 blind 19개에 대한 참가자 설명 감사를 마치기 전까지 공개 결과의
-`publishable`은 `false`다.
+필수 blind 19개에 대한 참가자 설명 감사도 완료했다. parser와 실제 답변·미완료
+상태는 19/19가 일치했고, fixture 근거성과 A/R 권한·출처 표기는 각각
+18/19였다. 나머지 1건은 잘못된 설명이 아니라 모델 응답이 `null`인 미완료
+사례여서 설명과 출처 표기를 평가할 답변 자체가 없었다. 현재 boolean 감사
+스키마는 N/A를 표현하지 못해 두 항목을 `false`로 기록했다.
+
+사람 감사 뒤 publication integrity gate는 통과했고 공개 결과의 `publishable`은
+`true`다. 이는 동결·감사·출처 연결을 공개할 수 있다는 뜻이지, 세 구조의 성능
+우열, Node4의 추가 효과, 216개 설명 전체의 사실성, 통계적 유의성, 실제 업무
+일반화 또는 환각 제거를 입증한다는 뜻이 아니다. 공개 감사와 결정 파일은 각각
+`HUMAN_AUDIT.json`, `PUBLICATION_DECISION.json`으로 증거 폴더에 포함했다.
 
 ## 공식 제출 요건 대응표
 
@@ -112,16 +121,16 @@ python -m pytest -q
 
 - [x] v2 고정 case와 모든 비교 시스템의 원문 실행 결과 보존
 - [x] 실패·시간 초과를 제외하지 않음
-- [ ] 필수 blind 항목의 사람 감사 방법과 결과를 공개
-- [ ] `HUMAN_AUDIT.json`과 publication gate를 통과한 뒤 허용된 주장만 사용
-- [ ] 기계 verdict 채점만 끝난 결과를 설명 전체의 사실성 증거로 사용하지 않음
-- [ ] 현재의 합성 fixture 점수를 실제 모델 성능으로 인용하지 않음
+- [x] 필수 blind 항목의 사람 감사 방법과 결과를 공개
+- [x] `HUMAN_AUDIT.json`과 publication integrity gate를 통과하고 제한된 문구를 승인
+- [x] 기계 verdict 채점만 끝난 결과를 설명 전체의 사실성 증거로 사용하지 않음
+- [x] 현재의 합성 fixture 점수를 실제 업무 전체 성능으로 인용하지 않음
 - [x] 2026-07-30 P0 파일럿 30개 원시 capture와 실패 1건 보존
 - [x] v1 채점기 결함을 숨기지 않고 무효화 기록 공개
 - [x] v2 공개 체인의 216개 항목·해시 검증 통과
-- [ ] v2 필수 blind 19개(미완료 1개 포함)를 참가자가 직접 검수
-- [ ] 19개 감사가 216개 전체 설명 검증이 아님을 명시
-- [ ] seed 반복을 독립 case로 세거나 독립 end-to-end 비교를 Node4 순수 인과효과로 표현하지 않음
+- [x] v2 필수 blind 19개(미완료 1개 포함)를 참가자가 직접 검수
+- [x] 19개 감사가 216개 전체 설명 검증이 아님을 명시
+- [x] seed 반복을 독립 case로 세거나 독립 end-to-end 비교를 Node4 순수 인과효과로 표현하지 않음
 
 ## 현재 남아 있는 `TODO`
 
@@ -129,15 +138,13 @@ python -m pytest -q
 - 제출 커밋 SHA와 릴리스 태그
 - 최종 YouTube 영상 URL
 - 최종 제출 SHA 확정 뒤 깨끗한 clone 검증 1회 반복
-- v2 필수 blind 19개(미완료 1개 포함) 사람 검수
 - 제출 모델 전체 digest와 실제 시연 환경
-- 사람 감사 결과와 보고서에 허용할 정확한 실험 문장
 - AI 코딩 보조 서비스의 모델·기간·사용 범위
 - 접수번호·팀명·영상 URL을 넣은 공식 양식 최종 DOCX/HWP와 PDF
 
 ## 제출본에 넣지 말아야 할 것
 
-- `publishable: false`인 탐색 실험을 확정 성능 증거처럼 소개한 문장
+- publication gate의 `publishable: true`를 성능 우월성이나 설명 전체 검증으로 확대하는 문장
 - `.tmp/`의 원시 프롬프트·thinking·절대 로컬 경로가 포함된 로그
 - 실제 `memory/memory.jsonl`, `knowledge/knowledge.db`, API 키와 인증 정보
 - 최종 커밋에서 재현하지 않은 테스트 통과 수치나 과거 영상

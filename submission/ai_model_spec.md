@@ -119,8 +119,11 @@ Ollama model ID `bdbd181c33f2`, `Q4_K_M`, 약 9.3 GB로 기록되어 있다. 이
   raw에 `ModelResponseError`인 유효 JSON 응답 실패로 기록된 미완료이며,
   의미 판정 오답은 아니지만 사전 등록 규칙에 따라 분모에 포함해 오답 처리했다.
   이 한 점 차이를 시스템 우월성으로 확대 해석하지 않는다.
-- 기계 채점은 첫 verdict만 측정한다. 설명의 사실성·출처 표기는 참가자의
-  필수 blind 감사 전 미검증이므로 결과 체인은 `publishable: false`다.
+- 기계 채점은 첫 verdict만 측정한다. 참가자가 필수 blind 19개를 감사한 결과
+  parser와 실제 답변·미완료 상태는 19/19가 일치했고, fixture 근거성과 A/R
+  권한·출처 표기는 각각 18/19였다. 나머지 1건은 모델 응답이 `null`인 미완료
+  사례로 평가할 설명이 없었다. publication integrity gate의 `publishable: true`는
+  공개 증거 사슬의 무결성 상태이며 성능 우월성이나 설명 전체 검증이 아니다.
 - 모델 호출·지연 수치는 격리 원시 capture에서 사후 계산한 운영 지표로,
   사전 등록 metric이나 공개 proof 체인의 검증 대상이 아니다. seed 반복은
   독립 case가 아니며 full/no-Node4는 독립 end-to-end 실행이므로 Node4의
@@ -165,4 +168,7 @@ Ollama model ID `bdbd181c33f2`, `Q4_K_M`, 약 9.3 GB로 기록되어 있다. 이
 - 외부 API·Codex 계정 실험을 공식 집계에서 제외했는지: `TODO`
 - v2 공개 결과 검증: 216개 항목, summary SHA-256
   `4df274b10ec209283ac4d7cbaafa560d7e6d28183ba336d188cbb1197651103a`
-- v2 사람 설명 감사: `TODO: 필수 blind 19개(미완료 1개 포함) 직접 검수`
+- v2 사람 설명 감사: 필수 blind 19개(미완료 1개 포함) 직접 검수 완료;
+  parse 19/19, fixture 근거성 18/19, A/R 권한·출처 표기 18/19
+- publication integrity gate: 통과. 성능 우월성, Node4 효과, 216개 설명 전체,
+  통계적 유의성, 실제 업무 일반화, AGI 또는 환각 제거 주장은 허용하지 않음
