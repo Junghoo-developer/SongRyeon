@@ -1,0 +1,215 @@
+{
+  "experiment_id": "songryeon-contest-evidence-authority-holdout-2026-08-v1",
+  "freeze_status": "frozen_before_live_outputs",
+  "frozen_at": "2026-08-06T04:32:45.753866+00:00",
+  "live_output_count_at_freeze": 0,
+  "manifest_id": "songryeon-contest-evidence-authority-holdout-v1",
+  "manifest_sha256": "629105c8f7d440ab59a222bf00f14e2186c58a2aeedc2c997c238f52cabfc848",
+  "planned_execution_count": 216,
+  "protocol_files": [
+    {
+      "path": "HUMAN_AUDIT_TEMPLATE.json",
+      "sha256": "e87aadd54b414a0342f8e763334dc05fb5c7a8baca5dbc1c33b2aa7a594e0838"
+    },
+    {
+      "path": "PROTOCOL.md",
+      "sha256": "57536d87a3467855d3564a4b28b1757c4481419ba62d1542525fbed9d630dc8b"
+    },
+    {
+      "path": "README.md",
+      "sha256": "51a7c0c3246653d37676fe1112065506c8d7a83a04c9b97d12a54ecf14c4d14b"
+    },
+    {
+      "path": "RUN_PLAN.json",
+      "sha256": "46df3174fc09dfb0d86df5e46de782c064fb66a48e00bb59a2b98285a8c59f06"
+    },
+    {
+      "path": "SCORING_RUBRIC.md",
+      "sha256": "58ef8fde773fdc832477e5cce35a8f5c1cf0c5c07fc865d0eb8725b67ed96feb"
+    },
+    {
+      "path": "__init__.py",
+      "sha256": "10c4087bec9d4f20000912387d7ac98087fffd88d043d8b5448e2005aecf6776"
+    },
+    {
+      "path": "manifest.json",
+      "sha256": "a1d41292ba51d0c70c81911ddd88aa80d0e53324487040acd82badc48ef3de1f"
+    },
+    {
+      "path": "outside_fixture.py",
+      "sha256": "acb0a69f88bcd9b0ce98c0d49b6a725f9ad1af1b224431a9e80656c72e7f7fef"
+    },
+    {
+      "path": "project/acorn.py",
+      "sha256": "5551f6d61e8cb14ba4d3fd44a3d5fe8887e045ca40d0dcc330c42d54292fa9f0"
+    },
+    {
+      "path": "project/beacon.py",
+      "sha256": "860503ce6f06212081f5b0cbd19ae6c8dae3fd3f0c14da5086a9ed0d2cbcbcdb"
+    },
+    {
+      "path": "project/cedar.py",
+      "sha256": "f26ba5b274ac28fe3cf43d6bfef4770e6709ab677f65bdd44f68498e0b510fcd"
+    },
+    {
+      "path": "project/comet.py",
+      "sha256": "59571e33c740f0bb604ee4f36bf010ecb06200277dbc09d350d94a4ef95d0b4e"
+    },
+    {
+      "path": "project/delta.py",
+      "sha256": "293a62ee3c9803ec92fa74d23fea9777501f2919efd421ce8aaa8e3258baa7b6"
+    },
+    {
+      "path": "project/drift.py",
+      "sha256": "664255aacb387707ebccc313732d80096bd8d5014156472ebccfa46d5c00aacc"
+    },
+    {
+      "path": "project/fossil.py",
+      "sha256": "8aee1219190a02269bb8b51e28e48249ff44d54856343a4303bc86863c5654b1"
+    },
+    {
+      "path": "project/granite.py",
+      "sha256": "c55a9b5d1cd9a3348e74ef847b2d50fefd19aaafab6fa084d6a98f5f3820718a"
+    },
+    {
+      "path": "project/harbor.py",
+      "sha256": "e1fccf15ade5a6d90e08bd7ecc0eb79cda26ff3a742f7cef7ff3996ee1fdcc75"
+    },
+    {
+      "path": "project/island.py",
+      "sha256": "c5e966a218d667c44c3b3807d47cba8ee57c66f1f648b9bb8c381e5664d2d467"
+    },
+    {
+      "path": "project/juniper.py",
+      "sha256": "3184e62a12890f8ae87e760c843047f86df428e272bb1f03f24031f85cc7b6c4"
+    },
+    {
+      "path": "project/kettle.py",
+      "sha256": "19acec338fbf54bada0638f420eb895b8fdc840ea386457b77f1ce08ba128597"
+    },
+    {
+      "path": "project/lagoon.py",
+      "sha256": "fe2e8f594742583ef376d61f9f4668a04c193b1bcf091c1ba1fdafbba5b605e7"
+    },
+    {
+      "path": "project/lantern.py",
+      "sha256": "50087e16f4656bd6c16911eaf94204ad446bf605732a7859b8f42dd8e3a66889"
+    },
+    {
+      "path": "project/lilac.py",
+      "sha256": "f4bf4ffbebbcd30b33b8bc0899660ae2b00f26177eb221d43cd08bf511a2eb7f"
+    },
+    {
+      "path": "project/maple.py",
+      "sha256": "385373c94f173e723e6d7203f7103c3e9ecf234aeb5899f9a78a486cdfad78e9"
+    },
+    {
+      "path": "project/marble.py",
+      "sha256": "f93c784d7723203dde64d22430585be22c64c187840f421ac133cdc993f8a454"
+    },
+    {
+      "path": "project/meadow.py",
+      "sha256": "42358f958515db3a17c41c029ea037f303928e482ca9bee340c1593f41290d67"
+    },
+    {
+      "path": "project/nectar.py",
+      "sha256": "2a554ee9d64f0e5ac5afd7543ac2c1b0a8c44d69cb276eb7a6d751d018387ea2"
+    },
+    {
+      "path": "project/orbit.py",
+      "sha256": "cd8a101f09983ba39e7e6f12878e8a1a990b88315b7f1680c2761437ea7c4cca"
+    },
+    {
+      "path": "project/pebble.py",
+      "sha256": "ede2a0149179056bec7d32c3ba3d5ed096699302d2aa57fa2ab082ac9a66b5ec"
+    },
+    {
+      "path": "project/pollen.py",
+      "sha256": "e6e0aa090e44c5c74f0b4d718aafa2ea48fee7d147f952cc8e5549b18f702210"
+    },
+    {
+      "path": "project/quartz.py",
+      "sha256": "45c3e8913c6c6c983c0dabdb0bde8d0723b27d244ecc265a12eee6cad900a607"
+    },
+    {
+      "path": "project/raster.py",
+      "sha256": "d83d54633889f981ffca169a9de1f7ae18c3329da5c49dab4d3bf78e5168133a"
+    },
+    {
+      "path": "project/saffron.py",
+      "sha256": "7549590490baeb1785aefaed33d7fb2af1e12659d11a6594748e629ef70c2a05"
+    },
+    {
+      "path": "project/thicket.py",
+      "sha256": "d83d54633889f981ffca169a9de1f7ae18c3329da5c49dab4d3bf78e5168133a"
+    },
+    {
+      "path": "project/tundra.py",
+      "sha256": "4cde297376a0fe957014cbef70a7d1e3850c79bc450353826a4279e82bb231c5"
+    },
+    {
+      "path": "project/umber.py",
+      "sha256": "f2083722a54fd068c52644721311072eca1b002feaccbb7ad674447ec786f182"
+    },
+    {
+      "path": "project/violet.py",
+      "sha256": "6b3b9ddd264f03bf7dfb9e9457bf9c75756c7e9024091a0e576aeb7eeeee037e"
+    },
+    {
+      "path": "project/willow.py",
+      "sha256": "f2083722a54fd068c52644721311072eca1b002feaccbb7ad674447ec786f182"
+    },
+    {
+      "path": "project/xenon.py",
+      "sha256": "67d58701a6425a79db6d8dd839a7c3e3f3ea13b514f4935d7d06fbf2c03666f2"
+    },
+    {
+      "path": "project/yarrow.py",
+      "sha256": "5551f6d61e8cb14ba4d3fd44a3d5fe8887e045ca40d0dcc330c42d54292fa9f0"
+    },
+    {
+      "path": "project/zephyr.py",
+      "sha256": "21bea88e42b60f12f2a3da53091076cc46aa425cf8276c2dd7e387b253f91095"
+    },
+    {
+      "path": "protocol.py",
+      "sha256": "51806df48bfbd670a96761e2262b8824de62b7f6ea33970478f011ba9734bff5"
+    },
+    {
+      "path": "publication.py",
+      "sha256": "537789f92cd95da6f5bbf43f927c9bffb0d219d8f396f00baf1a5cb1a72027e7"
+    },
+    {
+      "path": "scorer.py",
+      "sha256": "b23e99881fd2c8f29cb1a2a8972d6ba39c9651a5e05a54408f5b55eb171a4cc6"
+    }
+  ],
+  "protocol_tree_sha256": "f1aab1c94e1345ebb176b1d1784b1299a27ed8d3293042ae3a775ce528ef99e5",
+  "publishable": false,
+  "run_plan_sha256": "343fb8827c6e6a4a976609c43267e80e5c25bbf549651eff3ec4d981aa862564",
+  "schema_version": 1,
+  "system_under_test": {
+    "file_count": 66,
+    "include_files": [
+      "evals/__init__.py",
+      "evals/evaluator.py",
+      "evals/live_capture.py",
+      "evals/runner.py",
+      "evals/schema.py",
+      "evals/source_identity.py",
+      "evals/summary.py",
+      "evals/variants.py"
+    ],
+    "include_python_roots": [
+      "agent_tools",
+      "demo",
+      "knowledge",
+      "llm",
+      "memory",
+      "nodes",
+      "prompts",
+      "runtime"
+    ],
+    "tree_sha256": "4a7624d164f6c00e5a83d05bc309d3f67ad6435560f8646a0e3e30ee5d28f690"
+  }
+}
