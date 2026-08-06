@@ -52,20 +52,54 @@
 
 ## 3. 비교실험 주장 검수
 
-- [ ] 실험 코드·case·채점 규칙이 첫 live 출력 전에 동결됐다.
-- [ ] 모델 태그·전체 digest·seed·temperature·context·도구 예산이 기록됐다.
-- [ ] 오류·timeout·형식 실패가 분모에서 제거되지 않았다.
-- [ ] 기계 판정이 측정한 것은 verdict이며 설명 전체의 진실성이 아님을 명시했다.
-- [ ] 사람 검수 전 결과에 `publishable: false`를 유지했다.
+- [x] 실험 코드·case·채점 규칙이 첫 live 출력 전에 동결됐다.
+- [x] 모델 태그·전체 digest·seed·temperature·context·도구 예산이 기록됐다.
+- [x] 오류·timeout·형식 실패가 분모에서 제거되지 않았다.
+- [x] 기계 판정이 측정한 것은 verdict이며 설명 전체의 진실성이 아님을 명시했다.
+- [x] 사람 검수 전 결과에 `publishable: false`를 유지했다.
 - [ ] 오답 전부와 사전 지정 blind 표본을 직접 읽었다.
-- [ ] 결과가 나쁠 때도 case·실패·원시 해시를 삭제하거나 교체하지 않았다.
-- [ ] “환각 제거”, “일반적인 정확도 향상”, “Node4 단독 인과효과”라고 과장하지 않았다.
+- [x] 결과가 나쁠 때도 case·실패·원시 해시를 삭제하거나 교체하지 않았다.
+- [x] “환각 제거”, “일반적인 정확도 향상”, “Node4 단독 인과효과”라고 과장하지 않았다.
+
+검수에는 정답을 제외해 미리 만든 `human_audit_v2_packet.md`와
+`HUMAN_AUDIT_V2_TEMPLATE.json`만 사용한다. 항목별 판단을 모두 끝낼 때까지
+`REVEAL.json`과 `SUMMARY.json`의 정답 열은 열지 않는다. 패킷의 19개 항목에서
+질문·공개 A·모델 답변·기계 parse 상태를 읽어 아래 네 가지를 표시한다.
+
+1. `verdict_parse_matches_answer`: 파서 결과가 실제 첫 verdict 또는 미완료 상태와 일치하는가
+2. `explanation_supported_by_fixture`: 설명이 fixture 원문보다 강하게 단정하지 않는가
+3. `ar_authority_labeling_accurate`: A와 R의 권한·출처를 뒤섞지 않는가
+4. `notes`: 문장 중단, 핵심 요구 누락 등 발견한 사항을 구체적으로 적는다
+
+19개 안에는 `single-tool-agent`의 `holdout-quartz-export`, seed `1709`
+미완료 1건이 포함된다. 블라인드 단계에서는 이 항목이 미완료로 기록됐는지만
+확인한다. 구체적인 실패 원인은 항목별 판단을 잠근 뒤 private raw의
+`error_type`과 대조한다. 사람 판정은 기존 JSON을 덮어쓰지 말고
+`HUMAN_AUDIT_V2_TEMPLATE.json`을 복사한 새 파일에 작성한다. 권장 경로는
+`.tmp/evals/contest_holdout_v2/HUMAN_AUDIT.json`이다. 참가자 본인이 검수한
+경우 reviewer type은 `human_owner`다. 19개는 사전 지정 표본 18개와 실패
+1개의 합집합이다.
+
+완료할 때는 `audit_status`를 `completed_human_review`로 바꾸고,
+`reviewer_id`, `reviewer_type`, `reviewer_disclosure`를 사실대로 채운다.
+`no_cases_excluded_or_replaced`, `raw_failure_rows_preserved`,
+`claim_wording_reviewed`도 직접 확인한 뒤에만 `true`로 바꾼다. 그 다음
+항목별 판단을 잠근 상태에서만 공개 `REVEAL.json`과 `SUMMARY.json`을 열어
+전체성·주장 문구를 대조하고,
+`python -m evals.contest_holdout_v1.publication --experiment-root
+.tmp/evals/contest_holdout_v2 --audit
+.tmp/evals/contest_holdout_v2/HUMAN_AUDIT.json`을 실행한다.
+
+감사 뒤에도 다음 제한은 유지한다: 19개 표본은 216개 전체 설명 검증이 아니며,
+seed 반복은 독립 case가 아니다. full/no-Node4는 독립 end-to-end 실행이라
+Node4 단독 인과효과가 아니고, 통계적 유의성·실제 업무 일반화·환각 제거를
+주장할 수 없다.
 
 사람 검수 기록:
 
 - 검수자: `TODO`
 - 검수 날짜: `TODO`
-- 검수한 blind ID 수: `TODO`
+- 검수한 blind ID 수: `TODO / 19`
 - 불일치와 처리 원칙: `TODO`
 - 보고서에 허용할 정확한 문장: `TODO`
 

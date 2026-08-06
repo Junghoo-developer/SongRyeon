@@ -1,0 +1,146 @@
+{
+  "schema_version": 1,
+  "experiment_id": "songryeon-contest-evidence-authority-holdout-2026-08-v1",
+  "audit_status": "template_not_completed",
+  "reviewer_id": "",
+  "reviewer_type": "human_owner",
+  "reviewer_disclosure": "",
+  "no_cases_excluded_or_replaced": false,
+  "raw_failure_rows_preserved": false,
+  "claim_wording_reviewed": false,
+  "items": [
+    {
+      "blind_id": "blind-0002bffeb7bde05be39788b8ada72e6d08c45121a4d243eda6d3210019468e26",
+      "verdict_parse_matches_answer": false,
+      "explanation_supported_by_fixture": false,
+      "ar_authority_labeling_accurate": false,
+      "notes": ""
+    },
+    {
+      "blind_id": "blind-017ab4d79a05a8bdbc34272b0b4ada6333f1839adfdfec1d1059b3df0f685bf3",
+      "verdict_parse_matches_answer": false,
+      "explanation_supported_by_fixture": false,
+      "ar_authority_labeling_accurate": false,
+      "notes": ""
+    },
+    {
+      "blind_id": "blind-05617cdd32a3f75c0742a0c6dc66b91f113e5cb93e853a6b1572b01568df52fe",
+      "verdict_parse_matches_answer": false,
+      "explanation_supported_by_fixture": false,
+      "ar_authority_labeling_accurate": false,
+      "notes": ""
+    },
+    {
+      "blind_id": "blind-06c58c43ab7ebade54bde6a1d2e5bef67153711d9dc346abb960a3958f8cd896",
+      "verdict_parse_matches_answer": false,
+      "explanation_supported_by_fixture": false,
+      "ar_authority_labeling_accurate": false,
+      "notes": ""
+    },
+    {
+      "blind_id": "blind-07348eed3d4f161813ba29e0ac8a1cadda9d0f06bb4a63ba16a7c69377a9e60d",
+      "verdict_parse_matches_answer": false,
+      "explanation_supported_by_fixture": false,
+      "ar_authority_labeling_accurate": false,
+      "notes": ""
+    },
+    {
+      "blind_id": "blind-0829512ed3511c18b55a4fae395e3acbc352ed87e5542996796ce2010b0d7d5f",
+      "verdict_parse_matches_answer": false,
+      "explanation_supported_by_fixture": false,
+      "ar_authority_labeling_accurate": false,
+      "notes": ""
+    },
+    {
+      "blind_id": "blind-0a3e6b2f85ec2d31a487018994147e0c58b462b89277bb6d7e845fe2873ef4de",
+      "verdict_parse_matches_answer": false,
+      "explanation_supported_by_fixture": false,
+      "ar_authority_labeling_accurate": false,
+      "notes": ""
+    },
+    {
+      "blind_id": "blind-0a80b540a1f1e2e14e7e16a16eb28ce9ef9c37f1c7db5480ae22e3509c160ee9",
+      "verdict_parse_matches_answer": false,
+      "explanation_supported_by_fixture": false,
+      "ar_authority_labeling_accurate": false,
+      "notes": ""
+    },
+    {
+      "blind_id": "blind-0acdecf71a6934fbdff345930e2ab75b5a2e427497bb893d504341302d1b3686",
+      "verdict_parse_matches_answer": false,
+      "explanation_supported_by_fixture": false,
+      "ar_authority_labeling_accurate": false,
+      "notes": ""
+    },
+    {
+      "blind_id": "blind-0b35a18ecd3a698157651d4db76787ab497bd65dc56fa7c3355a51f8d76d5c5f",
+      "verdict_parse_matches_answer": false,
+      "explanation_supported_by_fixture": false,
+      "ar_authority_labeling_accurate": false,
+      "notes": ""
+    },
+    {
+      "blind_id": "blind-0da67b5d12eed51180b8fd91e87e926764c1e15ae7dda71b0190a8761c6af5d7",
+      "verdict_parse_matches_answer": false,
+      "explanation_supported_by_fixture": false,
+      "ar_authority_labeling_accurate": false,
+      "notes": ""
+    },
+    {
+      "blind_id": "blind-134f56ab9f0da97e408f89eed9690c56180b77b7f36aa952b62b8b40f9de3c20",
+      "verdict_parse_matches_answer": false,
+      "explanation_supported_by_fixture": false,
+      "ar_authority_labeling_accurate": false,
+      "notes": ""
+    },
+    {
+      "blind_id": "blind-13d1eff322f4a146eb22c51ce53807fc1feb30c4ebe69cc7bd410471a3a72a88",
+      "verdict_parse_matches_answer": false,
+      "explanation_supported_by_fixture": false,
+      "ar_authority_labeling_accurate": false,
+      "notes": ""
+    },
+    {
+      "blind_id": "blind-13dddbf3487aef34dd1e8636f26207e530413053cef30fbeac0e3776d00fa626",
+      "verdict_parse_matches_answer": false,
+      "explanation_supported_by_fixture": false,
+      "ar_authority_labeling_accurate": false,
+      "notes": ""
+    },
+    {
+      "blind_id": "blind-14bbf334e14c32c28aa6c9520526d2b60ae312769521174d1933adaf9f1a62c2",
+      "verdict_parse_matches_answer": false,
+      "explanation_supported_by_fixture": false,
+      "ar_authority_labeling_accurate": false,
+      "notes": ""
+    },
+    {
+      "blind_id": "blind-14f6e199cfae9ad97f4f9ea5e78cdc8e08a488b0fac5ab86667b9b542735ace1",
+      "verdict_parse_matches_answer": false,
+      "explanation_supported_by_fixture": false,
+      "ar_authority_labeling_accurate": false,
+      "notes": ""
+    },
+    {
+      "blind_id": "blind-16ba7ad5da08686043d6e9882885fb98cf055ccd08b48f034ccb2f38d75c54bd",
+      "verdict_parse_matches_answer": false,
+      "explanation_supported_by_fixture": false,
+      "ar_authority_labeling_accurate": false,
+      "notes": ""
+    },
+    {
+      "blind_id": "blind-16bdc5812db2eeda4ff97be44a4911eacdf0ae429de7ef8974d9ca65cc319e7b",
+      "verdict_parse_matches_answer": false,
+      "explanation_supported_by_fixture": false,
+      "ar_authority_labeling_accurate": false,
+      "notes": ""
+    },
+    {
+      "blind_id": "blind-267800312f9f005a9ced307f96d1c1068e70eb28e4b6df077c8773307cc7d6b5",
+      "verdict_parse_matches_answer": false,
+      "explanation_supported_by_fixture": false,
+      "ar_authority_labeling_accurate": false,
+      "notes": ""
+    }
+  ]
+}
