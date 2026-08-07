@@ -1,0 +1,183 @@
+{
+  "schema_version": 1,
+  "stage": "contract",
+  "system_name": "bare-gemma4-26b-complete-source-v3",
+  "freeze_sha256": "f79283727da275b6461caaf55911d0f78ddca0814a74de6b416d4cd6d6620322",
+  "freeze_publication": {
+    "commit": "cd31bb53afcdf1042893f12f08650ec2d2d8b360",
+    "remote_ref": "origin/codex/contest-release-2026"
+  },
+  "run_plan_sha256": "3ced638a936ee4497db1bd55a7572eefae1d1cdbeee5896ceec3dbecc97b7108",
+  "model_contract": {
+    "model_name": "gemma4:26b",
+    "timeout_seconds": 300,
+    "num_ctx": 16384,
+    "keep_alive": "30m",
+    "temperature": 0,
+    "seed": 8849,
+    "think": false
+  },
+  "model_readiness": {
+    "server_version": "0.32.6",
+    "model_name": "gemma4:26b",
+    "model_digest": "5571076f3d70050487b26b341705799e0ab29b808164f90d20d4cf84f699d251"
+  },
+  "run_id": "82e5d4da186f421a86bc900259fb15f6",
+  "run_state": "complete",
+  "final_readiness": {
+    "server_version": "0.32.6",
+    "model_name": "gemma4:26b",
+    "model_digest": "5571076f3d70050487b26b341705799e0ab29b808164f90d20d4cf84f699d251"
+  },
+  "contract_preflight": null,
+  "rows": [
+    {
+      "schema_version": 1,
+      "plan_id": "contract-01-contract-primitive-return",
+      "stage": "contract",
+      "mode": "contract",
+      "case_id": "contract-primitive-return",
+      "difficulty": "contract",
+      "expected_ids": [
+        "CT1"
+      ],
+      "internal_claim_ids": [
+        "CT1"
+      ],
+      "effective_request_sha256": "2a8dcb653de8925f3fd775f628f3df66b0f39a002d1a5131adf7806af043c75f",
+      "completed": true,
+      "answer": "{\n  \"claims\": [\n    {\n      \"id\": \"CT1\",\n      \"verdict\": \"SUPPORTED\",\n      \"observation\": {\n        \"kind\": \"return\",\n        \"value\": {\n          \"exception\": null,\n          \"value\": true\n        },\n        \"exception\": null\n      },\n      \"reason\": \"The provided ID and verdict are reproduced exactly as requested.\"\n    }\n  ]\n}",
+      "error": null,
+      "latency_ms": 2552.525,
+      "model_call_count": 1,
+      "agent_tool_calls": [],
+      "model_metrics": {
+        "total_duration": 2539396400,
+        "load_duration": 322514600,
+        "prompt_eval_count": 137,
+        "prompt_eval_duration": 501613000,
+        "eval_count": 101,
+        "eval_duration": 1712538000
+      },
+      "model_reply": {
+        "model": "gemma4:26b",
+        "done_reason": "stop",
+        "thinking": ""
+      },
+      "state": "finished",
+      "attempt_id": "82e5d4da186f421a86bc900259fb15f6:1:contract-01-contract-primitive-return"
+    },
+    {
+      "schema_version": 1,
+      "plan_id": "contract-02-contract-nested-return",
+      "stage": "contract",
+      "mode": "contract",
+      "case_id": "contract-nested-return",
+      "difficulty": "contract",
+      "expected_ids": [
+        "CT2"
+      ],
+      "internal_claim_ids": [
+        "CT2"
+      ],
+      "effective_request_sha256": "85eaf2727583f38eae87c7a3ad84d33d7b334f120cc1d931c66f4f7a4286d045",
+      "completed": true,
+      "answer": "{\n  \"claims\": [\n    {\n      \"id\": \"CT2\",\n      \"verdict\": \"UNSUPPORTED\",\n      \"observation\": {\n        \"kind\": \"return\",\n        \"value\": {\n          \"items\": [\n            1,\n            \"둘\",\n            false\n          ],\n          \"meta\": {\n            \"n\": 3\n          }\n        },\n        \"exception\": null\n      },\n      \"reason\": \"The provided data was reproduced exactly as requested.\"\n    }\n  ]\n}",
+      "error": null,
+      "latency_ms": 2381.021,
+      "model_call_count": 1,
+      "agent_tool_calls": [],
+      "model_metrics": {
+        "total_duration": 2379643000,
+        "load_duration": 391909100,
+        "prompt_eval_count": 151,
+        "prompt_eval_duration": 175646000,
+        "eval_count": 123,
+        "eval_duration": 1793506000
+      },
+      "model_reply": {
+        "model": "gemma4:26b",
+        "done_reason": "stop",
+        "thinking": ""
+      },
+      "state": "finished",
+      "attempt_id": "82e5d4da186f421a86bc900259fb15f6:2:contract-02-contract-nested-return"
+    },
+    {
+      "schema_version": 1,
+      "plan_id": "contract-03-contract-raised-exception",
+      "stage": "contract",
+      "mode": "contract",
+      "case_id": "contract-raised-exception",
+      "difficulty": "contract",
+      "expected_ids": [
+        "CT3"
+      ],
+      "internal_claim_ids": [
+        "CT3"
+      ],
+      "effective_request_sha256": "2cf3b66dd73b191d6f4769a100b72c3eb2c741707c4073d43bbdc4bfb80b9fe1",
+      "completed": true,
+      "answer": "{\n  \"claims\": [\n    {\n      \"id\": \"CT3\",\n      \"verdict\": \"SUPPORTED\",\n      \"observation\": {\n        \"kind\": \"raise\",\n        \"value\": null,\n        \"exception\": \"ValueError\"\n      },\n      \"reason\": \"The provided claim was reproduced exactly as requested.\"\n    }\n  ]\n}",
+      "error": null,
+      "latency_ms": 1855.621,
+      "model_call_count": 1,
+      "agent_tool_calls": [],
+      "model_metrics": {
+        "total_duration": 1837741700,
+        "load_duration": 397029700,
+        "prompt_eval_count": 137,
+        "prompt_eval_duration": 162553000,
+        "eval_count": 85,
+        "eval_duration": 1258458000
+      },
+      "model_reply": {
+        "model": "gemma4:26b",
+        "done_reason": "stop",
+        "thinking": ""
+      },
+      "state": "finished",
+      "attempt_id": "82e5d4da186f421a86bc900259fb15f6:3:contract-03-contract-raised-exception"
+    },
+    {
+      "schema_version": 1,
+      "plan_id": "contract-04-contract-three-claim-batch",
+      "stage": "contract",
+      "mode": "contract",
+      "case_id": "contract-three-claim-batch",
+      "difficulty": "contract",
+      "expected_ids": [
+        "CT4-A",
+        "CT4-B",
+        "CT4-C"
+      ],
+      "internal_claim_ids": [
+        "CT4-A",
+        "CT4-B",
+        "CT4-C"
+      ],
+      "effective_request_sha256": "b9b6ea489415889c9d83086f6488884d2a45ae88e2af4abf9d0af7b198892365",
+      "completed": true,
+      "answer": "{\n  \"claims\": [\n    {\n      \"id\": \"CT4-A\",\n      \"verdict\": \"SUPPORTED\",\n      \"observation\": {\n        \"kind\": \"return\",\n        \"value\": {\n          \"exception\": null,\n          \"value\": [1, 2]\n        },\n        \"exception\": null\n      },\n      \"reason\": \"The claim is reproduced exactly as provided.\"\n    },\n    {\n      \"id\": \"CT4-B\",\n      \"verdict\": \"UNSUPPORTED\",\n      \"observation\": {\n        \"kind\": \"raise\",\n        \"value\": null,\n        \"exception\": \"RuntimeError\"\n      },\n      \"reason\": \"The claim is reproduced exactly as provided.\"\n    },\n    {\n      \"id\": \"CT4-C\",\n      \"verdict\": \"INSUFFICIENT\",\n      \"observation\": {\n        \"kind\": \"unknown\",\n        \"value\": null,\n        \"exception\": null\n      },\n      \"reason\": \"The claim is reproduced exactly as provided.\"\n    }\n  ]\n}",
+      "error": null,
+      "latency_ms": 4246.612,
+      "model_call_count": 1,
+      "agent_tool_calls": [],
+      "model_metrics": {
+        "total_duration": 4245351100,
+        "load_duration": 368242600,
+        "prompt_eval_count": 200,
+        "prompt_eval_duration": 173456000,
+        "eval_count": 253,
+        "eval_duration": 3685921000
+      },
+      "model_reply": {
+        "model": "gemma4:26b",
+        "done_reason": "stop",
+        "thinking": ""
+      },
+      "state": "finished",
+      "attempt_id": "82e5d4da186f421a86bc900259fb15f6:4:contract-04-contract-three-claim-batch"
+    }
+  ]
+}
