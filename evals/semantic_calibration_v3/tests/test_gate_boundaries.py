@@ -10,6 +10,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from artifacts import SYSTEM_NAME
+from schemas import encode_wire_observation
 from score_v3 import score_semantic_document
 
 
@@ -58,7 +59,10 @@ def response_for_unit(unit, correct_ids):
             {
                 "id": visible_id,
                 "verdict": verdict,
-                "observation": expected["observation"],
+                "observation": encode_wire_observation(
+                    expected["observation"],
+                    allow_unknown=False,
+                ),
                 "reason": "synthetic boundary answer",
             }
         )
@@ -126,6 +130,44 @@ def semantic_document(
         "model_contract": {"model_name": "gemma4:26b"},
         "contract_preflight": {"sha256": HASH, "run_id": "contract"},
         "rows": rows,
+    }
+
+
+def test_parse_failures_are_reported_by_boundary_stage():
+    counts = {"anchor": 12, "medium": 12, "hard": 12}
+    document = semantic_document(counts, counts)
+    batch_row = next(row for row in document["rows"] if row["mode"] == "batch")
+    batch_answer = json.loads(batch_row["answer"])
+    batch_answer["claims"][0]["observation"]["value_json"] = "NaN"
+    batch_row["answer"] = json.dumps(batch_answer)
+
+    single_rows = [row for row in document["rows"] if row["mode"] == "single"]
+    single_rows[0]["answer"] = "not strict json"
+    normalized_answer = json.loads(single_rows[1]["answer"])
+    normalized_answer["claims"][0]["observation"]["exception"] = "ValueError"
+    single_rows[1]["answer"] = json.dumps(normalized_answer)
+
+    score = score_semantic_document(document)
+    assert score["parse_error_stages"]["batch"] == {"inner_json_decode": 1}
+    assert score["parse_error_stages"]["single"] == {
+        "outer_json_or_schema": 1,
+        "normalized_observation": 1,
+    }
+    assert score["parse_pipeline"]["batch"] == {
+        "total_units": 12,
+        "execution_success": 12,
+        "outer_json_or_schema_success": 12,
+        "inner_json_decode_success": 11,
+        "normalized_observation_success": 11,
+        "fully_parsed_units": 11,
+    }
+    assert score["parse_pipeline"]["single"] == {
+        "total_units": 36,
+        "execution_success": 36,
+        "outer_json_or_schema_success": 35,
+        "inner_json_decode_success": 35,
+        "normalized_observation_success": 34,
+        "fully_parsed_units": 34,
     }
 
 

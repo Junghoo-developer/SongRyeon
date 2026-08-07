@@ -31,6 +31,7 @@ from score_v3 import (
     validate_contract_preflight_binding,
 )
 from seal_v3 import canonical_run_path, public_evidence_path, write_bytes_once
+from schemas import encode_wire_observation
 
 
 READINESS = {"ollama_version": "test", "model": "gemma4:26b"}
@@ -50,7 +51,10 @@ def answer(claims):
                 {
                     "id": claim["id"],
                     "verdict": claim["verdict"],
-                    "observation": claim["observation"],
+                    "observation": encode_wire_observation(
+                        claim["observation"],
+                        allow_unknown=True,
+                    ),
                     "reason": "fixture-derived test answer",
                 }
                 for claim in claims

@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 
-from schemas import canonical_json, response_schema
+from schemas import canonical_json, encode_wire_observation, response_schema
 
 
 SEMANTIC_SYSTEM_PROMPT = """You predict CPython 3.10.11 behavior from complete source code.
@@ -13,17 +13,23 @@ Each claim gives a proposition about one function call in a fresh interpreter.
 SUPPORTED means the proposition observation exactly matches the actual call.
 UNSUPPORTED means it does not. In both cases, observation must contain your
 predicted actual result, not a copy of a false proposition. Do not execute code.
-For return observations exception must be null. For raise observations value
-must be null. Every reason must be nonempty. Return only the required JSON
-object. Every claim must appear exactly once."""
+The input proposition_observation uses a typed JSON value. In your output,
+encode the predicted actual value exactly once as JSON text in value_json.
+For example, JSON true becomes the string "true", a list becomes the string
+"[1,2]", and the actual string null becomes the string '"null"'. For
+return observations exception must be null. For raise observations value_json
+must be the four-character string "null". Every reason must be nonempty.
+Return only the required JSON object. Every claim must appear exactly once."""
 
 
 CONTRACT_SYSTEM_PROMPT = """This is a structured-output transcription check.
-Copy each supplied id, verdict, and observation exactly into the required JSON
-object and add a short nonempty reason. Do not reinterpret the supplied values.
-For return observations exception must be null. For raise observations value
-must be null. For unknown observations both value and exception must be null.
-Return only the JSON object. Every claim must appear exactly once."""
+Copy every supplied id, verdict, kind, value_json meaning, and exception into
+the required JSON object and add a short nonempty reason. value_json is JSON
+text encoded exactly once; preserve its typed JSON meaning without adding a
+wrapper. For return observations exception must be null. For raise observations
+value_json must be the four-character string "null". For unknown observations
+value_json must be "null" and exception must be null. Return only the JSON
+object. Every claim must appear exactly once."""
 
 
 def opaque_token(namespace, value):
@@ -84,7 +90,10 @@ def build_contract_unit(case, *, ordinal):
         {
             "id": claim["id"],
             "verdict": claim["verdict"],
-            "observation": claim["observation"],
+            "observation": encode_wire_observation(
+                claim["observation"],
+                allow_unknown=True,
+            ),
         }
         for claim in case["claims"]
     ]

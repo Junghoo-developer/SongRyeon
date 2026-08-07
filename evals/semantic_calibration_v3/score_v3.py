@@ -44,7 +44,7 @@ from pathlib import Path
 
 from artifacts import SYSTEM_NAME, scoring_matrix_valid, validate_artifact_document
 from freeze_v3 import sha256, verify_freeze, verify_freeze_publication
-from schemas import canonical_json, load_strict_json, parse_response
+from schemas import canonical_json, load_strict_json, parse_error_stage, parse_response
 from seal_v3 import verify_public_evidence
 
 
@@ -123,6 +123,26 @@ def require_valid_matrix(score, label):
         raise ValueError(f"{label} row matrix is invalid")
 
 
+def parse_pipeline_counts(total_units, execution_success, parsed_units, stages):
+    """Report cumulative success at each fail-closed parsing boundary."""
+
+    outer_success = execution_success - stages.get("outer_json_or_schema", 0)
+    inner_success = outer_success - stages.get("inner_json_decode", 0)
+    normalized_success = inner_success - stages.get("normalized_observation", 0)
+    if min(execution_success, outer_success, inner_success, normalized_success) < 0:
+        raise ValueError("parse pipeline counts are inconsistent")
+    if normalized_success != parsed_units:
+        raise ValueError("parse pipeline does not reconcile with parsed units")
+    return {
+        "total_units": total_units,
+        "execution_success": execution_success,
+        "outer_json_or_schema_success": outer_success,
+        "inner_json_decode_success": inner_success,
+        "normalized_observation_success": normalized_success,
+        "fully_parsed_units": parsed_units,
+    }
+
+
 def score_contract_document(document):
     if not isinstance(document, dict):
         document = {}
@@ -137,6 +157,7 @@ def score_contract_document(document):
     details = []
     exact_tasks = 0
     exact_claims = 0
+    parse_error_stages = Counter()
     total_claims = sum(len(case["claims"]) for case in expected_cases.values())
     model_contract = document.get("model_contract")
     expected_model = (
@@ -158,6 +179,8 @@ def score_contract_document(document):
             )
         else:
             parsed, parse_error = None, "execution_invalid"
+        if parse_error is not None:
+            parse_error_stages[parse_error_stage(parse_error)] += 1
         claim_results = []
         for expected in case["claims"]:
             actual = parsed.get(expected["id"]) if parsed else None
@@ -184,6 +207,9 @@ def score_contract_document(document):
             }
         )
     passed = matrix_ok and exact_tasks == 4 and exact_claims == total_claims
+    stage_document = dict(parse_error_stages)
+    execution_success = sum(detail["execution_valid"] for detail in details)
+    parsed_units = sum(detail["parse_error"] is None for detail in details)
     return {
         "passed": passed,
         "matrix_ok": matrix_ok,
@@ -191,6 +217,13 @@ def score_contract_document(document):
         "task_count": 4,
         "exact_claims": exact_claims,
         "claim_count": total_claims,
+        "parse_error_stages": stage_document,
+        "parse_pipeline": parse_pipeline_counts(
+            4,
+            execution_success,
+            parsed_units,
+            stage_document,
+        ),
         "details": details,
     }
 
@@ -234,6 +267,7 @@ def score_semantic_document(document):
         for mode in ("single", "batch")
     }
     claim_results = {"single": {}, "batch": {}}
+    parse_error_stages = {"single": Counter(), "batch": Counter()}
     unit_details = []
 
     for unit, raw_row in zip(units, rows):
@@ -251,6 +285,8 @@ def score_semantic_document(document):
             )
         else:
             parsed, parse_error = None, "execution_invalid"
+        if parse_error is not None:
+            parse_error_stages[mode][parse_error_stage(parse_error)] += 1
         if execution_valid:
             summaries[mode]["completed_units"] += 1
         if parse_error is None:
@@ -344,6 +380,18 @@ def score_semantic_document(document):
         mode: {name: dict(counts) for name, counts in values.items()}
         for mode, values in tier.items()
     }
+    stage_document = {
+        mode: dict(counts) for mode, counts in parse_error_stages.items()
+    }
+    pipeline_document = {
+        mode: parse_pipeline_counts(
+            summary_document[mode]["units"],
+            summary_document[mode].get("completed_units", 0),
+            summary_document[mode].get("parsed_units", 0),
+            stage_document[mode],
+        )
+        for mode in ("single", "batch")
+    }
 
     single = summary_document["single"]
     batch = summary_document["batch"]
@@ -380,6 +428,8 @@ def score_semantic_document(document):
         "status": status,
         "matrix_ok": matrix_ok,
         "summaries": summary_document,
+        "parse_error_stages": stage_document,
+        "parse_pipeline": pipeline_document,
         "difficulty": tier_document,
         "paired": dict(paired),
         "gate_conditions": conditions,

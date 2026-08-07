@@ -12,7 +12,7 @@ if str(ROOT) not in sys.path:
 
 from build_oracle import build_oracle
 from build_plan import build_plan
-from schemas import parse_response, response_schema
+from schemas import encode_wire_observation, parse_response, response_schema
 from score_v3 import score_contract_document, score_semantic_document
 from artifacts import SYSTEM_NAME
 
@@ -33,7 +33,10 @@ def answer(claims):
                 {
                     "id": claim["id"],
                     "verdict": claim["verdict"],
-                    "observation": claim["observation"],
+                    "observation": encode_wire_observation(
+                        claim["observation"],
+                        allow_unknown=True,
+                    ),
                     "reason": "fixture-derived test answer",
                 }
                 for claim in claims
@@ -140,6 +143,24 @@ def test_plan_matrix_and_frozen_order():
         )
 
 
+def test_contract_prompt_uses_wire_but_semantic_proposition_stays_typed():
+    plan = load("control/run_plan.json")
+    for unit in plan["contract_units"]:
+        supplied = json.loads(unit["user_prompt"].split("\n", 1)[1])
+        assert all(
+            set(claim["observation"]) == {"kind", "value_json", "exception"}
+            for claim in supplied
+        )
+    for unit in plan["semantic_units"]:
+        assert '"proposition_observation"' in unit["user_prompt"]
+        assert '"value_json"' not in unit["user_prompt"]
+        variants = unit["response_schema"]["properties"]["claims"]["items"][
+            "properties"
+        ]["observation"]["oneOf"]
+        assert all("value_json" in variant["properties"] for variant in variants)
+        assert all("value" not in variant["properties"] for variant in variants)
+
+
 def test_typed_parser_rejects_wrong_shapes():
     valid = answer(
         [
@@ -159,16 +180,23 @@ def test_typed_parser_rejects_wrong_shapes():
                 {
                     "id": "X",
                     "verdict": "SUPPORTED",
-                    "observation": {"kind": "raise", "value": 1, "exception": "ValueError"},
+                    "observation": {
+                        "kind": "raise",
+                        "value_json": "1",
+                        "exception": "ValueError",
+                    },
                     "reason": "bad",
                 }
             ]
         }
     )
-    assert parse_response(invalid, ["X"], allow_unknown=False)[1] == "raise_value_must_be_null"
+    assert (
+        parse_response(invalid, ["X"], allow_unknown=False)[1]
+        == "raise_value_json_must_be_null"
+    )
     duplicate = valid.replace('"id":"X"', '"id":"X","id":"X"')
     assert parse_response(duplicate, ["X"], allow_unknown=False)[1] == "answer_is_not_strict_json"
-    non_json_number = valid.replace('"value":true', '"value":NaN')
+    non_json_number = valid.replace('"value_json":"true"', '"value_json":NaN')
     assert parse_response(non_json_number, ["X"], allow_unknown=False)[1] == "answer_is_not_strict_json"
     unhashable_id = json.dumps(
         {

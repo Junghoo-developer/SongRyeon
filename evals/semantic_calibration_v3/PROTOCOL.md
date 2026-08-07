@@ -1,4 +1,4 @@
-# Semantic Calibration v3.1 — Preregistration
+# Semantic Calibration v3.2 — Preregistration
 
 ## Status and purpose
 
@@ -11,6 +11,19 @@ preserved under `evidence/semantic_calibration_v3/2aeb51729e9b184f9fd70b96eb0274
 V3.1 removes only that provider-side pattern. The local strict parser still
 rejects empty or whitespace-only reasons. Fixtures, prompts, oracle outcomes,
 run order, score thresholds, and stopping rules are unchanged.
+
+Revision v3.2 follows a completed v3.1 contract preflight that produced four
+strictly parseable responses but reproduced only 2/4 tasks and 4/6 embedded
+claims exactly. No semantic request was made. For primitive Boolean and array
+returns, the model wrapped the supplied raw value in an extra object; the
+frozen v3.1 artifact and diagnosis are preserved under
+`evidence/semantic_calibration_v3/f79283727da275b6461caaf55911d0f78ddca0814a74de6b416d4cd6d6620322/`.
+V3.2 changes only the output transport for observation values and the necessary
+output-serialization instructions: `value_json` is always a string containing
+one strict JSON document. The local parser decodes it exactly once and restores
+the original typed `{kind, value, exception}` observation before the unchanged
+oracle comparison. Semantic claims, fixture source, typed propositions, oracle
+outcomes, order, budgets, thresholds, and stopping rules remain unchanged.
 
 This is a public calibration suite, not a hidden benchmark and not a system
 ranking. It separates three possible bottlenecks that Hard Semantics v2 mixed:
@@ -85,23 +98,30 @@ Every claim object has exactly these fields:
   "verdict": "SUPPORTED",
   "observation": {
     "kind": "return",
-    "value": 3,
+    "value_json": "3",
     "exception": null
   },
   "reason": "short reason"
 }
 ```
 
-`observation` always has exactly `kind`, `value`, and `exception`.
+The model-facing wire `observation` always has exactly `kind`, `value_json`,
+and `exception`. `value_json` contains one JSON document encoded as a string.
+The local parser decodes it exactly once into the typed observation used by the
+oracle and scorer.
 
-- Return: `kind="return"`, actual JSON value, `exception=null`.
-- Raise: `kind="raise"`, `value=null`, actual exception class name.
+- Return: `kind="return"`, the actual value encoded in `value_json`,
+  `exception=null`.
+- Raise: `kind="raise"`, `value_json="null"`, actual exception class name.
 - Unknown is reserved for the later authority calibration:
-  `kind="unknown"`, `value=null`, `exception=null`.
+  `kind="unknown"`, `value_json="null"`, `exception=null`.
 
 The semantic suite permits only `SUPPORTED` or `UNSUPPORTED`. The observation
 must state the predicted actual result even when the proposition is false.
-String-encoded mini-languages such as `RETURN [...]` are forbidden.
+Ad hoc string mini-languages such as `RETURN [...]` are forbidden.
+`value_json` is not an ad hoc mini-language: it is the specified JSON transport,
+is strictly decoded exactly once, rejects duplicate keys, non-JSON constants,
+trailing text, and non-finite numbers, and is then compared as a typed value.
 `reason` must be a nonempty string. A call is complete only when Ollama returns
 `done_reason="stop"`; a length-limited response is an execution failure even
 if its prefix happens to parse.
@@ -116,9 +136,12 @@ Before semantic calibration, the bare adapter receives four trivial tasks:
 4. a three-claim batch containing return, raise, and unknown observations.
 
 All four must complete, strictly parse, match every requested ID, and reproduce
-the explicitly supplied verdict and typed observation exactly. Failure stops
-the run. The contract or adapter must be corrected in a newly frozen version;
-responses are never repaired after generation.
+the explicitly supplied verdict and typed observation meaning after exactly one
+strict `value_json` decode. For return values, lexical whitespace and object-key
+order inside that string are not scored; duplicate keys and invalid JSON are
+rejected. Raise and unknown observations require the exact four-character
+string `null`. Failure stops the run. The contract or adapter must be corrected
+in a newly frozen version; responses are never repaired after generation.
 
 The semantic run records the exact contract artifact SHA-256 and contract
 `run_id` in its own header. A scorer rejects a semantic artifact paired with
@@ -161,7 +184,11 @@ all 4 or 48 result rows are present.
 
 Report separately:
 
-- completion and strict-schema parse;
+- cumulative success counts for completion, outer strict-JSON and claim-wire
+  shape validation, inner `value_json` decode, typed observation normalization,
+  and complete parse;
+- first-failure attribution at the local parser's execution, outer JSON/shape,
+  inner-decode, or typed-normalization boundary;
 - verdict exactness;
 - typed observation exactness;
 - joint verdict-plus-observation correctness;

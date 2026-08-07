@@ -8,17 +8,20 @@ import re
 
 CLAIM_KEYS = {"id", "verdict", "observation", "reason"}
 OBSERVATION_KEYS = {"kind", "value", "exception"}
+WIRE_OBSERVATION_KEYS = {"kind", "value_json", "exception"}
 EXCEPTION_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 def canonical_json(value) -> str:
-    return json.dumps(
+    serialized = json.dumps(
         value,
         ensure_ascii=False,
         allow_nan=False,
         separators=(",", ":"),
         sort_keys=True,
     )
+    serialized.encode("utf-8", errors="strict")
+    return serialized
 
 
 def _reject_non_json_constant(value):
@@ -35,11 +38,13 @@ def _reject_duplicate_keys(pairs):
 
 
 def strict_json_loads(text):
-    return json.loads(
+    value = json.loads(
         text,
         parse_constant=_reject_non_json_constant,
         object_pairs_hook=_reject_duplicate_keys,
     )
+    canonical_json(value)
+    return value
 
 
 def load_strict_json(path):
@@ -55,7 +60,7 @@ def validate_observation(value, *, allow_unknown: bool) -> str | None:
             return "return_exception_must_be_null"
         try:
             canonical_json(value["value"])
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, RecursionError):
             return "return_value_not_json"
         return None
     if kind == "raise":
@@ -72,6 +77,70 @@ def validate_observation(value, *, allow_unknown: bool) -> str | None:
     return "observation_kind_invalid"
 
 
+def encode_wire_observation(value, *, allow_unknown: bool):
+    """Encode a validated typed observation for the fixed-string wire schema."""
+
+    error = validate_observation(value, allow_unknown=allow_unknown)
+    if error:
+        raise ValueError(f"invalid typed observation: {error}")
+    return {
+        "kind": value["kind"],
+        "value_json": canonical_json(value["value"]),
+        "exception": value["exception"],
+    }
+
+
+def decode_wire_observation(value, *, allow_unknown: bool):
+    """Strictly decode one wire observation into the oracle's typed shape."""
+
+    if not isinstance(value, dict) or set(value) != WIRE_OBSERVATION_KEYS:
+        return None, "wire_observation_schema_mismatch"
+    kind = value["kind"]
+    if not isinstance(kind, str):
+        return None, "wire_observation_kind_invalid"
+    value_json = value["value_json"]
+    if not isinstance(value_json, str):
+        return None, "value_json_not_string"
+    if kind in {"raise", "unknown"} and value_json != "null":
+        return None, f"{kind}_value_json_must_be_null"
+    try:
+        decoded = strict_json_loads(value_json)
+    except (json.JSONDecodeError, ValueError, RecursionError):
+        return None, "value_json_not_strict_json"
+    typed = {
+        "kind": kind,
+        "value": decoded,
+        "exception": value["exception"],
+    }
+    error = validate_observation(typed, allow_unknown=allow_unknown)
+    if error:
+        return None, error
+    return typed, None
+
+
+def parse_error_stage(error):
+    """Map a parse failure to the boundary that rejected it."""
+
+    if error is None:
+        return None
+    if error == "execution_invalid":
+        return "execution"
+    if error == "value_json_not_strict_json":
+        return "inner_json_decode"
+    if error in {
+        "return_exception_must_be_null",
+        "return_value_not_json",
+        "raise_value_json_must_be_null",
+        "raise_value_must_be_null",
+        "raise_exception_invalid",
+        "unknown_value_json_must_be_null",
+        "unknown_payload_must_be_null",
+        "observation_kind_invalid",
+    }:
+        return "normalized_observation"
+    return "outer_json_or_schema"
+
+
 def parse_response(
     text,
     expected_ids,
@@ -81,7 +150,7 @@ def parse_response(
 ):
     try:
         document = strict_json_loads(text.strip())
-    except (AttributeError, json.JSONDecodeError, ValueError):
+    except (AttributeError, json.JSONDecodeError, ValueError, RecursionError):
         return None, "answer_is_not_strict_json"
     if not isinstance(document, dict) or set(document) != {"claims"}:
         return None, "top_level_schema_mismatch"
@@ -104,13 +173,15 @@ def parse_response(
             return None, "verdict_invalid"
         if not isinstance(claim["reason"], str) or not claim["reason"].strip():
             return None, "reason_invalid"
-        error = validate_observation(
+        observation, error = decode_wire_observation(
             claim["observation"],
             allow_unknown=allow_unknown,
         )
         if error:
             return None, error
-        by_id[claim_id] = claim
+        normalized = dict(claim)
+        normalized["observation"] = observation
+        by_id[claim_id] = normalized
     return by_id, None
 
 
@@ -122,20 +193,20 @@ def response_schema(ids, *, allow_unknown: bool):
         {
             "type": "object",
             "additionalProperties": False,
-            "required": ["kind", "value", "exception"],
+            "required": ["kind", "value_json", "exception"],
             "properties": {
                 "kind": {"const": "return"},
-                "value": {},
+                "value_json": {"type": "string", "minLength": 1},
                 "exception": {"type": "null"},
             },
         },
         {
             "type": "object",
             "additionalProperties": False,
-            "required": ["kind", "value", "exception"],
+            "required": ["kind", "value_json", "exception"],
             "properties": {
                 "kind": {"const": "raise"},
-                "value": {"type": "null"},
+                "value_json": {"const": "null"},
                 "exception": {
                     "type": "string",
                     "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
@@ -148,10 +219,10 @@ def response_schema(ids, *, allow_unknown: bool):
             {
                 "type": "object",
                 "additionalProperties": False,
-                "required": ["kind", "value", "exception"],
+                "required": ["kind", "value_json", "exception"],
                 "properties": {
                     "kind": {"const": "unknown"},
-                    "value": {"type": "null"},
+                    "value_json": {"const": "null"},
                     "exception": {"type": "null"},
                 },
             }
