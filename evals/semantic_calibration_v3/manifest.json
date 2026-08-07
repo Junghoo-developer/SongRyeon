@@ -1,0 +1,127 @@
+{
+  "schema_version": 1,
+  "suite_id": "songryeon-semantic-calibration-v3",
+  "python_scope": "CPython 3.10.11",
+  "cases": [
+    {
+      "case_id": "cal-a01-short-circuit",
+      "difficulty": "anchor",
+      "source": "fixtures/cal_a01_bool.py",
+      "claims": [
+        {"id": "C01-1", "function": "observe_and", "description": "observe_and() returns the proposition observation.", "proposition": {"kind": "return", "value": [0, ["left"]], "exception": null}},
+        {"id": "C01-2", "function": "observe_or", "description": "observe_or() returns the proposition observation.", "proposition": {"kind": "return", "value": ["fallback", ["left", "right"]], "exception": null}},
+        {"id": "C01-3", "function": "observe_chain", "description": "observe_chain() returns the proposition observation.", "proposition": {"kind": "return", "value": [true, ["a", "b", "c"]], "exception": null}}
+      ]
+    },
+    {
+      "case_id": "cal-a02-slice-boundaries",
+      "difficulty": "anchor",
+      "source": "fixtures/cal_a02_slice.py",
+      "claims": [
+        {"id": "C02-1", "function": "observe_reverse_window", "description": "observe_reverse_window() returns the proposition observation.", "proposition": {"kind": "return", "value": [4, 3, 2], "exception": null}},
+        {"id": "C02-2", "function": "observe_negative_stride", "description": "observe_negative_stride() returns the proposition observation.", "proposition": {"kind": "return", "value": [5, 3], "exception": null}},
+        {"id": "C02-3", "function": "observe_extended_assignment", "description": "observe_extended_assignment() returns the proposition observation.", "proposition": {"kind": "return", "value": [0, 8, 2, 9, 4, 5], "exception": null}}
+      ]
+    },
+    {
+      "case_id": "cal-a03-comprehension-order",
+      "difficulty": "anchor",
+      "source": "fixtures/cal_a03_comprehension.py",
+      "claims": [
+        {"id": "C03-2", "function": "observe_scope", "description": "observe_scope() returns the proposition observation.", "proposition": {"kind": "return", "value": [2, [0, 2, 4]], "exception": null}},
+        {"id": "C03-1", "function": "observe_order", "description": "observe_order() returns the proposition observation.", "proposition": {"kind": "return", "value": [[10, 30], ["k0", "k1", "v1", "k2", "k3", "v3"]], "exception": null}},
+        {"id": "C03-3", "function": "observe_nested", "description": "observe_nested() returns the proposition observation.", "proposition": {"kind": "return", "value": [[2, 3], [1, 4]], "exception": null}}
+      ]
+    },
+    {
+      "case_id": "cal-a04-dict-equivalence",
+      "difficulty": "anchor",
+      "source": "fixtures/cal_a04_dict.py",
+      "claims": [
+        {"id": "C04-2", "function": "observe_update_order", "description": "observe_update_order() returns the proposition observation.", "proposition": {"kind": "return", "value": ["b", "a", "c"], "exception": null}},
+        {"id": "C04-3", "function": "observe_setdefault", "description": "observe_setdefault() returns the proposition observation.", "proposition": {"kind": "return", "value": [1, [], 1], "exception": null}},
+        {"id": "C04-1", "function": "observe_equal_keys", "description": "observe_equal_keys() returns the proposition observation.", "proposition": {"kind": "return", "value": [1, true, "float"], "exception": null}}
+      ]
+    },
+    {
+      "case_id": "cal-m01-call-signature",
+      "difficulty": "medium",
+      "source": "fixtures/cal_m01_signature.py",
+      "claims": [
+        {"id": "C05-1", "function": "observe_valid", "description": "observe_valid() returns the proposition observation.", "proposition": {"kind": "return", "value": [1, 2, 4], "exception": null}},
+        {"id": "C05-2", "function": "observe_positional_only_error", "description": "observe_positional_only_error() raises the proposition exception.", "proposition": {"kind": "raise", "value": null, "exception": "TypeError"}},
+        {"id": "C05-3", "function": "observe_default", "description": "observe_default() returns the proposition observation.", "proposition": {"kind": "return", "value": [1, 2, 4], "exception": null}}
+      ]
+    },
+    {
+      "case_id": "cal-m02-stable-sort",
+      "difficulty": "medium",
+      "source": "fixtures/cal_m02_sort.py",
+      "claims": [
+        {"id": "C06-1", "function": "observe_labels", "description": "observe_labels() returns the proposition observation.", "proposition": {"kind": "return", "value": ["b", "a", "c"], "exception": null}},
+        {"id": "C06-3", "function": "observe_reverse_labels", "description": "observe_reverse_labels() returns the proposition observation.", "proposition": {"kind": "return", "value": ["c", "a", "b"], "exception": null}},
+        {"id": "C06-2", "function": "observe_key_calls", "description": "observe_key_calls() returns the proposition observation.", "proposition": {"kind": "return", "value": ["a", "b", "c"], "exception": null}}
+      ]
+    },
+    {
+      "case_id": "cal-m03-membership-protocol",
+      "difficulty": "medium",
+      "source": "fixtures/cal_m03_membership.py",
+      "claims": [
+        {"id": "C07-1", "function": "observe_contains", "description": "observe_contains() returns the proposition observation.", "proposition": {"kind": "return", "value": ["nonempty", ["contains"]], "exception": null}},
+        {"id": "C07-2", "function": "observe_iter", "description": "observe_iter() returns the proposition observation.", "proposition": {"kind": "return", "value": [true, ["iter"]], "exception": null}},
+        {"id": "C07-3", "function": "observe_legacy", "description": "observe_legacy() returns the proposition observation.", "proposition": {"kind": "return", "value": [true, ["get:0", "get:1", "get:2", "get:3"]], "exception": null}}
+      ]
+    },
+    {
+      "case_id": "cal-m04-singledispatch",
+      "difficulty": "medium",
+      "source": "fixtures/cal_m04_dispatch.py",
+      "claims": [
+        {"id": "C08-2", "function": "observe_flag", "description": "observe_flag() returns the proposition observation.", "proposition": {"kind": "return", "value": "bool", "exception": null}},
+        {"id": "C08-3", "function": "observe_float", "description": "observe_float() returns the proposition observation.", "proposition": {"kind": "return", "value": "int", "exception": null}},
+        {"id": "C08-1", "function": "observe_bool", "description": "observe_bool() returns the proposition observation.", "proposition": {"kind": "return", "value": "bool", "exception": null}}
+      ]
+    },
+    {
+      "case_id": "cal-h01-reflected-operator",
+      "difficulty": "hard",
+      "source": "fixtures/cal_h01_operators.py",
+      "claims": [
+        {"id": "C09-1", "function": "observe_forward", "description": "observe_forward() returns the proposition observation.", "proposition": {"kind": "return", "value": ["right", ["R.radd"]], "exception": null}},
+        {"id": "C09-2", "function": "observe_reverse", "description": "observe_reverse() returns the proposition observation.", "proposition": {"kind": "return", "value": ["right", ["R.radd"]], "exception": null}},
+        {"id": "C09-3", "function": "observe_not_implemented", "description": "observe_not_implemented() returns the proposition observation.", "proposition": {"kind": "return", "value": [7, ["N.add", "R.radd"]], "exception": null}}
+      ]
+    },
+    {
+      "case_id": "cal-h02-metaclass-order",
+      "difficulty": "hard",
+      "source": "fixtures/cal_h02_metaclass.py",
+      "claims": [
+        {"id": "C10-1", "function": "observe_events", "description": "observe_events() returns the proposition observation.", "proposition": {"kind": "return", "value": ["prepare", "set:x", "set:method", "set:x", "new:2", "decorate"], "exception": null}},
+        {"id": "C10-2", "function": "observe_x", "description": "observe_x() returns the proposition observation.", "proposition": {"kind": "return", "value": 2, "exception": null}},
+        {"id": "C10-3", "function": "observe_decorated", "description": "observe_decorated() returns the proposition observation.", "proposition": {"kind": "return", "value": false, "exception": null}}
+      ]
+    },
+    {
+      "case_id": "cal-h03-new-return-type",
+      "difficulty": "hard",
+      "source": "fixtures/cal_h03_new.py",
+      "claims": [
+        {"id": "C11-1", "function": "observe_other_type", "description": "observe_other_type() returns the proposition observation.", "proposition": {"kind": "return", "value": "Factory", "exception": null}},
+        {"id": "C11-2", "function": "observe_other_events", "description": "observe_other_events() returns the proposition observation.", "proposition": {"kind": "return", "value": ["new:other", "factory:init"], "exception": null}},
+        {"id": "C11-3", "function": "observe_child", "description": "observe_child() returns the proposition observation.", "proposition": {"kind": "return", "value": ["Child", ["new:self", "factory:init"]], "exception": null}}
+      ]
+    },
+    {
+      "case_id": "cal-h04-exec-namespaces",
+      "difficulty": "hard",
+      "source": "fixtures/cal_h04_exec.py",
+      "claims": [
+        {"id": "C12-2", "function": "observe_function_x", "description": "observe_function_x() returns the proposition observation.", "proposition": {"kind": "return", "value": 20, "exception": null}},
+        {"id": "C12-1", "function": "observe_top_level_y", "description": "observe_top_level_y() returns the proposition observation.", "proposition": {"kind": "return", "value": 21, "exception": null}},
+        {"id": "C12-3", "function": "observe_function_y", "description": "observe_function_y() returns the proposition observation.", "proposition": {"kind": "return", "value": 21, "exception": null}}
+      ]
+    }
+  ]
+}

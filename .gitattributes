@@ -1,0 +1,4 @@
+.gitattributes text eol=lf
+evals/semantic_calibration_v3/** text eol=lf
+evidence/semantic_calibration_v3/** text eol=lf
+llm/**/*.py text eol=lf

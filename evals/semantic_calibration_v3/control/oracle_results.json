@@ -1,0 +1,573 @@
+{
+  "schema_version": 1,
+  "python_version": "3.10.11 (tags/v3.10.11:7d4cc5a, Apr  5 2023, 00:38:17) [MSC v.1929 64 bit (AMD64)]",
+  "manifest_sha256": "98b29c0c50440723f34afcc8f3e66054862aca754aed6fb5bcec24bd57d3dc6b",
+  "results": [
+    {
+      "case_id": "cal-a01-short-circuit",
+      "difficulty": "anchor",
+      "source": "fixtures/cal_a01_bool.py",
+      "source_sha256": "2453a64f3d5f4c75584ff047e21ee032003d8f0dec9f19bcec3c3e8aa1db2fb7",
+      "claims": [
+        {
+          "id": "C01-1",
+          "verdict": "SUPPORTED",
+          "observation": {
+            "kind": "return",
+            "value": [
+              0,
+              [
+                "left"
+              ]
+            ],
+            "exception": null
+          }
+        },
+        {
+          "id": "C01-2",
+          "verdict": "SUPPORTED",
+          "observation": {
+            "kind": "return",
+            "value": [
+              "fallback",
+              [
+                "left",
+                "right"
+              ]
+            ],
+            "exception": null
+          }
+        },
+        {
+          "id": "C01-3",
+          "verdict": "UNSUPPORTED",
+          "observation": {
+            "kind": "return",
+            "value": [
+              "done",
+              [
+                "a",
+                "b",
+                "c"
+              ]
+            ],
+            "exception": null
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "cal-a02-slice-boundaries",
+      "difficulty": "anchor",
+      "source": "fixtures/cal_a02_slice.py",
+      "source_sha256": "099a9f540730f5554713d6f3bb95119e05fdfbc3b3996733c38729b5cc29f842",
+      "claims": [
+        {
+          "id": "C02-1",
+          "verdict": "SUPPORTED",
+          "observation": {
+            "kind": "return",
+            "value": [
+              4,
+              3,
+              2
+            ],
+            "exception": null
+          }
+        },
+        {
+          "id": "C02-2",
+          "verdict": "UNSUPPORTED",
+          "observation": {
+            "kind": "return",
+            "value": [
+              5,
+              3,
+              1
+            ],
+            "exception": null
+          }
+        },
+        {
+          "id": "C02-3",
+          "verdict": "SUPPORTED",
+          "observation": {
+            "kind": "return",
+            "value": [
+              0,
+              8,
+              2,
+              9,
+              4,
+              5
+            ],
+            "exception": null
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "cal-a03-comprehension-order",
+      "difficulty": "anchor",
+      "source": "fixtures/cal_a03_comprehension.py",
+      "source_sha256": "623508420fb4e330df73b73e9f6d8e59187a573dfec346c262aa8b3b547030c0",
+      "claims": [
+        {
+          "id": "C03-2",
+          "verdict": "UNSUPPORTED",
+          "observation": {
+            "kind": "return",
+            "value": [
+              "outer",
+              [
+                0,
+                2,
+                4
+              ]
+            ],
+            "exception": null
+          }
+        },
+        {
+          "id": "C03-1",
+          "verdict": "SUPPORTED",
+          "observation": {
+            "kind": "return",
+            "value": [
+              [
+                10,
+                30
+              ],
+              [
+                "k0",
+                "k1",
+                "v1",
+                "k2",
+                "k3",
+                "v3"
+              ]
+            ],
+            "exception": null
+          }
+        },
+        {
+          "id": "C03-3",
+          "verdict": "UNSUPPORTED",
+          "observation": {
+            "kind": "return",
+            "value": [
+              [
+                1,
+                4
+              ],
+              [
+                2,
+                3
+              ]
+            ],
+            "exception": null
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "cal-a04-dict-equivalence",
+      "difficulty": "anchor",
+      "source": "fixtures/cal_a04_dict.py",
+      "source_sha256": "9dde17fe0c0318fb4784364d798028e3b2e52c5d60446174830d66109cd3e681",
+      "claims": [
+        {
+          "id": "C04-2",
+          "verdict": "UNSUPPORTED",
+          "observation": {
+            "kind": "return",
+            "value": [
+              "a",
+              "b",
+              "c"
+            ],
+            "exception": null
+          }
+        },
+        {
+          "id": "C04-3",
+          "verdict": "UNSUPPORTED",
+          "observation": {
+            "kind": "return",
+            "value": [
+              1,
+              [
+                "default"
+              ],
+              1
+            ],
+            "exception": null
+          }
+        },
+        {
+          "id": "C04-1",
+          "verdict": "SUPPORTED",
+          "observation": {
+            "kind": "return",
+            "value": [
+              1,
+              true,
+              "float"
+            ],
+            "exception": null
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "cal-m01-call-signature",
+      "difficulty": "medium",
+      "source": "fixtures/cal_m01_signature.py",
+      "source_sha256": "63edad0afae47e9213f67f72327f5a238c4cf203d07d3bad2c1a6699beaf89ca",
+      "claims": [
+        {
+          "id": "C05-1",
+          "verdict": "SUPPORTED",
+          "observation": {
+            "kind": "return",
+            "value": [
+              1,
+              2,
+              4
+            ],
+            "exception": null
+          }
+        },
+        {
+          "id": "C05-2",
+          "verdict": "SUPPORTED",
+          "observation": {
+            "kind": "raise",
+            "value": null,
+            "exception": "TypeError"
+          }
+        },
+        {
+          "id": "C05-3",
+          "verdict": "UNSUPPORTED",
+          "observation": {
+            "kind": "return",
+            "value": [
+              1,
+              2,
+              3
+            ],
+            "exception": null
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "cal-m02-stable-sort",
+      "difficulty": "medium",
+      "source": "fixtures/cal_m02_sort.py",
+      "source_sha256": "195db18f6bb47a9fe2331d2aac716283a0d1917b8161c0e1a332be173c38a3b3",
+      "claims": [
+        {
+          "id": "C06-1",
+          "verdict": "SUPPORTED",
+          "observation": {
+            "kind": "return",
+            "value": [
+              "b",
+              "a",
+              "c"
+            ],
+            "exception": null
+          }
+        },
+        {
+          "id": "C06-3",
+          "verdict": "UNSUPPORTED",
+          "observation": {
+            "kind": "return",
+            "value": [
+              "a",
+              "c",
+              "b"
+            ],
+            "exception": null
+          }
+        },
+        {
+          "id": "C06-2",
+          "verdict": "SUPPORTED",
+          "observation": {
+            "kind": "return",
+            "value": [
+              "a",
+              "b",
+              "c"
+            ],
+            "exception": null
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "cal-m03-membership-protocol",
+      "difficulty": "medium",
+      "source": "fixtures/cal_m03_membership.py",
+      "source_sha256": "bf3b4627dbed26b765074a2f9ad65730154ff182227c1cf0a4bed4a0a5a082e5",
+      "claims": [
+        {
+          "id": "C07-1",
+          "verdict": "UNSUPPORTED",
+          "observation": {
+            "kind": "return",
+            "value": [
+              true,
+              [
+                "contains"
+              ]
+            ],
+            "exception": null
+          }
+        },
+        {
+          "id": "C07-2",
+          "verdict": "SUPPORTED",
+          "observation": {
+            "kind": "return",
+            "value": [
+              true,
+              [
+                "iter"
+              ]
+            ],
+            "exception": null
+          }
+        },
+        {
+          "id": "C07-3",
+          "verdict": "UNSUPPORTED",
+          "observation": {
+            "kind": "return",
+            "value": [
+              false,
+              [
+                "get:0",
+                "get:1",
+                "get:2",
+                "get:3"
+              ]
+            ],
+            "exception": null
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "cal-m04-singledispatch",
+      "difficulty": "medium",
+      "source": "fixtures/cal_m04_dispatch.py",
+      "source_sha256": "b248cfea1e5818c9db289dfd69381ce9c7b4d9a36b61c54c4f34138e6d1a5557",
+      "claims": [
+        {
+          "id": "C08-2",
+          "verdict": "UNSUPPORTED",
+          "observation": {
+            "kind": "return",
+            "value": "int",
+            "exception": null
+          }
+        },
+        {
+          "id": "C08-3",
+          "verdict": "UNSUPPORTED",
+          "observation": {
+            "kind": "return",
+            "value": "object",
+            "exception": null
+          }
+        },
+        {
+          "id": "C08-1",
+          "verdict": "SUPPORTED",
+          "observation": {
+            "kind": "return",
+            "value": "bool",
+            "exception": null
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "cal-h01-reflected-operator",
+      "difficulty": "hard",
+      "source": "fixtures/cal_h01_operators.py",
+      "source_sha256": "c4ea1b083eed57545a7f1f6ab0b7cf2c125559acd1c66f813f681991cc41ae25",
+      "claims": [
+        {
+          "id": "C09-1",
+          "verdict": "SUPPORTED",
+          "observation": {
+            "kind": "return",
+            "value": [
+              "right",
+              [
+                "R.radd"
+              ]
+            ],
+            "exception": null
+          }
+        },
+        {
+          "id": "C09-2",
+          "verdict": "UNSUPPORTED",
+          "observation": {
+            "kind": "return",
+            "value": [
+              "left",
+              [
+                "L.add"
+              ]
+            ],
+            "exception": null
+          }
+        },
+        {
+          "id": "C09-3",
+          "verdict": "SUPPORTED",
+          "observation": {
+            "kind": "return",
+            "value": [
+              7,
+              [
+                "N.add",
+                "R.radd"
+              ]
+            ],
+            "exception": null
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "cal-h02-metaclass-order",
+      "difficulty": "hard",
+      "source": "fixtures/cal_h02_metaclass.py",
+      "source_sha256": "0c12010a9f7021e124b876010d4221c1be578b2b6c3e5214072e22e771cb7b7e",
+      "claims": [
+        {
+          "id": "C10-1",
+          "verdict": "SUPPORTED",
+          "observation": {
+            "kind": "return",
+            "value": [
+              "prepare",
+              "set:x",
+              "set:method",
+              "set:x",
+              "new:2",
+              "decorate"
+            ],
+            "exception": null
+          }
+        },
+        {
+          "id": "C10-2",
+          "verdict": "SUPPORTED",
+          "observation": {
+            "kind": "return",
+            "value": 2,
+            "exception": null
+          }
+        },
+        {
+          "id": "C10-3",
+          "verdict": "UNSUPPORTED",
+          "observation": {
+            "kind": "return",
+            "value": true,
+            "exception": null
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "cal-h03-new-return-type",
+      "difficulty": "hard",
+      "source": "fixtures/cal_h03_new.py",
+      "source_sha256": "42882ef4d0e547effba10c2dbc7ad413f0973a0e53a06d886050005abe3b647e",
+      "claims": [
+        {
+          "id": "C11-1",
+          "verdict": "UNSUPPORTED",
+          "observation": {
+            "kind": "return",
+            "value": "Product",
+            "exception": null
+          }
+        },
+        {
+          "id": "C11-2",
+          "verdict": "UNSUPPORTED",
+          "observation": {
+            "kind": "return",
+            "value": [
+              "new:other",
+              "product:init"
+            ],
+            "exception": null
+          }
+        },
+        {
+          "id": "C11-3",
+          "verdict": "SUPPORTED",
+          "observation": {
+            "kind": "return",
+            "value": [
+              "Child",
+              [
+                "new:self",
+                "factory:init"
+              ]
+            ],
+            "exception": null
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "cal-h04-exec-namespaces",
+      "difficulty": "hard",
+      "source": "fixtures/cal_h04_exec.py",
+      "source_sha256": "fa62c3d1b939bb282ff904fd70fe6c657207a72993e459fc74868d4981580ced",
+      "claims": [
+        {
+          "id": "C12-2",
+          "verdict": "UNSUPPORTED",
+          "observation": {
+            "kind": "return",
+            "value": 10,
+            "exception": null
+          }
+        },
+        {
+          "id": "C12-1",
+          "verdict": "SUPPORTED",
+          "observation": {
+            "kind": "return",
+            "value": 21,
+            "exception": null
+          }
+        },
+        {
+          "id": "C12-3",
+          "verdict": "UNSUPPORTED",
+          "observation": {
+            "kind": "raise",
+            "value": null,
+            "exception": "NameError"
+          }
+        }
+      ]
+    }
+  ]
+}

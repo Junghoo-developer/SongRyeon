@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "case_id": "contract-primitive-return",
+      "claims": [
+        {"id": "CT1", "verdict": "SUPPORTED", "observation": {"kind": "return", "value": true, "exception": null}}
+      ]
+    },
+    {
+      "case_id": "contract-nested-return",
+      "claims": [
+        {"id": "CT2", "verdict": "UNSUPPORTED", "observation": {"kind": "return", "value": {"items": [1, "둘", false], "meta": {"n": 3}}, "exception": null}}
+      ]
+    },
+    {
+      "case_id": "contract-raised-exception",
+      "claims": [
+        {"id": "CT3", "verdict": "SUPPORTED", "observation": {"kind": "raise", "value": null, "exception": "ValueError"}}
+      ]
+    },
+    {
+      "case_id": "contract-three-claim-batch",
+      "claims": [
+        {"id": "CT4-A", "verdict": "SUPPORTED", "observation": {"kind": "return", "value": [1, 2], "exception": null}},
+        {"id": "CT4-B", "verdict": "UNSUPPORTED", "observation": {"kind": "raise", "value": null, "exception": "RuntimeError"}},
+        {"id": "CT4-C", "verdict": "INSUFFICIENT", "observation": {"kind": "unknown", "value": null, "exception": null}}
+      ]
+    }
+  ]
+}
