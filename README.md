@@ -1,11 +1,17 @@
 # SongRyeon Core v1
 
 송련 코어 v1은 **LLM이 만든 내용과 코드가 확인한 사실을 구분해 기록하고,
-그 기록을 제한된 에이전트 시야로 제공하는 구조**를 먼저 만드는 중입니다.
+그 기록을 제한된 에이전트 시야로 제공하는 연구형 에이전트 프로토타입**입니다.
 
 현재 단계에는 기억, 외부 지식 색인, 읽기 전용 파일 도구, 네 노드 라우팅과
 로컬 Ollama의 오픈웨이트 모델로 한 턴을 끝까지 실행하는 데모가 있습니다.
-대회 제출·시연용 대형 모델은 `gemma4:26b`, 비교 기준선은 `qwen3:14b`입니다.
+대회 제출·시연과 공식 구조 비교는 모두 `gemma4:26b`를 사용합니다.
+`qwen3:14b`는 공식 v2 점수에 포함되지 않은 과거 모델 체급 탐색 대상입니다.
+
+2026년 오픈소스 개발자대회 공개 소스는 고정 태그
+[`contest-2026-final`](https://github.com/Junghoo-developer/SongRyeon/tree/contest-2026-final)로
+보존합니다. 결과보고서와 영상은 대회 포털에 별도로 제출하므로 소스 태그에는
+포함하지 않습니다.
 
 송련이 보장하려는 범위는 세상 모든 정보의 진실성이 아닙니다. 내장 실행
 경로에서 **LLM이 코드로 확인 가능한 실행 사실을 직접 작성하거나 바꾸지
@@ -192,7 +198,7 @@ CPU·GPU, 메모리 구성에 따라 달라집니다.
 PowerShell:
 
 ```powershell
-git clone --branch codex/contest-release-2026 --single-branch https://github.com/Junghoo-developer/SongRyeon.git SongRyeon_Core_v1
+git clone --branch contest-2026-final --single-branch https://github.com/Junghoo-developer/SongRyeon.git SongRyeon_Core_v1
 Set-Location SongRyeon_Core_v1
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
@@ -204,7 +210,7 @@ python -m pytest -q
 Bash:
 
 ```bash
-git clone --branch codex/contest-release-2026 --single-branch https://github.com/Junghoo-developer/SongRyeon.git SongRyeon_Core_v1
+git clone --branch contest-2026-final --single-branch https://github.com/Junghoo-developer/SongRyeon.git SongRyeon_Core_v1
 cd SongRyeon_Core_v1
 python3 -m venv .venv
 source .venv/bin/activate
@@ -246,8 +252,8 @@ python -m demo --memory ./tmp/demo-memory.jsonl \
   "nodes/review.py를 실제 도구로 읽고 역할을 설명해 줘."
 ```
 
-더 작은 `qwen3:14b`는 기본 모델이나 저사양 대체 모델이 아니라 **비교평가
-기준선**입니다. 기준선 결과를 재현할 때만 별도로 받아 모델을 명시합니다.
+더 작은 `qwen3:14b`는 기본 모델·저사양 대체 모델·공식 v2 비교군이 아닙니다.
+과거 모델 체급 탐색을 재현할 때만 별도로 받아 모델을 명시합니다.
 
 ```powershell
 ollama pull qwen3:14b
@@ -321,7 +327,8 @@ SDK는 기존 Codex 로그인을 재사용하며 토큰·이메일을 저장소�
 
 대회용 구조 비교는 외부 API가 아닌 같은 로컬
 `gemma4:26b`를 사용하는 24-case holdout에서 실행했습니다. 3개 구조와
-3개 seed의 총 216회에서 단일 에이전트 71/72, Node4 제외 송련 72/72,
+3개 seed의 총 216회에서 단일 에이전트 71/72,
+Node4 모델 검열 제외(결정론적 bypass) 송련 72/72,
 전체 송련 72/72의 첫 verdict 기계 채점 결과를 얻었습니다. 필수 blind
 19개 사람 감사는 parse 19/19, fixture 근거성 18/19, A/R 권한·출처
 표기 18/19였고, 나머지 1건은 `null` 미완료였습니다. 후속

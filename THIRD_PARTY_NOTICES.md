@@ -23,7 +23,8 @@ They are installed separately by the user.
 - Ollama tag and digest: `qwen3:14b` /
   `bdbd181c33f2ed1b31c972991882db3cf4d192569092138a7d29e973cd9debe8`
 - License: Apache License 2.0
-- Use in SongRyeon: smaller locally executed comparison baseline
+- Use in SongRyeon: historical local model-scale exploration; not an official
+  v2 comparison system or automatic fallback
 
 The exact model tag and digest used for an evaluation should be recorded with
 the corresponding raw evaluation result.

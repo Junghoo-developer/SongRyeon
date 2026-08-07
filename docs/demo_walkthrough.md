@@ -42,8 +42,8 @@ python -m demo --memory ./tmp/demo-memory.jsonl \
   "nodes/review.py를 실제 도구로 읽고 역할을 세 문장으로 설명해 줘."
 ```
 
-`qwen3:14b`는 이전 기본값이나 자동 대체 모델이 아니라 비교평가 기준선이다.
-기준선을 재현할 때만 `ollama pull qwen3:14b` 후
+`qwen3:14b`는 이전 기본값·자동 대체 모델·공식 v2 비교군이 아니라 과거
+모델 체급 탐색 대상이다. 해당 탐색을 재현할 때만 `ollama pull qwen3:14b` 후
 `--model qwen3:14b`를 명시한다.
 
 현재 모델·서버·컨텍스트·제한 시간 설정은 각각 `--model`, `--base-url`,

@@ -8,7 +8,7 @@ Hardware figures below are evidence about that host, not a claimed minimum.
 - Python 3.10 or newer
 - Ollama installed locally, or an explicitly selected self-hosted Ollama endpoint
 - `gemma4:26b` available for the contest-large profile
-- `qwen3:14b` available only when reproducing the smaller baseline
+- `qwen3:14b` available only when reproducing the historical model-scale exploration
 - no external API key required
 - network access is not required after the model and source are installed
 
@@ -37,7 +37,7 @@ If the Ollama app or service is already running, do not start a second server.
 Create a clean clone and virtual environment in PowerShell:
 
 ```powershell
-git clone --branch refoundation/songryeon-v1 --single-branch https://github.com/Junghoo-developer/SongRyeon.git SongRyeon_Core_v1
+git clone --branch contest-2026-final --single-branch https://github.com/Junghoo-developer/SongRyeon.git SongRyeon_Core_v1
 Set-Location SongRyeon_Core_v1
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
@@ -49,7 +49,7 @@ python -m pytest -q
 The Bash equivalent is:
 
 ```bash
-git clone --branch refoundation/songryeon-v1 --single-branch https://github.com/Junghoo-developer/SongRyeon.git SongRyeon_Core_v1
+git clone --branch contest-2026-final --single-branch https://github.com/Junghoo-developer/SongRyeon.git SongRyeon_Core_v1
 cd SongRyeon_Core_v1
 python3 -m venv .venv
 source .venv/bin/activate
@@ -138,11 +138,12 @@ smaller context requested by SongRyeon is an explicit runtime choice and must
 not be confused with the model's maximum capability. Record the requested
 context alongside every raw evaluation result.
 
-The installed baseline observed on the same date was `qwen3:14b`, Ollama model
+The historical exploration model observed on the same date was `qwen3:14b`, Ollama model
 ID `bdbd181c33f2`, full digest
 `bdbd181c33f2ed1b31c972991882db3cf4d192569092138a7d29e973cd9debe8`,
-`Q4_K_M`, 9,276,198,565 bytes. This is a comparison baseline, not the default
-or an automatic fallback. Pull it only when reproducing that group:
+`Q4_K_M`, 9,276,198,565 bytes. It is not part of the official v2 structural
+comparison, the default, or an automatic fallback. Pull it only when
+reproducing the historical model-scale exploration:
 
 ```powershell
 ollama pull qwen3:14b
@@ -150,8 +151,8 @@ python -m demo --model qwen3:14b --memory .\.tmp\baseline-memory.jsonl `
   "runtime/gates.py를 실제로 읽고 역할을 설명해 줘."
 ```
 
-Contest-large and baseline results are separate groups even when every other
-setting is identical.
+Official `gemma4:26b` results and the historical `qwen3:14b` exploration are
+separate groups even when every other setting is identical.
 
 ## Record a new evaluation environment
 
