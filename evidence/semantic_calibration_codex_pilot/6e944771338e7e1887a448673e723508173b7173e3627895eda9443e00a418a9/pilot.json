@@ -1,0 +1,160 @@
+{
+  "schema_version": 1,
+  "experiment_id": "sol-medium-hard-batches-v1",
+  "run_id": "5f5d50d259c3443dafed8abfedf97049",
+  "run_state": "complete",
+  "publishable": false,
+  "official_score": false,
+  "diagnostic_score": true,
+  "agent_runtime": true,
+  "purpose": "ceiling diagnostic only",
+  "protocol_sha256": "12b52207986330861fefeb53d4e3a1b73403fed9568714be2f67a4353d22ecea",
+  "dependency_hashes": {
+    "evals/semantic_calibration_v3/FREEZE.json": "fb9f26c1cba78eafa7f8b1422b2a19757eaa748bf205b3dc918a6ebe9ed872a0",
+    "evals/semantic_calibration_v3/control/run_plan.json": "5f54b9b6dd972b6ad01fe2e1db5bc8d8f2edbfb9bffbd6846361798517c19522",
+    "evals/semantic_calibration_v3/control/oracle_results.json": "4358ae9a4e583591263885b674636a8f07598adc5e7189ed4a41c08305ffd5f2",
+    "evals/semantic_calibration_v3/manifest.json": "98b29c0c50440723f34afcc8f3e66054862aca754aed6fb5bcec24bd57d3dc6b",
+    "evals/semantic_calibration_v3/schemas.py": "5d187d5117d7fe63fb2b31685133e877e72d5b781e2ead2c55976d6be08362b4",
+    "llm/codex_account.py": "20e465fff8aa6ac656609103bb879b8106be7da7cb4082a01dd195a7d04d6cdc"
+  },
+  "git": {
+    "commit": "fe0c5315dab2a8a3041e4889372348e0e0b1b090",
+    "branch": "codex/contest-release-2026",
+    "upstream": "origin/codex/contest-release-2026",
+    "remote_url": "https://github.com/Junghoo-developer/SongRyeon.git",
+    "remote_commit": "fe0c5315dab2a8a3041e4889372348e0e0b1b090"
+  },
+  "model_contract": {
+    "model_name": "gpt-5.6-sol",
+    "reasoning_effort": "medium",
+    "sdk_version": "0.144.4",
+    "request_count": 4,
+    "claim_count": 12,
+    "num_predict_semantics": "post-hoc SDK usage check, not server cap"
+  },
+  "decision_rule": {
+    "harder_v4_trigger_min_joint": 10,
+    "required_parsed_units": 4
+  },
+  "started_at_unix": 1786092705.0959678,
+  "rows": [
+    {
+      "plan_id": "semantic-33-batch-cal-h01-reflected-operator-Q-59fd981294_Q-fb72e27640_Q-c1f4f9aa46",
+      "case_id": "cal-h01-reflected-operator",
+      "expected_ids": [
+        "Q-59fd981294",
+        "Q-fb72e27640",
+        "Q-c1f4f9aa46"
+      ],
+      "effective_request_sha256": "0e337ae694ffe1fb1edd9e229791563ebb94a2c461ab0d1b005ba6c74ef9eeb1",
+      "attempt_id": "01e7c7a74d33448382111aac466c5e9f",
+      "state": "finished",
+      "model_call_count": 1,
+      "agent_tool_calls": [],
+      "observed_item_types": [],
+      "answer": null,
+      "model_reply": null,
+      "model_metrics": {},
+      "parse_error": null,
+      "claims": [],
+      "error": "ModelCallError: Codex 계정 모델 호출을 완료하지 못했습니다. 오류 종류: RuntimeError",
+      "latency_ms": 2004.4252
+    },
+    {
+      "plan_id": "semantic-40-batch-cal-h02-metaclass-order-Q-8ea116cd1b_Q-2dff061d7b_Q-2932ec0e9c",
+      "case_id": "cal-h02-metaclass-order",
+      "expected_ids": [
+        "Q-8ea116cd1b",
+        "Q-2dff061d7b",
+        "Q-2932ec0e9c"
+      ],
+      "effective_request_sha256": "3ed6d8c3bd6d12ca3639e336c1e15f776518c2f1b5d972f9cb1a74ca8e71860a",
+      "attempt_id": "134a96e96f4a4d8c8630886fa142914f",
+      "state": "finished",
+      "model_call_count": 1,
+      "agent_tool_calls": [],
+      "observed_item_types": [],
+      "answer": null,
+      "model_reply": null,
+      "model_metrics": {},
+      "parse_error": null,
+      "claims": [],
+      "error": "ModelCallError: Codex 계정 모델 호출을 완료하지 못했습니다. 오류 종류: RuntimeError",
+      "latency_ms": 1400.9905
+    },
+    {
+      "plan_id": "semantic-41-batch-cal-h03-new-return-type-Q-37bd519fff_Q-d0109ae755_Q-0de4b040cb",
+      "case_id": "cal-h03-new-return-type",
+      "expected_ids": [
+        "Q-37bd519fff",
+        "Q-d0109ae755",
+        "Q-0de4b040cb"
+      ],
+      "effective_request_sha256": "5bf962536795d6de049bf2f927414f4bb3402961eee3c2cd304591057fac15d9",
+      "attempt_id": "9e5758d8635c475fb5b2cf167a517ae1",
+      "state": "finished",
+      "model_call_count": 1,
+      "agent_tool_calls": [],
+      "observed_item_types": [],
+      "answer": null,
+      "model_reply": null,
+      "model_metrics": {},
+      "parse_error": null,
+      "claims": [],
+      "error": "ModelCallError: Codex 계정 모델 호출을 완료하지 못했습니다. 오류 종류: RuntimeError",
+      "latency_ms": 1639.8401
+    },
+    {
+      "plan_id": "semantic-48-batch-cal-h04-exec-namespaces-Q-c9f97f02a0_Q-2ca0af488a_Q-885d3c76eb",
+      "case_id": "cal-h04-exec-namespaces",
+      "expected_ids": [
+        "Q-c9f97f02a0",
+        "Q-2ca0af488a",
+        "Q-885d3c76eb"
+      ],
+      "effective_request_sha256": "67184706f89b7e519175634a5b66bca1ef2484eb46e1421d76b98ee2aa87df4e",
+      "attempt_id": "ae71d522600d4858a7f478972272ad5c",
+      "state": "finished",
+      "model_call_count": 1,
+      "agent_tool_calls": [],
+      "observed_item_types": [],
+      "answer": null,
+      "model_reply": null,
+      "model_metrics": {},
+      "parse_error": null,
+      "claims": [],
+      "error": "ModelCallError: Codex 계정 모델 호출을 완료하지 못했습니다. 오류 종류: RuntimeError",
+      "latency_ms": 1414.8406
+    }
+  ],
+  "model_readiness": {
+    "provider": "openai_codex",
+    "execution_mode": "codex_account_integration",
+    "model_name": "gpt-5.6-sol",
+    "reasoning_effort": "medium",
+    "sdk_version": "0.144.4"
+  },
+  "summary": {
+    "attempted_units": 4,
+    "parsed_units": 0,
+    "claim_count": 12,
+    "joint_correct": 0,
+    "classification": "output_or_runtime_failure",
+    "usage": {
+      "cached_input_tokens": 0,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "reasoning_output_tokens": 0,
+      "total_tokens": 0
+    },
+    "latency_ms": 6460.0964
+  },
+  "final_readiness": {
+    "provider": "openai_codex",
+    "execution_mode": "codex_account_integration",
+    "model_name": "gpt-5.6-sol",
+    "reasoning_effort": "medium",
+    "sdk_version": "0.144.4"
+  },
+  "finished_at_unix": 1786092713.0056536
+}

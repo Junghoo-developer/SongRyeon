@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "source_database": "C:/Users/peter/.codex/logs_2.sqlite",
+  "source_database_mode": "read_only",
+  "sdk_process_uuid": "pid:47836:02fb4c4f-53c2-476b-8b97-c9e8e7af7133",
+  "observed_window_unix_seconds": [1786092704, 1786092715],
+  "authentication_observation": {
+    "log_id": 347544842,
+    "auth_mode": "Chatgpt",
+    "openai_api_key_present": false,
+    "codex_api_key_present": false
+  },
+  "directly_observed_turn_errors": [
+    {
+      "log_id": 347545018,
+      "thread_id": "019fdb6b-dacf-7f20-8b67-7d53c87154ea",
+      "reasoning_effort": "medium",
+      "http_status": 400,
+      "error_type": "invalid_request_error",
+      "error_code": "invalid_json_schema",
+      "parameter": "text.format.schema",
+      "message": "Invalid schema for response_format 'codex_output_schema': In context=('properties', 'claims', 'items', 'properties', 'observation'), 'oneOf' is not permitted."
+    },
+    {
+      "log_id": 347545183,
+      "thread_id": "019fdb6b-e2a2-7460-b1a9-770b7ebc5219",
+      "reasoning_effort": "medium",
+      "http_status": 400,
+      "error_type": "invalid_request_error",
+      "error_code": "invalid_json_schema",
+      "parameter": "text.format.schema",
+      "message": "Invalid schema for response_format 'codex_output_schema': In context=('properties', 'claims', 'items', 'properties', 'observation'), 'oneOf' is not permitted."
+    },
+    {
+      "log_id": 347545336,
+      "thread_id": "019fdb6b-e82e-74c0-ad5d-a91fad8ba85b",
+      "reasoning_effort": "medium",
+      "http_status": 400,
+      "error_type": "invalid_request_error",
+      "error_code": "invalid_json_schema",
+      "parameter": "text.format.schema",
+      "message": "Invalid schema for response_format 'codex_output_schema': In context=('properties', 'claims', 'items', 'properties', 'observation'), 'oneOf' is not permitted."
+    }
+  ],
+  "fourth_turn": {
+    "thread_id": "019fdb6b-eea3-7270-9ebf-ba54c238c783",
+    "artifact_error_type": "ModelCallError wrapping RuntimeError",
+    "same_frozen_response_schema": true,
+    "detailed_server_error_observed": false
+  },
+  "interpretation_limit": "The first three schema rejections are directly observed. The exact fourth underlying RuntimeError message is not directly observed. Zero returned usage metrics do not prove zero credit consumption."
+}
