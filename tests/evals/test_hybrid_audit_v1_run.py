@@ -250,12 +250,20 @@ def test_cloud_readiness_explicitly_records_tools_are_not_allowed(monkeypatch):
     assert readiness["tools_allowed"] is False
 
 
-def test_default_output_root_is_outside_the_synchronized_workspace():
-    output_root = run.OUTPUT_ROOT.resolve()
-    workspace_root = run.WORKSPACE_ROOT.resolve()
+def test_output_root_uses_workspace_tmp_for_cross_process_persistence():
+    assert run.OUTPUT_ROOT == (
+        run.WORKSPACE_ROOT / ".tmp" / "evals" / "hybrid_audit_v1_2"
+    )
 
-    assert output_root != workspace_root
-    assert workspace_root not in output_root.parents
+
+def test_append_only_json_never_replaces_existing_path(tmp_path):
+    path = tmp_path / "journal.json"
+    run._write_json_exclusive(path, {"value": 1})
+
+    with pytest.raises(FileExistsError, match="append-only"):
+        run._write_json_exclusive(path, {"value": 2})
+
+    assert json.loads(path.read_text("utf-8")) == {"value": 1}
 
 
 def test_cli_has_no_num_ctx_override():
@@ -285,12 +293,14 @@ def test_run_condition_checkpoints_readiness_and_reserved_row_before_call(
     class InspectingClient(_FakeClient):
         def __init__(self):
             super().__init__(reply=reply)
-            self.pre_invocation_artifact = None
+            self.pre_invocation_checkpoint = None
             self.closed = False
 
         def complete(self, **arguments):
-            output = next(tmp_path.rglob(f"{run.LOCAL_CONDITION}.json"))
-            self.pre_invocation_artifact = json.loads(output.read_text("utf-8"))
+            reserved_path = next(tmp_path.rglob("0001-reserved.json"))
+            self.pre_invocation_checkpoint = json.loads(
+                reserved_path.read_text("utf-8")
+            )
             return super().complete(**arguments)
 
         def close(self):
@@ -316,12 +326,13 @@ def test_run_condition_checkpoints_readiness_and_reserved_row_before_call(
 
     output = run.run_condition(run.LOCAL_CONDITION, argparse.Namespace())
 
-    reserved = client.pre_invocation_artifact
-    assert reserved["model_readiness"] == readiness
-    assert reserved["run_state"] == "running"
-    assert reserved["rows"][0]["runner_attempt"] == 1
-    assert reserved["rows"][0]["state"] == "invocation_reserved"
-    assert reserved["rows"][0]["raw_response"] == ""
+    checkpoint = client.pre_invocation_checkpoint
+    assert checkpoint["model_readiness"] == readiness
+    reserved = checkpoint["row"]
+    assert reserved["runner_attempt"] == 1
+    assert reserved["state"] == "invocation_reserved"
+    assert reserved["raw_response"] == ""
+    assert next(tmp_path.rglob("0001-result.json")).is_file()
     final = json.loads(output.read_text("utf-8"))
     assert final["run_state"] == "complete"
     assert final["rows"][0]["state"] == "valid"

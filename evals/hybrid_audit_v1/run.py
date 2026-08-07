@@ -30,17 +30,12 @@ from .freeze import verify_freeze_publication
 from . import schemas
 
 
-EXPERIMENT_ID = "songryeon-hybrid-a-only-audit-pilot-v1-1"
+EXPERIMENT_ID = "songryeon-hybrid-a-only-audit-pilot-v1-2"
 ROOT = Path(__file__).resolve().parent
 WORKSPACE_ROOT = ROOT.parents[1]
 SOURCE_PATH = ROOT / "source_snapshot.json"
 FREEZE_PATH = ROOT / "FREEZE.json"
-OUTPUT_ROOT = (
-    Path(os.environ.get("LOCALAPPDATA", tempfile.gettempdir()))
-    / "SongRyeon"
-    / "evals"
-    / "hybrid_audit_v1_1"
-)
+OUTPUT_ROOT = WORKSPACE_ROOT / ".tmp" / "evals" / "hybrid_audit_v1_2"
 
 LOCAL_CONDITION = "local-a-only-auditor"
 CLOUD_CONDITION = "cloud-a-only-auditor"
@@ -108,6 +103,31 @@ def _atomic_write_json(path: Path, document: Mapping[str, Any]) -> None:
         os.replace(temporary, path)
     finally:
         temporary.unlink(missing_ok=True)
+
+
+def _write_json_exclusive(path: Path, document: Mapping[str, Any]) -> None:
+    """Create one durable JSON file without replacing an existing path."""
+
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = (canonical_json(document) + "\n").encode("utf-8")
+    try:
+        descriptor = os.open(
+            str(path),
+            os.O_CREAT | os.O_EXCL | os.O_WRONLY,
+        )
+    except FileExistsError:
+        raise FileExistsError(
+            f"append-only journal path already exists: {path}"
+        ) from None
+    try:
+        with os.fdopen(descriptor, "wb") as file:
+            file.write(payload)
+            file.flush()
+            os.fsync(file.fileno())
+    except BaseException:
+        path.unlink(missing_ok=True)
+        raise
 
 
 def _reserve_attempt(output_path: Path) -> Path:
@@ -336,6 +356,8 @@ def run_condition(condition: str, args: argparse.Namespace) -> Path:
     output_directory = OUTPUT_ROOT / freeze["freeze_payload_sha256"]
     output_path = output_directory / f"{condition}.json"
     _reserve_attempt(output_path)
+    journal_directory = output_path.with_suffix(".journal")
+    journal_directory.mkdir(parents=True, exist_ok=False)
     artifact = _new_artifact(
         condition=condition,
         source=source,
@@ -343,14 +365,26 @@ def run_condition(condition: str, args: argparse.Namespace) -> Path:
         freeze=freeze,
         readiness=readiness,
     )
-    _atomic_write_json(output_path, artifact)
+    _write_json_exclusive(journal_directory / "0000-start.json", artifact)
     try:
         for runner_attempt, case in enumerate(source["cases"], 1):
             def checkpoint_before_invocation(
                 reserved_row: Mapping[str, Any],
             ) -> None:
-                artifact["rows"].append(dict(reserved_row))
-                _atomic_write_json(output_path, artifact)
+                _write_json_exclusive(
+                    journal_directory
+                    / f"{runner_attempt:04d}-reserved.json",
+                    {
+                        "schema_version": 1,
+                        "experiment_id": EXPERIMENT_ID,
+                        "condition": condition,
+                        "freeze_payload_sha256": freeze[
+                            "freeze_payload_sha256"
+                        ],
+                        "model_readiness": readiness,
+                        "row": dict(reserved_row),
+                    },
+                )
 
             row = _run_case(
                 client,
@@ -358,12 +392,15 @@ def run_condition(condition: str, args: argparse.Namespace) -> Path:
                 runner_attempt=runner_attempt,
                 checkpoint_before_invocation=checkpoint_before_invocation,
             )
-            artifact["rows"][-1] = row
-            _atomic_write_json(output_path, artifact)
+            artifact["rows"].append(row)
+            _write_json_exclusive(
+                journal_directory / f"{runner_attempt:04d}-result.json",
+                row,
+            )
         artifact["run_state"] = "complete"
         artifact["finished_at_unix"] = time.time()
         artifact["summary"] = _summarize_rows(artifact["rows"])
-        _atomic_write_json(output_path, artifact)
+        _write_json_exclusive(output_path, artifact)
         return output_path
     finally:
         close = getattr(client, "close", None)

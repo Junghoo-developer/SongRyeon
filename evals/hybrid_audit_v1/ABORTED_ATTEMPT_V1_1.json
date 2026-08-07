@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "experiment_id": "songryeon-hybrid-a-only-audit-pilot-v1-1",
+  "freeze_payload_sha256": "b5dfa4e27d7f0d0c8b5f0caac27b05fd19c12c5522a8fd4a49e320fd058c339d",
+  "condition": "local-a-only-auditor",
+  "status": "infrastructure_aborted_no_score",
+  "observed": {
+    "runner_exit_code": 0,
+    "reported_canonical_path": "LOCALAPPDATA/SongRyeon/evals/hybrid_audit_v1_1/<freeze>/local-a-only-auditor.json",
+    "planned_rows": 30
+  },
+  "exclusion_reason": "The external raw artifact was not visible from the next isolated shell, so its bytes and decisions were not durably auditable.",
+  "successor_rule": "Score no v1-1 row; use append-only workspace journals under a newly frozen v1-2 run."
+}

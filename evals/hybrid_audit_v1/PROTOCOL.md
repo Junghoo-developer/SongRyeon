@@ -15,6 +15,19 @@ data directory, outside the synchronized workspace, and reruns the complete
 30-case plan under a new source commit and freeze.  Results from the five
 aborted rows are not mixed into the successor score.
 
+The v1.1 local runner later exited successfully after its 30-row plan, but its
+raw artifact was written outside the tool workspace and was not visible from
+the next isolated shell.  Because the bytes were not durably recoverable, no
+v1.1 decision is scored.  `ABORTED_ATTEMPT_V1_1.json` records this second
+infrastructure exclusion.
+
+The final successor ID is `songryeon-hybrid-a-only-audit-pilot-v1-2`.  It uses
+the synchronized workspace only for append-only journal files: every reserved
+and completed row receives a new path, and the canonical condition artifact is
+created once after all 30 rows.  It never repeatedly replaces one synced file.
+The cohort, prompt, labels, model contracts, router, and metrics remain
+unchanged.
+
 ## Status and question
 
 This is a **retrospective paired feasibility pilot**, not a new held-out
