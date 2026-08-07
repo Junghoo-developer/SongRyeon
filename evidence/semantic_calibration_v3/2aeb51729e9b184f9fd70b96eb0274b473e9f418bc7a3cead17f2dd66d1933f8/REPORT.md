@@ -6,7 +6,7 @@ The primary v3 run stopped at the preregistered contract gate. No semantic
 calibration request was made.
 
 - frozen source commit: `b81ae3ee48622fd12a75b684a98bb923b53b1de1`
-- sealed contract evidence commit: `cd2763589e6b8eae24ab462394592bf157acac4d`
+- sealed contract evidence commit: `cd2763568aa29a45e19bb9ad5d5ff14b940abefa`
 - freeze SHA-256: `2aeb51729e9b184f9fd70b96eb0274b473e9f418bc7a3cead17f2dd66d1933f8`
 - contract artifact SHA-256: `33ecb9e8dd3fe8891d4b17167e97f3e14dd8d55a4359fecba115f850564758ec`
 - execution matrix: valid, 4/4 rows present
