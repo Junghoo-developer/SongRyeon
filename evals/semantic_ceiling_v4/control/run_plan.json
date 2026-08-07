@@ -1,0 +1,950 @@
+{
+  "schema_version": 1,
+  "experiment_id": "sol-medium-semantic-ceiling-v4",
+  "units": [
+    {
+      "plan_id": "semantic-01-176ffdd26f10ca75",
+      "case_id": "v4-c01-class-creation",
+      "expected_ids": [
+        "Q-89c4eb933ff48afd",
+        "Q-df485af026de6c5d",
+        "Q-30dc06d2d5d1b911"
+      ],
+      "internal_claim_ids": [
+        "V4C01-1",
+        "V4C01-2",
+        "V4C01-3"
+      ],
+      "system_prompt": "You predict CPython 3.10.11 behavior from complete source code.\nEach claim gives a proposition about one zero-argument function call in a fresh\ninterpreter. SUPPORTED means the proposition observation exactly matches the\nactual call. UNSUPPORTED means it does not. In both cases, observation must\ncontain your predicted actual result, not a copy of a false proposition. Do not\nexecute code. The input proposition_observation uses a typed JSON value. In your\noutput, encode the predicted actual value exactly once as JSON text in\nvalue_json. For example, JSON true becomes the string \"true\", a list becomes\nthe string \"[1,2]\", and the actual string null becomes the string '\"null\"'.\nFor return observations exception must be null. For raise observations\nvalue_json must be the four-character string \"null\". Every reason must be\nnonempty. Return only the required JSON object. Every claim must appear exactly\nonce.",
+      "user_prompt": "Evaluate all three claims using only the complete source packet below. Each expression is called in its own fresh interpreter.\n\n[SOURCE_PACKET]\n{\"content\":\"EVENTS = []\\n\\n\\nclass TrackingNamespace(dict):\\n    def __setitem__(self, key, value):\\n        if key not in {\\\"__module__\\\", \\\"__qualname__\\\"}:\\n            EVENTS.append(\\\"set:\\\" + key)\\n        super().__setitem__(key, value)\\n\\n\\nclass Meta(type):\\n    @classmethod\\n    def __prepare__(metaclass, name, bases, **kwargs):\\n        EVENTS.append(\\\"prepare:\\\" + \\\",\\\".join(base.__name__ for base in bases))\\n        return TrackingNamespace()\\n\\n    def __new__(metaclass, name, bases, namespace, **kwargs):\\n        EVENTS.append(\\\"meta:new:before\\\")\\n        cls = super().__new__(metaclass, name, bases, namespace, **kwargs)\\n        EVENTS.append(\\\"meta:new:after\\\")\\n        return cls\\n\\n    def __init__(cls, name, bases, namespace, **kwargs):\\n        EVENTS.append(\\\"meta:init\\\")\\n        super().__init__(name, bases, namespace)\\n\\n\\nclass Marker:\\n    def __set_name__(self, owner, name):\\n        EVENTS.append(\\\"set_name:\\\" + name)\\n        self.owner = owner\\n        self.name = name\\n\\n\\nclass Base:\\n    def __init_subclass__(cls, flag, **kwargs):\\n        EVENTS.append(\\\"init_subclass:\\\" + cls.__name__ + \\\":\\\" + str(flag))\\n        super().__init_subclass__(**kwargs)\\n\\n\\nclass Replacement:\\n    def __mro_entries__(self, bases):\\n        EVENTS.append(\\\"mro_entries\\\")\\n        return (Base,)\\n\\n\\nreplacement = Replacement()\\nEVENTS.clear()\\n\\n\\ndef decorate(cls):\\n    EVENTS.append(\\\"decorate\\\")\\n    return cls\\n\\n\\n@decorate\\nclass Target(replacement, flag=3, metaclass=Meta):\\n    field = Marker()\\n\\n\\ndef observe_creation_events():\\n    return list(EVENTS)\\n\\n\\ndef observe_rewritten_bases():\\n    return [\\n        [base.__name__ for base in Target.__bases__],\\n        Target.__orig_bases__[0] is replacement,\\n    ]\\n\\n\\ndef observe_marker_binding():\\n    return [Target.field.owner.__name__, Target.field.name]\\n\",\"path\":\"source-3ec8a48cd4bbca57.py\"}\n\n[CLAIMS]\n[{\"description\":\"observe_creation_events() returns the proposition observation.\",\"expression\":\"observe_creation_events()\",\"id\":\"Q-89c4eb933ff48afd\",\"proposition_observation\":{\"exception\":null,\"kind\":\"return\",\"value\":[\"mro_entries\",\"prepare:Base\",\"set:field\",\"set:__orig_bases__\",\"meta:new:before\",\"init_subclass:Target:3\",\"set_name:field\",\"meta:new:after\",\"meta:init\",\"decorate\"]}},{\"description\":\"observe_rewritten_bases() returns the proposition observation.\",\"expression\":\"observe_rewritten_bases()\",\"id\":\"Q-df485af026de6c5d\",\"proposition_observation\":{\"exception\":null,\"kind\":\"return\",\"value\":[[\"Base\"],true]}},{\"description\":\"observe_marker_binding() returns the proposition observation.\",\"expression\":\"observe_marker_binding()\",\"id\":\"Q-30dc06d2d5d1b911\",\"proposition_observation\":{\"exception\":null,\"kind\":\"return\",\"value\":[\"Target\",\"field\"]}}]",
+      "response_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "claims"
+        ],
+        "properties": {
+          "claims": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "verdict",
+                "observation",
+                "reason"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "enum": [
+                    "Q-89c4eb933ff48afd",
+                    "Q-df485af026de6c5d",
+                    "Q-30dc06d2d5d1b911"
+                  ]
+                },
+                "verdict": {
+                  "type": "string",
+                  "enum": [
+                    "SUPPORTED",
+                    "UNSUPPORTED"
+                  ]
+                },
+                "observation": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "kind",
+                        "value_json",
+                        "exception"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "return"
+                          ]
+                        },
+                        "value_json": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "exception": {
+                          "type": "null"
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "kind",
+                        "value_json",
+                        "exception"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "raise"
+                          ]
+                        },
+                        "value_json": {
+                          "type": "string",
+                          "enum": [
+                            "null"
+                          ]
+                        },
+                        "exception": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                        }
+                      }
+                    }
+                  ]
+                },
+                "reason": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      },
+      "num_predict": 2400,
+      "effective_request_sha256": "dc783ee2d0a053826eb8883e140e99c571fb8f9c8b3a54f8e23a414a8eb05417"
+    },
+    {
+      "plan_id": "semantic-02-715d84fd0d876447",
+      "case_id": "v4-c02-duplicate-slots",
+      "expected_ids": [
+        "Q-1317655e2453d8eb",
+        "Q-78cc0908ffb5b7bc",
+        "Q-24ba5997b46b1ce2"
+      ],
+      "internal_claim_ids": [
+        "V4C02-1",
+        "V4C02-2",
+        "V4C02-3"
+      ],
+      "system_prompt": "You predict CPython 3.10.11 behavior from complete source code.\nEach claim gives a proposition about one zero-argument function call in a fresh\ninterpreter. SUPPORTED means the proposition observation exactly matches the\nactual call. UNSUPPORTED means it does not. In both cases, observation must\ncontain your predicted actual result, not a copy of a false proposition. Do not\nexecute code. The input proposition_observation uses a typed JSON value. In your\noutput, encode the predicted actual value exactly once as JSON text in\nvalue_json. For example, JSON true becomes the string \"true\", a list becomes\nthe string \"[1,2]\", and the actual string null becomes the string '\"null\"'.\nFor return observations exception must be null. For raise observations\nvalue_json must be the four-character string \"null\". Every reason must be\nnonempty. Return only the required JSON object. Every claim must appear exactly\nonce.",
+      "user_prompt": "Evaluate all three claims using only the complete source packet below. Each expression is called in its own fresh interpreter.\n\n[SOURCE_PACKET]\n{\"content\":\"class Root:\\n    __slots__ = (\\\"value\\\",)\\n\\n\\nclass Child(Root):\\n    __slots__ = (\\\"value\\\",)\\n\\n\\ndef make_child():\\n    instance = Child()\\n    Root.value.__set__(instance, \\\"root\\\")\\n    Child.value.__set__(instance, \\\"child\\\")\\n    return instance\\n\\n\\ndef observe_distinct_slots():\\n    instance = make_child()\\n    return [\\n        instance.value,\\n        Root.value.__get__(instance, Child),\\n        Child.value.__get__(instance, Child),\\n    ]\\n\\n\\ndef observe_after_child_delete():\\n    instance = make_child()\\n    Child.value.__delete__(instance)\\n    return instance.value\\n\\n\\ndef observe_normal_assignment():\\n    instance = make_child()\\n    instance.value = \\\"new\\\"\\n    return [instance.value, Root.value.__get__(instance, Child)]\\n\",\"path\":\"source-80b6b9a8948b96a5.py\"}\n\n[CLAIMS]\n[{\"description\":\"observe_distinct_slots() returns the proposition observation.\",\"expression\":\"observe_distinct_slots()\",\"id\":\"Q-1317655e2453d8eb\",\"proposition_observation\":{\"exception\":null,\"kind\":\"return\",\"value\":[\"child\",\"root\",\"child\"]}},{\"description\":\"observe_after_child_delete() returns the proposition observation.\",\"expression\":\"observe_after_child_delete()\",\"id\":\"Q-78cc0908ffb5b7bc\",\"proposition_observation\":{\"exception\":null,\"kind\":\"return\",\"value\":\"root\"}},{\"description\":\"observe_normal_assignment() returns the proposition observation.\",\"expression\":\"observe_normal_assignment()\",\"id\":\"Q-24ba5997b46b1ce2\",\"proposition_observation\":{\"exception\":null,\"kind\":\"return\",\"value\":[\"new\",\"root\"]}}]",
+      "response_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "claims"
+        ],
+        "properties": {
+          "claims": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "verdict",
+                "observation",
+                "reason"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "enum": [
+                    "Q-1317655e2453d8eb",
+                    "Q-78cc0908ffb5b7bc",
+                    "Q-24ba5997b46b1ce2"
+                  ]
+                },
+                "verdict": {
+                  "type": "string",
+                  "enum": [
+                    "SUPPORTED",
+                    "UNSUPPORTED"
+                  ]
+                },
+                "observation": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "kind",
+                        "value_json",
+                        "exception"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "return"
+                          ]
+                        },
+                        "value_json": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "exception": {
+                          "type": "null"
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "kind",
+                        "value_json",
+                        "exception"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "raise"
+                          ]
+                        },
+                        "value_json": {
+                          "type": "string",
+                          "enum": [
+                            "null"
+                          ]
+                        },
+                        "exception": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                        }
+                      }
+                    }
+                  ]
+                },
+                "reason": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      },
+      "num_predict": 2400,
+      "effective_request_sha256": "938bf3e5f72aa1d1e12b46a242447dacd5562d698d3c601a89afa9816eda29ca"
+    },
+    {
+      "plan_id": "semantic-03-55e49d1ce2936ef5",
+      "case_id": "v4-c03-zero-arg-super",
+      "expected_ids": [
+        "Q-551d18592e9d3ce3",
+        "Q-a781815c0b888d72",
+        "Q-2dab992c5b4e4fe3"
+      ],
+      "internal_claim_ids": [
+        "V4C03-1",
+        "V4C03-2",
+        "V4C03-3"
+      ],
+      "system_prompt": "You predict CPython 3.10.11 behavior from complete source code.\nEach claim gives a proposition about one zero-argument function call in a fresh\ninterpreter. SUPPORTED means the proposition observation exactly matches the\nactual call. UNSUPPORTED means it does not. In both cases, observation must\ncontain your predicted actual result, not a copy of a false proposition. Do not\nexecute code. The input proposition_observation uses a typed JSON value. In your\noutput, encode the predicted actual value exactly once as JSON text in\nvalue_json. For example, JSON true becomes the string \"true\", a list becomes\nthe string \"[1,2]\", and the actual string null becomes the string '\"null\"'.\nFor return observations exception must be null. For raise observations\nvalue_json must be the four-character string \"null\". Every reason must be\nnonempty. Return only the required JSON object. Every claim must appear exactly\nonce.",
+      "user_prompt": "Evaluate all three claims using only the complete source packet below. Each expression is called in its own fresh interpreter.\n\n[SOURCE_PACKET]\n{\"content\":\"class Base:\\n    def token(self):\\n        return \\\"base\\\"\\n\\n\\nclass Child(Base):\\n    def direct(self):\\n        return super().token()\\n\\n    def list_comprehension(self):\\n        return [super().token() for _ in range(1)]\\n\\n    def nested_function(self):\\n        def inner():\\n            return super().token()\\n\\n        return inner()\\n\\n\\ndef observe_direct():\\n    return Child().direct()\\n\\n\\ndef observe_list_comprehension():\\n    return Child().list_comprehension()\\n\\n\\ndef observe_nested_function():\\n    return Child().nested_function()\\n\",\"path\":\"source-7f662a2c1235ad97.py\"}\n\n[CLAIMS]\n[{\"description\":\"observe_direct() returns the proposition observation.\",\"expression\":\"observe_direct()\",\"id\":\"Q-551d18592e9d3ce3\",\"proposition_observation\":{\"exception\":null,\"kind\":\"return\",\"value\":\"base\"}},{\"description\":\"observe_list_comprehension() returns the proposition observation.\",\"expression\":\"observe_list_comprehension()\",\"id\":\"Q-a781815c0b888d72\",\"proposition_observation\":{\"exception\":null,\"kind\":\"return\",\"value\":[\"base\"]}},{\"description\":\"observe_nested_function() raises the proposition exception.\",\"expression\":\"observe_nested_function()\",\"id\":\"Q-2dab992c5b4e4fe3\",\"proposition_observation\":{\"exception\":\"TypeError\",\"kind\":\"raise\",\"value\":null}}]",
+      "response_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "claims"
+        ],
+        "properties": {
+          "claims": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "verdict",
+                "observation",
+                "reason"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "enum": [
+                    "Q-551d18592e9d3ce3",
+                    "Q-a781815c0b888d72",
+                    "Q-2dab992c5b4e4fe3"
+                  ]
+                },
+                "verdict": {
+                  "type": "string",
+                  "enum": [
+                    "SUPPORTED",
+                    "UNSUPPORTED"
+                  ]
+                },
+                "observation": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "kind",
+                        "value_json",
+                        "exception"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "return"
+                          ]
+                        },
+                        "value_json": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "exception": {
+                          "type": "null"
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "kind",
+                        "value_json",
+                        "exception"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "raise"
+                          ]
+                        },
+                        "value_json": {
+                          "type": "string",
+                          "enum": [
+                            "null"
+                          ]
+                        },
+                        "exception": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                        }
+                      }
+                    }
+                  ]
+                },
+                "reason": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      },
+      "num_predict": 2400,
+      "effective_request_sha256": "050190dbcb59f912ae337696ac73795d94fa54f88e344794df21a684afd9520a"
+    },
+    {
+      "plan_id": "semantic-04-80e9d09017084875",
+      "case_id": "v4-c04-yield-from",
+      "expected_ids": [
+        "Q-2ea3021d4226cef5",
+        "Q-2dfe7f6a72c0a9a2",
+        "Q-9c11b3b99a20f94e"
+      ],
+      "internal_claim_ids": [
+        "V4C04-1",
+        "V4C04-2",
+        "V4C04-3"
+      ],
+      "system_prompt": "You predict CPython 3.10.11 behavior from complete source code.\nEach claim gives a proposition about one zero-argument function call in a fresh\ninterpreter. SUPPORTED means the proposition observation exactly matches the\nactual call. UNSUPPORTED means it does not. In both cases, observation must\ncontain your predicted actual result, not a copy of a false proposition. Do not\nexecute code. The input proposition_observation uses a typed JSON value. In your\noutput, encode the predicted actual value exactly once as JSON text in\nvalue_json. For example, JSON true becomes the string \"true\", a list becomes\nthe string \"[1,2]\", and the actual string null becomes the string '\"null\"'.\nFor return observations exception must be null. For raise observations\nvalue_json must be the four-character string \"null\". Every reason must be\nnonempty. Return only the required JSON object. Every claim must appear exactly\nonce.",
+      "user_prompt": "Evaluate all three claims using only the complete source packet below. Each expression is called in its own fresh interpreter.\n\n[SOURCE_PACKET]\n{\"content\":\"def delegated(events):\\n    events.append(\\\"delegated:start\\\")\\n    received = yield \\\"ready\\\"\\n    events.append([\\\"delegated:received\\\", received])\\n    try:\\n        yield received * 2\\n    except KeyError:\\n        events.append(\\\"delegated:key_error\\\")\\n        return received + 4\\n    finally:\\n        events.append(\\\"delegated:finally\\\")\\n    return received + 5\\n\\n\\ndef outer(events):\\n    events.append(\\\"outer:start\\\")\\n    try:\\n        result = yield from delegated(events)\\n        events.append([\\\"outer:result\\\", result])\\n        return result + 1\\n    finally:\\n        events.append(\\\"outer:finally\\\")\\n\\n\\ndef observe_send():\\n    events = []\\n    generator = outer(events)\\n    first = next(generator)\\n    second = generator.send(3)\\n    try:\\n        next(generator)\\n    except StopIteration as stop:\\n        return [first, second, stop.value, events]\\n\\n\\ndef observe_throw():\\n    events = []\\n    generator = outer(events)\\n    first = next(generator)\\n    second = generator.send(3)\\n    try:\\n        generator.throw(KeyError(\\\"x\\\"))\\n    except StopIteration as stop:\\n        return [first, second, stop.value, events]\\n\\n\\ndef observe_close():\\n    events = []\\n    generator = outer(events)\\n    first = next(generator)\\n    second = generator.send(3)\\n    result = generator.close()\\n    return [first, second, result, events]\\n\",\"path\":\"source-046ab139c1fbfbdb.py\"}\n\n[CLAIMS]\n[{\"description\":\"observe_send() returns the proposition observation.\",\"expression\":\"observe_send()\",\"id\":\"Q-2ea3021d4226cef5\",\"proposition_observation\":{\"exception\":null,\"kind\":\"return\",\"value\":[\"ready\",6,8,[\"outer:start\",\"delegated:start\",[\"delegated:received\",3],\"delegated:finally\",[\"outer:result\",8],\"outer:finally\"]]}},{\"description\":\"observe_throw() returns the proposition observation.\",\"expression\":\"observe_throw()\",\"id\":\"Q-2dfe7f6a72c0a9a2\",\"proposition_observation\":{\"exception\":null,\"kind\":\"return\",\"value\":[\"ready\",6,8,[\"outer:start\",\"delegated:start\",[\"delegated:received\",3],\"delegated:key_error\",\"delegated:finally\",[\"outer:result\",7],\"outer:finally\"]]}},{\"description\":\"observe_close() returns the proposition observation.\",\"expression\":\"observe_close()\",\"id\":\"Q-9c11b3b99a20f94e\",\"proposition_observation\":{\"exception\":null,\"kind\":\"return\",\"value\":[\"ready\",6,null,[\"outer:start\",\"delegated:start\",[\"delegated:received\",3],\"delegated:finally\",[\"outer:result\",null],\"outer:finally\"]]}}]",
+      "response_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "claims"
+        ],
+        "properties": {
+          "claims": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "verdict",
+                "observation",
+                "reason"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "enum": [
+                    "Q-2ea3021d4226cef5",
+                    "Q-2dfe7f6a72c0a9a2",
+                    "Q-9c11b3b99a20f94e"
+                  ]
+                },
+                "verdict": {
+                  "type": "string",
+                  "enum": [
+                    "SUPPORTED",
+                    "UNSUPPORTED"
+                  ]
+                },
+                "observation": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "kind",
+                        "value_json",
+                        "exception"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "return"
+                          ]
+                        },
+                        "value_json": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "exception": {
+                          "type": "null"
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "kind",
+                        "value_json",
+                        "exception"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "raise"
+                          ]
+                        },
+                        "value_json": {
+                          "type": "string",
+                          "enum": [
+                            "null"
+                          ]
+                        },
+                        "exception": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                        }
+                      }
+                    }
+                  ]
+                },
+                "reason": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      },
+      "num_predict": 2400,
+      "effective_request_sha256": "c7aa37cf2a718d807218db2f31f76490ee8aac66a1cf4bc66e113be16c6f1e9c"
+    },
+    {
+      "plan_id": "semantic-05-b1560c158c71f219",
+      "case_id": "v4-c05-match-protocol",
+      "expected_ids": [
+        "Q-090d8262eab53fff",
+        "Q-1d9b522f363ddb12",
+        "Q-0dedd0546f7796b3"
+      ],
+      "internal_claim_ids": [
+        "V4C05-1",
+        "V4C05-2",
+        "V4C05-3"
+      ],
+      "system_prompt": "You predict CPython 3.10.11 behavior from complete source code.\nEach claim gives a proposition about one zero-argument function call in a fresh\ninterpreter. SUPPORTED means the proposition observation exactly matches the\nactual call. UNSUPPORTED means it does not. In both cases, observation must\ncontain your predicted actual result, not a copy of a false proposition. Do not\nexecute code. The input proposition_observation uses a typed JSON value. In your\noutput, encode the predicted actual value exactly once as JSON text in\nvalue_json. For example, JSON true becomes the string \"true\", a list becomes\nthe string \"[1,2]\", and the actual string null becomes the string '\"null\"'.\nFor return observations exception must be null. For raise observations\nvalue_json must be the four-character string \"null\". Every reason must be\nnonempty. Return only the required JSON object. Every claim must appear exactly\nonce.",
+      "user_prompt": "Evaluate all three claims using only the complete source packet below. Each expression is called in its own fresh interpreter.\n\n[SOURCE_PACKET]\n{\"content\":\"EVENTS = []\\n\\n\\nclass Point:\\n    __match_args__ = (\\\"x\\\", \\\"y\\\")\\n\\n    def __init__(self, x, y):\\n        self._x = x\\n        self._y = y\\n\\n    @property\\n    def x(self):\\n        EVENTS.append(\\\"x\\\")\\n        return self._x\\n\\n    @property\\n    def y(self):\\n        EVENTS.append(\\\"y\\\")\\n        return self._y\\n\\n\\nclass Broken:\\n    __match_args__ = [\\\"x\\\"]\\n    x = 1\\n\\n\\ndef guard(value):\\n    EVENTS.append(\\\"guard:\\\" + str(value))\\n    return value > 0\\n\\n\\ndef classify(value):\\n    match value:\\n        case Point(1, y) if guard(y):\\n            return \\\"first\\\"\\n        case Point(x, 2):\\n            return \\\"second\\\"\\n        case _:\\n            return \\\"other\\\"\\n\\n\\ndef observe_guard_fallback():\\n    EVENTS.clear()\\n    result = classify(Point(1, 0))\\n    return [result, list(EVENTS)]\\n\\n\\ndef observe_second_case():\\n    EVENTS.clear()\\n    result = classify(Point(0, 2))\\n    return [result, list(EVENTS)]\\n\\n\\ndef observe_invalid_match_args():\\n    match Broken():\\n        case Broken(value):\\n            return value\\n\",\"path\":\"source-df25316e1a3a8d15.py\"}\n\n[CLAIMS]\n[{\"description\":\"observe_guard_fallback() returns the proposition observation.\",\"expression\":\"observe_guard_fallback()\",\"id\":\"Q-090d8262eab53fff\",\"proposition_observation\":{\"exception\":null,\"kind\":\"return\",\"value\":[\"second\",[\"x\",\"y\",\"guard:0\",\"x\",\"y\"]]}},{\"description\":\"observe_second_case() returns the proposition observation.\",\"expression\":\"observe_second_case()\",\"id\":\"Q-1d9b522f363ddb12\",\"proposition_observation\":{\"exception\":null,\"kind\":\"return\",\"value\":[\"second\",[\"x\",\"y\",\"x\",\"y\"]]}},{\"description\":\"observe_invalid_match_args() raises the proposition exception.\",\"expression\":\"observe_invalid_match_args()\",\"id\":\"Q-0dedd0546f7796b3\",\"proposition_observation\":{\"exception\":\"TypeError\",\"kind\":\"raise\",\"value\":null}}]",
+      "response_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "claims"
+        ],
+        "properties": {
+          "claims": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "verdict",
+                "observation",
+                "reason"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "enum": [
+                    "Q-090d8262eab53fff",
+                    "Q-1d9b522f363ddb12",
+                    "Q-0dedd0546f7796b3"
+                  ]
+                },
+                "verdict": {
+                  "type": "string",
+                  "enum": [
+                    "SUPPORTED",
+                    "UNSUPPORTED"
+                  ]
+                },
+                "observation": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "kind",
+                        "value_json",
+                        "exception"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "return"
+                          ]
+                        },
+                        "value_json": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "exception": {
+                          "type": "null"
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "kind",
+                        "value_json",
+                        "exception"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "raise"
+                          ]
+                        },
+                        "value_json": {
+                          "type": "string",
+                          "enum": [
+                            "null"
+                          ]
+                        },
+                        "exception": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                        }
+                      }
+                    }
+                  ]
+                },
+                "reason": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      },
+      "num_predict": 2400,
+      "effective_request_sha256": "7aa9c253f8322c8fb0d31965fef438b5d814bb36e390235caafc45b2d50c584e"
+    },
+    {
+      "plan_id": "semantic-06-df40b80722a682e9",
+      "case_id": "v4-c06-exception-targets",
+      "expected_ids": [
+        "Q-31c0577938ec6f51",
+        "Q-6a965a9fa17917a1",
+        "Q-5ff8a7b1ad6d0663"
+      ],
+      "internal_claim_ids": [
+        "V4C06-1",
+        "V4C06-2",
+        "V4C06-3"
+      ],
+      "system_prompt": "You predict CPython 3.10.11 behavior from complete source code.\nEach claim gives a proposition about one zero-argument function call in a fresh\ninterpreter. SUPPORTED means the proposition observation exactly matches the\nactual call. UNSUPPORTED means it does not. In both cases, observation must\ncontain your predicted actual result, not a copy of a false proposition. Do not\nexecute code. The input proposition_observation uses a typed JSON value. In your\noutput, encode the predicted actual value exactly once as JSON text in\nvalue_json. For example, JSON true becomes the string \"true\", a list becomes\nthe string \"[1,2]\", and the actual string null becomes the string '\"null\"'.\nFor return observations exception must be null. For raise observations\nvalue_json must be the four-character string \"null\". Every reason must be\nnonempty. Return only the required JSON object. Every claim must appear exactly\nonce.",
+      "user_prompt": "Evaluate all three claims using only the complete source packet below. Each expression is called in its own fresh interpreter.\n\n[SOURCE_PACKET]\n{\"content\":\"def make_readers():\\n    error = \\\"outer\\\"\\n\\n    def before_handler():\\n        return error\\n\\n    try:\\n        raise ValueError(\\\"x\\\")\\n    except ValueError as error:\\n        def inside_handler():\\n            return error\\n\\n    return before_handler, inside_handler\\n\\n\\ndef make_saved_reader():\\n    try:\\n        raise ValueError(\\\"x\\\")\\n    except ValueError as error:\\n        return lambda error=error: type(error).__name__\\n\\n\\ndef observe_cleared_cells():\\n    outcomes = []\\n    for reader in make_readers():\\n        try:\\n            outcomes.append(reader())\\n        except BaseException as failure:\\n            outcomes.append(type(failure).__name__)\\n    return outcomes\\n\\n\\ndef observe_default_capture():\\n    return make_saved_reader()()\\n\\n\\ndef observe_previous_binding():\\n    error = \\\"before\\\"\\n    try:\\n        raise ZeroDivisionError()\\n    except ZeroDivisionError as error:\\n        inside = type(error).__name__\\n\\n    try:\\n        after = error\\n    except NameError as failure:\\n        after = type(failure).__name__\\n\\n    return [inside, after, \\\"error\\\" in locals()]\\n\",\"path\":\"source-47bc1165330727a4.py\"}\n\n[CLAIMS]\n[{\"description\":\"observe_cleared_cells() returns the proposition observation.\",\"expression\":\"observe_cleared_cells()\",\"id\":\"Q-31c0577938ec6f51\",\"proposition_observation\":{\"exception\":null,\"kind\":\"return\",\"value\":[\"NameError\",\"NameError\"]}},{\"description\":\"observe_default_capture() returns the proposition observation.\",\"expression\":\"observe_default_capture()\",\"id\":\"Q-6a965a9fa17917a1\",\"proposition_observation\":{\"exception\":null,\"kind\":\"return\",\"value\":\"Exception\"}},{\"description\":\"observe_previous_binding() returns the proposition observation.\",\"expression\":\"observe_previous_binding()\",\"id\":\"Q-5ff8a7b1ad6d0663\",\"proposition_observation\":{\"exception\":null,\"kind\":\"return\",\"value\":[\"ZeroDivisionError\",\"NameError\",false]}}]",
+      "response_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "claims"
+        ],
+        "properties": {
+          "claims": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "verdict",
+                "observation",
+                "reason"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "enum": [
+                    "Q-31c0577938ec6f51",
+                    "Q-6a965a9fa17917a1",
+                    "Q-5ff8a7b1ad6d0663"
+                  ]
+                },
+                "verdict": {
+                  "type": "string",
+                  "enum": [
+                    "SUPPORTED",
+                    "UNSUPPORTED"
+                  ]
+                },
+                "observation": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "kind",
+                        "value_json",
+                        "exception"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "return"
+                          ]
+                        },
+                        "value_json": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "exception": {
+                          "type": "null"
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "kind",
+                        "value_json",
+                        "exception"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "raise"
+                          ]
+                        },
+                        "value_json": {
+                          "type": "string",
+                          "enum": [
+                            "null"
+                          ]
+                        },
+                        "exception": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                        }
+                      }
+                    }
+                  ]
+                },
+                "reason": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      },
+      "num_predict": 2400,
+      "effective_request_sha256": "5642b9e8cbbd35502665f71ef82501738a4c8dfada09e5edc3169284799d9176"
+    },
+    {
+      "plan_id": "semantic-07-1bdf2b9c65254203",
+      "case_id": "v4-c07-augmented-descriptor",
+      "expected_ids": [
+        "Q-82b2c5d5ce73af81",
+        "Q-4d54b0bc1baf869a",
+        "Q-9ac6e773924103f3"
+      ],
+      "internal_claim_ids": [
+        "V4C07-1",
+        "V4C07-2",
+        "V4C07-3"
+      ],
+      "system_prompt": "You predict CPython 3.10.11 behavior from complete source code.\nEach claim gives a proposition about one zero-argument function call in a fresh\ninterpreter. SUPPORTED means the proposition observation exactly matches the\nactual call. UNSUPPORTED means it does not. In both cases, observation must\ncontain your predicted actual result, not a copy of a false proposition. Do not\nexecute code. The input proposition_observation uses a typed JSON value. In your\noutput, encode the predicted actual value exactly once as JSON text in\nvalue_json. For example, JSON true becomes the string \"true\", a list becomes\nthe string \"[1,2]\", and the actual string null becomes the string '\"null\"'.\nFor return observations exception must be null. For raise observations\nvalue_json must be the four-character string \"null\". Every reason must be\nnonempty. Return only the required JSON object. Every claim must appear exactly\nonce.",
+      "user_prompt": "Evaluate all three claims using only the complete source packet below. Each expression is called in its own fresh interpreter.\n\n[SOURCE_PACKET]\n{\"content\":\"EVENTS = []\\n\\n\\nclass Left:\\n    def __iadd__(self, other):\\n        EVENTS.append(\\\"iadd\\\")\\n        return NotImplemented\\n\\n    def __add__(self, other):\\n        EVENTS.append(\\\"add\\\")\\n        return \\\"left\\\"\\n\\n\\nclass Right(Left):\\n    def __radd__(self, other):\\n        EVENTS.append(\\\"radd\\\")\\n        return \\\"right\\\"\\n\\n\\nclass Stored:\\n    def __get__(self, instance, owner):\\n        if instance is None:\\n            return self\\n        EVENTS.append(\\\"get\\\")\\n        return instance._value\\n\\n    def __set__(self, instance, value):\\n        EVENTS.append(\\\"set:\\\" + type(value).__name__)\\n        instance._value = value\\n\\n\\nclass Box:\\n    value = Stored()\\n\\n    def __init__(self):\\n        self._value = Left()\\n\\n\\ndef observe_subclass_fallback():\\n    EVENTS.clear()\\n    box = Box()\\n    box.value += Right()\\n    return [box.value, list(EVENTS)]\\n\\n\\ndef observe_same_type_fallback():\\n    EVENTS.clear()\\n    box = Box()\\n    box.value += Left()\\n    return [box.value, list(EVENTS)]\\n\\n\\ndef observe_assignment_events():\\n    EVENTS.clear()\\n    box = Box()\\n    box.value += Right()\\n    return list(EVENTS)\\n\",\"path\":\"source-ae9a268b3d44db33.py\"}\n\n[CLAIMS]\n[{\"description\":\"observe_subclass_fallback() returns the proposition observation.\",\"expression\":\"observe_subclass_fallback()\",\"id\":\"Q-82b2c5d5ce73af81\",\"proposition_observation\":{\"exception\":null,\"kind\":\"return\",\"value\":[\"right\",[\"get\",\"iadd\",\"radd\",\"set:str\",\"get\"]]}},{\"description\":\"observe_same_type_fallback() returns the proposition observation.\",\"expression\":\"observe_same_type_fallback()\",\"id\":\"Q-4d54b0bc1baf869a\",\"proposition_observation\":{\"exception\":null,\"kind\":\"return\",\"value\":[\"left\",[\"get\",\"iadd\",\"radd\",\"set:str\",\"get\"]]}},{\"description\":\"observe_assignment_events() returns the proposition observation.\",\"expression\":\"observe_assignment_events()\",\"id\":\"Q-9ac6e773924103f3\",\"proposition_observation\":{\"exception\":null,\"kind\":\"return\",\"value\":[\"get\",\"iadd\",\"radd\",\"set:str\"]}}]",
+      "response_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "claims"
+        ],
+        "properties": {
+          "claims": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "verdict",
+                "observation",
+                "reason"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "enum": [
+                    "Q-82b2c5d5ce73af81",
+                    "Q-4d54b0bc1baf869a",
+                    "Q-9ac6e773924103f3"
+                  ]
+                },
+                "verdict": {
+                  "type": "string",
+                  "enum": [
+                    "SUPPORTED",
+                    "UNSUPPORTED"
+                  ]
+                },
+                "observation": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "kind",
+                        "value_json",
+                        "exception"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "return"
+                          ]
+                        },
+                        "value_json": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "exception": {
+                          "type": "null"
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "kind",
+                        "value_json",
+                        "exception"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "raise"
+                          ]
+                        },
+                        "value_json": {
+                          "type": "string",
+                          "enum": [
+                            "null"
+                          ]
+                        },
+                        "exception": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                        }
+                      }
+                    }
+                  ]
+                },
+                "reason": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      },
+      "num_predict": 2400,
+      "effective_request_sha256": "01db3e5f9fa7f950f555286883aae9e96d1780cb1576cc1a64cbc42a667f3795"
+    },
+    {
+      "plan_id": "semantic-08-6a1fa575ecdb8bf0",
+      "case_id": "v4-c08-context-stack",
+      "expected_ids": [
+        "Q-c13d9de873485184",
+        "Q-4ca8326d5f2d3011",
+        "Q-61f5a9dc87c373dd"
+      ],
+      "internal_claim_ids": [
+        "V4C08-1",
+        "V4C08-2",
+        "V4C08-3"
+      ],
+      "system_prompt": "You predict CPython 3.10.11 behavior from complete source code.\nEach claim gives a proposition about one zero-argument function call in a fresh\ninterpreter. SUPPORTED means the proposition observation exactly matches the\nactual call. UNSUPPORTED means it does not. In both cases, observation must\ncontain your predicted actual result, not a copy of a false proposition. Do not\nexecute code. The input proposition_observation uses a typed JSON value. In your\noutput, encode the predicted actual value exactly once as JSON text in\nvalue_json. For example, JSON true becomes the string \"true\", a list becomes\nthe string \"[1,2]\", and the actual string null becomes the string '\"null\"'.\nFor return observations exception must be null. For raise observations\nvalue_json must be the four-character string \"null\". Every reason must be\nnonempty. Return only the required JSON object. Every claim must appear exactly\nonce.",
+      "user_prompt": "Evaluate all three claims using only the complete source packet below. Each expression is called in its own fresh interpreter.\n\n[SOURCE_PACKET]\n{\"content\":\"EVENTS = []\\n\\n\\nclass Manager:\\n    def __init__(self, name, mode):\\n        self.name = name\\n        self.mode = mode\\n\\n    def __enter__(self):\\n        EVENTS.append(\\\"enter:\\\" + self.name)\\n        return self\\n\\n    def __exit__(self, kind, value, traceback):\\n        EVENTS.append(\\n            [\\\"exit:\\\" + self.name, None if kind is None else kind.__name__]\\n        )\\n        if self.mode == \\\"replace\\\":\\n            raise KeyError(self.name)\\n        if self.mode == \\\"suppress\\\":\\n            return True\\n        return False\\n\\n\\ndef run_suppressed_stack():\\n    EVENTS.clear()\\n    with Manager(\\\"outer\\\", \\\"pass\\\"):\\n        with Manager(\\\"middle\\\", \\\"suppress\\\"):\\n            with Manager(\\\"inner\\\", \\\"replace\\\"):\\n                EVENTS.append(\\\"body\\\")\\n                raise ValueError(\\\"body\\\")\\n    EVENTS.append(\\\"after\\\")\\n    return list(EVENTS)\\n\\n\\ndef observe_suppressed_trace():\\n    return run_suppressed_stack()\\n\\n\\ndef observe_after_marker():\\n    return run_suppressed_stack()[-1]\\n\\n\\ndef observe_unsuppressed_replacement():\\n    EVENTS.clear()\\n    with Manager(\\\"outer\\\", \\\"pass\\\"):\\n        with Manager(\\\"inner\\\", \\\"replace\\\"):\\n            raise ValueError(\\\"body\\\")\\n\",\"path\":\"source-010670d866e3b1d3.py\"}\n\n[CLAIMS]\n[{\"description\":\"observe_suppressed_trace() returns the proposition observation.\",\"expression\":\"observe_suppressed_trace()\",\"id\":\"Q-c13d9de873485184\",\"proposition_observation\":{\"exception\":null,\"kind\":\"return\",\"value\":[\"enter:outer\",\"enter:middle\",\"enter:inner\",\"body\",[\"exit:inner\",\"ValueError\"],[\"exit:middle\",\"KeyError\"],[\"exit:outer\",\"KeyError\"],\"after\"]}},{\"description\":\"observe_after_marker() returns the proposition observation.\",\"expression\":\"observe_after_marker()\",\"id\":\"Q-4ca8326d5f2d3011\",\"proposition_observation\":{\"exception\":null,\"kind\":\"return\",\"value\":\"after\"}},{\"description\":\"observe_unsuppressed_replacement() raises the proposition exception.\",\"expression\":\"observe_unsuppressed_replacement()\",\"id\":\"Q-61f5a9dc87c373dd\",\"proposition_observation\":{\"exception\":\"ValueError\",\"kind\":\"raise\",\"value\":null}}]",
+      "response_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "claims"
+        ],
+        "properties": {
+          "claims": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "verdict",
+                "observation",
+                "reason"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "enum": [
+                    "Q-c13d9de873485184",
+                    "Q-4ca8326d5f2d3011",
+                    "Q-61f5a9dc87c373dd"
+                  ]
+                },
+                "verdict": {
+                  "type": "string",
+                  "enum": [
+                    "SUPPORTED",
+                    "UNSUPPORTED"
+                  ]
+                },
+                "observation": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "kind",
+                        "value_json",
+                        "exception"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "return"
+                          ]
+                        },
+                        "value_json": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "exception": {
+                          "type": "null"
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "kind",
+                        "value_json",
+                        "exception"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "raise"
+                          ]
+                        },
+                        "value_json": {
+                          "type": "string",
+                          "enum": [
+                            "null"
+                          ]
+                        },
+                        "exception": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                        }
+                      }
+                    }
+                  ]
+                },
+                "reason": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      },
+      "num_predict": 2400,
+      "effective_request_sha256": "c80a02a08e33c5655954a265e54465dcbb97b22e273d14f1a2df23f9b541a6d2"
+    }
+  ]
+}

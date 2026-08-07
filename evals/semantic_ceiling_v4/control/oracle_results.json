@@ -1,0 +1,421 @@
+{
+  "schema_version": 1,
+  "python_version": "3.10.11 (tags/v3.10.11:7d4cc5a, Apr  5 2023, 00:38:17) [MSC v.1929 64 bit (AMD64)]",
+  "manifest_sha256": "4219d0e0596ec8c39023b82d31124e1d556ffbd6cf4c1a1464b189c8fb4fd12b",
+  "results": [
+    {
+      "case_id": "v4-c01-class-creation",
+      "source": "fixtures/v4_c01_class_creation.py",
+      "source_sha256": "c563b9562c269c78b4d00be7672710e951de88216f6a6e7e8b4213b5f62c6dc7",
+      "claims": [
+        {
+          "id": "V4C01-1",
+          "verdict": "UNSUPPORTED",
+          "observation": {
+            "exception": null,
+            "kind": "return",
+            "value": [
+              "mro_entries",
+              "prepare:Base",
+              "set:field",
+              "set:__orig_bases__",
+              "meta:new:before",
+              "set_name:field",
+              "init_subclass:Target:3",
+              "meta:new:after",
+              "meta:init",
+              "decorate"
+            ]
+          }
+        },
+        {
+          "id": "V4C01-2",
+          "verdict": "SUPPORTED",
+          "observation": {
+            "exception": null,
+            "kind": "return",
+            "value": [
+              [
+                "Base"
+              ],
+              true
+            ]
+          }
+        },
+        {
+          "id": "V4C01-3",
+          "verdict": "SUPPORTED",
+          "observation": {
+            "exception": null,
+            "kind": "return",
+            "value": [
+              "Target",
+              "field"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "v4-c02-duplicate-slots",
+      "source": "fixtures/v4_c02_duplicate_slots.py",
+      "source_sha256": "b1a60cc485692e6186622a9df7f7921e5eaac62cdbb58cb6f00ba2cad5d1f853",
+      "claims": [
+        {
+          "id": "V4C02-1",
+          "verdict": "SUPPORTED",
+          "observation": {
+            "exception": null,
+            "kind": "return",
+            "value": [
+              "child",
+              "root",
+              "child"
+            ]
+          }
+        },
+        {
+          "id": "V4C02-2",
+          "verdict": "UNSUPPORTED",
+          "observation": {
+            "exception": "AttributeError",
+            "kind": "raise",
+            "value": null
+          }
+        },
+        {
+          "id": "V4C02-3",
+          "verdict": "SUPPORTED",
+          "observation": {
+            "exception": null,
+            "kind": "return",
+            "value": [
+              "new",
+              "root"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "v4-c03-zero-arg-super",
+      "source": "fixtures/v4_c03_zero_arg_super.py",
+      "source_sha256": "04584eb9c75fe54234ef10691372b50668a9413a7703bdd073afc5369c7d3408",
+      "claims": [
+        {
+          "id": "V4C03-1",
+          "verdict": "SUPPORTED",
+          "observation": {
+            "exception": null,
+            "kind": "return",
+            "value": "base"
+          }
+        },
+        {
+          "id": "V4C03-2",
+          "verdict": "UNSUPPORTED",
+          "observation": {
+            "exception": "TypeError",
+            "kind": "raise",
+            "value": null
+          }
+        },
+        {
+          "id": "V4C03-3",
+          "verdict": "UNSUPPORTED",
+          "observation": {
+            "exception": "RuntimeError",
+            "kind": "raise",
+            "value": null
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "v4-c04-yield-from",
+      "source": "fixtures/v4_c04_yield_from.py",
+      "source_sha256": "e1db802ad55fa44e6df0d3bc0ff66b584a89c72c40e3dab2f93de65bfdf216e4",
+      "claims": [
+        {
+          "id": "V4C04-1",
+          "verdict": "UNSUPPORTED",
+          "observation": {
+            "exception": null,
+            "kind": "return",
+            "value": [
+              "ready",
+              6,
+              9,
+              [
+                "outer:start",
+                "delegated:start",
+                [
+                  "delegated:received",
+                  3
+                ],
+                "delegated:finally",
+                [
+                  "outer:result",
+                  8
+                ],
+                "outer:finally"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "V4C04-2",
+          "verdict": "SUPPORTED",
+          "observation": {
+            "exception": null,
+            "kind": "return",
+            "value": [
+              "ready",
+              6,
+              8,
+              [
+                "outer:start",
+                "delegated:start",
+                [
+                  "delegated:received",
+                  3
+                ],
+                "delegated:key_error",
+                "delegated:finally",
+                [
+                  "outer:result",
+                  7
+                ],
+                "outer:finally"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "V4C04-3",
+          "verdict": "UNSUPPORTED",
+          "observation": {
+            "exception": null,
+            "kind": "return",
+            "value": [
+              "ready",
+              6,
+              null,
+              [
+                "outer:start",
+                "delegated:start",
+                [
+                  "delegated:received",
+                  3
+                ],
+                "delegated:finally",
+                "outer:finally"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "v4-c05-match-protocol",
+      "source": "fixtures/v4_c05_match_protocol.py",
+      "source_sha256": "763667b3c6650d0869d5eaf20992805b3b3196f02280ab22659d62aace638e4f",
+      "claims": [
+        {
+          "id": "V4C05-1",
+          "verdict": "UNSUPPORTED",
+          "observation": {
+            "exception": null,
+            "kind": "return",
+            "value": [
+              "other",
+              [
+                "x",
+                "y",
+                "guard:0",
+                "x",
+                "y"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "V4C05-2",
+          "verdict": "SUPPORTED",
+          "observation": {
+            "exception": null,
+            "kind": "return",
+            "value": [
+              "second",
+              [
+                "x",
+                "y",
+                "x",
+                "y"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "V4C05-3",
+          "verdict": "SUPPORTED",
+          "observation": {
+            "exception": "TypeError",
+            "kind": "raise",
+            "value": null
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "v4-c06-exception-targets",
+      "source": "fixtures/v4_c06_exception_targets.py",
+      "source_sha256": "5910cfcb74664b6611ebaa97e574a9ce4f5c247147f604b8ec877d7f481ff431",
+      "claims": [
+        {
+          "id": "V4C06-1",
+          "verdict": "SUPPORTED",
+          "observation": {
+            "exception": null,
+            "kind": "return",
+            "value": [
+              "NameError",
+              "NameError"
+            ]
+          }
+        },
+        {
+          "id": "V4C06-2",
+          "verdict": "UNSUPPORTED",
+          "observation": {
+            "exception": null,
+            "kind": "return",
+            "value": "ValueError"
+          }
+        },
+        {
+          "id": "V4C06-3",
+          "verdict": "UNSUPPORTED",
+          "observation": {
+            "exception": null,
+            "kind": "return",
+            "value": [
+              "ZeroDivisionError",
+              "UnboundLocalError",
+              false
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "v4-c07-augmented-descriptor",
+      "source": "fixtures/v4_c07_augmented_descriptor.py",
+      "source_sha256": "79841c86c67fef3e00ebe19ee2b841630c899231aa74ecb66c79533841a4d752",
+      "claims": [
+        {
+          "id": "V4C07-1",
+          "verdict": "SUPPORTED",
+          "observation": {
+            "exception": null,
+            "kind": "return",
+            "value": [
+              "right",
+              [
+                "get",
+                "iadd",
+                "radd",
+                "set:str",
+                "get"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "V4C07-2",
+          "verdict": "UNSUPPORTED",
+          "observation": {
+            "exception": null,
+            "kind": "return",
+            "value": [
+              "left",
+              [
+                "get",
+                "iadd",
+                "add",
+                "set:str",
+                "get"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "V4C07-3",
+          "verdict": "SUPPORTED",
+          "observation": {
+            "exception": null,
+            "kind": "return",
+            "value": [
+              "get",
+              "iadd",
+              "radd",
+              "set:str"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "v4-c08-context-stack",
+      "source": "fixtures/v4_c08_context_stack.py",
+      "source_sha256": "d4bb0cc6eba8be6346d88849cf90e3d3abeb4138b469386f93e2166323f130a9",
+      "claims": [
+        {
+          "id": "V4C08-1",
+          "verdict": "UNSUPPORTED",
+          "observation": {
+            "exception": null,
+            "kind": "return",
+            "value": [
+              "enter:outer",
+              "enter:middle",
+              "enter:inner",
+              "body",
+              [
+                "exit:inner",
+                "ValueError"
+              ],
+              [
+                "exit:middle",
+                "KeyError"
+              ],
+              [
+                "exit:outer",
+                null
+              ],
+              "after"
+            ]
+          }
+        },
+        {
+          "id": "V4C08-2",
+          "verdict": "SUPPORTED",
+          "observation": {
+            "exception": null,
+            "kind": "return",
+            "value": "after"
+          }
+        },
+        {
+          "id": "V4C08-3",
+          "verdict": "UNSUPPORTED",
+          "observation": {
+            "exception": "KeyError",
+            "kind": "raise",
+            "value": null
+          }
+        }
+      ]
+    }
+  ]
+}

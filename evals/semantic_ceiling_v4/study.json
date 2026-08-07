@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "experiment_id": "sol-medium-semantic-ceiling-v4",
+  "purpose": "Measure whether a new public composite-semantics screen avoids the v2 Sol-medium ceiling.",
+  "scope": {
+    "python": "CPython 3.10.11",
+    "case_clusters": 8,
+    "claims_per_cluster": 3,
+    "claim_count": 24,
+    "batch_only": true,
+    "separate_fresh_thread_requests": 8
+  },
+  "model_contract": {
+    "provider": "openai_codex",
+    "execution_mode": "codex_account_integration",
+    "model_name": "gpt-5.6-sol",
+    "reasoning_effort": "medium",
+    "sdk_version": "0.144.4",
+    "api_key_environment_forbidden": ["OPENAI_API_KEY", "CODEX_API_KEY", "CODEX_ACCESS_TOKEN"],
+    "fresh_thread_per_cluster": true,
+    "agent_tools_allowed": false,
+    "runner_request_retry_count": 0,
+    "transport_internal_retry_claim": false
+  },
+  "output_contract": {
+    "generated_token_posthoc_limit_per_batch": 2400,
+    "strict_json": true,
+    "value_json_decode_count": 1,
+    "reason_scored": false
+  },
+  "balance_contract": {
+    "supported": 12,
+    "unsupported": 12,
+    "supported_per_batch_position": [4, 4, 4],
+    "unsupported_per_batch_position": [4, 4, 4]
+  },
+  "baseline_contract": {
+    "strategy": "copy each proposition observation and answer SUPPORTED",
+    "joint_correct": 12,
+    "supported_joint_correct": 12,
+    "unsupported_joint_correct": 0
+  },
+  "execution_rule": {
+    "maximum_model_requests": 8,
+    "score_based_early_stop": false,
+    "runtime_or_client_contract_error": "record_and_stop_immediately",
+    "strict_parse_failure": "record_and_continue_remaining_clusters",
+    "started_but_unfinished_request": "indeterminate_and_never_retry_same_freeze",
+    "canonical_attempts_per_freeze": 1
+  },
+  "classification_priority": [
+    "output_or_runtime_failure",
+    "ceiling_persists",
+    "near_ceiling",
+    "anti_ceiling_pass",
+    "semantic_floor_or_topic_cliff",
+    "shape_inconclusive"
+  ],
+  "classification_rules": {
+    "output_or_runtime_failure": "fewer than 8 strict parses or readiness mismatch",
+    "ceiling_persists": "24 of 24 jointly correct claims",
+    "near_ceiling": "21 through 23 jointly correct claims",
+    "anti_ceiling_pass": "14 through 20 jointly correct, at least 4 non-perfect clusters, at most 1 zero-score cluster, and at least 4 unsupported claims jointly correct",
+    "semantic_floor_or_topic_cliff": "13 or fewer jointly correct claims, or at least 2 zero-score clusters",
+    "shape_inconclusive": "every other fully parsed distribution"
+  },
+  "interpretation_boundary": {
+    "statistical_claim": false,
+    "public_hidden_benchmark": false,
+    "general_coding_score": false,
+    "model_comparison": false,
+    "billing_zero_cost_claim": false,
+    "local_gpu_telemetry_claim": false,
+    "backend_revision_observed": false,
+    "temperature_observed_or_fixed": false,
+    "seed_observed_or_fixed": false,
+    "single_stochastic_realization": true,
+    "claim_or_cluster_statistical_independence_assumed": false,
+    "causal_difficulty_comparison_to_v2": false,
+    "same_target_model_family_assisted_authoring": true
+  }
+}

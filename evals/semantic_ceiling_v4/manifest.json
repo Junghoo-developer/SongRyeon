@@ -1,0 +1,295 @@
+{
+  "schema_version": 1,
+  "suite_id": "sol-medium-semantic-ceiling-v4",
+  "python_scope": "CPython 3.10.11",
+  "cases": [
+    {
+      "case_id": "v4-c01-class-creation",
+      "source": "fixtures/v4_c01_class_creation.py",
+      "claims": [
+        {
+          "id": "V4C01-1",
+          "function": "observe_creation_events",
+          "description": "observe_creation_events() returns the proposition observation.",
+          "proposition": {
+            "kind": "return",
+            "value": ["mro_entries", "prepare:Base", "set:field", "set:__orig_bases__", "meta:new:before", "init_subclass:Target:3", "set_name:field", "meta:new:after", "meta:init", "decorate"],
+            "exception": null
+          }
+        },
+        {
+          "id": "V4C01-2",
+          "function": "observe_rewritten_bases",
+          "description": "observe_rewritten_bases() returns the proposition observation.",
+          "proposition": {
+            "kind": "return",
+            "value": [["Base"], true],
+            "exception": null
+          }
+        },
+        {
+          "id": "V4C01-3",
+          "function": "observe_marker_binding",
+          "description": "observe_marker_binding() returns the proposition observation.",
+          "proposition": {
+            "kind": "return",
+            "value": ["Target", "field"],
+            "exception": null
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "v4-c02-duplicate-slots",
+      "source": "fixtures/v4_c02_duplicate_slots.py",
+      "claims": [
+        {
+          "id": "V4C02-1",
+          "function": "observe_distinct_slots",
+          "description": "observe_distinct_slots() returns the proposition observation.",
+          "proposition": {
+            "kind": "return",
+            "value": ["child", "root", "child"],
+            "exception": null
+          }
+        },
+        {
+          "id": "V4C02-2",
+          "function": "observe_after_child_delete",
+          "description": "observe_after_child_delete() returns the proposition observation.",
+          "proposition": {
+            "kind": "return",
+            "value": "root",
+            "exception": null
+          }
+        },
+        {
+          "id": "V4C02-3",
+          "function": "observe_normal_assignment",
+          "description": "observe_normal_assignment() returns the proposition observation.",
+          "proposition": {
+            "kind": "return",
+            "value": ["new", "root"],
+            "exception": null
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "v4-c03-zero-arg-super",
+      "source": "fixtures/v4_c03_zero_arg_super.py",
+      "claims": [
+        {
+          "id": "V4C03-1",
+          "function": "observe_direct",
+          "description": "observe_direct() returns the proposition observation.",
+          "proposition": {
+            "kind": "return",
+            "value": "base",
+            "exception": null
+          }
+        },
+        {
+          "id": "V4C03-2",
+          "function": "observe_list_comprehension",
+          "description": "observe_list_comprehension() returns the proposition observation.",
+          "proposition": {
+            "kind": "return",
+            "value": ["base"],
+            "exception": null
+          }
+        },
+        {
+          "id": "V4C03-3",
+          "function": "observe_nested_function",
+          "description": "observe_nested_function() raises the proposition exception.",
+          "proposition": {
+            "kind": "raise",
+            "value": null,
+            "exception": "TypeError"
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "v4-c04-yield-from",
+      "source": "fixtures/v4_c04_yield_from.py",
+      "claims": [
+        {
+          "id": "V4C04-1",
+          "function": "observe_send",
+          "description": "observe_send() returns the proposition observation.",
+          "proposition": {
+            "kind": "return",
+            "value": ["ready", 6, 8, ["outer:start", "delegated:start", ["delegated:received", 3], "delegated:finally", ["outer:result", 8], "outer:finally"]],
+            "exception": null
+          }
+        },
+        {
+          "id": "V4C04-2",
+          "function": "observe_throw",
+          "description": "observe_throw() returns the proposition observation.",
+          "proposition": {
+            "kind": "return",
+            "value": ["ready", 6, 8, ["outer:start", "delegated:start", ["delegated:received", 3], "delegated:key_error", "delegated:finally", ["outer:result", 7], "outer:finally"]],
+            "exception": null
+          }
+        },
+        {
+          "id": "V4C04-3",
+          "function": "observe_close",
+          "description": "observe_close() returns the proposition observation.",
+          "proposition": {
+            "kind": "return",
+            "value": ["ready", 6, null, ["outer:start", "delegated:start", ["delegated:received", 3], "delegated:finally", ["outer:result", null], "outer:finally"]],
+            "exception": null
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "v4-c05-match-protocol",
+      "source": "fixtures/v4_c05_match_protocol.py",
+      "claims": [
+        {
+          "id": "V4C05-1",
+          "function": "observe_guard_fallback",
+          "description": "observe_guard_fallback() returns the proposition observation.",
+          "proposition": {
+            "kind": "return",
+            "value": ["second", ["x", "y", "guard:0", "x", "y"]],
+            "exception": null
+          }
+        },
+        {
+          "id": "V4C05-2",
+          "function": "observe_second_case",
+          "description": "observe_second_case() returns the proposition observation.",
+          "proposition": {
+            "kind": "return",
+            "value": ["second", ["x", "y", "x", "y"]],
+            "exception": null
+          }
+        },
+        {
+          "id": "V4C05-3",
+          "function": "observe_invalid_match_args",
+          "description": "observe_invalid_match_args() raises the proposition exception.",
+          "proposition": {
+            "kind": "raise",
+            "value": null,
+            "exception": "TypeError"
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "v4-c06-exception-targets",
+      "source": "fixtures/v4_c06_exception_targets.py",
+      "claims": [
+        {
+          "id": "V4C06-1",
+          "function": "observe_cleared_cells",
+          "description": "observe_cleared_cells() returns the proposition observation.",
+          "proposition": {
+            "kind": "return",
+            "value": ["NameError", "NameError"],
+            "exception": null
+          }
+        },
+        {
+          "id": "V4C06-2",
+          "function": "observe_default_capture",
+          "description": "observe_default_capture() returns the proposition observation.",
+          "proposition": {
+            "kind": "return",
+            "value": "Exception",
+            "exception": null
+          }
+        },
+        {
+          "id": "V4C06-3",
+          "function": "observe_previous_binding",
+          "description": "observe_previous_binding() returns the proposition observation.",
+          "proposition": {
+            "kind": "return",
+            "value": ["ZeroDivisionError", "NameError", false],
+            "exception": null
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "v4-c07-augmented-descriptor",
+      "source": "fixtures/v4_c07_augmented_descriptor.py",
+      "claims": [
+        {
+          "id": "V4C07-1",
+          "function": "observe_subclass_fallback",
+          "description": "observe_subclass_fallback() returns the proposition observation.",
+          "proposition": {
+            "kind": "return",
+            "value": ["right", ["get", "iadd", "radd", "set:str", "get"]],
+            "exception": null
+          }
+        },
+        {
+          "id": "V4C07-2",
+          "function": "observe_same_type_fallback",
+          "description": "observe_same_type_fallback() returns the proposition observation.",
+          "proposition": {
+            "kind": "return",
+            "value": ["left", ["get", "iadd", "radd", "set:str", "get"]],
+            "exception": null
+          }
+        },
+        {
+          "id": "V4C07-3",
+          "function": "observe_assignment_events",
+          "description": "observe_assignment_events() returns the proposition observation.",
+          "proposition": {
+            "kind": "return",
+            "value": ["get", "iadd", "radd", "set:str"],
+            "exception": null
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "v4-c08-context-stack",
+      "source": "fixtures/v4_c08_context_stack.py",
+      "claims": [
+        {
+          "id": "V4C08-1",
+          "function": "observe_suppressed_trace",
+          "description": "observe_suppressed_trace() returns the proposition observation.",
+          "proposition": {
+            "kind": "return",
+            "value": ["enter:outer", "enter:middle", "enter:inner", "body", ["exit:inner", "ValueError"], ["exit:middle", "KeyError"], ["exit:outer", "KeyError"], "after"],
+            "exception": null
+          }
+        },
+        {
+          "id": "V4C08-2",
+          "function": "observe_after_marker",
+          "description": "observe_after_marker() returns the proposition observation.",
+          "proposition": {
+            "kind": "return",
+            "value": "after",
+            "exception": null
+          }
+        },
+        {
+          "id": "V4C08-3",
+          "function": "observe_unsuppressed_replacement",
+          "description": "observe_unsuppressed_replacement() raises the proposition exception.",
+          "proposition": {
+            "kind": "raise",
+            "value": null,
+            "exception": "ValueError"
+          }
+        }
+      ]
+    }
+  ]
+}

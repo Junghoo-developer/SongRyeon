@@ -1,5 +1,9 @@
 .gitattributes text eol=lf
 evals/semantic_calibration_v3/** text eol=lf
+evals/semantic_ceiling_v4/** text eol=lf
+tests/evals/test_semantic_ceiling_v4*.py text eol=lf
 evidence/semantic_calibration_v3/** text eol=lf
+evidence/semantic_ceiling_v4/** text eol=lf
+evidence/semantic_ceiling_v4/**/run.json -text
 evidence/semantic_calibration_codex_pilot/**/pilot.json -text
 llm/**/*.py text eol=lf
