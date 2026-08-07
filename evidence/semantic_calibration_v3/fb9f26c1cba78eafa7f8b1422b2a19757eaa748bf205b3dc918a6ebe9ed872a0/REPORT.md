@@ -80,14 +80,20 @@ of three.
 | typed observation correct | 21/36 | 19/36 |
 | joint verdict + observation | **20/36 (55.6%)** | **17/36 (47.2%)** |
 | joint correctness given a parsed unit | 20/33 (60.6%) | 17/24 (70.8%) |
-| exact three-claim batches | — | 3/12 |
-| generated tokens | 6,041 | 5,277 |
+| exact three-claim batches | not applicable | 3/12 |
+| recorded generated tokens | >= 6,041 | 5,277 |
 | measured call latency | 126.19 s | 85.41 s |
 
 Paired claim outcomes were 16 both-correct, 4 single-only, 1 batch-only, and
 15 neither. The observed single-to-batch net loss was three claims, but this
 must not be interpreted as a clean semantic batch effect because four batch
 units failed inner JSON decoding.
+
+An independent rescore reproduced every correctness, parsing, denominator,
+and gate value above. The single-lane token value is only a lower bound: the
+one `num_predict`-terminated call retained its attempt and latency but not its
+provider `eval_count`, so the exact single and combined generated-token totals
+cannot be recovered from the sealed artifact. The batch token total is exact.
 
 ## Parsing and execution failures
 
@@ -99,8 +105,9 @@ normalization failures.
 - total: 48 model-call attempts, 47 execution completions, 41 fully parsed
   units.
 
-The six malformed `value_json` strings included trailing commas or incomplete
-arrays, Python-style single-quoted lists, and fragments of the outer
+Six failed units contained ten malformed `value_json` strings. They included
+trailing commas or incomplete arrays, Python-style single-quoted lists, and
+fragments of the outer
 `exception` field leaking inside the inner JSON string. Thus v3.2 recovered
 outer-schema compatibility but moved the remaining serialization vulnerability
 into a free string. End-to-end wire reliability still failed under semantic
