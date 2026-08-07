@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "status": "preregistered_before_scored_model_call",
+  "model_contract": {
+    "model_name": "gemma4:26b",
+    "timeout_seconds": 300,
+    "num_ctx": 16384,
+    "keep_alive": "30m",
+    "temperature": 0,
+    "seed": 8849,
+    "think": false
+  },
+  "model_readiness": {
+    "server_version": "0.32.6",
+    "model_name": "gemma4:26b",
+    "model_digest": "5571076f3d70050487b26b341705799e0ab29b808164f90d20d4cf84f699d251"
+  },
+  "package_versions": {
+    "python": "3.10.11",
+    "implementation": "CPython",
+    "packages": {
+      "pytest": "9.0.3"
+    }
+  },
+  "source_commit": "ebb577068fb859a8877f7855789dee0abcafcdf2",
+  "files": {
+    "workspace/.gitattributes": "e1775518ff2b681d597e579aabded4c1495c703c5a7f0cba561647d9453076ce",
+    "experiment/artifacts.py": "27f7c470be5378ac4533b7a6979e05a7cf97cbdebd70625c5627c09a6836bd31",
+    "experiment/build_oracle.py": "9e86f45b689474c25ceceab186461d5ed3376b03d593455142d397cb486fbc41",
+    "experiment/build_plan.py": "3de8d7a78fd26a7b35c4a8b49ad7e9c980dc7ebed7dca07063eb7ab27cdac434",
+    "experiment/contract_cases.json": "13a15bccbb0c5c984bfdf448d9d451aa704f548223c59b24dec829c248076d86",
+    "experiment/contracts.py": "219c43c3a52c9709cd13a18f7543a61cc4d28836bba4656e3ebd18b70b5e5937",
+    "experiment/control/oracle_results.json": "4358ae9a4e583591263885b674636a8f07598adc5e7189ed4a41c08305ffd5f2",
+    "experiment/control/run_plan.json": "3ced638a936ee4497db1bd55a7572eefae1d1cdbeee5896ceec3dbecc97b7108",
+    "experiment/fixtures/cal_a01_bool.py": "2453a64f3d5f4c75584ff047e21ee032003d8f0dec9f19bcec3c3e8aa1db2fb7",
+    "experiment/fixtures/cal_a02_slice.py": "099a9f540730f5554713d6f3bb95119e05fdfbc3b3996733c38729b5cc29f842",
+    "experiment/fixtures/cal_a03_comprehension.py": "623508420fb4e330df73b73e9f6d8e59187a573dfec346c262aa8b3b547030c0",
+    "experiment/fixtures/cal_a04_dict.py": "9dde17fe0c0318fb4784364d798028e3b2e52c5d60446174830d66109cd3e681",
+    "experiment/fixtures/cal_h01_operators.py": "c4ea1b083eed57545a7f1f6ab0b7cf2c125559acd1c66f813f681991cc41ae25",
+    "experiment/fixtures/cal_h02_metaclass.py": "0c12010a9f7021e124b876010d4221c1be578b2b6c3e5214072e22e771cb7b7e",
+    "experiment/fixtures/cal_h03_new.py": "42882ef4d0e547effba10c2dbc7ad413f0973a0e53a06d886050005abe3b647e",
+    "experiment/fixtures/cal_h04_exec.py": "fa62c3d1b939bb282ff904fd70fe6c657207a72993e459fc74868d4981580ced",
+    "experiment/fixtures/cal_m01_signature.py": "63edad0afae47e9213f67f72327f5a238c4cf203d07d3bad2c1a6699beaf89ca",
+    "experiment/fixtures/cal_m02_sort.py": "195db18f6bb47a9fe2331d2aac716283a0d1917b8161c0e1a332be173c38a3b3",
+    "experiment/fixtures/cal_m03_membership.py": "bf3b4627dbed26b765074a2f9ad65730154ff182227c1cf0a4bed4a0a5a082e5",
+    "experiment/fixtures/cal_m04_dispatch.py": "b248cfea1e5818c9db289dfd69381ce9c7b4d9a36b61c54c4f34138e6d1a5557",
+    "experiment/freeze_v3.py": "4ad6cc408e2d0c0e0003d6f06e1bc3e7185e2ca5164c0c450f285d153e2e94e2",
+    "experiment/manifest.json": "98b29c0c50440723f34afcc8f3e66054862aca754aed6fb5bcec24bd57d3dc6b",
+    "experiment/PROTOCOL.md": "6c0da8c4978f3016628a863a2aa453a65d95de828b0f0ab347a5392e42e2a196",
+    "experiment/run_bare_v3.py": "0c75426c8cb44d4173e1353f4c5257f3955aafc816a5e0086dad7bb56fcfca68",
+    "experiment/schemas.py": "268fd5279810c4a3fcb72ee1e7afe89417a971f5f31db5cb4eec54eae25b5137",
+    "experiment/score_v3.py": "23b4693c7c7dc67da5d88d5098baaa5c5bd9286abe8e264f2305e3eaad8dfb60",
+    "experiment/seal_v3.py": "142d473819cec2f6eca09825e700a9ecd051cccf60a5079ef1e43f1cf7e38b8c",
+    "experiment/tests/test_gate_boundaries.py": "839c2e4026fcb191be7838be61b2fc027cda7549d4c95959197f79204b8bee15",
+    "experiment/tests/test_oracle_path_safety.py": "6ee010d89ec6acfdb2178931a3684001bc476fdcc4f397c67326094cd6ede263",
+    "experiment/tests/test_protocol_invariants.py": "846e748cc0fea6a6a952077050b581c15eb6762026d76f7c428d23761317ffe9",
+    "experiment/tests/test_v3.py": "14f6d472662ec479daa0f87942de7e3f83dcf9a5abb949c8342e814d66df5eba",
+    "workspace/llm/__init__.py": "2d5e41123841cf0a3c1d12eaa2b40a2f0fa8f19ebf702efc95ff05cbf041b4f9",
+    "workspace/llm/client.py": "e95c6b9d4e511000871ac74e48f21d0ffc19ee4db6d02742e7a56afeb7fb9b81",
+    "workspace/llm/codex_account.py": "20e465fff8aa6ac656609103bb879b8106be7da7cb4082a01dd195a7d04d6cdc",
+    "workspace/llm/openai_compatible.py": "8c57668262e09ce44ec926c2ef9a59f94d8889b6587227d5333ad1747697bd6d",
+    "workspace/llm/structured.py": "0b8fd2336e3096870324c142977c3602a24b73cbd4afe2fe8ac3d98be295553c"
+  }
+}
