@@ -173,7 +173,7 @@ def response_schema(ids, *, allow_unknown: bool):
                         "id": {"type": "string", "enum": list(ids)},
                         "verdict": {"type": "string", "enum": verdicts},
                         "observation": {"oneOf": observation_variants},
-                        "reason": {"type": "string", "minLength": 1, "pattern": "\\S"},
+                        "reason": {"type": "string", "minLength": 1},
                     },
                 },
             }

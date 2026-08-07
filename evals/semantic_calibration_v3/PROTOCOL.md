@@ -1,6 +1,16 @@
-# Semantic Calibration v3 — Preregistration
+# Semantic Calibration v3.1 — Preregistration
 
 ## Status and purpose
+
+Revision v3.1 is a single compatibility amendment made after the primary v3
+contract preflight failed before producing any model response. The frozen v3
+schema used the unanchored provider-side pattern `\S`; Ollama 0.32.6 rejected
+all four requests because its JSON-schema converter requires patterns to start
+with `^` and end with `$`. The failed freeze, exact artifact, and diagnosis are
+preserved under `evidence/semantic_calibration_v3/2aeb51729e9b184f9fd70b96eb0274b473e9f418bc7a3cead17f2dd66d1933f8/`.
+V3.1 removes only that provider-side pattern. The local strict parser still
+rejects empty or whitespace-only reasons. Fixtures, prompts, oracle outcomes,
+run order, score thresholds, and stopping rules are unchanged.
 
 This is a public calibration suite, not a hidden benchmark and not a system
 ranking. It separates three possible bottlenecks that Hard Semantics v2 mixed:

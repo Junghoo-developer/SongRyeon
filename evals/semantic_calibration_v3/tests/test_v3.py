@@ -186,6 +186,45 @@ def test_typed_parser_rejects_wrong_shapes():
     assert response_schema(["X"], allow_unknown=False)["properties"]["claims"]["minItems"] == 1
 
 
+def test_provider_schema_uses_only_anchored_patterns_while_parser_rejects_blank_reason():
+    schema = response_schema(["X"], allow_unknown=False)
+    patterns = []
+
+    def collect(value):
+        if isinstance(value, dict):
+            if "pattern" in value:
+                patterns.append(value["pattern"])
+            for child in value.values():
+                collect(child)
+        elif isinstance(value, list):
+            for child in value:
+                collect(child)
+
+    collect(schema)
+    assert patterns
+    assert all(pattern.startswith("^") and pattern.endswith("$") for pattern in patterns)
+    reason_schema = schema["properties"]["claims"]["items"]["properties"]["reason"]
+    assert reason_schema == {"type": "string", "minLength": 1}
+
+    whitespace_reason = json.dumps(
+        {
+            "claims": [
+                {
+                    "id": "X",
+                    "verdict": "SUPPORTED",
+                    "observation": {
+                        "kind": "return",
+                        "value": True,
+                        "exception": None,
+                    },
+                    "reason": "   ",
+                }
+            ]
+        }
+    )
+    assert parse_response(whitespace_reason, ["X"], allow_unknown=False)[1] == "reason_invalid"
+
+
 def test_perfect_contract_document_passes():
     cases = load("contract_cases.json")["cases"]
     units = load("control/run_plan.json")["contract_units"]
