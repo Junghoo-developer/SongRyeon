@@ -1,0 +1,139 @@
+{
+  "schema_version": 1,
+  "stage": "contract",
+  "system_name": "bare-gemma4-26b-complete-source-v3",
+  "freeze_sha256": "2aeb51729e9b184f9fd70b96eb0274b473e9f418bc7a3cead17f2dd66d1933f8",
+  "freeze_publication": {
+    "commit": "b81ae3ee48622fd12a75b684a98bb923b53b1de1",
+    "remote_ref": "origin/codex/contest-release-2026"
+  },
+  "run_plan_sha256": "0a878e6fe48ab5c5ca4f25ec7d7d6b016e34efb9ec6f728d7348b931178036d7",
+  "model_contract": {
+    "model_name": "gemma4:26b",
+    "timeout_seconds": 300,
+    "num_ctx": 16384,
+    "keep_alive": "30m",
+    "temperature": 0,
+    "seed": 8849,
+    "think": false
+  },
+  "model_readiness": {
+    "server_version": "0.32.6",
+    "model_name": "gemma4:26b",
+    "model_digest": "5571076f3d70050487b26b341705799e0ab29b808164f90d20d4cf84f699d251"
+  },
+  "run_id": "80be28ebf7ac4af09cf4ba4f0ddab31c",
+  "run_state": "complete",
+  "final_readiness": {
+    "server_version": "0.32.6",
+    "model_name": "gemma4:26b",
+    "model_digest": "5571076f3d70050487b26b341705799e0ab29b808164f90d20d4cf84f699d251"
+  },
+  "contract_preflight": null,
+  "rows": [
+    {
+      "schema_version": 1,
+      "plan_id": "contract-01-contract-primitive-return",
+      "stage": "contract",
+      "mode": "contract",
+      "case_id": "contract-primitive-return",
+      "difficulty": "contract",
+      "expected_ids": [
+        "CT1"
+      ],
+      "internal_claim_ids": [
+        "CT1"
+      ],
+      "effective_request_sha256": "db22894115b6824ebee5ac819184e09ea36ce3b80c302b913150da995eb3e787",
+      "completed": false,
+      "answer": "",
+      "error": "ModelCallError: Ollama HTTP 오류(400): {\"error\":\"{\\\"error\\\":{\\\"code\\\":400,\\\"message\\\":\\\"Field 'json_schema': \\\\\\\"json_schema\\\\\\\": JSON schema conversion failed:\\\\nPattern must start with '^' and end with '$'\\\",\\\"type\\\":\\\"invalid_request_error\\\"}}\"}",
+      "latency_ms": 10221.091,
+      "model_call_count": 1,
+      "agent_tool_calls": [],
+      "model_metrics": {},
+      "model_reply": null,
+      "state": "finished",
+      "attempt_id": "80be28ebf7ac4af09cf4ba4f0ddab31c:1:contract-01-contract-primitive-return"
+    },
+    {
+      "schema_version": 1,
+      "plan_id": "contract-02-contract-nested-return",
+      "stage": "contract",
+      "mode": "contract",
+      "case_id": "contract-nested-return",
+      "difficulty": "contract",
+      "expected_ids": [
+        "CT2"
+      ],
+      "internal_claim_ids": [
+        "CT2"
+      ],
+      "effective_request_sha256": "d972bd6b9d3dc3082ab5cb60ee23db7c60b64d7bebb9ca922d901a32ffe4618f",
+      "completed": false,
+      "answer": "",
+      "error": "ModelCallError: Ollama HTTP 오류(400): {\"error\":\"{\\\"error\\\":{\\\"code\\\":400,\\\"message\\\":\\\"Field 'json_schema': \\\\\\\"json_schema\\\\\\\": JSON schema conversion failed:\\\\nPattern must start with '^' and end with '$'\\\",\\\"type\\\":\\\"invalid_request_error\\\"}}\"}",
+      "latency_ms": 435.334,
+      "model_call_count": 1,
+      "agent_tool_calls": [],
+      "model_metrics": {},
+      "model_reply": null,
+      "state": "finished",
+      "attempt_id": "80be28ebf7ac4af09cf4ba4f0ddab31c:2:contract-02-contract-nested-return"
+    },
+    {
+      "schema_version": 1,
+      "plan_id": "contract-03-contract-raised-exception",
+      "stage": "contract",
+      "mode": "contract",
+      "case_id": "contract-raised-exception",
+      "difficulty": "contract",
+      "expected_ids": [
+        "CT3"
+      ],
+      "internal_claim_ids": [
+        "CT3"
+      ],
+      "effective_request_sha256": "76f461b3305b3b832a1dfe8a2054bbf561b621a966b2c87a42e47066aabdb9b5",
+      "completed": false,
+      "answer": "",
+      "error": "ModelCallError: Ollama HTTP 오류(400): {\"error\":\"{\\\"error\\\":{\\\"code\\\":400,\\\"message\\\":\\\"Field 'json_schema': \\\\\\\"json_schema\\\\\\\": JSON schema conversion failed:\\\\nPattern must start with '^' and end with '$'\\\",\\\"type\\\":\\\"invalid_request_error\\\"}}\"}",
+      "latency_ms": 434.297,
+      "model_call_count": 1,
+      "agent_tool_calls": [],
+      "model_metrics": {},
+      "model_reply": null,
+      "state": "finished",
+      "attempt_id": "80be28ebf7ac4af09cf4ba4f0ddab31c:3:contract-03-contract-raised-exception"
+    },
+    {
+      "schema_version": 1,
+      "plan_id": "contract-04-contract-three-claim-batch",
+      "stage": "contract",
+      "mode": "contract",
+      "case_id": "contract-three-claim-batch",
+      "difficulty": "contract",
+      "expected_ids": [
+        "CT4-A",
+        "CT4-B",
+        "CT4-C"
+      ],
+      "internal_claim_ids": [
+        "CT4-A",
+        "CT4-B",
+        "CT4-C"
+      ],
+      "effective_request_sha256": "2ebdff4db81d0461ac8865860e6b5383bf1489d76e8e2794f4672675d19b8d46",
+      "completed": false,
+      "answer": "",
+      "error": "ModelCallError: Ollama HTTP 오류(400): {\"error\":\"{\\\"error\\\":{\\\"code\\\":400,\\\"message\\\":\\\"Field 'json_schema': \\\\\\\"json_schema\\\\\\\": JSON schema conversion failed:\\\\nPattern must start with '^' and end with '$'\\\",\\\"type\\\":\\\"invalid_request_error\\\"}}\"}",
+      "latency_ms": 434.571,
+      "model_call_count": 1,
+      "agent_tool_calls": [],
+      "model_metrics": {},
+      "model_reply": null,
+      "state": "finished",
+      "attempt_id": "80be28ebf7ac4af09cf4ba4f0ddab31c:4:contract-04-contract-three-claim-batch"
+    }
+  ]
+}
