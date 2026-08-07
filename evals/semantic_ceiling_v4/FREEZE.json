@@ -1,0 +1,157 @@
+{
+  "schema_version": 1,
+  "status": "preregistered_before_target_model_output",
+  "experiment_id": "sol-medium-semantic-ceiling-v4",
+  "python_contract": {
+    "implementation": "CPython",
+    "version": "3.10.11"
+  },
+  "sdk_distribution": {
+    "name": "openai-codex",
+    "version": "0.144.4",
+    "record_path": "openai_codex-0.144.4.dist-info/RECORD",
+    "record_sha256": "4a3c8d5a7b5355ca7aaa55f95e7c3d1e2287d3022f515b4f04c231ad157cda4b",
+    "verified_file_count": 25,
+    "verified_files_tree_sha256": "7a2943cb2f9d6ca4ec3b828ef450e776dd61c5d88ae267e35fe49f95423bd005"
+  },
+  "source_commit": "c755e72f79999805ba707614365df6edf0216471",
+  "source_publication": {
+    "commit": "c755e72f79999805ba707614365df6edf0216471",
+    "branch": "codex/contest-release-2026",
+    "upstream": "origin/codex/contest-release-2026",
+    "remote_url": "https://github.com/Junghoo-developer/SongRyeon.git",
+    "live_commit": "c755e72f79999805ba707614365df6edf0216471"
+  },
+  "model_contract": {
+    "provider": "openai_codex",
+    "execution_mode": "codex_account_integration",
+    "model_name": "gpt-5.6-sol",
+    "reasoning_effort": "medium",
+    "sdk_version": "0.144.4",
+    "api_key_environment_forbidden": [
+      "OPENAI_API_KEY",
+      "CODEX_API_KEY",
+      "CODEX_ACCESS_TOKEN"
+    ],
+    "fresh_thread_per_cluster": true,
+    "agent_tools_allowed": false,
+    "runner_request_retry_count": 0,
+    "transport_internal_retry_claim": false
+  },
+  "files": {
+    ".gitattributes": {
+      "size": 391,
+      "sha256": "02943246d23653f062802042ac4b9ec320927cd1b828fa70e6f141bdbe3b8ffb"
+    },
+    "evals/semantic_ceiling_v4/PROTOCOL.md": {
+      "size": 7678,
+      "sha256": "7873a2871ec23a83f8055f0df09e2bf600c02d461e114bd90efe9ee20d749ab2"
+    },
+    "evals/semantic_ceiling_v4/build_v4.py": {
+      "size": 22946,
+      "sha256": "a1adf478f863f1b8ece973d1ffa710de47682b540a072030e94243dff4e51813"
+    },
+    "evals/semantic_ceiling_v4/control/oracle_results.json": {
+      "size": 10295,
+      "sha256": "1a517a833fae3cec346c35bf9f91a937ae31864d71d1060b6b5f4c8a5fc19f91"
+    },
+    "evals/semantic_ceiling_v4/control/run_plan.json": {
+      "size": 54555,
+      "sha256": "a38918d4323d4ad8eef51301503853925551aef565947b80fffdca6689d6cfc5"
+    },
+    "evals/semantic_ceiling_v4/fixtures/v4_c01_class_creation.py": {
+      "size": 1751,
+      "sha256": "c563b9562c269c78b4d00be7672710e951de88216f6a6e7e8b4213b5f62c6dc7"
+    },
+    "evals/semantic_ceiling_v4/fixtures/v4_c02_duplicate_slots.py": {
+      "size": 710,
+      "sha256": "b1a60cc485692e6186622a9df7f7921e5eaac62cdbb58cb6f00ba2cad5d1f853"
+    },
+    "evals/semantic_ceiling_v4/fixtures/v4_c03_zero_arg_super.py": {
+      "size": 525,
+      "sha256": "04584eb9c75fe54234ef10691372b50668a9413a7703bdd073afc5369c7d3408"
+    },
+    "evals/semantic_ceiling_v4/fixtures/v4_c04_yield_from.py": {
+      "size": 1294,
+      "sha256": "e1db802ad55fa44e6df0d3bc0ff66b584a89c72c40e3dab2f93de65bfdf216e4"
+    },
+    "evals/semantic_ceiling_v4/fixtures/v4_c05_match_protocol.py": {
+      "size": 977,
+      "sha256": "763667b3c6650d0869d5eaf20992805b3b3196f02280ab22659d62aace638e4f"
+    },
+    "evals/semantic_ceiling_v4/fixtures/v4_c06_exception_targets.py": {
+      "size": 1053,
+      "sha256": "5910cfcb74664b6611ebaa97e574a9ce4f5c247147f604b8ec877d7f481ff431"
+    },
+    "evals/semantic_ceiling_v4/fixtures/v4_c07_augmented_descriptor.py": {
+      "size": 1070,
+      "sha256": "79841c86c67fef3e00ebe19ee2b841630c899231aa74ecb66c79533841a4d752"
+    },
+    "evals/semantic_ceiling_v4/fixtures/v4_c08_context_stack.py": {
+      "size": 1131,
+      "sha256": "d4bb0cc6eba8be6346d88849cf90e3d3abeb4138b469386f93e2166323f130a9"
+    },
+    "evals/semantic_ceiling_v4/freeze_v4.py": {
+      "size": 31963,
+      "sha256": "a064367bd40901a8cae11b123d5b08347d58db9ffd8870e1d8412e8975f083c6"
+    },
+    "evals/semantic_ceiling_v4/manifest.json": {
+      "size": 9773,
+      "sha256": "4219d0e0596ec8c39023b82d31124e1d556ffbd6cf4c1a1464b189c8fb4fd12b"
+    },
+    "evals/semantic_ceiling_v4/run_v4.py": {
+      "size": 39545,
+      "sha256": "1b12298d04650e73c747090480aafc0fbfe75c0633125213adbd985cdd39e5d9"
+    },
+    "evals/semantic_ceiling_v4/schemas_v4.py": {
+      "size": 9288,
+      "sha256": "35499d52ff0646067152b80a1d3646b85c874726eb7293bcba1dd7632479fba9"
+    },
+    "evals/semantic_ceiling_v4/seal_v4.py": {
+      "size": 7705,
+      "sha256": "ea21b849d0d66091d661beb1c2b7f5caf03395fbbf700318d2ca09255ae90387"
+    },
+    "evals/semantic_ceiling_v4/study.json": {
+      "size": 3094,
+      "sha256": "d2ee4d19a0bc807ff3a4270ab5e02bf52f7be705250971039f57630fab407d3c"
+    },
+    "llm/__init__.py": {
+      "size": 731,
+      "sha256": "2d5e41123841cf0a3c1d12eaa2b40a2f0fa8f19ebf702efc95ff05cbf041b4f9"
+    },
+    "llm/client.py": {
+      "size": 14320,
+      "sha256": "e95c6b9d4e511000871ac74e48f21d0ffc19ee4db6d02742e7a56afeb7fb9b81"
+    },
+    "llm/codex_account.py": {
+      "size": 13137,
+      "sha256": "20e465fff8aa6ac656609103bb879b8106be7da7cb4082a01dd195a7d04d6cdc"
+    },
+    "llm/openai_compatible.py": {
+      "size": 13116,
+      "sha256": "8c57668262e09ce44ec926c2ef9a59f94d8889b6587227d5333ad1747697bd6d"
+    },
+    "llm/structured.py": {
+      "size": 6947,
+      "sha256": "0b8fd2336e3096870324c142977c3602a24b73cbd4afe2fe8ac3d98be295553c"
+    },
+    "tests/evals/test_semantic_ceiling_v4_build.py": {
+      "size": 12340,
+      "sha256": "6ea32369c915cf9ed34293723774500c57d6595b8c0c05418b68fd90840a3757"
+    },
+    "tests/evals/test_semantic_ceiling_v4_freeze.py": {
+      "size": 15265,
+      "sha256": "ff8d2c0d6e64dddbd1e396c22a97b153d9f4986927dcaeeb8c90d56ae272e151"
+    },
+    "tests/evals/test_semantic_ceiling_v4_runner.py": {
+      "size": 22050,
+      "sha256": "743ca5512420023d58403722a76822326e94755e1d02b8acd7885ce73787f2ed"
+    }
+  },
+  "tree_sha256": "c3131e0b32e7781b82a7bda38da73006218c381c3a6e8fed8948544034b9a8a1",
+  "study_sha256": "d2ee4d19a0bc807ff3a4270ab5e02bf52f7be705250971039f57630fab407d3c",
+  "manifest_sha256": "4219d0e0596ec8c39023b82d31124e1d556ffbd6cf4c1a1464b189c8fb4fd12b",
+  "plan_sha256": "a38918d4323d4ad8eef51301503853925551aef565947b80fffdca6689d6cfc5",
+  "oracle_sha256": "1a517a833fae3cec346c35bf9f91a937ae31864d71d1060b6b5f4c8a5fc19f91",
+  "protocol_sha256": "7873a2871ec23a83f8055f0df09e2bf600c02d461e114bd90efe9ee20d749ab2"
+}
