@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "experiment_id": "songryeon-hybrid-a-only-audit-pilot-v1-2",
+  "study_status": "retrospective_paired_feasibility_pilot",
+  "publishable": false,
+  "result": "inconclusive_but_promising",
+  "source_snapshot_sha256": "69752087feab18941be24598cba307a889ba39197db829551267fea9653d5e44",
+  "freeze_payload_sha256": "ea606ae79fcecaef33b8cc0359d971654f0198e5bc224ab20098d899109fbec9",
+  "artifacts": {
+    "local_auditor_sha256": "765764d6de9885e263fa1719927d01f33b49c2b5ff5d7509ffb0291988251c45",
+    "cloud_auditor_sha256": "88a616792e0a2fc81c1f0faeea17d7f4efa88aab0458093d358ee3a50806dafe",
+    "summary_sha256": "44b9916e3e51855f6cc4a2f69b13e31416468279c2ce6322c41b685c41580286",
+    "human_audit_packet_sha256": "b7b05270b8cf921d82c1057155b71ade124204e7ed72ae70ed6f67447f294903",
+    "human_audit_key_sha256": "5d826d5fa192051293209e9f9810b78c1c2e1f5b2a3b7d1cf58451348343d1df"
+  },
+  "reference_labels": {
+    "status": "blind_ai_preliminary_not_human_ground_truth",
+    "permit": 24,
+    "reject": 6
+  },
+  "conditions": {
+    "no_audit": {
+      "correct": 24,
+      "planned": 30,
+      "technical_failures": 0,
+      "false_permits": 6,
+      "false_rejects": 0,
+      "error_detection": 0.0,
+      "supported_draft_preservation": 1.0,
+      "balanced_accuracy": 0.5
+    },
+    "local_a_only_auditor": {
+      "correct": 21,
+      "planned": 30,
+      "valid": 25,
+      "technical_failures": 5,
+      "false_permits": 3,
+      "false_rejects": 1,
+      "error_detection": 0.5,
+      "supported_draft_preservation": 0.75,
+      "balanced_accuracy": 0.625,
+      "latency_ms": 90483.874,
+      "reported_total_tokens": 21759
+    },
+    "cloud_a_only_auditor": {
+      "correct": 28,
+      "planned": 30,
+      "valid": 30,
+      "technical_failures": 0,
+      "false_permits": 2,
+      "false_rejects": 0,
+      "error_detection": 0.6666666666666666,
+      "supported_draft_preservation": 1.0,
+      "balanced_accuracy": 0.8333333333333333,
+      "latency_ms": 145435.712,
+      "reported_total_tokens": 319815
+    },
+    "selective_hybrid_8_of_30": {
+      "correct": 24,
+      "planned": 30,
+      "valid": 27,
+      "technical_failures": 3,
+      "false_permits": 3,
+      "false_rejects": 0,
+      "error_detection": 0.5,
+      "supported_draft_preservation": 0.875,
+      "balanced_accuracy": 0.6875,
+      "cloud_runner_attempts": 8,
+      "selective_cloud_total_tokens": 85303,
+      "cloud_attempt_reduction": 0.7333333333333334,
+      "cloud_token_reduction": 0.7332739239873052
+    }
+  },
+  "paired": {
+    "cloud_vs_local": {
+      "both_valid": 25,
+      "semantic_corrections": 2,
+      "semantic_regressions": 0,
+      "net_semantic_correction": 2,
+      "invalid_pairs": 5
+    },
+    "selective_vs_local": {
+      "both_valid": 25,
+      "semantic_corrections": 1,
+      "semantic_regressions": 0,
+      "net_semantic_correction": 1,
+      "invalid_pairs": 5
+    }
+  },
+  "predeclared_threshold": {
+    "status": "inconclusive",
+    "reasons": [
+      "local condition had five technical failures",
+      "cloud-vs-local net semantic correction was 2, below 3",
+      "error-detection gain was 16.67 percentage points, below 20"
+    ]
+  },
+  "secondary_ai_blind_review": {
+    "human_ground_truth": false,
+    "item_count": 4,
+    "agreement": [
+      "the imported-but-not-invoked parser draft should be rejected",
+      "the upload-budget correction should be permitted"
+    ],
+    "disagreement": "whether explicitly attributed non-A memory content is permissible when it is not presented as code-verified A",
+    "implication": "clarify the authority policy and test an A envelope for R provenance before any contest-facing accuracy claim"
+  },
+  "telemetry_caveat": "Codex-account token telemetry includes provider harness overhead and is not an invoice or an API-price estimate."
+}
