@@ -1,0 +1,318 @@
+{
+  "schema_version": 2,
+  "experiment_id": "sol-medium-hard-batches-v2",
+  "run_id": "e5b5c94498e947a2a6628a977c044bcd",
+  "run_state": "complete",
+  "publishable": false,
+  "official_score": false,
+  "diagnostic_score": true,
+  "agent_runtime": true,
+  "purpose": "ceiling diagnostic after transport-schema repair",
+  "prior_invalid_artifact_sha256": "6e944771338e7e1887a448673e723508173b7173e3627895eda9443e00a418a9",
+  "protocol_sha256": "6605f8807ac6bc2c4ede3afa78f56f576c452f8ed1c7054bec0b50c75c2adac9",
+  "base_dependency_hashes": {
+    "evals/semantic_calibration_v3/FREEZE.json": "fb9f26c1cba78eafa7f8b1422b2a19757eaa748bf205b3dc918a6ebe9ed872a0",
+    "evals/semantic_calibration_v3/control/run_plan.json": "5f54b9b6dd972b6ad01fe2e1db5bc8d8f2edbfb9bffbd6846361798517c19522",
+    "evals/semantic_calibration_v3/control/oracle_results.json": "4358ae9a4e583591263885b674636a8f07598adc5e7189ed4a41c08305ffd5f2",
+    "evals/semantic_calibration_v3/manifest.json": "98b29c0c50440723f34afcc8f3e66054862aca754aed6fb5bcec24bd57d3dc6b",
+    "evals/semantic_calibration_v3/schemas.py": "5d187d5117d7fe63fb2b31685133e877e72d5b781e2ead2c55976d6be08362b4",
+    "llm/codex_account.py": "20e465fff8aa6ac656609103bb879b8106be7da7cb4082a01dd195a7d04d6cdc"
+  },
+  "v2_dependency_hashes": {
+    "evals/semantic_calibration_codex_pilot.py": "7e54c909f1f35ed4bf4b23f14bc14b0cd4832da29b1466862a0f8c2ef7b7863a",
+    "evidence/semantic_calibration_codex_pilot/6e944771338e7e1887a448673e723508173b7173e3627895eda9443e00a418a9/pilot.json": "6e944771338e7e1887a448673e723508173b7173e3627895eda9443e00a418a9"
+  },
+  "git": {
+    "commit": "b09c0297aedab6a8c1eccd240ce8a636f47f3584",
+    "branch": "codex/contest-release-2026",
+    "upstream": "origin/codex/contest-release-2026",
+    "remote_url": "https://github.com/Junghoo-developer/SongRyeon.git",
+    "remote_commit": "b09c0297aedab6a8c1eccd240ce8a636f47f3584"
+  },
+  "model_contract": {
+    "model_name": "gpt-5.6-sol",
+    "reasoning_effort": "medium",
+    "sdk_version": "0.144.4",
+    "maximum_request_count": 4,
+    "claim_count": 12,
+    "num_predict_semantics": "post-hoc SDK usage check, not server cap"
+  },
+  "transport_schema_policy": {
+    "changed_path": "properties.claims.items.properties.observation",
+    "source_union": "oneOf(return, raise)",
+    "transport_shape": "anyOf(return, raise) with singleton enums",
+    "logical_document_set_unchanged": true,
+    "strict_posthoc_parser_unchanged": true
+  },
+  "decision_rule": {
+    "harder_v4_trigger_min_joint": 10,
+    "required_parsed_units": 4
+  },
+  "started_at_unix": 1786094161.7840223,
+  "rows": [
+    {
+      "plan_id": "semantic-33-batch-cal-h01-reflected-operator-Q-59fd981294_Q-fb72e27640_Q-c1f4f9aa46",
+      "case_id": "cal-h01-reflected-operator",
+      "expected_ids": [
+        "Q-59fd981294",
+        "Q-fb72e27640",
+        "Q-c1f4f9aa46"
+      ],
+      "source_effective_request_sha256": "0e337ae694ffe1fb1edd9e229791563ebb94a2c461ab0d1b005ba6c74ef9eeb1",
+      "source_response_schema_sha256": "820ed7676463f1fe160a729fc0cc6c8d0d7c8cd6f14cf560e8cf4e0fa0465305",
+      "transport_response_schema_sha256": "1ae878c19778f43413890f65ecc6009985763f6c0eb74fa1cdac98725d6a3d80",
+      "transport_effective_request_sha256": "d66959ca140a32320de290f73ddc59b532d123330a98dbdf1a666ea032205d40",
+      "attempt_id": "79c156132f6b44de8c538b202dd81d20",
+      "state": "finished",
+      "model_call_count": 1,
+      "agent_tool_calls": [],
+      "observed_item_types": [
+        "UserMessageThreadItem",
+        "ReasoningThreadItem",
+        "AgentMessageThreadItem"
+      ],
+      "answer": "{\"claims\":[{\"id\":\"Q-59fd981294\",\"verdict\":\"SUPPORTED\",\"observation\":{\"kind\":\"return\",\"value_json\":\"[\\\"right\\\",[\\\"R.radd\\\"]]\",\"exception\":null},\"reason\":\"Right is a strict subclass of Left, so its reflected addition method takes priority.\"},{\"id\":\"Q-fb72e27640\",\"verdict\":\"UNSUPPORTED\",\"observation\":{\"kind\":\"return\",\"value_json\":\"[\\\"left\\\",[\\\"L.add\\\"]]\",\"exception\":null},\"reason\":\"The inherited Left.__add__ on the left operand runs and returns \\\"left\\\" without invoking reflection.\"},{\"id\":\"Q-c1f4f9aa46\",\"verdict\":\"SUPPORTED\",\"observation\":{\"kind\":\"return\",\"value_json\":\"[7,[\\\"N.add\\\",\\\"R.radd\\\"]]\",\"exception\":null},\"reason\":\"Neutral.__add__ returns NotImplemented, so Reflected.__radd__ is called and returns 7.\"}]}",
+      "model_reply": {
+        "model": "gpt-5.6-sol",
+        "done_reason": "stop",
+        "thinking": ""
+      },
+      "model_metrics": {
+        "cached_input_tokens": 0,
+        "input_tokens": 10746,
+        "output_tokens": 347,
+        "reasoning_output_tokens": 138,
+        "total_tokens": 11093
+      },
+      "parse_error": null,
+      "claims": [
+        {
+          "id": "Q-59fd981294",
+          "verdict_correct": true,
+          "observation_correct": true,
+          "joint_correct": true
+        },
+        {
+          "id": "Q-fb72e27640",
+          "verdict_correct": true,
+          "observation_correct": true,
+          "joint_correct": true
+        },
+        {
+          "id": "Q-c1f4f9aa46",
+          "verdict_correct": true,
+          "observation_correct": true,
+          "joint_correct": true
+        }
+      ],
+      "error": null,
+      "latency_ms": 17785.2629
+    },
+    {
+      "plan_id": "semantic-40-batch-cal-h02-metaclass-order-Q-8ea116cd1b_Q-2dff061d7b_Q-2932ec0e9c",
+      "case_id": "cal-h02-metaclass-order",
+      "expected_ids": [
+        "Q-8ea116cd1b",
+        "Q-2dff061d7b",
+        "Q-2932ec0e9c"
+      ],
+      "source_effective_request_sha256": "3ed6d8c3bd6d12ca3639e336c1e15f776518c2f1b5d972f9cb1a74ca8e71860a",
+      "source_response_schema_sha256": "89c355314ccd3de3013a8ea0b9f6c8d46cb5529daa4361f47de6aa8c075b6cda",
+      "transport_response_schema_sha256": "dcdfedbb3dafbdf81a6830f4aec30997821d6cc9688c8a4a04df1c31ad417ae0",
+      "transport_effective_request_sha256": "6eb760df933994abeb7bc1553165ed7cc5668c0346837e0827a2ffce85f276b2",
+      "attempt_id": "17a682aea2174e8db6c59bb1787a91d5",
+      "state": "finished",
+      "model_call_count": 1,
+      "agent_tool_calls": [],
+      "observed_item_types": [
+        "UserMessageThreadItem",
+        "ReasoningThreadItem",
+        "AgentMessageThreadItem"
+      ],
+      "answer": "{\"claims\":[{\"id\":\"Q-8ea116cd1b\",\"verdict\":\"SUPPORTED\",\"observation\":{\"kind\":\"return\",\"value_json\":\"[\\\"prepare\\\",\\\"set:x\\\",\\\"set:method\\\",\\\"set:x\\\",\\\"new:2\\\",\\\"decorate\\\"]\",\"exception\":null},\"reason\":\"Class preparation occurs first; the tracked namespace records both x assignments and the method, Meta.__new__ observes the final x value of 2, and the decorator runs last.\"},{\"id\":\"Q-2dff061d7b\",\"verdict\":\"SUPPORTED\",\"observation\":{\"kind\":\"return\",\"value_json\":\"2\",\"exception\":null},\"reason\":\"The second assignment to x replaces the first, so Demo.x is 2.\"},{\"id\":\"Q-2932ec0e9c\",\"verdict\":\"UNSUPPORTED\",\"observation\":{\"kind\":\"return\",\"value_json\":\"true\",\"exception\":null},\"reason\":\"The class decorator assigns True to Demo.decorated before observe_decorated is called.\"}]}",
+      "model_reply": {
+        "model": "gpt-5.6-sol",
+        "done_reason": "stop",
+        "thinking": ""
+      },
+      "model_metrics": {
+        "cached_input_tokens": 0,
+        "input_tokens": 10743,
+        "output_tokens": 283,
+        "reasoning_output_tokens": 71,
+        "total_tokens": 11026
+      },
+      "parse_error": null,
+      "claims": [
+        {
+          "id": "Q-8ea116cd1b",
+          "verdict_correct": true,
+          "observation_correct": true,
+          "joint_correct": true
+        },
+        {
+          "id": "Q-2dff061d7b",
+          "verdict_correct": true,
+          "observation_correct": true,
+          "joint_correct": true
+        },
+        {
+          "id": "Q-2932ec0e9c",
+          "verdict_correct": true,
+          "observation_correct": true,
+          "joint_correct": true
+        }
+      ],
+      "error": null,
+      "latency_ms": 8497.9882
+    },
+    {
+      "plan_id": "semantic-41-batch-cal-h03-new-return-type-Q-37bd519fff_Q-d0109ae755_Q-0de4b040cb",
+      "case_id": "cal-h03-new-return-type",
+      "expected_ids": [
+        "Q-37bd519fff",
+        "Q-d0109ae755",
+        "Q-0de4b040cb"
+      ],
+      "source_effective_request_sha256": "5bf962536795d6de049bf2f927414f4bb3402961eee3c2cd304591057fac15d9",
+      "source_response_schema_sha256": "6eaa49db8caad71a723227ae7516fc2c38ec8e064989851547ec036f9fa05214",
+      "transport_response_schema_sha256": "0f245b222558341b109b21f40f72cc02a8030eab0317bd01031d8bd66d19a709",
+      "transport_effective_request_sha256": "648a2759bdf3f1078c3b9cf14ef06eb675cb6e5d8965a4100e255a2e5c7a08d6",
+      "attempt_id": "146dadda484b4d31ab778a0d7f286188",
+      "state": "finished",
+      "model_call_count": 1,
+      "agent_tool_calls": [],
+      "observed_item_types": [
+        "UserMessageThreadItem",
+        "ReasoningThreadItem",
+        "AgentMessageThreadItem"
+      ],
+      "answer": "{\"claims\":[{\"id\":\"Q-37bd519fff\",\"verdict\":\"UNSUPPORTED\",\"observation\":{\"kind\":\"return\",\"value_json\":\"\\\"Product\\\"\",\"exception\":null},\"reason\":\"Factory.__new__ returns a Product for mode \\\"other\\\", so Factory.__init__ is not called.\"},{\"id\":\"Q-d0109ae755\",\"verdict\":\"UNSUPPORTED\",\"observation\":{\"kind\":\"return\",\"value_json\":\"[\\\"new:other\\\",\\\"product:init\\\"]\",\"exception\":null},\"reason\":\"Constructing the returned Product invokes Product.__init__, while Factory.__init__ is skipped because the returned object is not a Factory instance.\"},{\"id\":\"Q-0de4b040cb\",\"verdict\":\"SUPPORTED\",\"observation\":{\"kind\":\"return\",\"value_json\":\"[\\\"Child\\\",[\\\"new:self\\\",\\\"factory:init\\\"]]\",\"exception\":null},\"reason\":\"Factory.__new__ allocates a Child instance for mode \\\"self\\\", after which the inherited Factory.__init__ runs.\"}]}",
+      "model_reply": {
+        "model": "gpt-5.6-sol",
+        "done_reason": "stop",
+        "thinking": ""
+      },
+      "model_metrics": {
+        "cached_input_tokens": 0,
+        "input_tokens": 10669,
+        "output_tokens": 316,
+        "reasoning_output_tokens": 102,
+        "total_tokens": 10985
+      },
+      "parse_error": null,
+      "claims": [
+        {
+          "id": "Q-37bd519fff",
+          "verdict_correct": true,
+          "observation_correct": true,
+          "joint_correct": true
+        },
+        {
+          "id": "Q-d0109ae755",
+          "verdict_correct": true,
+          "observation_correct": true,
+          "joint_correct": true
+        },
+        {
+          "id": "Q-0de4b040cb",
+          "verdict_correct": true,
+          "observation_correct": true,
+          "joint_correct": true
+        }
+      ],
+      "error": null,
+      "latency_ms": 10738.8646
+    },
+    {
+      "plan_id": "semantic-48-batch-cal-h04-exec-namespaces-Q-c9f97f02a0_Q-2ca0af488a_Q-885d3c76eb",
+      "case_id": "cal-h04-exec-namespaces",
+      "expected_ids": [
+        "Q-c9f97f02a0",
+        "Q-2ca0af488a",
+        "Q-885d3c76eb"
+      ],
+      "source_effective_request_sha256": "67184706f89b7e519175634a5b66bca1ef2484eb46e1421d76b98ee2aa87df4e",
+      "source_response_schema_sha256": "13a495ebcd988c74bd047662104085e509d02499a39a2a6485852b56c924e2b3",
+      "transport_response_schema_sha256": "68440783f7328394197480b7d6ffcc5699634b72658d9abc8c72c179f8347c88",
+      "transport_effective_request_sha256": "61549c5a10001defd77f0ad83d882721c04fca09eb898a709e0c482ce412d636",
+      "attempt_id": "0b728ea5b391460da5351b4087926864",
+      "state": "finished",
+      "model_call_count": 1,
+      "agent_tool_calls": [],
+      "observed_item_types": [
+        "UserMessageThreadItem",
+        "ReasoningThreadItem",
+        "AgentMessageThreadItem"
+      ],
+      "answer": "{\"claims\":[{\"id\":\"Q-c9f97f02a0\",\"verdict\":\"UNSUPPORTED\",\"observation\":{\"kind\":\"return\",\"value_json\":\"10\",\"exception\":null},\"reason\":\"The function resolves x in its globals namespace, where x is 10, rather than in the separate locals namespace.\"},{\"id\":\"Q-2ca0af488a\",\"verdict\":\"SUPPORTED\",\"observation\":{\"kind\":\"return\",\"value_json\":\"21\",\"exception\":null},\"reason\":\"Top-level exec code resolves x from the locals namespace as 20 and stores y = 21 there.\"},{\"id\":\"Q-885d3c76eb\",\"verdict\":\"UNSUPPORTED\",\"observation\":{\"kind\":\"raise\",\"value_json\":\"null\",\"exception\":\"NameError\"},\"reason\":\"The function resolves y through its globals namespace, but exec stored y only in the separate locals namespace, so calling it raises NameError.\"}]}",
+      "model_reply": {
+        "model": "gpt-5.6-sol",
+        "done_reason": "stop",
+        "thinking": ""
+      },
+      "model_metrics": {
+        "cached_input_tokens": 0,
+        "input_tokens": 10642,
+        "output_tokens": 303,
+        "reasoning_output_tokens": 105,
+        "total_tokens": 10945
+      },
+      "parse_error": null,
+      "claims": [
+        {
+          "id": "Q-c9f97f02a0",
+          "verdict_correct": true,
+          "observation_correct": true,
+          "joint_correct": true
+        },
+        {
+          "id": "Q-2ca0af488a",
+          "verdict_correct": true,
+          "observation_correct": true,
+          "joint_correct": true
+        },
+        {
+          "id": "Q-885d3c76eb",
+          "verdict_correct": true,
+          "observation_correct": true,
+          "joint_correct": true
+        }
+      ],
+      "error": null,
+      "latency_ms": 8935.2111
+    }
+  ],
+  "model_readiness": {
+    "provider": "openai_codex",
+    "execution_mode": "codex_account_integration",
+    "model_name": "gpt-5.6-sol",
+    "reasoning_effort": "medium",
+    "sdk_version": "0.144.4"
+  },
+  "summary": {
+    "planned_units": 4,
+    "attempted_units": 4,
+    "parsed_units": 4,
+    "claim_count": 12,
+    "joint_correct": 12,
+    "stopped_early": false,
+    "classification": "harder_v4_triggered",
+    "usage": {
+      "cached_input_tokens": 0,
+      "input_tokens": 42800,
+      "output_tokens": 1249,
+      "reasoning_output_tokens": 416,
+      "total_tokens": 44049
+    },
+    "latency_ms": 45957.3268
+  },
+  "final_readiness": {
+    "provider": "openai_codex",
+    "execution_mode": "codex_account_integration",
+    "model_name": "gpt-5.6-sol",
+    "reasoning_effort": "medium",
+    "sdk_version": "0.144.4"
+  },
+  "finished_at_unix": 1786094209.0790253
+}

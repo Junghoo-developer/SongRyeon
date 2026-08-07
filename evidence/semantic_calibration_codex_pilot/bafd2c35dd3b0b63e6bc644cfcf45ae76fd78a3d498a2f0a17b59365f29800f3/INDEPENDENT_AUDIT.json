@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "artifact_sha256": "bafd2c35dd3b0b63e6bc644cfcf45ae76fd78a3d498a2f0a17b59365f29800f3",
+  "audit_kind": "read_only_reimplementation_independent_from_project_scorer",
+  "reviewer_kind": "Codex sub-agent",
+  "human_review": false,
+  "project_scorer_imported": false,
+  "model_calls": 0,
+  "files_modified_by_auditor": 0,
+  "method": [
+    "Parse JSON with duplicate-key and non-finite-value rejection.",
+    "Map frozen public claim IDs through the run plan to internal oracle IDs.",
+    "Decode value_json while preserving return/raise observation type.",
+    "Compare verdict and typed observation independently for every claim.",
+    "Recompute row counts, metric sums, hashes, call counts, and provenance."
+  ],
+  "invariants_checked": 224,
+  "discrepancies": 0,
+  "rows": [
+    {
+      "plan_id": "semantic-33-batch-cal-h01-reflected-operator-Q-59fd981294_Q-fb72e27640_Q-c1f4f9aa46",
+      "strict_parse": true,
+      "joint_correct": 3,
+      "claim_count": 3
+    },
+    {
+      "plan_id": "semantic-40-batch-cal-h02-metaclass-order-Q-8ea116cd1b_Q-2dff061d7b_Q-2932ec0e9c",
+      "strict_parse": true,
+      "joint_correct": 3,
+      "claim_count": 3
+    },
+    {
+      "plan_id": "semantic-41-batch-cal-h03-new-return-type-Q-37bd519fff_Q-d0109ae755_Q-0de4b040cb",
+      "strict_parse": true,
+      "joint_correct": 3,
+      "claim_count": 3
+    },
+    {
+      "plan_id": "semantic-48-batch-cal-h04-exec-namespaces-Q-c9f97f02a0_Q-2ca0af488a_Q-885d3c76eb",
+      "strict_parse": true,
+      "joint_correct": 3,
+      "claim_count": 3
+    }
+  ],
+  "recomputed_summary": {
+    "parsed_units": 4,
+    "joint_correct": 12,
+    "claim_count": 12,
+    "model_call_counts": [1, 1, 1, 1],
+    "unique_attempt_ids": 4,
+    "agent_tool_calls": 0,
+    "input_tokens": 42800,
+    "output_tokens": 1249,
+    "reasoning_output_tokens": 416,
+    "total_tokens": 44049,
+    "latency_ms": 45957.3268,
+    "classification": "harder_v4_triggered"
+  },
+  "provenance": {
+    "artifact_commit": "b09c0297aedab6a8c1eccd240ce8a636f47f3584",
+    "head_upstream_remote_equal_at_audit": true,
+    "protocol_sha256": "6605f8807ac6bc2c4ede3afa78f56f576c452f8ed1c7054bec0b50c75c2adac9",
+    "all_frozen_dependency_request_schema_hashes_match": true
+  },
+  "limitations": "This is an automated independent implementation audit, not an independent human replication or a controlled model comparison."
+}

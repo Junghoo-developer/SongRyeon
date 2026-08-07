@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "source_database": "C:/Users/peter/.codex/logs_2.sqlite",
+  "source_database_mode": "read_only",
+  "sdk_process_uuid": "pid:44956:42713f5f-00b3-4589-8607-3e20a5ad08ad",
+  "observed_window_unix_seconds": [1786094161, 1786094209],
+  "authentication_route": {
+    "mode": "Chatgpt",
+    "runner_forbidden_environment_variables": [
+      "OPENAI_API_KEY",
+      "CODEX_API_KEY",
+      "CODEX_ACCESS_TOKEN"
+    ],
+    "api_key_absence_observation_log_ids": [
+      347586340,
+      347586835,
+      347587198,
+      347587542
+    ],
+    "interpretation": "The Platform API-key route was not used. Account allowance, credit, ledger, and auto-top-up state were not inspected."
+  },
+  "turns": [
+    {
+      "log_id": 347586338,
+      "thread_id": "019fdb82-14a5-7ac3-aec3-de3273c8b8a0",
+      "turn_id": "019fdb82-1673-7841-8c66-b4edf9277554",
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "medium",
+      "auth_mode": "Chatgpt"
+    },
+    {
+      "log_id": 347586833,
+      "thread_id": "019fdb82-5a26-7cd3-b6c2-4d99c5a0b105",
+      "turn_id": "019fdb82-5aa7-7a11-ac11-b9c4c7e0e484",
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "medium",
+      "auth_mode": "Chatgpt"
+    },
+    {
+      "log_id": 347587196,
+      "thread_id": "019fdb82-7b5b-7093-b4a5-6c38c7528a34",
+      "turn_id": "019fdb82-7be6-7c50-8838-e92dd04ca0dd",
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "medium",
+      "auth_mode": "Chatgpt"
+    },
+    {
+      "log_id": 347587540,
+      "thread_id": "019fdb82-a555-72b1-9d08-9e940085d44e",
+      "turn_id": "019fdb82-a5e1-7e12-a5ce-ee17011dec9e",
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "medium",
+      "auth_mode": "Chatgpt"
+    }
+  ],
+  "artifact_runtime_observations": {
+    "model_call_counts": [1, 1, 1, 1],
+    "observed_item_types_per_turn": [
+      ["UserMessageThreadItem", "ReasoningThreadItem", "AgentMessageThreadItem"],
+      ["UserMessageThreadItem", "ReasoningThreadItem", "AgentMessageThreadItem"],
+      ["UserMessageThreadItem", "ReasoningThreadItem", "AgentMessageThreadItem"],
+      ["UserMessageThreadItem", "ReasoningThreadItem", "AgentMessageThreadItem"]
+    ],
+    "agent_tool_calls": 0,
+    "log_tool_item_marker_counts": {
+      "FunctionCall": 0,
+      "LocalShellCall": 0,
+      "McpToolCall": 0,
+      "CustomToolCall": 0
+    }
+  },
+  "hardware_boundary": {
+    "model_client": "remote Codex account integration",
+    "local_ollama_client_invoked": false,
+    "whole_machine_gpu_telemetry_collected": false,
+    "interpretation": "No local inference backend was on the experiment path; unrelated whole-machine GPU use is outside this attestation."
+  },
+  "privacy_boundary": "Only safe identifiers and classifications are retained. Raw log bodies are excluded because they may contain authentication material."
+}
