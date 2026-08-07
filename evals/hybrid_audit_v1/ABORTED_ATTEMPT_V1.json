@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "experiment_id": "songryeon-hybrid-a-only-audit-pilot-v1",
+  "freeze_payload_sha256": "f753551bcf2f8c006512f2cd0dc5e0f0813e5f81af93b19588388ce2eb870cb1",
+  "condition": "local-a-only-auditor",
+  "status": "infrastructure_aborted_no_retry",
+  "failure": {
+    "type": "PermissionError",
+    "operation": "atomic checkpoint os.replace",
+    "cause": "OneDrive synchronized workspace denied replacement"
+  },
+  "partial_artifact": {
+    "sha256": "0b0337d1e12a01e2a43024d602d1069bb22cbbe93c5dc3fc83423a6d8d1abe2f",
+    "attempt_lock_sha256": "40a6338900aee89dec33f07c7e959737103e95e8dec761d8e1a1fb2c3649e188",
+    "last_write_utc": "2026-08-07T12:33:38.5048419Z",
+    "captured_rows": 5,
+    "valid_rows": 4,
+    "failed_rows": 1,
+    "case_ids": [
+      "el-declared-upload-budget",
+      "el-declared-retry-policy",
+      "el-declared-tag-quota",
+      "el-enforced-message-ceiling",
+      "el-enforced-preview-window"
+    ],
+    "row_states": ["valid", "valid", "valid", "failed", "valid"]
+  },
+  "successor_rule": "Do not reuse these rows; rerun all 30 under v1-1 after relocating raw output outside OneDrive."
+}

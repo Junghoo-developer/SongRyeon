@@ -30,12 +30,17 @@ from .freeze import verify_freeze_publication
 from . import schemas
 
 
-EXPERIMENT_ID = "songryeon-hybrid-a-only-audit-pilot-v1"
+EXPERIMENT_ID = "songryeon-hybrid-a-only-audit-pilot-v1-1"
 ROOT = Path(__file__).resolve().parent
 WORKSPACE_ROOT = ROOT.parents[1]
 SOURCE_PATH = ROOT / "source_snapshot.json"
 FREEZE_PATH = ROOT / "FREEZE.json"
-OUTPUT_ROOT = WORKSPACE_ROOT / ".tmp" / "evals" / "hybrid_audit_v1"
+OUTPUT_ROOT = (
+    Path(os.environ.get("LOCALAPPDATA", tempfile.gettempdir()))
+    / "SongRyeon"
+    / "evals"
+    / "hybrid_audit_v1_1"
+)
 
 LOCAL_CONDITION = "local-a-only-auditor"
 CLOUD_CONDITION = "cloud-a-only-auditor"

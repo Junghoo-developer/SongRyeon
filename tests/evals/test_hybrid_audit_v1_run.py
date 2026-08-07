@@ -250,6 +250,14 @@ def test_cloud_readiness_explicitly_records_tools_are_not_allowed(monkeypatch):
     assert readiness["tools_allowed"] is False
 
 
+def test_default_output_root_is_outside_the_synchronized_workspace():
+    output_root = run.OUTPUT_ROOT.resolve()
+    workspace_root = run.WORKSPACE_ROOT.resolve()
+
+    assert output_root != workspace_root
+    assert workspace_root not in output_root.parents
+
+
 def test_cli_has_no_num_ctx_override():
     parser = run._build_parser()
 

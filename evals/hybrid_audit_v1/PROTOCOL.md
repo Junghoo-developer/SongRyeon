@@ -1,5 +1,20 @@
 # Hybrid A-only audit pilot v1
 
+## Superseding an infrastructure-aborted canonical attempt
+
+The first sealed execution (`songryeon-hybrid-a-only-audit-pilot-v1`, freeze
+`f753551b...`) was aborted after five local rows because OneDrive denied an
+atomic checkpoint replacement.  Its canonical attempt was not retried and its
+lock and partial artifact remain preserved locally.  The compact hash witness
+is committed as `ABORTED_ATTEMPT_V1.json`.
+
+This successor is identified as `songryeon-hybrid-a-only-audit-pilot-v1-1`.
+It changes no cohort, prompt, reference label, model contract, router, or
+metric.  It relocates raw output to the operating system's local application
+data directory, outside the synchronized workspace, and reruns the complete
+30-case plan under a new source commit and freeze.  Results from the five
+aborted rows are not mixed into the successor score.
+
 ## Status and question
 
 This is a **retrospective paired feasibility pilot**, not a new held-out

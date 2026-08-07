@@ -18,7 +18,7 @@ from .prompts import canonical_json
 from .schemas import select_escalation_case_ids, validate_source_snapshot
 
 
-EXPERIMENT_ID = "songryeon-hybrid-a-only-audit-pilot-v1"
+EXPERIMENT_ID = "songryeon-hybrid-a-only-audit-pilot-v1-1"
 ROOT = Path(__file__).resolve().parent
 WORKSPACE_ROOT = ROOT.parents[1]
 SOURCE_PATH = ROOT / "source_snapshot.json"
@@ -30,6 +30,7 @@ GIT_COMMIT = re.compile(r"^[0-9a-f]{40}$")
 # and scoring the frozen study.  Package initializers are included because
 # Python executes them before the imported modules.
 FROZEN_RELATIVE_PATHS = (
+    "evals/hybrid_audit_v1/ABORTED_ATTEMPT_V1.json",
     "evals/hybrid_audit_v1/__init__.py",
     "evals/hybrid_audit_v1/PROTOCOL.md",
     "evals/hybrid_audit_v1/source_snapshot.json",
