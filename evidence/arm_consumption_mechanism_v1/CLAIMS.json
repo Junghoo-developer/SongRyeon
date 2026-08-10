@@ -1,0 +1,152 @@
+{
+  "all_condition_counts_recomputed_from_public_rows": {
+    "ar-consumer-rule": {
+      "negative": {
+        "evidence_laundering": 10,
+        "n": 45,
+        "semantic_grounded_success": 27
+      },
+      "positive": {
+        "n": 45,
+        "positive_recognized": 43,
+        "semantic_grounded_success": 41
+      },
+      "total": {
+        "n": 90,
+        "semantic_grounded_success": 68
+      }
+    },
+    "ar-label-only": {
+      "negative": {
+        "evidence_laundering": 18,
+        "n": 45,
+        "semantic_grounded_success": 25
+      },
+      "positive": {
+        "n": 45,
+        "positive_recognized": 45,
+        "semantic_grounded_success": 44
+      },
+      "total": {
+        "n": 90,
+        "semantic_grounded_success": 69
+      }
+    },
+    "ar-label-placebo": {
+      "negative": {
+        "evidence_laundering": 13,
+        "n": 45,
+        "semantic_grounded_success": 23
+      },
+      "positive": {
+        "n": 45,
+        "positive_recognized": 44,
+        "semantic_grounded_success": 39
+      },
+      "total": {
+        "n": 90,
+        "semantic_grounded_success": 62
+      }
+    },
+    "evidence-enforced": {
+      "negative": {
+        "evidence_laundering": 1,
+        "n": 45,
+        "semantic_grounded_success": 29
+      },
+      "positive": {
+        "n": 45,
+        "positive_recognized": 45,
+        "semantic_grounded_success": 45
+      },
+      "total": {
+        "n": 90,
+        "semantic_grounded_success": 74
+      }
+    },
+    "opaque-label": {
+      "negative": {
+        "evidence_laundering": 15,
+        "n": 45,
+        "semantic_grounded_success": 22
+      },
+      "positive": {
+        "n": 45,
+        "positive_recognized": 45,
+        "semantic_grounded_success": 43
+      },
+      "total": {
+        "n": 90,
+        "semantic_grounded_success": 65
+      }
+    },
+    "style-placebo-enforced": {
+      "negative": {
+        "evidence_laundering": 15,
+        "n": 45,
+        "semantic_grounded_success": 21
+      },
+      "positive": {
+        "n": 45,
+        "positive_recognized": 43,
+        "semantic_grounded_success": 43
+      },
+      "total": {
+        "n": 90,
+        "semantic_grounded_success": 64
+      }
+    }
+  },
+  "claim_ceiling": [
+    "This is an exploratory signal on reused synthetic Python cases, not a confirmatory or held-out result.",
+    "The result does not establish general superiority of SongRyeon, SongRyeon as a whole, the final re-check stage alone, production performance, or real-world performance.",
+    "The run used one local model/version and three repeated seeds; seeds are not independent cases.",
+    "Semantic scores are blind-AI preliminary scores, not an independent human raw-packet audit.",
+    "Internal locks and hashes exist, but there is no external timestamp, access log, or third-party custody proving the blind key remained unopened.",
+    "The original predeclared GO/NO-GO decision was NO-GO; the primary prompt-arm threshold was not met."
+  ],
+  "claim_status": "exploratory_not_publishable",
+  "headline_comparison": {
+    "comparator": "style-placebo-enforced",
+    "negative_evidence_laundering": {
+      "comparator": {
+        "denominator": 45,
+        "numerator": 15
+      },
+      "treatment": {
+        "denominator": 45,
+        "numerator": 1
+      }
+    },
+    "positive_semantic_grounded_success": {
+      "comparator": {
+        "denominator": 45,
+        "numerator": 43
+      },
+      "treatment": {
+        "denominator": 45,
+        "numerator": 45
+      }
+    },
+    "treatment": "evidence-enforced"
+  },
+  "publishable": false,
+  "schema_version": 1,
+  "study_design": {
+    "cases": 30,
+    "model": "gemma4:26b",
+    "model_digest": "5571076f3d70050487b26b341705799e0ab29b808164f90d20d4cf84f699d251",
+    "negative_cases": 15,
+    "positive_cases": 15,
+    "scoring": "condition-masked blind AI preliminary scoring; 540 rows; 70 disagreements adjudicated before unblinding",
+    "seeds": [
+      42,
+      43,
+      44
+    ]
+  },
+  "upstream_report_anchors": {
+    "score_lock_sha256": "8b0ee1bd51be6a0bafb97840256faa07084c5763ec6f2a801dda80593089c852",
+    "unblinded_summary_sha256": "51ae979e96128d4aebacfb8645ff7c6eabffde82b14d68ee3437bddc1c375f20"
+  }
+}

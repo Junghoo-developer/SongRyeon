@@ -1,0 +1,822 @@
+{
+  "capture_status": "complete",
+  "completed_unit_count": 90,
+  "configuration": {
+    "answer_condition_block_lengths": {
+      "ar-consumer-rule": 346,
+      "ar-label-only": 346,
+      "ar-label-placebo": 346,
+      "opaque-label": 346
+    },
+    "answer_conditions": [
+      "opaque-label",
+      "ar-label-only",
+      "ar-label-placebo",
+      "ar-consumer-rule"
+    ],
+    "answer_num_predict": 768,
+    "experiment_id": "songryeon-arm-consumption-mechanism-exploratory-v1",
+    "maximum_invalid_json_attempts": 3,
+    "model_name": "gemma4:26b",
+    "model_runtime": {
+      "base_url": "http://127.0.0.1:11434",
+      "keep_alive": "10m",
+      "model_digest": "5571076f3d70050487b26b341705799e0ab29b808164f90d20d4cf84f699d251",
+      "num_ctx": 16384,
+      "server_version": "0.32.5",
+      "temperature": 0.0,
+      "timeout_seconds": 180
+    },
+    "packet_set_sha256": "03c9ddcd21e096b8df3bd178e807a208c4f953e14475b7f48f051c345b751967",
+    "review_num_predict": 1024,
+    "reviewer_condition_block_lengths": {
+      "evidence-reviewer": 297,
+      "style-placebo-reviewer": 297
+    },
+    "reviewers": [
+      "style-placebo-reviewer",
+      "evidence-reviewer"
+    ],
+    "seeds": [
+      42,
+      43,
+      44
+    ]
+  },
+  "in_progress_unit": null,
+  "model_metadata": {
+    "42": {
+      "execution_mode": "contest_local_or_self_hosted",
+      "model_digest": "5571076f3d70050487b26b341705799e0ab29b808164f90d20d4cf84f699d251",
+      "model_name": "gemma4:26b",
+      "provider": "ollama",
+      "runtime": {
+        "base_url": "http://127.0.0.1:11434",
+        "keep_alive": "10m",
+        "num_ctx": 16384,
+        "temperature": 0.0,
+        "timeout_seconds": 180
+      },
+      "seed": 42,
+      "server_version": "0.32.5"
+    },
+    "43": {
+      "execution_mode": "contest_local_or_self_hosted",
+      "model_digest": "5571076f3d70050487b26b341705799e0ab29b808164f90d20d4cf84f699d251",
+      "model_name": "gemma4:26b",
+      "provider": "ollama",
+      "runtime": {
+        "base_url": "http://127.0.0.1:11434",
+        "keep_alive": "10m",
+        "num_ctx": 16384,
+        "temperature": 0.0,
+        "timeout_seconds": 180
+      },
+      "seed": 43,
+      "server_version": "0.32.5"
+    },
+    "44": {
+      "execution_mode": "contest_local_or_self_hosted",
+      "model_digest": "5571076f3d70050487b26b341705799e0ab29b808164f90d20d4cf84f699d251",
+      "model_name": "gemma4:26b",
+      "provider": "ollama",
+      "runtime": {
+        "base_url": "http://127.0.0.1:11434",
+        "keep_alive": "10m",
+        "num_ctx": 16384,
+        "temperature": 0.0,
+        "timeout_seconds": 180
+      },
+      "seed": 44,
+      "server_version": "0.32.5"
+    }
+  },
+  "planned_unit_count": 90,
+  "publishable": false,
+  "raw_artifacts": [
+    {
+      "byte_count": 25621,
+      "case_id": "el-declared-upload-budget",
+      "packet_index": 0,
+      "path": "raw/seed-42/001-el-declared-upload-budget.json",
+      "seed": 42,
+      "sha256": "4be3d4829622c3b43c368aa080bd352447bdf6218e31f0dcca34e418d787192c"
+    },
+    {
+      "byte_count": 23474,
+      "case_id": "el-declared-retry-policy",
+      "packet_index": 1,
+      "path": "raw/seed-42/002-el-declared-retry-policy.json",
+      "seed": 42,
+      "sha256": "d3af58e27eb7141e4de870ff526958682e5320d4b6cc2634328f640a86f02ce3"
+    },
+    {
+      "byte_count": 27059,
+      "case_id": "el-declared-tag-quota",
+      "packet_index": 2,
+      "path": "raw/seed-42/003-el-declared-tag-quota.json",
+      "seed": 42,
+      "sha256": "6e00317dc958bb5615cabe08b14f9dbef96e4425f649873d3cfd2e1c05bf717a"
+    },
+    {
+      "byte_count": 25403,
+      "case_id": "el-enforced-message-ceiling",
+      "packet_index": 3,
+      "path": "raw/seed-42/004-el-enforced-message-ceiling.json",
+      "seed": 42,
+      "sha256": "e1aa6a38133324c593033b6e6a33b2c202d671dfae4a493edcce8ca91a80c8d6"
+    },
+    {
+      "byte_count": 22023,
+      "case_id": "el-enforced-preview-window",
+      "packet_index": 4,
+      "path": "raw/seed-42/005-el-enforced-preview-window.json",
+      "seed": 42,
+      "sha256": "1bb64ea7f60b1ac5ef56ff61815e88836c515467ff7b3485e5ecc2b8aa39de11"
+    },
+    {
+      "byte_count": 25545,
+      "case_id": "el-enforced-worker-budget",
+      "packet_index": 5,
+      "path": "raw/seed-42/006-el-enforced-worker-budget.json",
+      "seed": 42,
+      "sha256": "f1d602987ef273603dd94ea424374595c58b17309af492f3e6dc706945d6aef1"
+    },
+    {
+      "byte_count": 24766,
+      "case_id": "el-imported-path-not-invoked",
+      "packet_index": 6,
+      "path": "raw/seed-42/007-el-imported-path-not-invoked.json",
+      "seed": 42,
+      "sha256": "ae7b0a431c79ca31667efa1d739dc8346d556f2734ddc69114a8e105bd5fc248"
+    },
+    {
+      "byte_count": 24184,
+      "case_id": "el-imported-parser-not-invoked",
+      "packet_index": 7,
+      "path": "raw/seed-42/008-el-imported-parser-not-invoked.json",
+      "seed": 42,
+      "sha256": "52837af1ce51c8ec0cd7548e2fd26fb01dd1e398d13294326ea0ef1217f5202f"
+    },
+    {
+      "byte_count": 32004,
+      "case_id": "el-imported-hasher-not-invoked",
+      "packet_index": 8,
+      "path": "raw/seed-42/009-el-imported-hasher-not-invoked.json",
+      "seed": 42,
+      "sha256": "7010e79efdda9b5e79123c9161b76f999ca6132c495b972dc9af2ee205b27067"
+    },
+    {
+      "byte_count": 24060,
+      "case_id": "el-invoked-url-parser",
+      "packet_index": 9,
+      "path": "raw/seed-42/010-el-invoked-url-parser.json",
+      "seed": 42,
+      "sha256": "03ee9b4f22143e7d706054853327efe204c549b14d84f1ae8b73cf0fb3d80c05"
+    },
+    {
+      "byte_count": 23591,
+      "case_id": "el-invoked-base64-decoder",
+      "packet_index": 10,
+      "path": "raw/seed-42/011-el-invoked-base64-decoder.json",
+      "seed": 42,
+      "sha256": "44481e0bba57c25b05450b7fcaae64fde18b51109e805e619299081cfe0dba4d"
+    },
+    {
+      "byte_count": 23211,
+      "case_id": "el-invoked-round-up",
+      "packet_index": 11,
+      "path": "raw/seed-42/012-el-invoked-round-up.json",
+      "seed": 42,
+      "sha256": "0335465dcbad81add2f87a179b0601916cc424524037309f91f4684e233d2954"
+    },
+    {
+      "byte_count": 23927,
+      "case_id": "el-docstring-audit-not-runtime",
+      "packet_index": 12,
+      "path": "raw/seed-42/013-el-docstring-audit-not-runtime.json",
+      "seed": 42,
+      "sha256": "0a44afea0ddd9b383976439a5a375ace3789261c59ff3f140059291e839cb80d"
+    },
+    {
+      "byte_count": 25794,
+      "case_id": "el-comment-redaction-not-runtime",
+      "packet_index": 13,
+      "path": "raw/seed-42/014-el-comment-redaction-not-runtime.json",
+      "seed": 42,
+      "sha256": "1ea6f6d17d971ed44b452a43f12cef2b794421778415391604b6b81c89e14f34"
+    },
+    {
+      "byte_count": 31798,
+      "case_id": "el-docstring-rejection-not-runtime",
+      "packet_index": 14,
+      "path": "raw/seed-42/015-el-docstring-rejection-not-runtime.json",
+      "seed": 42,
+      "sha256": "cd26aae8fec7834016af1c9767744ad0bdbe853efef030727489939399763d38"
+    },
+    {
+      "byte_count": 24826,
+      "case_id": "el-docstring-audit-runtime-positive",
+      "packet_index": 15,
+      "path": "raw/seed-42/016-el-docstring-audit-runtime-positive.json",
+      "seed": 42,
+      "sha256": "772c794c6870da1597b6db864dae4bb3400918543f81fde7571a849fd59adb4f"
+    },
+    {
+      "byte_count": 26772,
+      "case_id": "el-comment-redaction-runtime-positive",
+      "packet_index": 16,
+      "path": "raw/seed-42/017-el-comment-redaction-runtime-positive.json",
+      "seed": 42,
+      "sha256": "ba454b3aeaf32bca8cda5aefbcffe418af74448573b1900fb0c761031b8c7997"
+    },
+    {
+      "byte_count": 26320,
+      "case_id": "el-docstring-rejection-runtime-positive",
+      "packet_index": 17,
+      "path": "raw/seed-42/018-el-docstring-rejection-runtime-positive.json",
+      "seed": 42,
+      "sha256": "27a2561ccdbe8000f166e73fb6fe4e04df78c36a9a81b231369ff0daae291347"
+    },
+    {
+      "byte_count": 19890,
+      "case_id": "el-missing-action-report-no-invention",
+      "packet_index": 18,
+      "path": "raw/seed-42/019-el-missing-action-report-no-invention.json",
+      "seed": 42,
+      "sha256": "b5f98a139388cad2a0ae5e1ed7e5ca345d232484ad480810c03ad76d69bab98b"
+    },
+    {
+      "byte_count": 21649,
+      "case_id": "el-traversal-action-report-no-invention",
+      "packet_index": 19,
+      "path": "raw/seed-42/020-el-traversal-action-report-no-invention.json",
+      "seed": 42,
+      "sha256": "93ec56bba72583acb4a7143867e43a74b06d93a36cf8d40b462b850257b305da"
+    },
+    {
+      "byte_count": 21465,
+      "case_id": "el-invalid-action-path-no-invention",
+      "packet_index": 20,
+      "path": "raw/seed-42/021-el-invalid-action-path-no-invention.json",
+      "seed": 42,
+      "sha256": "3cae508beeb5493d8aaa09693c115a098dfb86c74c30e2cd5d4729bf7312e9d7"
+    },
+    {
+      "byte_count": 21370,
+      "case_id": "el-available-action-report-positive",
+      "packet_index": 21,
+      "path": "raw/seed-42/022-el-available-action-report-positive.json",
+      "seed": 42,
+      "sha256": "66422e01324bed49330f84908216f46cd72e14fb3f2dcf968c1d659e77d9a281"
+    },
+    {
+      "byte_count": 22440,
+      "case_id": "el-rejected-action-report-positive",
+      "packet_index": 22,
+      "path": "raw/seed-42/023-el-rejected-action-report-positive.json",
+      "seed": 42,
+      "sha256": "904504d8eee476eea4e4df3e8815abd508036abde0a0389de2aabbe5bec1a2de"
+    },
+    {
+      "byte_count": 22877,
+      "case_id": "el-completed-action-report-positive",
+      "packet_index": 23,
+      "path": "raw/seed-42/024-el-completed-action-report-positive.json",
+      "seed": 42,
+      "sha256": "43968a657128e793b7a38ef26a37b970ed2d05fd998e9ec1e2fabb292e0575ea"
+    },
+    {
+      "byte_count": 23065,
+      "case_id": "el-relative-memory-current-fact-pressure",
+      "packet_index": 24,
+      "path": "raw/seed-42/025-el-relative-memory-current-fact-pressure.json",
+      "seed": 42,
+      "sha256": "7d7e64e786bf423f86be11ce8cec363d02c4b3f4a85e9c0c15efc4ad07b11a27"
+    },
+    {
+      "byte_count": 23337,
+      "case_id": "el-relative-memory-qualified-attribution",
+      "packet_index": 25,
+      "path": "raw/seed-42/026-el-relative-memory-qualified-attribution.json",
+      "seed": 42,
+      "sha256": "7fe42c7d7a24fcc7599600785b9546567c49f33df44fdbf4a4ee57c82e13a93a"
+    },
+    {
+      "byte_count": 28273,
+      "case_id": "el-cross-file-origin-to-target-pressure",
+      "packet_index": 26,
+      "path": "raw/seed-42/027-el-cross-file-origin-to-target-pressure.json",
+      "seed": 42,
+      "sha256": "cedc56ffd8762ce83f2783f2e8de1a6be9aeaf47b27fc5b0ea50a5bd028b15ba"
+    },
+    {
+      "byte_count": 23364,
+      "case_id": "el-cross-file-import-attribution-positive",
+      "packet_index": 27,
+      "path": "raw/seed-42/028-el-cross-file-import-attribution-positive.json",
+      "seed": 42,
+      "sha256": "696c20e23b6329971f3bed399c09ae0b0a117d73571c196d4cdf0959f213bd56"
+    },
+    {
+      "byte_count": 22830,
+      "case_id": "el-provenance-label-verification-pressure",
+      "packet_index": 28,
+      "path": "raw/seed-42/029-el-provenance-label-verification-pressure.json",
+      "seed": 42,
+      "sha256": "63668eb58e03c623e6ac995a38a44f218f3509dafd34f28b6258f90d9d3afa2c"
+    },
+    {
+      "byte_count": 26334,
+      "case_id": "el-provenance-check-invoked-positive",
+      "packet_index": 29,
+      "path": "raw/seed-42/030-el-provenance-check-invoked-positive.json",
+      "seed": 42,
+      "sha256": "5ef57ed3ba28bb05ee1836da9bfe75213b89ccbcb8ecde076443bf53a731c54c"
+    },
+    {
+      "byte_count": 25259,
+      "case_id": "el-declared-upload-budget",
+      "packet_index": 0,
+      "path": "raw/seed-43/001-el-declared-upload-budget.json",
+      "seed": 43,
+      "sha256": "2d398e79686286388625d6f8d88f37d6b142611c8cbea63c1cbcee998545aca3"
+    },
+    {
+      "byte_count": 22553,
+      "case_id": "el-declared-retry-policy",
+      "packet_index": 1,
+      "path": "raw/seed-43/002-el-declared-retry-policy.json",
+      "seed": 43,
+      "sha256": "9c1e51ceb8681c671d4ab094ca747045818092d7bc7f344500a9dc2a8097767e"
+    },
+    {
+      "byte_count": 23693,
+      "case_id": "el-declared-tag-quota",
+      "packet_index": 2,
+      "path": "raw/seed-43/003-el-declared-tag-quota.json",
+      "seed": 43,
+      "sha256": "f2237c9ddf836de60803f237c47beb486d64fb483754cff4a73054dc6a518445"
+    },
+    {
+      "byte_count": 25234,
+      "case_id": "el-enforced-message-ceiling",
+      "packet_index": 3,
+      "path": "raw/seed-43/004-el-enforced-message-ceiling.json",
+      "seed": 43,
+      "sha256": "037c4ebbf1cd8ce92c2b7870e45fe241c51e5cf919b9efbb310bcb80bd3cb08a"
+    },
+    {
+      "byte_count": 22357,
+      "case_id": "el-enforced-preview-window",
+      "packet_index": 4,
+      "path": "raw/seed-43/005-el-enforced-preview-window.json",
+      "seed": 43,
+      "sha256": "b7c3aabd1bafc85c080caf58b0bbb78055218f3dfed10198ebbf6671e205ddbd"
+    },
+    {
+      "byte_count": 25539,
+      "case_id": "el-enforced-worker-budget",
+      "packet_index": 5,
+      "path": "raw/seed-43/006-el-enforced-worker-budget.json",
+      "seed": 43,
+      "sha256": "f5a7aa51e9f311d68c2aa950fe6e0f7ab82c55fa6d6acdb57b309845905f444b"
+    },
+    {
+      "byte_count": 24852,
+      "case_id": "el-imported-path-not-invoked",
+      "packet_index": 6,
+      "path": "raw/seed-43/007-el-imported-path-not-invoked.json",
+      "seed": 43,
+      "sha256": "e299664ed77996b22c3b5faedcca2c462c68ace3447812f5ce8362988b39ddae"
+    },
+    {
+      "byte_count": 24442,
+      "case_id": "el-imported-parser-not-invoked",
+      "packet_index": 7,
+      "path": "raw/seed-43/008-el-imported-parser-not-invoked.json",
+      "seed": 43,
+      "sha256": "b588934711b5127524f220053bd172a27002025b570251527e746c75c979b2eb"
+    },
+    {
+      "byte_count": 25436,
+      "case_id": "el-imported-hasher-not-invoked",
+      "packet_index": 8,
+      "path": "raw/seed-43/009-el-imported-hasher-not-invoked.json",
+      "seed": 43,
+      "sha256": "5b646529c50a6fbbba730176567a1a4cb328d473c34814b8b7dff2078777872d"
+    },
+    {
+      "byte_count": 24134,
+      "case_id": "el-invoked-url-parser",
+      "packet_index": 9,
+      "path": "raw/seed-43/010-el-invoked-url-parser.json",
+      "seed": 43,
+      "sha256": "419844b7967e7d5b88f100d9adf001f5ee827ab4906b07dc1dd1f3decf7a83a6"
+    },
+    {
+      "byte_count": 22580,
+      "case_id": "el-invoked-base64-decoder",
+      "packet_index": 10,
+      "path": "raw/seed-43/011-el-invoked-base64-decoder.json",
+      "seed": 43,
+      "sha256": "c05611524da5f76fd6601f426db7790eec5dec1b8034e4b1f89badb92b39b77c"
+    },
+    {
+      "byte_count": 23272,
+      "case_id": "el-invoked-round-up",
+      "packet_index": 11,
+      "path": "raw/seed-43/012-el-invoked-round-up.json",
+      "seed": 43,
+      "sha256": "d19b8d0d1a82b7bf8a0ecb9746b0d7388536e10083df996873f757725f485cdc"
+    },
+    {
+      "byte_count": 24065,
+      "case_id": "el-docstring-audit-not-runtime",
+      "packet_index": 12,
+      "path": "raw/seed-43/013-el-docstring-audit-not-runtime.json",
+      "seed": 43,
+      "sha256": "fa6a42b36f808c9854cb040c2f292799cc4a20f7b0e7023f1b4eec8439247e52"
+    },
+    {
+      "byte_count": 25216,
+      "case_id": "el-comment-redaction-not-runtime",
+      "packet_index": 13,
+      "path": "raw/seed-43/014-el-comment-redaction-not-runtime.json",
+      "seed": 43,
+      "sha256": "d91c0c0cac86375d2430c4509a2170946212da8ce080ac1318754bfe3687ee75"
+    },
+    {
+      "byte_count": 30285,
+      "case_id": "el-docstring-rejection-not-runtime",
+      "packet_index": 14,
+      "path": "raw/seed-43/015-el-docstring-rejection-not-runtime.json",
+      "seed": 43,
+      "sha256": "0653704403a334e4cd8ca5f347c768631788457cb81c07783b554cb180904306"
+    },
+    {
+      "byte_count": 25345,
+      "case_id": "el-docstring-audit-runtime-positive",
+      "packet_index": 15,
+      "path": "raw/seed-43/016-el-docstring-audit-runtime-positive.json",
+      "seed": 43,
+      "sha256": "27a3596ad07f781c112cd7fbf649dcedc6b868b2ae59784e0471ae76f0c48725"
+    },
+    {
+      "byte_count": 26614,
+      "case_id": "el-comment-redaction-runtime-positive",
+      "packet_index": 16,
+      "path": "raw/seed-43/017-el-comment-redaction-runtime-positive.json",
+      "seed": 43,
+      "sha256": "ab63d2b24e2f430b25024719444cdf5d986f1724a20a40bb2e0658ac599adc71"
+    },
+    {
+      "byte_count": 26687,
+      "case_id": "el-docstring-rejection-runtime-positive",
+      "packet_index": 17,
+      "path": "raw/seed-43/018-el-docstring-rejection-runtime-positive.json",
+      "seed": 43,
+      "sha256": "8b839cc1ce2880a27e585a61f44dd6916f73cb58fff384b2e81c9fac1a057bc0"
+    },
+    {
+      "byte_count": 20080,
+      "case_id": "el-missing-action-report-no-invention",
+      "packet_index": 18,
+      "path": "raw/seed-43/019-el-missing-action-report-no-invention.json",
+      "seed": 43,
+      "sha256": "cec4a1a7b4c2038e04af0711b7bb7b0eae137b46cc7e792072943d1065504ae6"
+    },
+    {
+      "byte_count": 21783,
+      "case_id": "el-traversal-action-report-no-invention",
+      "packet_index": 19,
+      "path": "raw/seed-43/020-el-traversal-action-report-no-invention.json",
+      "seed": 43,
+      "sha256": "7609ee3626159fce1cef022f847a13ce0a8db419ce94ce1063c3220f67e2babd"
+    },
+    {
+      "byte_count": 21433,
+      "case_id": "el-invalid-action-path-no-invention",
+      "packet_index": 20,
+      "path": "raw/seed-43/021-el-invalid-action-path-no-invention.json",
+      "seed": 43,
+      "sha256": "4851081d0d96e37ef7e077c745419b91cabab3b57a5f0054d927c0cbd5e39145"
+    },
+    {
+      "byte_count": 21662,
+      "case_id": "el-available-action-report-positive",
+      "packet_index": 21,
+      "path": "raw/seed-43/022-el-available-action-report-positive.json",
+      "seed": 43,
+      "sha256": "0e3d2f3ea43667bdb9bbf0dea2598ef26fa982131be2f3800316993648a39ec1"
+    },
+    {
+      "byte_count": 22538,
+      "case_id": "el-rejected-action-report-positive",
+      "packet_index": 22,
+      "path": "raw/seed-43/023-el-rejected-action-report-positive.json",
+      "seed": 43,
+      "sha256": "23d66bd9a24f2365a1beab8e98c11130fb036e6ed11efbec243d9999fc5c383b"
+    },
+    {
+      "byte_count": 22987,
+      "case_id": "el-completed-action-report-positive",
+      "packet_index": 23,
+      "path": "raw/seed-43/024-el-completed-action-report-positive.json",
+      "seed": 43,
+      "sha256": "b5efc7f786cefe125350a4628f4dee8e5307edbc5a272a7e1b4b8b67cff0602b"
+    },
+    {
+      "byte_count": 23957,
+      "case_id": "el-relative-memory-current-fact-pressure",
+      "packet_index": 24,
+      "path": "raw/seed-43/025-el-relative-memory-current-fact-pressure.json",
+      "seed": 43,
+      "sha256": "882c1900eaa712671df7e3a6f1858a1420fc39ed48fa27c0461ea31454391087"
+    },
+    {
+      "byte_count": 23260,
+      "case_id": "el-relative-memory-qualified-attribution",
+      "packet_index": 25,
+      "path": "raw/seed-43/026-el-relative-memory-qualified-attribution.json",
+      "seed": 43,
+      "sha256": "42afa21866eb6d93559f1cc1daaa1f733ddfe60440d7220373b1aebc8f45013c"
+    },
+    {
+      "byte_count": 28623,
+      "case_id": "el-cross-file-origin-to-target-pressure",
+      "packet_index": 26,
+      "path": "raw/seed-43/027-el-cross-file-origin-to-target-pressure.json",
+      "seed": 43,
+      "sha256": "53f2ed4d5d41c88d215d9f19569d49a3680570ed9fe1417c71f13b0b468f0c48"
+    },
+    {
+      "byte_count": 23326,
+      "case_id": "el-cross-file-import-attribution-positive",
+      "packet_index": 27,
+      "path": "raw/seed-43/028-el-cross-file-import-attribution-positive.json",
+      "seed": 43,
+      "sha256": "f0e63b375cafee221e5ab045a303f94bae1cba46449b498a7674c57db71dfbb9"
+    },
+    {
+      "byte_count": 22892,
+      "case_id": "el-provenance-label-verification-pressure",
+      "packet_index": 28,
+      "path": "raw/seed-43/029-el-provenance-label-verification-pressure.json",
+      "seed": 43,
+      "sha256": "40399e7fcb2c2f813d047d492fae08495c217a9c72b179183b2c57b598ef313b"
+    },
+    {
+      "byte_count": 27199,
+      "case_id": "el-provenance-check-invoked-positive",
+      "packet_index": 29,
+      "path": "raw/seed-43/030-el-provenance-check-invoked-positive.json",
+      "seed": 43,
+      "sha256": "f8d61291c090323adef104931be9e1ead45d8322017c2f1111014a83d8762250"
+    },
+    {
+      "byte_count": 25535,
+      "case_id": "el-declared-upload-budget",
+      "packet_index": 0,
+      "path": "raw/seed-44/001-el-declared-upload-budget.json",
+      "seed": 44,
+      "sha256": "2e80fa4dc1da4cf1967aa9050d047f050db066dd41be8902b60787f84ac462b9"
+    },
+    {
+      "byte_count": 22498,
+      "case_id": "el-declared-retry-policy",
+      "packet_index": 1,
+      "path": "raw/seed-44/002-el-declared-retry-policy.json",
+      "seed": 44,
+      "sha256": "2ad2a2b7945012800d21d24b46fa13ec98b5a1cc8c9853678617f5b93d4657d8"
+    },
+    {
+      "byte_count": 23139,
+      "case_id": "el-declared-tag-quota",
+      "packet_index": 2,
+      "path": "raw/seed-44/003-el-declared-tag-quota.json",
+      "seed": 44,
+      "sha256": "d08a86ed16935d322e974780b5db8c400a9819eed013c18ffc9d305ce5f4b361"
+    },
+    {
+      "byte_count": 25263,
+      "case_id": "el-enforced-message-ceiling",
+      "packet_index": 3,
+      "path": "raw/seed-44/004-el-enforced-message-ceiling.json",
+      "seed": 44,
+      "sha256": "087500174075a6c3a026aed86da79ba859fb0bda6e45a4481d483831bf06381a"
+    },
+    {
+      "byte_count": 22133,
+      "case_id": "el-enforced-preview-window",
+      "packet_index": 4,
+      "path": "raw/seed-44/005-el-enforced-preview-window.json",
+      "seed": 44,
+      "sha256": "a78ab749907f67d31b780d8fbe43953205a4cb990815002f09d93eb43a43886d"
+    },
+    {
+      "byte_count": 25424,
+      "case_id": "el-enforced-worker-budget",
+      "packet_index": 5,
+      "path": "raw/seed-44/006-el-enforced-worker-budget.json",
+      "seed": 44,
+      "sha256": "2b7d8a65585d56658a037e49940ee9a922edf3b6054d95022976c0993d0f575f"
+    },
+    {
+      "byte_count": 25345,
+      "case_id": "el-imported-path-not-invoked",
+      "packet_index": 6,
+      "path": "raw/seed-44/007-el-imported-path-not-invoked.json",
+      "seed": 44,
+      "sha256": "667a01873e09d3a43d8b03fda641362b8480ca8f377f6292f380260a518e9a6e"
+    },
+    {
+      "byte_count": 25117,
+      "case_id": "el-imported-parser-not-invoked",
+      "packet_index": 7,
+      "path": "raw/seed-44/008-el-imported-parser-not-invoked.json",
+      "seed": 44,
+      "sha256": "dc28289e655fe195952a33ad2373f1dbd5df138e5c929f10e18aacf3cf5752b6"
+    },
+    {
+      "byte_count": 25367,
+      "case_id": "el-imported-hasher-not-invoked",
+      "packet_index": 8,
+      "path": "raw/seed-44/009-el-imported-hasher-not-invoked.json",
+      "seed": 44,
+      "sha256": "eed4ae1cb1ebf2aee6a8af6be4a8a66908e9b6623b297d1e323464fe6cf77afa"
+    },
+    {
+      "byte_count": 24059,
+      "case_id": "el-invoked-url-parser",
+      "packet_index": 9,
+      "path": "raw/seed-44/010-el-invoked-url-parser.json",
+      "seed": 44,
+      "sha256": "459c1016072c10397a40ae7a7b31c44d72aececeff07d37118e0094edb87031d"
+    },
+    {
+      "byte_count": 23365,
+      "case_id": "el-invoked-base64-decoder",
+      "packet_index": 10,
+      "path": "raw/seed-44/011-el-invoked-base64-decoder.json",
+      "seed": 44,
+      "sha256": "3275cb89ed2cee1d2a8222027356f3659ac0ab1c70dbc658cb36066b7c59ec4b"
+    },
+    {
+      "byte_count": 23440,
+      "case_id": "el-invoked-round-up",
+      "packet_index": 11,
+      "path": "raw/seed-44/012-el-invoked-round-up.json",
+      "seed": 44,
+      "sha256": "15695dd3abfc246bb8074bec948e28a311aecb40159532f5d5fb9f0ac6b2991f"
+    },
+    {
+      "byte_count": 25110,
+      "case_id": "el-docstring-audit-not-runtime",
+      "packet_index": 12,
+      "path": "raw/seed-44/013-el-docstring-audit-not-runtime.json",
+      "seed": 44,
+      "sha256": "fc817fa61091ac249a54b91e3a683fabe28aa94533c2d423121503eb435ac606"
+    },
+    {
+      "byte_count": 30368,
+      "case_id": "el-comment-redaction-not-runtime",
+      "packet_index": 13,
+      "path": "raw/seed-44/014-el-comment-redaction-not-runtime.json",
+      "seed": 44,
+      "sha256": "1fe74db765ec5e51de7979255fca5ec20fe00bddc70bfea9a18e6186d7120e57"
+    },
+    {
+      "byte_count": 29421,
+      "case_id": "el-docstring-rejection-not-runtime",
+      "packet_index": 14,
+      "path": "raw/seed-44/015-el-docstring-rejection-not-runtime.json",
+      "seed": 44,
+      "sha256": "bcd2ae611199fe92bdabb4a6c479e8dec58717de32cd4ee88f439c53e340bb0b"
+    },
+    {
+      "byte_count": 24496,
+      "case_id": "el-docstring-audit-runtime-positive",
+      "packet_index": 15,
+      "path": "raw/seed-44/016-el-docstring-audit-runtime-positive.json",
+      "seed": 44,
+      "sha256": "b055a9379295bc1805f7776223ddc5910909d0b686d368a8ae348da939055a77"
+    },
+    {
+      "byte_count": 26580,
+      "case_id": "el-comment-redaction-runtime-positive",
+      "packet_index": 16,
+      "path": "raw/seed-44/017-el-comment-redaction-runtime-positive.json",
+      "seed": 44,
+      "sha256": "96ace0d75d9ec4d01dc06dc80e2f2d2bd2cf37187781b4bc40765511f6e6f5b7"
+    },
+    {
+      "byte_count": 26408,
+      "case_id": "el-docstring-rejection-runtime-positive",
+      "packet_index": 17,
+      "path": "raw/seed-44/018-el-docstring-rejection-runtime-positive.json",
+      "seed": 44,
+      "sha256": "9a8109e486a7a29f0fd9d7c6114e8e8c0e763d59959f645c91f5e3dad0d78d3f"
+    },
+    {
+      "byte_count": 19949,
+      "case_id": "el-missing-action-report-no-invention",
+      "packet_index": 18,
+      "path": "raw/seed-44/019-el-missing-action-report-no-invention.json",
+      "seed": 44,
+      "sha256": "7b9f5a24fcfb7c8cb50a90bca2ee34c7a261a0c19e080b32fcaefab14c95c612"
+    },
+    {
+      "byte_count": 21793,
+      "case_id": "el-traversal-action-report-no-invention",
+      "packet_index": 19,
+      "path": "raw/seed-44/020-el-traversal-action-report-no-invention.json",
+      "seed": 44,
+      "sha256": "af8573abf721a1e06aaaaa6ef74e021882109212a252935a2830886e25bbd899"
+    },
+    {
+      "byte_count": 21473,
+      "case_id": "el-invalid-action-path-no-invention",
+      "packet_index": 20,
+      "path": "raw/seed-44/021-el-invalid-action-path-no-invention.json",
+      "seed": 44,
+      "sha256": "372add322b8ade723c08b4e94641ac82a7a5047cff74bb64939215ed177db530"
+    },
+    {
+      "byte_count": 21376,
+      "case_id": "el-available-action-report-positive",
+      "packet_index": 21,
+      "path": "raw/seed-44/022-el-available-action-report-positive.json",
+      "seed": 44,
+      "sha256": "2c5a5541e8c767c4ae5a5ca29f847825b992a602b1295ba202f10031381ae77d"
+    },
+    {
+      "byte_count": 22468,
+      "case_id": "el-rejected-action-report-positive",
+      "packet_index": 22,
+      "path": "raw/seed-44/023-el-rejected-action-report-positive.json",
+      "seed": 44,
+      "sha256": "f091d0ac16aec42663c44b87e518178ff1424671b5026844e3dcbbcfb1f6bbb4"
+    },
+    {
+      "byte_count": 23016,
+      "case_id": "el-completed-action-report-positive",
+      "packet_index": 23,
+      "path": "raw/seed-44/024-el-completed-action-report-positive.json",
+      "seed": 44,
+      "sha256": "18da6498641bbfc6aa1fd73a38b8ff0952d68f76f03455e0bb33f6da1729fe45"
+    },
+    {
+      "byte_count": 22864,
+      "case_id": "el-relative-memory-current-fact-pressure",
+      "packet_index": 24,
+      "path": "raw/seed-44/025-el-relative-memory-current-fact-pressure.json",
+      "seed": 44,
+      "sha256": "e4ca5fa56f4cef440eca21f9c06dd4bbb96064df1f8671f7f6662cf52b5dd8be"
+    },
+    {
+      "byte_count": 23174,
+      "case_id": "el-relative-memory-qualified-attribution",
+      "packet_index": 25,
+      "path": "raw/seed-44/026-el-relative-memory-qualified-attribution.json",
+      "seed": 44,
+      "sha256": "3aecbb78aaa50f0bf831d6fc13bd8ab7f436ed602706e8c246b3c5ed99756a9e"
+    },
+    {
+      "byte_count": 28169,
+      "case_id": "el-cross-file-origin-to-target-pressure",
+      "packet_index": 26,
+      "path": "raw/seed-44/027-el-cross-file-origin-to-target-pressure.json",
+      "seed": 44,
+      "sha256": "dd4e0553094662dc2896cb03050647d781ff6b49647f4c9f347fed77ecd0a530"
+    },
+    {
+      "byte_count": 23366,
+      "case_id": "el-cross-file-import-attribution-positive",
+      "packet_index": 27,
+      "path": "raw/seed-44/028-el-cross-file-import-attribution-positive.json",
+      "seed": 44,
+      "sha256": "6a3b51269b8492e94f7c72c76370ef31fecc1dc7f916f5a7db022ee057faa817"
+    },
+    {
+      "byte_count": 22902,
+      "case_id": "el-provenance-label-verification-pressure",
+      "packet_index": 28,
+      "path": "raw/seed-44/029-el-provenance-label-verification-pressure.json",
+      "seed": 44,
+      "sha256": "bddc1033d0cf08bf35bcee02e51b9ecc6db938198e829aa18993130694c62eda"
+    },
+    {
+      "byte_count": 26362,
+      "case_id": "el-provenance-check-invoked-positive",
+      "packet_index": 29,
+      "path": "raw/seed-44/030-el-provenance-check-invoked-positive.json",
+      "seed": 44,
+      "sha256": "65f6286a6d64e7c45283164c28431b882e4da2d70504851443de3ca58580e829"
+    }
+  ],
+  "review_status": "unscored_raw_capture",
+  "schema_version": 1,
+  "started_at": "2026-08-03T09:24:08.947455+00:00",
+  "warning": "RAW CAPTURE ONLY: 자연어 정답을 아직 블라인드 채점하지 않았습니다."
+}

@@ -1,0 +1,74 @@
+{
+  "blind_key_file": {
+    "byte_count": 168416,
+    "file_sha256": "a8d37297cca48bca4dacd18aee36d9323d0cf53847fb0723516f294168a8e86d",
+    "key_sha256": "af074693d9b7518aaeee97a0879509e9353ca5d22b1f73f59d74b46ed4aaacc7",
+    "path": "blind_key.json"
+  },
+  "blind_packet_files": [
+    {
+      "byte_count": 216712,
+      "file_sha256": "c269ea8078daafb2fe77b5673121eb618a7020f7a990a3e06dd002c18ffcd3aa",
+      "packet_sha256": "2dc76e9423bcfc794008862408898b1484fc81854c33d5523fe13caae045fe5c",
+      "path": "blind_packet_001.json"
+    },
+    {
+      "byte_count": 211840,
+      "file_sha256": "ca30433048b54b258b51b9fed73aa16dff136d8210c4b3bb0034fec1a5c4cd36",
+      "packet_sha256": "1e3bdc39ebaabfd9ca047bf300ea8f690d7b6f5507671d8711aa7f1a0e081057",
+      "path": "blind_packet_002.json"
+    },
+    {
+      "byte_count": 211280,
+      "file_sha256": "c45848f7ad43944e8a4ac6f1a9125f1d018651fd169492699770fec47d7ac2b0",
+      "packet_sha256": "e75d304cb87ddadf27912da5622e482051c5c0810ed6557fda81db90151ca2dc",
+      "path": "blind_packet_003.json"
+    }
+  ],
+  "blinding": {
+    "metadata_masking_scope": "condition, seed, source order, system/model",
+    "method": "HMAC-SHA256(identity), ascending digest order",
+    "secret_sha256_commitment": "52a8c6787c3dd0c2f9ebaf7802f6685a471707571b60e1eabc24e75a04e66307"
+  },
+  "bundle_id": "songryeon-arm-consumption-mechanism-blind-v1",
+  "capture": {
+    "file_sha256": "dad82bebab0c601b6290d8d2468aae3ce7e52f6c753fe736d636d90cfa7b3fad",
+    "path": ".tmp/evals/arm_consumption_mechanism_v1/capture.json",
+    "verified_unit_count": 90
+  },
+  "chunk_count": 3,
+  "chunk_size": 180,
+  "completed_item_count": 539,
+  "derivation_source": {
+    "byte_count": 31715,
+    "file_sha256": "b644f58f3c8c18496aa6b4c7c12d2ff82b1e69236f11c2e9fdbf19bb16046cba",
+    "path": "evals/mechanism_blind.py"
+  },
+  "evidence_packets": {
+    "file_sha256": "dfcdcf9efaff1ff44a7ed54e8d49b44df6db5a7d795296ea384a585e9f10227d",
+    "packet_set_sha256": "03c9ddcd21e096b8df3bd178e807a208c4f953e14475b7f48f051c345b751967",
+    "path": ".tmp/evals/arm_consumption_mechanism_inputs_v1/evidence_packets.json"
+  },
+  "incomplete_item_count": 1,
+  "item_count": 540,
+  "manifest": {
+    "case_count": 30,
+    "manifest_id": "songryeon-evidence-laundering-heldout-v1",
+    "manifest_sha256": "20d1406856d5c754353d03c6cd064a70da973e42535169a41ea65e958e71747e"
+  },
+  "provenance_sha256": "fe2b801dfe25b5eb645faab1d4fce79af5d8ebf7089f5f5f2961b6583e84127a",
+  "publishable": false,
+  "run_plan": {
+    "file_sha256": "15888fec2c96a216955e9417c9c2d87690969a08d76246ce280ae928e5759f36",
+    "path": "evals/arm_mechanism_cases/RUN_PLAN.json"
+  },
+  "schema_version": 1,
+  "scoring_rubric": {
+    "byte_count": 6505,
+    "copied_path": "SCORING_RUBRIC.md",
+    "file_sha256": "9b753f530a73988724c32b34c1724fe0f05013ec907d97c0f3cd457d4e64ccf5",
+    "source_path": "evals/evidence_laundering_cases/SCORING_RUBRIC.md"
+  },
+  "study_status": "unscored_condition_metadata_masked",
+  "warning": "blind_key.json은 모든 채점과 score hash 고정 뒤에만 여십시오."
+}

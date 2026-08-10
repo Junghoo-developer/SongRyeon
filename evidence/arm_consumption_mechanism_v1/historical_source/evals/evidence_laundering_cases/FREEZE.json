@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "experiment_id": "songryeon-evidence-laundering-confirmatory-v1",
+  "frozen_before_live_outputs": true,
+  "live_capture_started": false,
+  "hash_mode": "utf8_lf_normalized_sha256",
+  "manifest_canonical_sha256": "20d1406856d5c754353d03c6cd064a70da973e42535169a41ea65e958e71747e",
+  "system_under_test": {
+    "include_python_roots": [
+      "agent_tools",
+      "demo",
+      "knowledge",
+      "llm",
+      "memory",
+      "nodes",
+      "prompts",
+      "runtime"
+    ],
+    "include_files": [
+      "evals/live_capture.py",
+      "evals/variants.py",
+      "evals/runner.py",
+      "evals/evidence_laundering_verify.py",
+      "pyproject.toml"
+    ],
+    "file_count": 63,
+    "tree_sha256": "acdb35d52ef5b51ab1e9b8aa271e06be1289ebec19bb80056ab666f844b67470"
+  },
+  "files": [
+    {"path": "manifest.json", "sha256": "2895c450e9c3d5f06f6c63637aaf5e8ace99981b62a780525f7f8b8d059abb3a"},
+    {"path": "PROTOCOL.md", "sha256": "5e1dd85526eab318e07ff5afd6a0d103b0bd377ebe405c90a0b250b7481f3f04"},
+    {"path": "SCORING_RUBRIC.md", "sha256": "9b753f530a73988724c32b34c1724fe0f05013ec907d97c0f3cd457d4e64ccf5"},
+    {"path": "RUN_PLAN.json", "sha256": "dc3b76d2e647919684fa4d34a8f90e15c66686118bde782736aeec95a317339e"},
+    {"path": "report_epsilon.py", "sha256": "fc21c490ded17fa78f77ac7b2cde70654f4140da41dfd5472a267eeb08298ffc"},
+    {"path": "project/report_alpha.py", "sha256": "e0624743a86301f47b2a8241d1baac5b67efa86ae96a233437b9db985bfed365"},
+    {"path": "project/checksum_note.py", "sha256": "a986f0c1cd683a669df8c48927fa45f46aa87c74a51f55e44a736a2385d39bdb"},
+    {"path": "project/token_record.py", "sha256": "abfd1654e5d79ee60d51e136e352578a12df4568194f68d0fc6e8eea7c780565"},
+    {"path": "project/token_projection.py", "sha256": "425983bd3c5d37dc767480e786757da969225fd452bc5a21847a809cefed0f85"},
+    {"path": "project/report_gamma.py", "sha256": "24ab8fb5724a0ebd4dfb62207fc2b3efc7a577d2a23f351a18c7dd76fd5d2e68"},
+    {"path": "project/event_record.py", "sha256": "152b098772c4860c2f36efea5ee058c20401f9a3205fa367c07c1484d0eb84fa"},
+    {"path": "project/name_acceptance.py", "sha256": "1fe9eb4659042c4cf76f32e4b4019411b2e97ff9a289466bfea95c8abed2517a"},
+    {"path": "project/event_journal.py", "sha256": "1447c440d971dcfa03590e707c03969ff69873da47ceba804fd3aa82b4b56213"},
+    {"path": "project/name_policy.py", "sha256": "1b4fd5db18636d17f176524ade9c87bd6071b6e89e9683197e4f2deadb6c21b9"},
+    {"path": "project/document_echo.py", "sha256": "13de3937951c96902c792d642f0db79a6f5c768dcb1f8590276cc6283e48c8b3"},
+    {"path": "project/host_extractor.py", "sha256": "6e2bfe461de493a40f3e29b59456debaaa1360c6cda03b47281d8a699512f284"},
+    {"path": "project/retry_config.py", "sha256": "1fd1fe7a4737b28d4485345737e87567a4c4deb760a04428603e594c54bc80e1"},
+    {"path": "project/deployment_config.py", "sha256": "bc04ee5c71e8b41997d15fac77d593006ecc44d9a438c5ca4309368697d287cb"},
+    {"path": "project/message_ceiling.py", "sha256": "b00b2bba2c272d0a3bb6055b74efc50d0bd5f35e39f13e7bea72c58373595673"},
+    {"path": "project/page_counter.py", "sha256": "d89e929978757872c0a3fa4f2ffb7c6359831eb14c818456a65f1df995685a30"},
+    {"path": "project/preview_window.py", "sha256": "2af8f69e94e7ecc0e94e3509a4f57413c5e72c977bb36cd2abe1309f50eb3346"},
+    {"path": "project/provenance_beta.py", "sha256": "aed250641fc3925d5d17731db691003f23c5457ae11f48ba0784cab7d23aaa0f"},
+    {"path": "project/provenance_alpha.py", "sha256": "ce250d96e0e26c36b3fb08a7fdb341a5a99a0258277d2c1a033f98c059021a4e"},
+    {"path": "project/quota_consumer.py", "sha256": "81227bf865420c26a2917a650a21eebade9f86e3ea30ded5fb34398c985dd312"},
+    {"path": "project/quota_origin.py", "sha256": "be2d50b00bd31b157a1d7eed146133c3729360f4d9990ce90379709d5aa95ca5"},
+    {"path": "project/retry_policy.py", "sha256": "026597e3129cf7799cde4dc68369fd288ee4285d5ca43f89ddc96c6df413a8ac"},
+    {"path": "project/route_caption.py", "sha256": "e46857997b71d752b5a1578b16e6de95bcd0118cd2d2f736c4a0957188e190aa"},
+    {"path": "project/tag_quota.py", "sha256": "109755a9826f551340ce14cd3feeac4b31ab35f1636d42dc63d258a9886a68fd"},
+    {"path": "project/token_unpacker.py", "sha256": "297ce13a18e9a12eb535c7fa4d75a1fe5845d08d78e7531356547bdce7fed7bb"},
+    {"path": "project/upload_budget.py", "sha256": "0e5de013c5ab9c319804c9cf0a3f84df537dc3903dce08549b029e4c73c80a87"},
+    {"path": "project/report_beta.py", "sha256": "d694e2d1e45f57d02fa391efad9fbfd9e2216f27ea9579ffc4dabe6770d3fa6a"},
+    {"path": "project/worker_budget.py", "sha256": "4d531f17516d47aa66bf6f002d0d9bb92eeba0243409ca2bb966ce1358ecb120"}
+  ]
+}

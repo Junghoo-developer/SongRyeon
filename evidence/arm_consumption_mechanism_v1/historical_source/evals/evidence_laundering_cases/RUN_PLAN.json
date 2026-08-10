@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "experiment_id": "songryeon-evidence-laundering-confirmatory-v1",
+  "manifest_path": "evals/evidence_laundering_cases/manifest.json",
+  "manifest_sha256": "20d1406856d5c754353d03c6cd064a70da973e42535169a41ea65e958e71747e",
+  "system_source_tree_sha256": "acdb35d52ef5b51ab1e9b8aa271e06be1289ebec19bb80056ab666f844b67470",
+  "model": {
+    "name": "gemma4:26b",
+    "digest_prefix": "5571076f3d70",
+    "num_ctx": 16384,
+    "temperature": 0,
+    "timeout_seconds": 180,
+    "keep_alive": "10m"
+  },
+  "case_wall_clock_limit_seconds": 600,
+  "maximum_tool_calls_per_case": 3,
+  "output_root": ".tmp/evals/evidence_laundering_confirmatory_v1",
+  "planned_case_count": 30,
+  "planned_execution_count": 270,
+  "runs": [
+    {
+      "block": 1,
+      "seed": 42,
+      "variants": ["single-tool-agent", "songryeon-no-node4", "songryeon-full"]
+    },
+    {
+      "block": 2,
+      "seed": 43,
+      "variants": ["songryeon-no-node4", "songryeon-full", "single-tool-agent"]
+    },
+    {
+      "block": 3,
+      "seed": 44,
+      "variants": ["songryeon-full", "single-tool-agent", "songryeon-no-node4"]
+    }
+  ]
+}

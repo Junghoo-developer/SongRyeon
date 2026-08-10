@@ -1,0 +1,20 @@
+{
+  "blind_packet_sha256": {
+    "blind_packet_001.json": "c269ea8078daafb2fe77b5673121eb618a7020f7a990a3e06dd002c18ffcd3aa",
+    "blind_packet_002.json": "ca30433048b54b258b51b9fed73aa16dff136d8210c4b3bb0034fec1a5c4cd36",
+    "blind_packet_003.json": "c45848f7ad43944e8a4ac6f1a9125f1d018651fd169492699770fec47d7ac2b0"
+  },
+  "packet_id": "songryeon-arm-consumption-mechanism-blind-v1",
+  "provenance_sha256": "302c1bf6c8e1b793bd3c6dcbb109c5d5da29b3111be3b26f61b398a6b4da331d",
+  "schema_version": 1,
+  "score_file_sha256": {
+    "scores-chunk-1.json": "ce1651a042600bad172a12b2d3015fe7aa9250645d02d63dd5c851c9874f05f0",
+    "scores-chunk-2.json": "8b4c231569b7fb40d4261043903fe4db437ffafc94fb35d4b1d64bdd037fc365",
+    "scores-chunk-3.json": "a4092e808910b0c537d29050215a44319941057e7d1ca30653ee19f757a3f6b5"
+  },
+  "scorer_type": "blind_ai_preliminary",
+  "scoring_status": "locked_before_unblinding",
+  "semantic_grounded_success_count_before_unblinding": 402,
+  "validated_item_count": 540,
+  "validated_unique_blind_id_count": 540
+}

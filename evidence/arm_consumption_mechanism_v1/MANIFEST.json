@@ -1,0 +1,463 @@
+{
+  "bundle_id": "songryeon-arm-public-evidence-v1",
+  "claim_status": "exploratory_not_publishable",
+  "file_count": 91,
+  "files": [
+    {
+      "bytes": 4213,
+      "path": "CLAIMS.json",
+      "sha256": "e53d0f07ddbcff37af1c42daec23c2daaff3dd2533de10b82b3a453d6e8d87d8"
+    },
+    {
+      "bytes": 168505,
+      "path": "data/blind_key_public.json",
+      "sha256": "fe756bcf4e3bc7d203ce941516e4662aed11315e005a91f9ac1c42e55a8464a1"
+    },
+    {
+      "bytes": 257619,
+      "path": "data/public_score_rows.csv",
+      "sha256": "cf03f2af83a29e152c0cdd25ad5dab19a94ec512d707cd9322dbb2009500b089"
+    },
+    {
+      "bytes": 508328,
+      "path": "data/public_score_rows.jsonl",
+      "sha256": "53662cfc7523509243f8d02994cf919a4d6ce968bd8966c76e3ec38378dd4c83"
+    },
+    {
+      "bytes": 9696,
+      "path": "historical_source/agent_tools/files.py",
+      "sha256": "19ad2c17d2067784326ace0e36f51887a041b07122a1e259dd314493e8772d96"
+    },
+    {
+      "bytes": 1833,
+      "path": "historical_source/agent_tools/result.py",
+      "sha256": "1300aec192c2f24fbb773e3d3b5ddd9fc87d1c2c1557713874a3df75afa5d7ec"
+    },
+    {
+      "bytes": 17242,
+      "path": "historical_source/docs/arm_consumption_mechanism_exploratory_results_2026-08-03.md",
+      "sha256": "c6aa05ab34e87aa9440271ca4b9dcb5f5fc318079a0eae0e317f0f955afba99c"
+    },
+    {
+      "bytes": 4782,
+      "path": "historical_source/evals/arm_mechanism_cases/EVIDENCE_PLAN.json",
+      "sha256": "8ce624bd2d8e0eb138d50e37aab861da95d227de2b501e17f2f45534a55e746f"
+    },
+    {
+      "bytes": 3272,
+      "path": "historical_source/evals/arm_mechanism_cases/FREEZE.json",
+      "sha256": "6992f83675e9b5efc8c39fb8f39d0dcd036048902f0cd33a7c4b0af37aab4027"
+    },
+    {
+      "bytes": 14335,
+      "path": "historical_source/evals/arm_mechanism_cases/PROTOCOL.md",
+      "sha256": "e9c499e669a192458f73dde580f516bc85af8b131dcd21b90fedecb0c0879dc1"
+    },
+    {
+      "bytes": 2380,
+      "path": "historical_source/evals/arm_mechanism_cases/RUN_PLAN.json",
+      "sha256": "15888fec2c96a216955e9417c9c2d87690969a08d76246ce280ae928e5759f36"
+    },
+    {
+      "bytes": 4607,
+      "path": "historical_source/evals/evidence_laundering_cases/FREEZE.json",
+      "sha256": "42d79b073dfa19c794e442efdb59aa4ae28f82b845827c290f6688285c65eec9"
+    },
+    {
+      "bytes": 28717,
+      "path": "historical_source/evals/evidence_laundering_cases/manifest.json",
+      "sha256": "2895c450e9c3d5f06f6c63637aaf5e8ace99981b62a780525f7f8b8d059abb3a"
+    },
+    {
+      "bytes": 180,
+      "path": "historical_source/evals/evidence_laundering_cases/project/checksum_note.py",
+      "sha256": "a986f0c1cd683a669df8c48927fa45f46aa87c74a51f55e44a736a2385d39bdb"
+    },
+    {
+      "bytes": 113,
+      "path": "historical_source/evals/evidence_laundering_cases/project/deployment_config.py",
+      "sha256": "bc04ee5c71e8b41997d15fac77d593006ecc44d9a438c5ca4309368697d287cb"
+    },
+    {
+      "bytes": 153,
+      "path": "historical_source/evals/evidence_laundering_cases/project/document_echo.py",
+      "sha256": "13de3937951c96902c792d642f0db79a6f5c768dcb1f8590276cc6283e48c8b3"
+    },
+    {
+      "bytes": 157,
+      "path": "historical_source/evals/evidence_laundering_cases/project/event_journal.py",
+      "sha256": "1447c440d971dcfa03590e707c03969ff69873da47ceba804fd3aa82b4b56213"
+    },
+    {
+      "bytes": 133,
+      "path": "historical_source/evals/evidence_laundering_cases/project/event_record.py",
+      "sha256": "152b098772c4860c2f36efea5ee058c20401f9a3205fa367c07c1484d0eb84fa"
+    },
+    {
+      "bytes": 159,
+      "path": "historical_source/evals/evidence_laundering_cases/project/host_extractor.py",
+      "sha256": "6e2bfe461de493a40f3e29b59456debaaa1360c6cda03b47281d8a699512f284"
+    },
+    {
+      "bytes": 210,
+      "path": "historical_source/evals/evidence_laundering_cases/project/message_ceiling.py",
+      "sha256": "b00b2bba2c272d0a3bb6055b74efc50d0bd5f35e39f13e7bea72c58373595673"
+    },
+    {
+      "bytes": 123,
+      "path": "historical_source/evals/evidence_laundering_cases/project/name_acceptance.py",
+      "sha256": "1fe9eb4659042c4cf76f32e4b4019411b2e97ff9a289466bfea95c8abed2517a"
+    },
+    {
+      "bytes": 199,
+      "path": "historical_source/evals/evidence_laundering_cases/project/name_policy.py",
+      "sha256": "1b4fd5db18636d17f176524ade9c87bd6071b6e89e9683197e4f2deadb6c21b9"
+    },
+    {
+      "bytes": 156,
+      "path": "historical_source/evals/evidence_laundering_cases/project/page_counter.py",
+      "sha256": "d89e929978757872c0a3fa4f2ffb7c6359831eb14c818456a65f1df995685a30"
+    },
+    {
+      "bytes": 131,
+      "path": "historical_source/evals/evidence_laundering_cases/project/preview_window.py",
+      "sha256": "2af8f69e94e7ecc0e94e3509a4f57413c5e72c977bb36cd2abe1309f50eb3346"
+    },
+    {
+      "bytes": 193,
+      "path": "historical_source/evals/evidence_laundering_cases/project/provenance_alpha.py",
+      "sha256": "ce250d96e0e26c36b3fb08a7fdb341a5a99a0258277d2c1a033f98c059021a4e"
+    },
+    {
+      "bytes": 507,
+      "path": "historical_source/evals/evidence_laundering_cases/project/provenance_beta.py",
+      "sha256": "aed250641fc3925d5d17731db691003f23c5457ae11f48ba0784cab7d23aaa0f"
+    },
+    {
+      "bytes": 156,
+      "path": "historical_source/evals/evidence_laundering_cases/project/quota_consumer.py",
+      "sha256": "81227bf865420c26a2917a650a21eebade9f86e3ea30ded5fb34398c985dd312"
+    },
+    {
+      "bytes": 105,
+      "path": "historical_source/evals/evidence_laundering_cases/project/quota_origin.py",
+      "sha256": "be2d50b00bd31b157a1d7eed146133c3729360f4d9990ce90379709d5aa95ca5"
+    },
+    {
+      "bytes": 149,
+      "path": "historical_source/evals/evidence_laundering_cases/project/report_alpha.py",
+      "sha256": "e0624743a86301f47b2a8241d1baac5b67efa86ae96a233437b9db985bfed365"
+    },
+    {
+      "bytes": 192,
+      "path": "historical_source/evals/evidence_laundering_cases/project/report_beta.py",
+      "sha256": "d694e2d1e45f57d02fa391efad9fbfd9e2216f27ea9579ffc4dabe6770d3fa6a"
+    },
+    {
+      "bytes": 196,
+      "path": "historical_source/evals/evidence_laundering_cases/project/report_gamma.py",
+      "sha256": "24ab8fb5724a0ebd4dfb62207fc2b3efc7a577d2a23f351a18c7dd76fd5d2e68"
+    },
+    {
+      "bytes": 96,
+      "path": "historical_source/evals/evidence_laundering_cases/project/retry_config.py",
+      "sha256": "1fd1fe7a4737b28d4485345737e87567a4c4deb760a04428603e594c54bc80e1"
+    },
+    {
+      "bytes": 124,
+      "path": "historical_source/evals/evidence_laundering_cases/project/retry_policy.py",
+      "sha256": "026597e3129cf7799cde4dc68369fd288ee4285d5ca43f89ddc96c6df413a8ac"
+    },
+    {
+      "bytes": 140,
+      "path": "historical_source/evals/evidence_laundering_cases/project/route_caption.py",
+      "sha256": "e46857997b71d752b5a1578b16e6de95bcd0118cd2d2f736c4a0957188e190aa"
+    },
+    {
+      "bytes": 114,
+      "path": "historical_source/evals/evidence_laundering_cases/project/tag_quota.py",
+      "sha256": "109755a9826f551340ce14cd3feeac4b31ab35f1636d42dc63d258a9886a68fd"
+    },
+    {
+      "bytes": 161,
+      "path": "historical_source/evals/evidence_laundering_cases/project/token_projection.py",
+      "sha256": "425983bd3c5d37dc767480e786757da969225fd452bc5a21847a809cefed0f85"
+    },
+    {
+      "bytes": 154,
+      "path": "historical_source/evals/evidence_laundering_cases/project/token_record.py",
+      "sha256": "abfd1654e5d79ee60d51e136e352578a12df4568194f68d0fc6e8eea7c780565"
+    },
+    {
+      "bytes": 155,
+      "path": "historical_source/evals/evidence_laundering_cases/project/token_unpacker.py",
+      "sha256": "297ce13a18e9a12eb535c7fa4d75a1fe5845d08d78e7531356547bdce7fed7bb"
+    },
+    {
+      "bytes": 142,
+      "path": "historical_source/evals/evidence_laundering_cases/project/upload_budget.py",
+      "sha256": "0e5de013c5ab9c319804c9cf0a3f84df537dc3903dce08549b029e4c73c80a87"
+    },
+    {
+      "bytes": 218,
+      "path": "historical_source/evals/evidence_laundering_cases/project/worker_budget.py",
+      "sha256": "4d531f17516d47aa66bf6f002d0d9bb92eeba0243409ca2bb966ce1358ecb120"
+    },
+    {
+      "bytes": 11280,
+      "path": "historical_source/evals/evidence_laundering_cases/PROTOCOL.md",
+      "sha256": "5e1dd85526eab318e07ff5afd6a0d103b0bd377ebe405c90a0b250b7481f3f04"
+    },
+    {
+      "bytes": 82,
+      "path": "historical_source/evals/evidence_laundering_cases/report_epsilon.py",
+      "sha256": "fc21c490ded17fa78f77ac7b2cde70654f4140da41dfd5472a267eeb08298ffc"
+    },
+    {
+      "bytes": 1135,
+      "path": "historical_source/evals/evidence_laundering_cases/RUN_PLAN.json",
+      "sha256": "dc3b76d2e647919684fa4d34a8f90e15c66686118bde782736aeec95a317339e"
+    },
+    {
+      "bytes": 6505,
+      "path": "historical_source/evals/evidence_laundering_cases/SCORING_RUBRIC.md",
+      "sha256": "9b753f530a73988724c32b34c1724fe0f05013ec907d97c0f3cd457d4e64ccf5"
+    },
+    {
+      "bytes": 35905,
+      "path": "historical_source/evals/evidence_laundering_verify.py",
+      "sha256": "fe046bdf8bcc602993a8a874a6f714844264cb33f93c1f662d2e105e5ac59bf7"
+    },
+    {
+      "bytes": 31715,
+      "path": "historical_source/evals/mechanism_blind.py",
+      "sha256": "b644f58f3c8c18496aa6b4c7c12d2ff82b1e69236f11c2e9fdbf19bb16046cba"
+    },
+    {
+      "bytes": 43858,
+      "path": "historical_source/evals/mechanism_capture.py",
+      "sha256": "b67f84ab72cc987665ee2422f2fc6c130747907a0766a56b2e690b4e092a0f26"
+    },
+    {
+      "bytes": 17671,
+      "path": "historical_source/evals/mechanism_packets.py",
+      "sha256": "0247f7c4a511f48137c7447cc966173463e577d80eda67dd21465228dbfba79f"
+    },
+    {
+      "bytes": 26705,
+      "path": "historical_source/evals/mechanism_rating_reconcile.py",
+      "sha256": "44cdea8181021fe493cc2ae867243841c358a1a96488aa8c3b917ace8abd4c9e"
+    },
+    {
+      "bytes": 27489,
+      "path": "historical_source/evals/mechanism_score_verify.py",
+      "sha256": "e16e264f5452d0a9c9c72ec70ed85cc472717522eb2f4b8cd13b264d03617b81"
+    },
+    {
+      "bytes": 46550,
+      "path": "historical_source/evals/mechanism_summary.py",
+      "sha256": "6414fa9eff9f17dc8a26c70589e34c3db00f7157d39c401bab938575023cd9b2"
+    },
+    {
+      "bytes": 26503,
+      "path": "historical_source/evals/mechanism_verify.py",
+      "sha256": "f3e399ef9cfce814a70ef917c1736c2cfda4f326c68567c0c8d07f8ada401b6e"
+    },
+    {
+      "bytes": 29532,
+      "path": "historical_source/evals/runner.py",
+      "sha256": "2bc29bf3bb87f6a82e1eb331e36101689d5032f239a9c165c6ecdc5e63eb1b8f"
+    },
+    {
+      "bytes": 14320,
+      "path": "historical_source/llm/client.py",
+      "sha256": "e95c6b9d4e511000871ac74e48f21d0ffc19ee4db6d02742e7a56afeb7fb9b81"
+    },
+    {
+      "bytes": 628,
+      "path": "historical_source/README.md",
+      "sha256": "76ac82a987197ea595f29989a015bdb0f68e576170bdf8889025c753cfeea302"
+    },
+    {
+      "bytes": 12862,
+      "path": "historical_source/tests/evals/test_evidence_laundering_protocol.py",
+      "sha256": "d6f4b4c790b05a55e80b1781e5e61aee263f3408282282d92dba7749ce271ff6"
+    },
+    {
+      "bytes": 15908,
+      "path": "historical_source/tests/evals/test_evidence_laundering_verify.py",
+      "sha256": "ad4383895abe015c2ec489aeb97182c233a9da840c61aed5e574484e2b0b6380"
+    },
+    {
+      "bytes": 8869,
+      "path": "historical_source/tests/evals/test_mechanism_blind.py",
+      "sha256": "07544a177d0ac7708fb7dc7ed25fc55ce87f57726003205e93a5354fccd5c140"
+    },
+    {
+      "bytes": 13614,
+      "path": "historical_source/tests/evals/test_mechanism_capture.py",
+      "sha256": "9ebd0e7abe79c702f4db509017872e2970a6db1ba668e209f566d462fa019e84"
+    },
+    {
+      "bytes": 6157,
+      "path": "historical_source/tests/evals/test_mechanism_packets.py",
+      "sha256": "d9f428884c2584a7689eb4c3060d07505117818cb7d2508ca30761d2afc84d22"
+    },
+    {
+      "bytes": 12266,
+      "path": "historical_source/tests/evals/test_mechanism_rating_reconcile.py",
+      "sha256": "5829b455b8c6ee51fb966ae678fed6b6e90b723e4d7c9d43beff6c31d995e8ba"
+    },
+    {
+      "bytes": 10703,
+      "path": "historical_source/tests/evals/test_mechanism_score_verify.py",
+      "sha256": "579a1f372a8e03af110f08971dae009306d4bff7d544e7e0a38b51bcd26448c7"
+    },
+    {
+      "bytes": 12228,
+      "path": "historical_source/tests/evals/test_mechanism_summary.py",
+      "sha256": "78b8c56530587f4e2b8b9a0e14973eb03c9e3b6225578846076fe300d0364d16"
+    },
+    {
+      "bytes": 3773,
+      "path": "historical_source/tests/evals/test_mechanism_verify.py",
+      "sha256": "4e6975d3dc42bf3d35d8df3e52672d34bf9fbe6d7cbb23de82f3ba276dc509da"
+    },
+    {
+      "bytes": 1490,
+      "path": "LIMITATIONS.md",
+      "sha256": "55f3ea7de26495d6fb42617684f192b9479700571a7a087a560ecb97f69493c0"
+    },
+    {
+      "bytes": 2380,
+      "path": "README.md",
+      "sha256": "850f3981607e1ae390063b0aa17a152b6dd22eec8b197f2d528d8239648b1b47"
+    },
+    {
+      "bytes": 24361,
+      "path": "SOURCE_HASHES.json",
+      "sha256": "2dfbb2dad0cf7d5a4a0dcfb92a6c86e6062bc9c36f46a4b03799988b998e01fc"
+    },
+    {
+      "bytes": 1070,
+      "path": "SOURCE_LINEAGE.json",
+      "sha256": "0d202d1b8a6383389d71e6442691bfab01ebf1b58a0eebaa5d190d6864a3b338"
+    },
+    {
+      "bytes": 2294,
+      "path": "tests/test_verify.py",
+      "sha256": "7be7e6aa96ad48af3c996cdbaf90e8431b5dacab836a3aefe541a8961191b1ea"
+    },
+    {
+      "bytes": 2315,
+      "path": "TRANSFORMATION_PROVENANCE.json",
+      "sha256": "de2031ec98eb0a3c7eb0993e7923c2c36b21e53f570dea17d63e62964a727970"
+    },
+    {
+      "bytes": 196916,
+      "path": "upstream_records/adjudication_packet.json",
+      "sha256": "d3a95c276a4f4341f25b34977beac4e739ecc9a0781523d57cff741f806af449"
+    },
+    {
+      "bytes": 28133,
+      "path": "upstream_records/adjudications.json",
+      "sha256": "799fbb945cea1d88ac2132d65279fe6a0fd364d09f2520f35673b9a32fd2fec3"
+    },
+    {
+      "bytes": 216712,
+      "path": "upstream_records/blind_packet_001.json",
+      "sha256": "c269ea8078daafb2fe77b5673121eb618a7020f7a990a3e06dd002c18ffcd3aa"
+    },
+    {
+      "bytes": 211840,
+      "path": "upstream_records/blind_packet_002.json",
+      "sha256": "ca30433048b54b258b51b9fed73aa16dff136d8210c4b3bb0034fec1a5c4cd36"
+    },
+    {
+      "bytes": 211280,
+      "path": "upstream_records/blind_packet_003.json",
+      "sha256": "c45848f7ad43944e8a4ac6f1a9125f1d018651fd169492699770fec47d7ac2b0"
+    },
+    {
+      "bytes": 3083,
+      "path": "upstream_records/blind_provenance.json",
+      "sha256": "302c1bf6c8e1b793bd3c6dcbb109c5d5da29b3111be3b26f61b398a6b4da331d"
+    },
+    {
+      "bytes": 29153,
+      "path": "upstream_records/capture_index.json",
+      "sha256": "dad82bebab0c601b6290d8d2468aae3ce7e52f6c753fe736d636d90cfa7b3fad"
+    },
+    {
+      "bytes": 29213,
+      "path": "upstream_records/evidence_packets.json",
+      "sha256": "dfcdcf9efaff1ff44a7ed54e8d49b44df6db5a7d795296ea384a585e9f10227d"
+    },
+    {
+      "bytes": 1921,
+      "path": "upstream_records/rating_provenance.json",
+      "sha256": "6d2f7f9d0efe6dbf4866b3ba2e4878bc069fcda8cde730a11c389e052e534247"
+    },
+    {
+      "bytes": 85603,
+      "path": "upstream_records/ratings-a-chunk-1.json",
+      "sha256": "edc4232748cefe936c8749360a17ef26091ae995c8da93696b1237d16d54d425"
+    },
+    {
+      "bytes": 68654,
+      "path": "upstream_records/ratings-a-chunk-2.json",
+      "sha256": "7b5655a83aa7e681c1757b8862fd77ed1f51b2dda57c7b8caffbb6fc2ef69119"
+    },
+    {
+      "bytes": 85169,
+      "path": "upstream_records/ratings-a-chunk-3.json",
+      "sha256": "7272b7628ac2a8a03bcdb5b76797d290004a09d3d6c9954ba2891591009b328d"
+    },
+    {
+      "bytes": 85430,
+      "path": "upstream_records/ratings-b-chunk-1.json",
+      "sha256": "fdc4d1d204c5ddcb0e1a8541a6fb8a2b7f15d07c18713ca223cd002908d577b8"
+    },
+    {
+      "bytes": 85750,
+      "path": "upstream_records/ratings-b-chunk-2.json",
+      "sha256": "b072d622e85180e0d1a562506ba677e4b974a40dde2cc0f2cf29ffccf29b4066"
+    },
+    {
+      "bytes": 68769,
+      "path": "upstream_records/ratings-b-chunk-3.json",
+      "sha256": "0507af781c88a0029423d99acbe5cd7c31dcb2594d269538c1e72aea61378613"
+    },
+    {
+      "bytes": 1038,
+      "path": "upstream_records/score_lock.json",
+      "sha256": "8b0ee1bd51be6a0bafb97840256faa07084c5763ec6f2a801dda80593089c852"
+    },
+    {
+      "bytes": 85702,
+      "path": "upstream_records/scores-chunk-1.json",
+      "sha256": "ce1651a042600bad172a12b2d3015fe7aa9250645d02d63dd5c851c9874f05f0"
+    },
+    {
+      "bytes": 85227,
+      "path": "upstream_records/scores-chunk-2.json",
+      "sha256": "8b4c231569b7fb40d4261043903fe4db437ffafc94fb35d4b1d64bdd037fc365"
+    },
+    {
+      "bytes": 85542,
+      "path": "upstream_records/scores-chunk-3.json",
+      "sha256": "a4092e808910b0c537d29050215a44319941057e7d1ca30653ee19f757a3f6b5"
+    },
+    {
+      "bytes": 6505,
+      "path": "upstream_records/SCORING_RUBRIC.md",
+      "sha256": "9b753f530a73988724c32b34c1724fe0f05013ec907d97c0f3cd457d4e64ccf5"
+    },
+    {
+      "bytes": 13301,
+      "path": "verify.py",
+      "sha256": "2d711aaba3e0438dad2747342fcf6c3745d2e9c27cfecdd927d9a2fb8e86995a"
+    }
+  ],
+  "schema_version": 1
+}

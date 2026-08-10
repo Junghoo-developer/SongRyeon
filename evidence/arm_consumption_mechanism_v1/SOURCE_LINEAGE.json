@@ -1,0 +1,24 @@
+{
+  "contest_source_tag": {
+    "commit_date": "2026-08-07T10:36:30+09:00",
+    "commit_parent": "4c6f5545d74d9c5e7ac320877a6bcad526f22648",
+    "commit_subject": "docs: finalize contest source release",
+    "name": "contest-2026-final",
+    "object_type": "tag",
+    "peeled_commit": "62d3152b2d90e4a8930b945279aa086fb16aa226",
+    "tag_object": "50c0cbca47c5ec06d06ec9db2b5aaf8bdc96562f"
+  },
+  "historical_arm_source": {
+    "commit": "3eaad35a93d0a2184864de8f4e169855cb3ada9f",
+    "commit_date": "2026-08-06T12:18:34+09:00",
+    "parent": "e61da6c1fdd012acc0dfb6f2b970aa0579d9c3c0",
+    "subject": "chore: preserve precontest research and holdout"
+  },
+  "relationship": {
+    "contest_tag_commit_is_ancestor_of_historical_arm_commit": false,
+    "historical_arm_commit_is_ancestor_of_contest_tag_commit": false,
+    "interpretation": "The ARM source commit and contest source tag commit diverged from the same parent; ARM files were not in the tagged contest source tree.",
+    "merge_base": "e61da6c1fdd012acc0dfb6f2b970aa0579d9c3c0"
+  },
+  "schema_version": 1
+}

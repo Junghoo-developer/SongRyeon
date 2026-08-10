@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "experiment_id": "songryeon-arm-consumption-mechanism-exploratory-v1",
+  "study_status": "exploratory-mechanism-replay",
+  "frozen_before_live_outputs": true,
+  "frozen_at": "2026-08-03T09:22:47.4209831Z",
+  "source_manifest_canonical_sha256": "20d1406856d5c754353d03c6cd064a70da973e42535169a41ea65e958e71747e",
+  "evidence_packet_set_sha256": "03c9ddcd21e096b8df3bd178e807a208c4f953e14475b7f48f051c345b751967",
+  "model": {
+    "name": "gemma4:26b",
+    "digest": "5571076f3d70050487b26b341705799e0ab29b808164f90d20d4cf84f699d251",
+    "server_version": "0.32.5",
+    "num_ctx": 16384,
+    "temperature": 0,
+    "seeds": [42, 43, 44]
+  },
+  "preflight": {
+    "test_result": "302 passed, 1 skipped",
+    "existing_experiment_sut_sha256": "acdb35d52ef5b51ab1e9b8aa271e06be1289ebec19bb80056ab666f844b67470",
+    "planned_units": 90,
+    "planned_answer_calls": 360,
+    "planned_reviewer_calls": 180
+  },
+  "files": [
+    {"path": "evals/arm_mechanism_cases/EVIDENCE_PLAN.json", "sha256": "8ce624bd2d8e0eb138d50e37aab861da95d227de2b501e17f2f45534a55e746f", "bytes": 4782},
+    {"path": "evals/arm_mechanism_cases/PROTOCOL.md", "sha256": "e9c499e669a192458f73dde580f516bc85af8b131dcd21b90fedecb0c0879dc1", "bytes": 14335},
+    {"path": "evals/arm_mechanism_cases/RUN_PLAN.json", "sha256": "15888fec2c96a216955e9417c9c2d87690969a08d76246ce280ae928e5759f36", "bytes": 2380},
+    {"path": "evals/mechanism_packets.py", "sha256": "0247f7c4a511f48137c7447cc966173463e577d80eda67dd21465228dbfba79f", "bytes": 17671},
+    {"path": "evals/mechanism_capture.py", "sha256": "b67f84ab72cc987665ee2422f2fc6c130747907a0766a56b2e690b4e092a0f26", "bytes": 43858},
+    {"path": "evals/mechanism_verify.py", "sha256": "f3e399ef9cfce814a70ef917c1736c2cfda4f326c68567c0c8d07f8ada401b6e", "bytes": 26503},
+    {"path": "evals/evidence_laundering_cases/manifest.json", "sha256": "2895c450e9c3d5f06f6c63637aaf5e8ace99981b62a780525f7f8b8d059abb3a", "bytes": 28717},
+    {"path": "evals/evidence_laundering_cases/SCORING_RUBRIC.md", "sha256": "9b753f530a73988724c32b34c1724fe0f05013ec907d97c0f3cd457d4e64ccf5", "bytes": 6505},
+    {"path": "evals/runner.py", "sha256": "2bc29bf3bb87f6a82e1eb331e36101689d5032f239a9c165c6ecdc5e63eb1b8f", "bytes": 29532},
+    {"path": "agent_tools/files.py", "sha256": "19ad2c17d2067784326ace0e36f51887a041b07122a1e259dd314493e8772d96", "bytes": 9696},
+    {"path": "agent_tools/result.py", "sha256": "1300aec192c2f24fbb773e3d3b5ddd9fc87d1c2c1557713874a3df75afa5d7ec", "bytes": 1833},
+    {"path": "llm/client.py", "sha256": "e95c6b9d4e511000871ac74e48f21d0ffc19ee4db6d02742e7a56afeb7fb9b81", "bytes": 14320},
+    {"path": "tests/evals/test_mechanism_packets.py", "sha256": "d9f428884c2584a7689eb4c3060d07505117818cb7d2508ca30761d2afc84d22", "bytes": 6157},
+    {"path": "tests/evals/test_mechanism_capture.py", "sha256": "9ebd0e7abe79c702f4db509017872e2970a6db1ba668e209f566d462fa019e84", "bytes": 13614},
+    {"path": "tests/evals/test_mechanism_verify.py", "sha256": "4e6975d3dc42bf3d35d8df3e52672d34bf9fbe6d7cbb23de82f3ba276dc509da", "bytes": 3773},
+    {"path": ".tmp/evals/arm_consumption_mechanism_inputs_v1/evidence_packets.json", "sha256": "dfcdcf9efaff1ff44a7ed54e8d49b44df6db5a7d795296ea384a585e9f10227d", "bytes": 29213}
+  ]
+}

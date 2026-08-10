@@ -1,0 +1,3 @@
+# The public ARM evidence bundle is hash-sealed. Preserve its exact bytes on
+# every platform so a checkout remains verifiable even when core.autocrlf=true.
+evidence/arm_consumption_mechanism_v1/** -text

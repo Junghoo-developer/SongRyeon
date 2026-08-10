@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "experiment_id": "songryeon-arm-consumption-mechanism-exploratory-v1",
+  "study_status": "exploratory-mechanism-replay",
+  "source_manifest_path": "evals/evidence_laundering_cases/manifest.json",
+  "source_manifest_sha256": "20d1406856d5c754353d03c6cd064a70da973e42535169a41ea65e958e71747e",
+  "evidence_plan_path": "evals/arm_mechanism_cases/EVIDENCE_PLAN.json",
+  "evidence_packet_path": ".tmp/evals/arm_consumption_mechanism_inputs_v1/evidence_packets.json",
+  "evidence_packet_set_sha256": "03c9ddcd21e096b8df3bd178e807a208c4f953e14475b7f48f051c345b751967",
+  "evidence_packet_file_sha256": "dfcdcf9efaff1ff44a7ed54e8d49b44df6db5a7d795296ea384a585e9f10227d",
+  "output_root": ".tmp/evals/arm_consumption_mechanism_v1",
+  "model": {
+    "name": "gemma4:26b",
+    "digest": "5571076f3d70050487b26b341705799e0ab29b808164f90d20d4cf84f699d251",
+    "server_version": "0.32.5",
+    "num_ctx": 16384,
+    "temperature": 0,
+    "timeout_seconds": 180,
+    "keep_alive": "10m"
+  },
+  "seeds": [42, 43, 44],
+  "answer_conditions": [
+    "opaque-label",
+    "ar-label-only",
+    "ar-label-placebo",
+    "ar-consumer-rule"
+  ],
+  "answer_condition_character_count": 346,
+  "answer_condition_sha256": {
+    "opaque-label": "471697897a00cd1e11c819dce7a6ec2c292f9a683213bb2d741f476082aaabfd",
+    "ar-label-only": "a07f387d4a61b51604b83676d29ce09bfff746bc6b6598228785e0097950d021",
+    "ar-label-placebo": "8b2ef1a4249a597d3cf2694c010bb6a54aef45de5faacf3edc503b26a430203c",
+    "ar-consumer-rule": "e1221202cb109281b645c0d53dd5a33930480df3939c1d6ca3c06849bcf39048"
+  },
+  "reviewer_conditions": [
+    "style-placebo-reviewer",
+    "evidence-reviewer"
+  ],
+  "reviewer_condition_character_count": 297,
+  "reviewer_condition_sha256": {
+    "style-placebo-reviewer": "c29922e4b89e8fcae022304f61603a26c0ccedd8dd3c3e8ec854e0434387bdd0",
+    "evidence-reviewer": "41e2f7a025c85c4a11037ac82839571fb3bbead37666f6bf9280c3b847fc4063"
+  },
+  "answer_num_predict": 768,
+  "reviewer_num_predict": 1024,
+  "maximum_attempts_per_call": 3,
+  "planned_case_count": 30,
+  "planned_answer_calls": 360,
+  "planned_reviewer_calls": 180,
+  "planned_model_calls": 540,
+  "analysis_unit": "case",
+  "primary_comparisons": [
+    "ar-label-only minus opaque-label",
+    "ar-consumer-rule minus ar-label-placebo",
+    "evidence-reviewer enforced minus style-placebo-reviewer enforced"
+  ]
+}

@@ -1,0 +1,3792 @@
+{
+  "blinding_method": "HMAC-SHA256(identity), ascending digest order",
+  "bundle_id": "songryeon-arm-consumption-mechanism-blind-v1",
+  "item_count": 540,
+  "items": [
+    {
+      "blind_id": "blind-0101ca2b1cefd921d0da43cfa168d327ba5dc0b73eee6487fb1a88e6573b46d4",
+      "case_id": "el-enforced-message-ceiling",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "087500174075a6c3a026aed86da79ba859fb0bda6e45a4481d483831bf06381a",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-0130b6438a9e91f9f60c4e641b766a1aa0826b054e909444adc5dcaa9726ea81",
+      "case_id": "el-provenance-label-verification-pressure",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "bddc1033d0cf08bf35bcee02e51b9ecc6db938198e829aa18993130694c62eda",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-02d56f2279afe21fc6553eb58397c4e9cf73cfd1d30da3bbc2526c8dae7c7030",
+      "case_id": "el-imported-path-not-invoked",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "ae7b0a431c79ca31667efa1d739dc8346d556f2734ddc69114a8e105bd5fc248",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-035075e75182b6353de322b32ca61cb7cbc7b2cfd7b25be3a2f6ca1df6b3298b",
+      "case_id": "el-docstring-rejection-runtime-positive",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "27a2561ccdbe8000f166e73fb6fe4e04df78c36a9a81b231369ff0daae291347",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-037572b1afe8a209b6b228fa5b1a4b03f54cc90ebc8014cd215daa7fb6343198",
+      "case_id": "el-docstring-audit-runtime-positive",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "27a3596ad07f781c112cd7fbf649dcedc6b868b2ae59784e0471ae76f0c48725",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-03a40ff02feb87df80a742ce01a6c9ab51159ae7ddedb3f12f276b71785f1e2d",
+      "case_id": "el-docstring-audit-not-runtime",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "fa6a42b36f808c9854cb040c2f292799cc4a20f7b0e7023f1b4eec8439247e52",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-03cbd14ba816b9d4b4a30a897acc724c14972dcb13a0d38bdaa76a8955515cf1",
+      "case_id": "el-declared-retry-policy",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "d3af58e27eb7141e4de870ff526958682e5320d4b6cc2634328f640a86f02ce3",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-03ce1eb318a6bccb5d620c6bcd90f5f1ac386907243729a0c4dbf484000cec13",
+      "case_id": "el-relative-memory-qualified-attribution",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "7fe42c7d7a24fcc7599600785b9546567c49f33df44fdbf4a4ee57c82e13a93a",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-03cf3e891042d35db8e17767344005710fbc2d65b82fe2467078283c44926a8c",
+      "case_id": "el-relative-memory-qualified-attribution",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "42afa21866eb6d93559f1cc1daaa1f733ddfe60440d7220373b1aebc8f45013c",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-04aa52687de3f8f60c0b7d0709c9040c0fb885c03bc3fc023bfe48ce450bca1a",
+      "case_id": "el-declared-retry-policy",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "9c1e51ceb8681c671d4ab094ca747045818092d7bc7f344500a9dc2a8097767e",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-0525f98ad1ec802522348081dba0fdaac67fdcd85904ac201af177e3721963a2",
+      "case_id": "el-invoked-url-parser",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "03ee9b4f22143e7d706054853327efe204c549b14d84f1ae8b73cf0fb3d80c05",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-052c5c9b382052e0d98090162ead9db461f937d315521d690dbad12b4b0c7e26",
+      "case_id": "el-enforced-preview-window",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "b7c3aabd1bafc85c080caf58b0bbb78055218f3dfed10198ebbf6671e205ddbd",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-055bbbdb3848c76c6417ead7dbbd8daef86ec1ee6c05569c076d661aed3e6402",
+      "case_id": "el-declared-upload-budget",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "4be3d4829622c3b43c368aa080bd352447bdf6218e31f0dcca34e418d787192c",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-05b7f030146b0b5533248c7fb10466604cd538cfff37c793d4924bec878b3fcb",
+      "case_id": "el-declared-tag-quota",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "f2237c9ddf836de60803f237c47beb486d64fb483754cff4a73054dc6a518445",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-06e0b0b46d8559943108eb57f8f5b242bb64482ad3c4dfe44ecb345b07fa40b4",
+      "case_id": "el-comment-redaction-runtime-positive",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "96ace0d75d9ec4d01dc06dc80e2f2d2bd2cf37187781b4bc40765511f6e6f5b7",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-07318b033989c02cd26dbafe00cc8455902e365b16dbbd58637d5e604a8a9ecf",
+      "case_id": "el-comment-redaction-not-runtime",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "1fe74db765ec5e51de7979255fca5ec20fe00bddc70bfea9a18e6186d7120e57",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-078763516e077114b63bc72d96965d6af3e3f3df35aad1bd0d42cc4310126764",
+      "case_id": "el-provenance-check-invoked-positive",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "65f6286a6d64e7c45283164c28431b882e4da2d70504851443de3ca58580e829",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-079bbcaf427911410b5a2461a1ad790423cd694c5aeaaeebc27d108c5a560cd8",
+      "case_id": "el-declared-retry-policy",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "2ad2a2b7945012800d21d24b46fa13ec98b5a1cc8c9853678617f5b93d4657d8",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-081d95f432662fa0e8d78ee986e73cfe2e93ba0851a24267a9e0f2db574cef9c",
+      "case_id": "el-docstring-audit-runtime-positive",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "772c794c6870da1597b6db864dae4bb3400918543f81fde7571a849fd59adb4f",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-0848787e1455d06207b94cb4dec2e49151f717c54e2ce69d7dac76f89601ac7e",
+      "case_id": "el-enforced-message-ceiling",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "e1aa6a38133324c593033b6e6a33b2c202d671dfae4a493edcce8ca91a80c8d6",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-0850278c3d4bd528f0a20fbe65fb9108861298cfc8af9b80ee44079038c55993",
+      "case_id": "el-missing-action-report-no-invention",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "cec4a1a7b4c2038e04af0711b7bb7b0eae137b46cc7e792072943d1065504ae6",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-0908fa1face1637eec0ca30f137542cc5c6004714f3fa64e15ebd706e723bc62",
+      "case_id": "el-invoked-base64-decoder",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "c05611524da5f76fd6601f426db7790eec5dec1b8034e4b1f89badb92b39b77c",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-09131d128733a591771ede43f02e78e8e0bc6f37d0487c405bd3866d051f0106",
+      "case_id": "el-invoked-round-up",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "d19b8d0d1a82b7bf8a0ecb9746b0d7388536e10083df996873f757725f485cdc",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-095cda2dd6755484926d8798bb1b7fc279137c0ee124553d61c6aca202e07cc6",
+      "case_id": "el-imported-path-not-invoked",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "e299664ed77996b22c3b5faedcca2c462c68ace3447812f5ce8362988b39ddae",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-09d3442eaf773c1d1122632cc14ebcda680f4147a9c43a4c1bd483bd3e15dd3d",
+      "case_id": "el-provenance-label-verification-pressure",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "63668eb58e03c623e6ac995a38a44f218f3509dafd34f28b6258f90d9d3afa2c",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-09d5621835152ab152656b3d8095c30226fc5a6ae6d820d52f0d5b669991751d",
+      "case_id": "el-available-action-report-positive",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "66422e01324bed49330f84908216f46cd72e14fb3f2dcf968c1d659e77d9a281",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-0b9fc84b71e1135abe80407f4d37a49885fa5f95d0516e3262a9a0568b9ab4c2",
+      "case_id": "el-missing-action-report-no-invention",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "b5f98a139388cad2a0ae5e1ed7e5ca345d232484ad480810c03ad76d69bab98b",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-0bff039e5b34251eda0ac6e5c1c11458feaa70d6ae1966149429c999172446b0",
+      "case_id": "el-docstring-rejection-not-runtime",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "bcd2ae611199fe92bdabb4a6c479e8dec58717de32cd4ee88f439c53e340bb0b",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-0c643bf8c25ac7352bf3a6611ede8abd8e68da8d12c3a4960ca5e3f4bc3bfbda",
+      "case_id": "el-enforced-message-ceiling",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "e1aa6a38133324c593033b6e6a33b2c202d671dfae4a493edcce8ca91a80c8d6",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-0d34b01b171372255b968a65e0d304291f7aa60905511ee5d667cab5e48be241",
+      "case_id": "el-provenance-label-verification-pressure",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "63668eb58e03c623e6ac995a38a44f218f3509dafd34f28b6258f90d9d3afa2c",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-0d6a4a8696d689c1a100fd553f2fc9ca8a09062db22739963b3e1cdaa6d00ec1",
+      "case_id": "el-imported-parser-not-invoked",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "b588934711b5127524f220053bd172a27002025b570251527e746c75c979b2eb",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-0d7b43591e063ef4501a925df6d6463b9b6f013838cb720dedcbbca8daed9079",
+      "case_id": "el-enforced-worker-budget",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "f1d602987ef273603dd94ea424374595c58b17309af492f3e6dc706945d6aef1",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-0fa7d6e9c15ce2058feb0ede3406cad6509a3be2396736c4c655f6954a5a11fd",
+      "case_id": "el-enforced-message-ceiling",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "087500174075a6c3a026aed86da79ba859fb0bda6e45a4481d483831bf06381a",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-0ff5983dad00909ee47ef0cb2a8fee73e251c86ac8b191c77c03ccd94ca337e3",
+      "case_id": "el-missing-action-report-no-invention",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "b5f98a139388cad2a0ae5e1ed7e5ca345d232484ad480810c03ad76d69bab98b",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-102258becf6a928701faa963a1ce0b0d434af7b3b5db8be2e34907252eb28983",
+      "case_id": "el-invalid-action-path-no-invention",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "3cae508beeb5493d8aaa09693c115a098dfb86c74c30e2cd5d4729bf7312e9d7",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-10d669eb106c3326bac4906f6c30e906864a5b363c2ffcf5bf2b412bf62cb7c5",
+      "case_id": "el-invalid-action-path-no-invention",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "372add322b8ade723c08b4e94641ac82a7a5047cff74bb64939215ed177db530",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-11463bdfea15849ccd83cb615ad69ad96a52c06d8a2e7aa8384a0e5daaf4e79b",
+      "case_id": "el-missing-action-report-no-invention",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "7b9f5a24fcfb7c8cb50a90bca2ee34c7a261a0c19e080b32fcaefab14c95c612",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-11ced5d438f6e40cc813e295d650e0c0c73c6e670a24d8b28a2f6743e5b025c1",
+      "case_id": "el-enforced-worker-budget",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "2b7d8a65585d56658a037e49940ee9a922edf3b6054d95022976c0993d0f575f",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-12468e9e71ebc7dc07211683e5cb94ea738bd2a44933ac7ac93683330a4147ea",
+      "case_id": "el-comment-redaction-not-runtime",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "d91c0c0cac86375d2430c4509a2170946212da8ce080ac1318754bfe3687ee75",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-1272f3cc3f708c855c4b5a0fac21b7f9bcb8470bcbc777302440522ff420ff94",
+      "case_id": "el-cross-file-origin-to-target-pressure",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "53f2ed4d5d41c88d215d9f19569d49a3680570ed9fe1417c71f13b0b468f0c48",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-12c5bbc71e9d98ac5e9058803ddf4bc4c520723831a112894cc84bc6ec083cea",
+      "case_id": "el-provenance-label-verification-pressure",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "63668eb58e03c623e6ac995a38a44f218f3509dafd34f28b6258f90d9d3afa2c",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-137a2b24e8441e6c1efee181706a4124c7f7ed53b48b94a74f5d17d71120576b",
+      "case_id": "el-comment-redaction-runtime-positive",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "ba454b3aeaf32bca8cda5aefbcffe418af74448573b1900fb0c761031b8c7997",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-1472c243cd7491358e37d5918c0ca4b23b4b0e694bf3fd756971d441e68fb62f",
+      "case_id": "el-cross-file-origin-to-target-pressure",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "53f2ed4d5d41c88d215d9f19569d49a3680570ed9fe1417c71f13b0b468f0c48",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-15285c8550acc32a6287b63e5d90140a69af637b0a8f41b8676021691feceedf",
+      "case_id": "el-comment-redaction-runtime-positive",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "ab63d2b24e2f430b25024719444cdf5d986f1724a20a40bb2e0658ac599adc71",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-15db930373f04b8ee9b5f8c7be50b284e48f3c6e2409e4103ec1bb7055341bff",
+      "case_id": "el-enforced-worker-budget",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "f5a7aa51e9f311d68c2aa950fe6e0f7ab82c55fa6d6acdb57b309845905f444b",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-1625ede31aeb0bd75164987e590df3d35d5be44e72f9ec65eb6e3b7e21d95218",
+      "case_id": "el-docstring-rejection-runtime-positive",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "9a8109e486a7a29f0fd9d7c6114e8e8c0e763d59959f645c91f5e3dad0d78d3f",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-17470370ccdb6878f7e605714ce28541f196356c118665fd649d55483f6ae443",
+      "case_id": "el-enforced-message-ceiling",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "e1aa6a38133324c593033b6e6a33b2c202d671dfae4a493edcce8ca91a80c8d6",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-17993063e41520a3330fa3f333d19af1e5c2af47a5d42ef1ec68cd09d807a54f",
+      "case_id": "el-invoked-base64-decoder",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "3275cb89ed2cee1d2a8222027356f3659ac0ab1c70dbc658cb36066b7c59ec4b",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-17bf52713f77909b58e2a333508580f8c4db11f73b62fda850f2715279fffe56",
+      "case_id": "el-docstring-rejection-runtime-positive",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "27a2561ccdbe8000f166e73fb6fe4e04df78c36a9a81b231369ff0daae291347",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-181d03a1b39d911a0987c1aaba90b85a330250c61bbdfd9b4307f9ea0400522f",
+      "case_id": "el-declared-upload-budget",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "2d398e79686286388625d6f8d88f37d6b142611c8cbea63c1cbcee998545aca3",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-195bb54f3aaf4321c991995bbd81c8aa0bb1cc2c0bf8c6740d4aec30e8262f1d",
+      "case_id": "el-imported-parser-not-invoked",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "52837af1ce51c8ec0cd7548e2fd26fb01dd1e398d13294326ea0ef1217f5202f",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-19a711ce5664c3bc1ba64b46fc168e809444e8d55589f0eadce40fc7c4e7de3d",
+      "case_id": "el-cross-file-import-attribution-positive",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "696c20e23b6329971f3bed399c09ae0b0a117d73571c196d4cdf0959f213bd56",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-1a056211fd5435bcae5f20965fb845882eed7e9e7a3ecdf3f080029461cd7179",
+      "case_id": "el-relative-memory-qualified-attribution",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "42afa21866eb6d93559f1cc1daaa1f733ddfe60440d7220373b1aebc8f45013c",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-1a4009f211c5a3126c05aa55b4f95fa47a839a9bcd3715d8211b89ca1d4e42ed",
+      "case_id": "el-traversal-action-report-no-invention",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "af8573abf721a1e06aaaaa6ef74e021882109212a252935a2830886e25bbd899",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-1adedfec433a7ba7bc55a53af68ad8bac39f1a5cc623eaa26ce90a0b86ea9bf7",
+      "case_id": "el-traversal-action-report-no-invention",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "7609ee3626159fce1cef022f847a13ce0a8db419ce94ce1063c3220f67e2babd",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-1c0980ffc68a0532e4688ae02acaafafe8eec642995075f3dfc25bccac0aca66",
+      "case_id": "el-traversal-action-report-no-invention",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "7609ee3626159fce1cef022f847a13ce0a8db419ce94ce1063c3220f67e2babd",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-1c67251b6b76b55d32524f91658abf6ff639017fae3a5e319efeb74a99c4c660",
+      "case_id": "el-docstring-rejection-not-runtime",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "0653704403a334e4cd8ca5f347c768631788457cb81c07783b554cb180904306",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-1cc2e55707204bad7e0c8e718368b95bd499b41d662e660d89b0b789747c7acb",
+      "case_id": "el-available-action-report-positive",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "2c5a5541e8c767c4ae5a5ca29f847825b992a602b1295ba202f10031381ae77d",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-1d52c24220e138e5537b7b63ecb8028dd533a9b67f6fe021c3426ebef3f7f14a",
+      "case_id": "el-docstring-rejection-runtime-positive",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "9a8109e486a7a29f0fd9d7c6114e8e8c0e763d59959f645c91f5e3dad0d78d3f",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-1e321c87e8ffde5f87846c9af7a669c7e68837b3e3c56825267bbdc16088fc1d",
+      "case_id": "el-imported-hasher-not-invoked",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "7010e79efdda9b5e79123c9161b76f999ca6132c495b972dc9af2ee205b27067",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-1e3dabc2880962934fe19a688b654e792c63d5c63b8ab134511b71a30d8caa3e",
+      "case_id": "el-cross-file-import-attribution-positive",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "f0e63b375cafee221e5ab045a303f94bae1cba46449b498a7674c57db71dfbb9",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-1f5631f4fbc392694d4164a1a18a929f8c189f257f581d076a6bd1a746e28af8",
+      "case_id": "el-invoked-url-parser",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "03ee9b4f22143e7d706054853327efe204c549b14d84f1ae8b73cf0fb3d80c05",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-1fbcdac49ac0559327b13f18494e36a9fd3cdf3e00a9cf81d937233deebecf95",
+      "case_id": "el-cross-file-origin-to-target-pressure",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "53f2ed4d5d41c88d215d9f19569d49a3680570ed9fe1417c71f13b0b468f0c48",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-1fbdbddb6a040a61c481d579aee59cab8aec3a27258d23c6d27b15f98e1c5f24",
+      "case_id": "el-invoked-round-up",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "d19b8d0d1a82b7bf8a0ecb9746b0d7388536e10083df996873f757725f485cdc",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-2016b6b833430d5d8527d852455a2d865cee79972955492fc75da1d97544ae12",
+      "case_id": "el-enforced-message-ceiling",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "037c4ebbf1cd8ce92c2b7870e45fe241c51e5cf919b9efbb310bcb80bd3cb08a",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-208cc15a7c5ac9d6ef9e7cd2c90d9cb90e97cb633f29462287747659fd99c258",
+      "case_id": "el-invoked-url-parser",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "419844b7967e7d5b88f100d9adf001f5ee827ab4906b07dc1dd1f3decf7a83a6",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-209aa7c1f17d2321c262664a11aedc163d901894f441851f5ca8991c20c6217a",
+      "case_id": "el-invoked-url-parser",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "419844b7967e7d5b88f100d9adf001f5ee827ab4906b07dc1dd1f3decf7a83a6",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-211b406ec1a6c24648edf45c66c0aee87a799031edec4e347555e4269f1f3544",
+      "case_id": "el-declared-tag-quota",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "6e00317dc958bb5615cabe08b14f9dbef96e4425f649873d3cfd2e1c05bf717a",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-211fe7a072812d3bf808e6989bd49b0e78590c3a29c9e5c5ceddbaabf2f7dac4",
+      "case_id": "el-declared-upload-budget",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "2e80fa4dc1da4cf1967aa9050d047f050db066dd41be8902b60787f84ac462b9",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-215a9fea3d004bfd350fd93c86162cbc980b79f9ceae233061a96ed228cd750a",
+      "case_id": "el-provenance-label-verification-pressure",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "63668eb58e03c623e6ac995a38a44f218f3509dafd34f28b6258f90d9d3afa2c",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-2161a555682809b097e57cb3cd9580a070b3498f74fac00ed95a24ed89612e37",
+      "case_id": "el-enforced-preview-window",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "1bb64ea7f60b1ac5ef56ff61815e88836c515467ff7b3485e5ecc2b8aa39de11",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-21b2e4de92387b4c4fd921e379767831a56eb7006a1c8cc5f884ece0fa25bfc4",
+      "case_id": "el-enforced-preview-window",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "b7c3aabd1bafc85c080caf58b0bbb78055218f3dfed10198ebbf6671e205ddbd",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-226aed2242e7cf8853166540ded704a4fb5dff969b0b6222473b34ae0ff819e7",
+      "case_id": "el-declared-tag-quota",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "6e00317dc958bb5615cabe08b14f9dbef96e4425f649873d3cfd2e1c05bf717a",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-23abc9a722ba4c36d9392a8937764e2028382f1978d47703054abeb54e327442",
+      "case_id": "el-docstring-audit-runtime-positive",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "772c794c6870da1597b6db864dae4bb3400918543f81fde7571a849fd59adb4f",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-23e787a298edd8f4ab5ac1688022300c446c3da87880681b51b767fdd7ef144e",
+      "case_id": "el-enforced-worker-budget",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "f1d602987ef273603dd94ea424374595c58b17309af492f3e6dc706945d6aef1",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-2474ee2f04053e9ef04ebbf20e160f0745b0c2017ca32035c79a578d2782e2b3",
+      "case_id": "el-docstring-rejection-runtime-positive",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "8b839cc1ce2880a27e585a61f44dd6916f73cb58fff384b2e81c9fac1a057bc0",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-250f946f2017bfa1ed3ae7d2c2c143cd31a55945c52ced1261fc570263ab715a",
+      "case_id": "el-invoked-url-parser",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "419844b7967e7d5b88f100d9adf001f5ee827ab4906b07dc1dd1f3decf7a83a6",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-2551af0244142701145873592f2f165eefa4f96df8c71d5ad89a4bda96a42cc3",
+      "case_id": "el-cross-file-origin-to-target-pressure",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "53f2ed4d5d41c88d215d9f19569d49a3680570ed9fe1417c71f13b0b468f0c48",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-26d2ee612cb3849657d9324d8c0704226c25bb436f98f0a8ce337daad8730ebb",
+      "case_id": "el-declared-retry-policy",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "2ad2a2b7945012800d21d24b46fa13ec98b5a1cc8c9853678617f5b93d4657d8",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-27a25759b1401a10a39b892f7c1734abcc34c7f762dc3220dbb168de4abd7091",
+      "case_id": "el-declared-tag-quota",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "d08a86ed16935d322e974780b5db8c400a9819eed013c18ffc9d305ce5f4b361",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-27c1b72e750f391cdb87fba98c2469059840802c6c9852976251925406d9e6b7",
+      "case_id": "el-invoked-base64-decoder",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "3275cb89ed2cee1d2a8222027356f3659ac0ab1c70dbc658cb36066b7c59ec4b",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-27d8f5ba80ca90c4da583fa0de73708f44ba85acbbc59595275511e0ebebbed9",
+      "case_id": "el-cross-file-origin-to-target-pressure",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "dd4e0553094662dc2896cb03050647d781ff6b49647f4c9f347fed77ecd0a530",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-27dcf7644bfdb781e794925ffb40fb3001082902e618339d87cda6e993cbebf4",
+      "case_id": "el-enforced-message-ceiling",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "087500174075a6c3a026aed86da79ba859fb0bda6e45a4481d483831bf06381a",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-288c7820811bc16ba6d66913209be249d9f4288cbcb5172c58cc072947ebe8d7",
+      "case_id": "el-invoked-url-parser",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "03ee9b4f22143e7d706054853327efe204c549b14d84f1ae8b73cf0fb3d80c05",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-28cfd0bd238ac3bf780ce7b62298779500736c5c572e94500411684ac1d5db26",
+      "case_id": "el-invoked-round-up",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "0335465dcbad81add2f87a179b0601916cc424524037309f91f4684e233d2954",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-297b07f27e9f3e0154ca2a64e2600520d683c99806d175704d61a1f5f27205e3",
+      "case_id": "el-comment-redaction-not-runtime",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "d91c0c0cac86375d2430c4509a2170946212da8ce080ac1318754bfe3687ee75",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-299fed3bbf7d81fb1c7365bf9954fa612ec63eaf28158f3cd536932b43d015ed",
+      "case_id": "el-provenance-check-invoked-positive",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "f8d61291c090323adef104931be9e1ead45d8322017c2f1111014a83d8762250",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-29fed672d09227142a62db11e12ae29392000ac332ffabe4a050ff5b4b5db721",
+      "case_id": "el-imported-parser-not-invoked",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "52837af1ce51c8ec0cd7548e2fd26fb01dd1e398d13294326ea0ef1217f5202f",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-2a0a85526571dc7e61255a12f3e03076f4bedcace0fbc55c9b9cc9c7f02f0f4b",
+      "case_id": "el-provenance-check-invoked-positive",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "f8d61291c090323adef104931be9e1ead45d8322017c2f1111014a83d8762250",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-2a892ee2243add59526a409d6a2983ba9acfc9b02e29b8ad28348b2429633999",
+      "case_id": "el-cross-file-import-attribution-positive",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "6a3b51269b8492e94f7c72c76370ef31fecc1dc7f916f5a7db022ee057faa817",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-2aa3f67f2651b5947f1854d5f3f1a6ab43586c369523ccc88439879d054246a2",
+      "case_id": "el-missing-action-report-no-invention",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "7b9f5a24fcfb7c8cb50a90bca2ee34c7a261a0c19e080b32fcaefab14c95c612",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-2ac0ca9fc09cae01e7ca0a54c43dc098b03c59043b3afa12cb08e442f29e530a",
+      "case_id": "el-provenance-label-verification-pressure",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "40399e7fcb2c2f813d047d492fae08495c217a9c72b179183b2c57b598ef313b",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-2b32c3a3c63b8d5aeb1d3ec86aefd42e09f02891f2771afe973dac05b32940a9",
+      "case_id": "el-invoked-url-parser",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "459c1016072c10397a40ae7a7b31c44d72aececeff07d37118e0094edb87031d",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-2ced6aa38e44d6aa70e75e75f6889d6779086050f5fda636fd33296527f8b4ca",
+      "case_id": "el-docstring-rejection-runtime-positive",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "8b839cc1ce2880a27e585a61f44dd6916f73cb58fff384b2e81c9fac1a057bc0",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-2db4a0d8ac7d5c480c85c09df6a5a3aac375682571a40e50cdbad4051f0ab6ab",
+      "case_id": "el-docstring-audit-runtime-positive",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "b055a9379295bc1805f7776223ddc5910909d0b686d368a8ae348da939055a77",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-2dbba2ec4806ae8cb8e4c43dac3a47efd77fcb20e640faf6ce49bdb450fb1f5f",
+      "case_id": "el-cross-file-origin-to-target-pressure",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "dd4e0553094662dc2896cb03050647d781ff6b49647f4c9f347fed77ecd0a530",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-2dea58d631dd081dce346923ea94901c2237b15cf31a4b06c1181807fc92af4b",
+      "case_id": "el-imported-hasher-not-invoked",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "7010e79efdda9b5e79123c9161b76f999ca6132c495b972dc9af2ee205b27067",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-2e8a748e38188ae05e8b174e63ad9c983baf95bbee4cfe48700dad3eb3818817",
+      "case_id": "el-relative-memory-qualified-attribution",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "42afa21866eb6d93559f1cc1daaa1f733ddfe60440d7220373b1aebc8f45013c",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-2f0a55aaffdd1f001f034087323fcd21e35745e46b2b3f3284b54a50792960a3",
+      "case_id": "el-enforced-message-ceiling",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "087500174075a6c3a026aed86da79ba859fb0bda6e45a4481d483831bf06381a",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-2f463a836428bfec845c2f5745091df7689c8924130b8feb140fdf3e0d0a3c98",
+      "case_id": "el-provenance-label-verification-pressure",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "40399e7fcb2c2f813d047d492fae08495c217a9c72b179183b2c57b598ef313b",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-30914fb7edf20e07082365cdb46494ac054c5d4e13e0ca079f57b0054190913d",
+      "case_id": "el-provenance-label-verification-pressure",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "63668eb58e03c623e6ac995a38a44f218f3509dafd34f28b6258f90d9d3afa2c",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-30a3d2518d106aa27345f89accac53c7bdf0511c5d0a661f5bb7199c0ac35202",
+      "case_id": "el-imported-hasher-not-invoked",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "7010e79efdda9b5e79123c9161b76f999ca6132c495b972dc9af2ee205b27067",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-315a505f5729fa1dc467355e7ed23afaee8e4c67b22dcd9fe191de7e728f59dc",
+      "case_id": "el-enforced-message-ceiling",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "087500174075a6c3a026aed86da79ba859fb0bda6e45a4481d483831bf06381a",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-31bc09c78e1fd66a4bc4bf66b747c09c045fc87a7c691087ed41e5887969ca8c",
+      "case_id": "el-docstring-audit-not-runtime",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "fc817fa61091ac249a54b91e3a683fabe28aa94533c2d423121503eb435ac606",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-326cc33cddc22353ea092a36b12d5f4cf8855e869c18c3c7d5b1d77534d830f4",
+      "case_id": "el-comment-redaction-not-runtime",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "1ea6f6d17d971ed44b452a43f12cef2b794421778415391604b6b81c89e14f34",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-32d1d8e4540e3db01e4d8b0e1166f9af42644a3c463d7291f0348f544047cfd6",
+      "case_id": "el-invoked-base64-decoder",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "c05611524da5f76fd6601f426db7790eec5dec1b8034e4b1f89badb92b39b77c",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-32d665ec0a3464f61891667555d6559448678bdeaf6cd058357db671abf7f80c",
+      "case_id": "el-declared-upload-budget",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "4be3d4829622c3b43c368aa080bd352447bdf6218e31f0dcca34e418d787192c",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-32f70760ded78fac42a6e5298f0e22529e65599a5ad0f4c41405c4cb1d527002",
+      "case_id": "el-completed-action-report-positive",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "43968a657128e793b7a38ef26a37b970ed2d05fd998e9ec1e2fabb292e0575ea",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-33779f01fb1825afa513fd3e13f8c03a419f401b114020539664225dfa5f092f",
+      "case_id": "el-enforced-worker-budget",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "2b7d8a65585d56658a037e49940ee9a922edf3b6054d95022976c0993d0f575f",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-339e15a7f07211295078e56b28576975f6c54af95c5e05424251dcb25998ff5f",
+      "case_id": "el-available-action-report-positive",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "2c5a5541e8c767c4ae5a5ca29f847825b992a602b1295ba202f10031381ae77d",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-34588ed1c82bcb2e5ad13496fbc64c27140827ed073e81b6c404f09d886f17f5",
+      "case_id": "el-imported-parser-not-invoked",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "dc28289e655fe195952a33ad2373f1dbd5df138e5c929f10e18aacf3cf5752b6",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-347a78324b6e0c9e65f11fb04496749c051b6ef4702da3247d50f60b4b036775",
+      "case_id": "el-provenance-check-invoked-positive",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "f8d61291c090323adef104931be9e1ead45d8322017c2f1111014a83d8762250",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-351fab4f3e3293a36a818b99bd6ee9bc67447fdcf4382b09091474e8e105af16",
+      "case_id": "el-docstring-audit-runtime-positive",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "b055a9379295bc1805f7776223ddc5910909d0b686d368a8ae348da939055a77",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-3550aa7b2045a5cb750255c7a2b3ac5e4a81c18498167a1ecc922151f6d48352",
+      "case_id": "el-enforced-preview-window",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "b7c3aabd1bafc85c080caf58b0bbb78055218f3dfed10198ebbf6671e205ddbd",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-36559532397dcafde1f8c06704b1f2fbe9e62fba12423b2f47998fc8e00e7237",
+      "case_id": "el-invoked-url-parser",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "03ee9b4f22143e7d706054853327efe204c549b14d84f1ae8b73cf0fb3d80c05",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-3688d68f58a88733f788279100d369793bfd558de6d0c9257fd5699440e4d433",
+      "case_id": "el-rejected-action-report-positive",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "23d66bd9a24f2365a1beab8e98c11130fb036e6ed11efbec243d9999fc5c383b",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-371ce2ffdbad0b471db3912b56c7938a46f1eff4974b04d4da5b68eb065be5f7",
+      "case_id": "el-traversal-action-report-no-invention",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "93ec56bba72583acb4a7143867e43a74b06d93a36cf8d40b462b850257b305da",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-385639a40a8a5695bdaf9368f7c0477a6de95c951864c4e04bae6697c65c21ce",
+      "case_id": "el-comment-redaction-runtime-positive",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "96ace0d75d9ec4d01dc06dc80e2f2d2bd2cf37187781b4bc40765511f6e6f5b7",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-389974b4bb70ba54d73e8f57c692586ba98a7d980a445dff5f327e4a231f82ef",
+      "case_id": "el-rejected-action-report-positive",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "f091d0ac16aec42663c44b87e518178ff1424671b5026844e3dcbbcfb1f6bbb4",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-38c9f4ef2d0028f176a9ecc3cef24198925aac0515fbbd2e7de450479c174163",
+      "case_id": "el-declared-tag-quota",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "f2237c9ddf836de60803f237c47beb486d64fb483754cff4a73054dc6a518445",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-3b79920d3771a91007cfa38448c7664fa2f5b4a66ed25ec13e8c898d60ad4040",
+      "case_id": "el-imported-path-not-invoked",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "ae7b0a431c79ca31667efa1d739dc8346d556f2734ddc69114a8e105bd5fc248",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-3c37f17bf200096b991e63ee4ebd90741dabb96f456cecd878ce7e842b755f1e",
+      "case_id": "el-declared-retry-policy",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "9c1e51ceb8681c671d4ab094ca747045818092d7bc7f344500a9dc2a8097767e",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-3cf949fe72f90856b6082c690b6c2c0735e6ee95bbaf16b64a32d771a60e3145",
+      "case_id": "el-available-action-report-positive",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "66422e01324bed49330f84908216f46cd72e14fb3f2dcf968c1d659e77d9a281",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-3cff782341b02e7493a182b6f3048842029329c3606e92d48824d66a522237f3",
+      "case_id": "el-provenance-label-verification-pressure",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "63668eb58e03c623e6ac995a38a44f218f3509dafd34f28b6258f90d9d3afa2c",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-3d05a0b39112173773e842c557732cc1ba7fc3f886f4b131cdeb14b4298b8660",
+      "case_id": "el-invalid-action-path-no-invention",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "3cae508beeb5493d8aaa09693c115a098dfb86c74c30e2cd5d4729bf7312e9d7",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-3e8cc4e77e2abde7b744e9081b534ef1c5cb0962772703d67e8263b9be29058f",
+      "case_id": "el-docstring-rejection-not-runtime",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "bcd2ae611199fe92bdabb4a6c479e8dec58717de32cd4ee88f439c53e340bb0b",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-3ecbee7ad8e2edb757a356fe9c45902bdbce3720e303888e3d8778d639652111",
+      "case_id": "el-enforced-worker-budget",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "2b7d8a65585d56658a037e49940ee9a922edf3b6054d95022976c0993d0f575f",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-3f0e2dd3c35f9ef8d1e3e40140fdb5904945a977a97af2889cc9cfa4a7d6724e",
+      "case_id": "el-relative-memory-qualified-attribution",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "3aecbb78aaa50f0bf831d6fc13bd8ab7f436ed602706e8c246b3c5ed99756a9e",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-3f4401819f9f72f0e28a296455520a36e8f6ba2d3fc96f8905a68d8950c41d22",
+      "case_id": "el-invoked-round-up",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "15695dd3abfc246bb8074bec948e28a311aecb40159532f5d5fb9f0ac6b2991f",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-3fa507587b3b2e44c104bf5345becbbebea3fedc54b1a8591a9ecd8980821435",
+      "case_id": "el-declared-tag-quota",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "6e00317dc958bb5615cabe08b14f9dbef96e4425f649873d3cfd2e1c05bf717a",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-3fa8040a39c06c1c6b02f01286b5ef0ed686d9907d390702790da77f3103dc68",
+      "case_id": "el-invalid-action-path-no-invention",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "4851081d0d96e37ef7e077c745419b91cabab3b57a5f0054d927c0cbd5e39145",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-40a87c45985de6ca9a2883ffc6e7f12b60d318e3b4c67f9088ec699f64659537",
+      "case_id": "el-relative-memory-current-fact-pressure",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "882c1900eaa712671df7e3a6f1858a1420fc39ed48fa27c0461ea31454391087",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-40e8a924ddc78f04ade9bc647c7c4aa2cb03940f532c281a302d9e0794f557e5",
+      "case_id": "el-invoked-url-parser",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "459c1016072c10397a40ae7a7b31c44d72aececeff07d37118e0094edb87031d",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-40f28d99214a0281701171c4eb72c1114b389e598ae91d89e9af1f262ba58bf7",
+      "case_id": "el-declared-upload-budget",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "2d398e79686286388625d6f8d88f37d6b142611c8cbea63c1cbcee998545aca3",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-41f7dbcaa3c8d090aae00c5d043c31c91f11dc6e9523c9d0b41b1afe8a6f3fb7",
+      "case_id": "el-comment-redaction-runtime-positive",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "ba454b3aeaf32bca8cda5aefbcffe418af74448573b1900fb0c761031b8c7997",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-4203ed64d1ae9f91f1baae7f62372a90a970aa984c9829f306e81809ee3a1d13",
+      "case_id": "el-relative-memory-current-fact-pressure",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "882c1900eaa712671df7e3a6f1858a1420fc39ed48fa27c0461ea31454391087",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-4278ad85b59bd7d13d24c1ff08cb6624871bf4f289b2fd6f4f890ccc209febbe",
+      "case_id": "el-imported-path-not-invoked",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "667a01873e09d3a43d8b03fda641362b8480ca8f377f6292f380260a518e9a6e",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-42ebc48e78576dbb2c0db099d3c0b9285107f77b21d516924d8aec032ddc86c6",
+      "case_id": "el-relative-memory-current-fact-pressure",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "7d7e64e786bf423f86be11ce8cec363d02c4b3f4a85e9c0c15efc4ad07b11a27",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-43169fcbc44359e0e9f48a4cb043faae024ca5ad8086877a3002885493eb83a6",
+      "case_id": "el-docstring-rejection-runtime-positive",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "8b839cc1ce2880a27e585a61f44dd6916f73cb58fff384b2e81c9fac1a057bc0",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-435cb5b4862f7b7652c7588608f6d47c8f8b1b617bce8de298bb92da8f2540dc",
+      "case_id": "el-imported-path-not-invoked",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "e299664ed77996b22c3b5faedcca2c462c68ace3447812f5ce8362988b39ddae",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-4429b212b4a70e4880476be666d156140d5f1cfb171482988b5dc2caa6f2829d",
+      "case_id": "el-declared-retry-policy",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "9c1e51ceb8681c671d4ab094ca747045818092d7bc7f344500a9dc2a8097767e",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-44333b1327a92dff3b3f614c6078bb157ac6218c13ed3363ae63644cfb6aa63d",
+      "case_id": "el-comment-redaction-not-runtime",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "1fe74db765ec5e51de7979255fca5ec20fe00bddc70bfea9a18e6186d7120e57",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-44714fadbf5eb73f0584aabbf43a902e6b10c70e144c0ea4a6d6ddfa1ae64d39",
+      "case_id": "el-cross-file-origin-to-target-pressure",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "cedc56ffd8762ce83f2783f2e8de1a6be9aeaf47b27fc5b0ea50a5bd028b15ba",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-44965954b32631dfc30b9c6282456528da44303b29e15bca44e6f082cc4224a0",
+      "case_id": "el-invoked-round-up",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "0335465dcbad81add2f87a179b0601916cc424524037309f91f4684e233d2954",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-44bdd946d99e92f54f181085a292afdb76833a6a91865a370d6bacaea6ca8a27",
+      "case_id": "el-rejected-action-report-positive",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "f091d0ac16aec42663c44b87e518178ff1424671b5026844e3dcbbcfb1f6bbb4",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-4529f65e619296f3210b8aed859ebec989ed65b1d70ab016d94c100311272851",
+      "case_id": "el-relative-memory-qualified-attribution",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "3aecbb78aaa50f0bf831d6fc13bd8ab7f436ed602706e8c246b3c5ed99756a9e",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-452aa776e963a3f89f2c4c584283413ef306fd590b3b584a1bcdd6950a79a0b8",
+      "case_id": "el-invoked-url-parser",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "03ee9b4f22143e7d706054853327efe204c549b14d84f1ae8b73cf0fb3d80c05",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-462168eaa23b2c22b2aeffaaa369506be42ff2b595b6327598b4e60fb68cfd23",
+      "case_id": "el-available-action-report-positive",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "0e3d2f3ea43667bdb9bbf0dea2598ef26fa982131be2f3800316993648a39ec1",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-469b5c159d02bd46129410835f57d299e0b243089472ad05298aad94a8cea906",
+      "case_id": "el-declared-tag-quota",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "6e00317dc958bb5615cabe08b14f9dbef96e4425f649873d3cfd2e1c05bf717a",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-4723f31cd9002414c76b0d22c3dfc6fadc931b8ae8033068788686c55493cf2b",
+      "case_id": "el-comment-redaction-runtime-positive",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "96ace0d75d9ec4d01dc06dc80e2f2d2bd2cf37187781b4bc40765511f6e6f5b7",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-473a486a54be2576ca6685d29bf5c450aaf8a71443c3940300ca6a80048ba155",
+      "case_id": "el-cross-file-origin-to-target-pressure",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "53f2ed4d5d41c88d215d9f19569d49a3680570ed9fe1417c71f13b0b468f0c48",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-47b4b97bc3b4f9ceefe5fa1c737bf71510af6dee006cb8dffdee411bf8d97129",
+      "case_id": "el-comment-redaction-runtime-positive",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "96ace0d75d9ec4d01dc06dc80e2f2d2bd2cf37187781b4bc40765511f6e6f5b7",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-49e784ef571d9638718a93901e42a8013e3b6eb1d99fe3ffd7976cfa4e3481ff",
+      "case_id": "el-invalid-action-path-no-invention",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "4851081d0d96e37ef7e077c745419b91cabab3b57a5f0054d927c0cbd5e39145",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-4a2e508b3f5e1b45a1639b2b14d6ab2410c9678ba4ab4d8d7c7312b39144b21b",
+      "case_id": "el-comment-redaction-not-runtime",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "1ea6f6d17d971ed44b452a43f12cef2b794421778415391604b6b81c89e14f34",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-4b22452a829ee1f3abb7823036e3c62c79254b008e46008143fcbb36e5c24102",
+      "case_id": "el-enforced-message-ceiling",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "037c4ebbf1cd8ce92c2b7870e45fe241c51e5cf919b9efbb310bcb80bd3cb08a",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-4b7a1e1f89e95fc60d4f0ac3070b356855af48bc30546345607a5467dfd7ed26",
+      "case_id": "el-docstring-audit-not-runtime",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "0a44afea0ddd9b383976439a5a375ace3789261c59ff3f140059291e839cb80d",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-4b92a471014e7f057f760dde6c41370f54d7c1f19be460f30c840d2d858753cc",
+      "case_id": "el-docstring-rejection-not-runtime",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "0653704403a334e4cd8ca5f347c768631788457cb81c07783b554cb180904306",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-4d96b94add03baebe6c42abf8747b2a184ea9efaa3a6c14564687474eec8127d",
+      "case_id": "el-docstring-rejection-runtime-positive",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "27a2561ccdbe8000f166e73fb6fe4e04df78c36a9a81b231369ff0daae291347",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-4de2f57765077bf1c3791f4a12398afcde7d1630b48a34a48d7596d1c9904c04",
+      "case_id": "el-declared-upload-budget",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "4be3d4829622c3b43c368aa080bd352447bdf6218e31f0dcca34e418d787192c",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-4e55c1c7325d9c50f6f05b646d7283dcdc046fd1c4b69b888543772183a05cde",
+      "case_id": "el-invoked-round-up",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "15695dd3abfc246bb8074bec948e28a311aecb40159532f5d5fb9f0ac6b2991f",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-4e61a13013298608a5162f5b5d6bf956085b05cbebbea8aff125058bbc27e173",
+      "case_id": "el-invoked-base64-decoder",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "c05611524da5f76fd6601f426db7790eec5dec1b8034e4b1f89badb92b39b77c",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-4ee77efe5e3b284365d458bb139a69cbbf92109f580b8b225a340767ad6c9cf8",
+      "case_id": "el-traversal-action-report-no-invention",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "af8573abf721a1e06aaaaa6ef74e021882109212a252935a2830886e25bbd899",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-4f5d258637f5b26c5b362ba0bcc94113c00a451fba66bbe5fa192e08297fbc41",
+      "case_id": "el-completed-action-report-positive",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "b5efc7f786cefe125350a4628f4dee8e5307edbc5a272a7e1b4b8b67cff0602b",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-4f8b06513188bb1de88f35b0d510d6fd9221d84d0a57d1cd1458c5034cd8f74b",
+      "case_id": "el-declared-upload-budget",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "2e80fa4dc1da4cf1967aa9050d047f050db066dd41be8902b60787f84ac462b9",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-50652cd60122aedffb15c2e5ccbc616e8a830358b868ecd2f7f7ac3d0173fc34",
+      "case_id": "el-cross-file-import-attribution-positive",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "6a3b51269b8492e94f7c72c76370ef31fecc1dc7f916f5a7db022ee057faa817",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-50f4ebd31fdd7ec1621b2778c13b2640344084a99bcfd7cb6ae5f0c732453675",
+      "case_id": "el-missing-action-report-no-invention",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "cec4a1a7b4c2038e04af0711b7bb7b0eae137b46cc7e792072943d1065504ae6",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-5132aef19b9663415e42dfa5a93f7de70a8e391fba646df0a86fd8714d6a16c0",
+      "case_id": "el-docstring-audit-not-runtime",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "0a44afea0ddd9b383976439a5a375ace3789261c59ff3f140059291e839cb80d",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-516905f31bde53523b218af0bbe1a17ba3104eb66f641c4e35eab04ff74f1149",
+      "case_id": "el-declared-retry-policy",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "9c1e51ceb8681c671d4ab094ca747045818092d7bc7f344500a9dc2a8097767e",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-51835b38e0d8ec2583c8e7da2d2a03a74c59fa2177d808c4b2f43f22bc599a62",
+      "case_id": "el-relative-memory-current-fact-pressure",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "882c1900eaa712671df7e3a6f1858a1420fc39ed48fa27c0461ea31454391087",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-51ac9544b9dddca5c4db80b69a7773332a32e73d9b01847a81d316c950dc0e0a",
+      "case_id": "el-provenance-check-invoked-positive",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "65f6286a6d64e7c45283164c28431b882e4da2d70504851443de3ca58580e829",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-51d9015c79c335f3f48da16687f60871cf2cf8b48ee74a4d74c827e1d2e2858a",
+      "case_id": "el-declared-retry-policy",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "2ad2a2b7945012800d21d24b46fa13ec98b5a1cc8c9853678617f5b93d4657d8",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-51fe4c39ab904e2ccde321c17a5e7f096b6240b8a021f0408ea0a533d2af68c2",
+      "case_id": "el-invalid-action-path-no-invention",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "3cae508beeb5493d8aaa09693c115a098dfb86c74c30e2cd5d4729bf7312e9d7",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-52448601a7bab715d702233844ce54654ea30cbf6ad9ed22040a45e251386b70",
+      "case_id": "el-comment-redaction-not-runtime",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "1ea6f6d17d971ed44b452a43f12cef2b794421778415391604b6b81c89e14f34",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-527ea42bc66c447687ffae0e9fe41b8d4856bf1c0e0a11e046a12212265c573f",
+      "case_id": "el-declared-tag-quota",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "d08a86ed16935d322e974780b5db8c400a9819eed013c18ffc9d305ce5f4b361",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-52fce1356d90fb7d594b18a9a43ac8a892b4e402ef40590f906d19826819d7e8",
+      "case_id": "el-comment-redaction-not-runtime",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "1fe74db765ec5e51de7979255fca5ec20fe00bddc70bfea9a18e6186d7120e57",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-533f0472c9e93ff87150dc1932ca3bdddc5b8545f92ac1d6ffdbdae3ccbc9334",
+      "case_id": "el-declared-tag-quota",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "d08a86ed16935d322e974780b5db8c400a9819eed013c18ffc9d305ce5f4b361",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-5445316fcdd67f35aefe81f52fcccac974e74060f169966b9b00858d80146288",
+      "case_id": "el-enforced-worker-budget",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "f1d602987ef273603dd94ea424374595c58b17309af492f3e6dc706945d6aef1",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-545630c41e6fbd0ee1a8cf3b16270f4f466a752de79757de88648494c4540d1b",
+      "case_id": "el-available-action-report-positive",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "0e3d2f3ea43667bdb9bbf0dea2598ef26fa982131be2f3800316993648a39ec1",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-55d13d1e5f77f1bb93997bc86b1fa3fbca75f6a309aa47d75037c04a6a6555e2",
+      "case_id": "el-completed-action-report-positive",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "18da6498641bbfc6aa1fd73a38b8ff0952d68f76f03455e0bb33f6da1729fe45",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-55ebea91f18bf7bfac73120f655162afe491e1d959869d7d0ee12a71af98db2c",
+      "case_id": "el-provenance-label-verification-pressure",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "40399e7fcb2c2f813d047d492fae08495c217a9c72b179183b2c57b598ef313b",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-566906f619a9d0aa1f5fa6259742183d76e46cb57b37f5fcf09fb4233014b529",
+      "case_id": "el-cross-file-import-attribution-positive",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "6a3b51269b8492e94f7c72c76370ef31fecc1dc7f916f5a7db022ee057faa817",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-56c73fc435713387d832630842eebfaafdee45e25c508f211b64ba63d034f07d",
+      "case_id": "el-enforced-worker-budget",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "f5a7aa51e9f311d68c2aa950fe6e0f7ab82c55fa6d6acdb57b309845905f444b",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-570d08ac9c790719ba3acecaf070362266212d879e6aaf8d9b0c4d5741b1751e",
+      "case_id": "el-available-action-report-positive",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "66422e01324bed49330f84908216f46cd72e14fb3f2dcf968c1d659e77d9a281",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-59437929c58ba7073ffa88de2b4cf8e4e1d03d8be6c68340664aa625d542b718",
+      "case_id": "el-imported-path-not-invoked",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "e299664ed77996b22c3b5faedcca2c462c68ace3447812f5ce8362988b39ddae",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-5944b1dbf461424c5a7155209cb6cb305e636a76cb90bf046c06e61455b844fc",
+      "case_id": "el-invalid-action-path-no-invention",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "3cae508beeb5493d8aaa09693c115a098dfb86c74c30e2cd5d4729bf7312e9d7",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-5954827ca26655395e915f8ff35279e57b1c76be7c7ebcbb6cb44a8f03cb4aed",
+      "case_id": "el-traversal-action-report-no-invention",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "7609ee3626159fce1cef022f847a13ce0a8db419ce94ce1063c3220f67e2babd",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-5a4c24b0d13ce6d028f8448fdb5e41039808abe0e02ced6dc6eb55f4e7e2dbc1",
+      "case_id": "el-cross-file-import-attribution-positive",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "f0e63b375cafee221e5ab045a303f94bae1cba46449b498a7674c57db71dfbb9",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-5a6406fe47eb9253779d78a84579b97cbee9773d86793769f86efe3531ce99ce",
+      "case_id": "el-imported-hasher-not-invoked",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "5b646529c50a6fbbba730176567a1a4cb328d473c34814b8b7dff2078777872d",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-5a71d208ce42facdf2d0b68d1e272a960e5bf198918f5b8318f959ab6bb87a49",
+      "case_id": "el-docstring-audit-not-runtime",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "0a44afea0ddd9b383976439a5a375ace3789261c59ff3f140059291e839cb80d",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-5be86027311e3d1534169dc02d008c908f267152232a4e9afde7b0bc420f67c8",
+      "case_id": "el-rejected-action-report-positive",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "904504d8eee476eea4e4df3e8815abd508036abde0a0389de2aabbe5bec1a2de",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-5c0bf53f3f51de11d3913cd78fe34f87ae5c931eb6fde62ef67bec8f3b9978e4",
+      "case_id": "el-declared-retry-policy",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "2ad2a2b7945012800d21d24b46fa13ec98b5a1cc8c9853678617f5b93d4657d8",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-5c9a1b271d76e86f0e318dde86d6c2d8419a4a44b6c87061056c8d0e2d5dce28",
+      "case_id": "el-enforced-worker-budget",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "f1d602987ef273603dd94ea424374595c58b17309af492f3e6dc706945d6aef1",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-5cab429699ad77771f37b48b5e816ee703f6bbceff274b58c6741d3a4fc6e394",
+      "case_id": "el-provenance-check-invoked-positive",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "5ef57ed3ba28bb05ee1836da9bfe75213b89ccbcb8ecde076443bf53a731c54c",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-5d1245013db29cf7131d597e0b57d61d55e32a3a8dc68064bccfb912bc2a37b3",
+      "case_id": "el-comment-redaction-runtime-positive",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "ab63d2b24e2f430b25024719444cdf5d986f1724a20a40bb2e0658ac599adc71",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-5ee69c38ed82bf7c64250126e985f4b3fd4312ce94e053741ec5d6c6dac41d22",
+      "case_id": "el-docstring-audit-not-runtime",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "fc817fa61091ac249a54b91e3a683fabe28aa94533c2d423121503eb435ac606",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-5f75ce4dddfae9b26602a4d1509a6c53166b8fba8242125177ff6fa52213ac01",
+      "case_id": "el-declared-upload-budget",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "2d398e79686286388625d6f8d88f37d6b142611c8cbea63c1cbcee998545aca3",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-5fa61136380faf5df6a313751539de06500e178d329733f10951c1d7b8951d20",
+      "case_id": "el-traversal-action-report-no-invention",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "af8573abf721a1e06aaaaa6ef74e021882109212a252935a2830886e25bbd899",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-5fec84936c01f079cb6736f82a37a784d5ebe9f875ce5ff4aa63eb1e906eec17",
+      "case_id": "el-docstring-rejection-runtime-positive",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "9a8109e486a7a29f0fd9d7c6114e8e8c0e763d59959f645c91f5e3dad0d78d3f",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-603ec81702fa4d930b7f3c630ed65c96274c08ad95716419a27f3deccdf026a6",
+      "case_id": "el-docstring-audit-not-runtime",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "0a44afea0ddd9b383976439a5a375ace3789261c59ff3f140059291e839cb80d",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-61898f014a47521727bde7a884ac108c908b35ab5103b60e637bd9f77e883563",
+      "case_id": "el-enforced-message-ceiling",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "e1aa6a38133324c593033b6e6a33b2c202d671dfae4a493edcce8ca91a80c8d6",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-61bed82eefe1081b2cba01a249555f376a5915706d55007b8b78cf94601f7682",
+      "case_id": "el-imported-hasher-not-invoked",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "7010e79efdda9b5e79123c9161b76f999ca6132c495b972dc9af2ee205b27067",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-621ddf09891e740cac05b555e9d75f29160180c8363c4e73f6da262a45f2403b",
+      "case_id": "el-comment-redaction-not-runtime",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "1fe74db765ec5e51de7979255fca5ec20fe00bddc70bfea9a18e6186d7120e57",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-6279a6aed6524a75c67ed58b47d8cd4fb98d6b312be4ec4fd9cb5c801fc009d1",
+      "case_id": "el-provenance-label-verification-pressure",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "40399e7fcb2c2f813d047d492fae08495c217a9c72b179183b2c57b598ef313b",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-62dfd59c270936e893c69585a76a16e9eb624b59dcd45a7bfba84a0961575b9d",
+      "case_id": "el-provenance-check-invoked-positive",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "f8d61291c090323adef104931be9e1ead45d8322017c2f1111014a83d8762250",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-63bad477890800119a8ea7508fe5d74d7236b841b60fa0105f8f22c64e969af3",
+      "case_id": "el-provenance-check-invoked-positive",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "65f6286a6d64e7c45283164c28431b882e4da2d70504851443de3ca58580e829",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-63bb99bf0d90e2caa5f95ebd2c2df79a6fcdd085e853bb86cb22473174d064ab",
+      "case_id": "el-declared-tag-quota",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "d08a86ed16935d322e974780b5db8c400a9819eed013c18ffc9d305ce5f4b361",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-63e071882cc6916c0d0cfcc475c534509258406bf3cb3892c83826c4079cc705",
+      "case_id": "el-available-action-report-positive",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "2c5a5541e8c767c4ae5a5ca29f847825b992a602b1295ba202f10031381ae77d",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-64dd1e51f870f8076df4d9acd1c0b806d917cf2af1fa2cc991b802d4540d0048",
+      "case_id": "el-invoked-round-up",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "0335465dcbad81add2f87a179b0601916cc424524037309f91f4684e233d2954",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-6526fe38d5ba3ed9ae51e5f6ed032682a3900c2b5f6e4194a3e382e6eb1b2f18",
+      "case_id": "el-cross-file-import-attribution-positive",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "f0e63b375cafee221e5ab045a303f94bae1cba46449b498a7674c57db71dfbb9",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-65e5cbf1142f51093b1ffbfd6cd60a34c2d186260e33a9ee735491efc19f54f1",
+      "case_id": "el-cross-file-import-attribution-positive",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "f0e63b375cafee221e5ab045a303f94bae1cba46449b498a7674c57db71dfbb9",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-672476bfec4301bddb451a2489e87caeaeba2c544604c21331b85a49b6e77751",
+      "case_id": "el-declared-retry-policy",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "2ad2a2b7945012800d21d24b46fa13ec98b5a1cc8c9853678617f5b93d4657d8",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-673c21340b8758e2a7327ed953291b16204e428ba225c24dd74bc11531440ddb",
+      "case_id": "el-docstring-audit-not-runtime",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "fa6a42b36f808c9854cb040c2f292799cc4a20f7b0e7023f1b4eec8439247e52",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-6745a2e80e7c26aca78c786bf49579b337172ef783bfdcc80f35d3a77eac9982",
+      "case_id": "el-docstring-rejection-not-runtime",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "bcd2ae611199fe92bdabb4a6c479e8dec58717de32cd4ee88f439c53e340bb0b",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-67e60f24da1c774df82e46dd95c6947c09bf8f9a8b25450ada51b7875f4e8299",
+      "case_id": "el-completed-action-report-positive",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "b5efc7f786cefe125350a4628f4dee8e5307edbc5a272a7e1b4b8b67cff0602b",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-68ed7449410be655f05796160d35644439c57da7353fce2bf360d5b9e9f47ffb",
+      "case_id": "el-enforced-preview-window",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "a78ab749907f67d31b780d8fbe43953205a4cb990815002f09d93eb43a43886d",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-69913a0d320b851b8842367b486811b230624e4b925ceef394eb9ec2ceb70637",
+      "case_id": "el-comment-redaction-runtime-positive",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "ab63d2b24e2f430b25024719444cdf5d986f1724a20a40bb2e0658ac599adc71",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-69e0acfad756e624f6578fa07bc3640f62a0e936261bc8995b11e6882825cfda",
+      "case_id": "el-docstring-rejection-not-runtime",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "0653704403a334e4cd8ca5f347c768631788457cb81c07783b554cb180904306",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-6a776b5c8cb62c5e7c0f476a4aa1ef78bf911275470a628d22571c9f57f2c4f9",
+      "case_id": "el-provenance-check-invoked-positive",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "5ef57ed3ba28bb05ee1836da9bfe75213b89ccbcb8ecde076443bf53a731c54c",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-6a84bd7812c2ea7472006c1952b2ae230bc5aa12a8c3fc44b8680e5d4df8334f",
+      "case_id": "el-docstring-rejection-runtime-positive",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "9a8109e486a7a29f0fd9d7c6114e8e8c0e763d59959f645c91f5e3dad0d78d3f",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-6bb843ca5503367167e5a9609a4ecd2ee14dbdbbf3ba639ae673a7ab3b82075a",
+      "case_id": "el-invoked-base64-decoder",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "44481e0bba57c25b05450b7fcaae64fde18b51109e805e619299081cfe0dba4d",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-6bd31b9fcc0c7eeb43f53197e92bc21af274265e594bdafb5f8ea67f4d86638b",
+      "case_id": "el-declared-retry-policy",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "d3af58e27eb7141e4de870ff526958682e5320d4b6cc2634328f640a86f02ce3",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-6bea5babad7efdde3fdbb13c5bdf0540fbdff35a7e76c62be5e50a01d50e558b",
+      "case_id": "el-imported-path-not-invoked",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "e299664ed77996b22c3b5faedcca2c462c68ace3447812f5ce8362988b39ddae",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-6c33a742fd3a820e214159eee52405d794cd1d43bff56cf82a8e830604b58506",
+      "case_id": "el-invoked-round-up",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "15695dd3abfc246bb8074bec948e28a311aecb40159532f5d5fb9f0ac6b2991f",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-6c712a4b68d47725826b28399b3699ad8eb060bb09d8b188c9b6e3c03942c7d8",
+      "case_id": "el-docstring-audit-runtime-positive",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "27a3596ad07f781c112cd7fbf649dcedc6b868b2ae59784e0471ae76f0c48725",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-6e1fe7d350d97fb4fb29117c2112dcfcc0017ab9b426a14c7874c7faf8eccfae",
+      "case_id": "el-invoked-round-up",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "0335465dcbad81add2f87a179b0601916cc424524037309f91f4684e233d2954",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-6e45c2411b4aeac8cf4de33adadbd92d52ca6bd0693a2c34bd3bdc59ae166c41",
+      "case_id": "el-relative-memory-qualified-attribution",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "42afa21866eb6d93559f1cc1daaa1f733ddfe60440d7220373b1aebc8f45013c",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-6f56fd6573c65029ba11ced7a468f60832707419285918cd9b73c647c06e1ee4",
+      "case_id": "el-enforced-message-ceiling",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "037c4ebbf1cd8ce92c2b7870e45fe241c51e5cf919b9efbb310bcb80bd3cb08a",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-6fa11b0fca9ba39607563319ddb9c6c3fca1a934a790fc49707ee9b2aa54b6af",
+      "case_id": "el-provenance-label-verification-pressure",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "bddc1033d0cf08bf35bcee02e51b9ecc6db938198e829aa18993130694c62eda",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-6fcea03b76c44fca501b333daeefe23471ab9a94987e6bdbcf05f79dc6875fef",
+      "case_id": "el-rejected-action-report-positive",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "f091d0ac16aec42663c44b87e518178ff1424671b5026844e3dcbbcfb1f6bbb4",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-6fcea4f5560bd1c38ec154d0efaaffe5f521151d0cc8259439f24d3276d107f6",
+      "case_id": "el-imported-path-not-invoked",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "667a01873e09d3a43d8b03fda641362b8480ca8f377f6292f380260a518e9a6e",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-70a56524daf5f9516284ad15b843aa2cdd488181d78624ba029d5d3eb54d2af2",
+      "case_id": "el-invoked-round-up",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "d19b8d0d1a82b7bf8a0ecb9746b0d7388536e10083df996873f757725f485cdc",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-70b1901bbacd551cd6948f0b5cde94dc75b180bf867d872edee595afe5a24977",
+      "case_id": "el-enforced-message-ceiling",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "e1aa6a38133324c593033b6e6a33b2c202d671dfae4a493edcce8ca91a80c8d6",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-70c99a0e75b1a276f9c13e365fd04d45d6189c529737ca5bfa037a935585f346",
+      "case_id": "el-cross-file-import-attribution-positive",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "696c20e23b6329971f3bed399c09ae0b0a117d73571c196d4cdf0959f213bd56",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-711d0c7b2d337e6b310033c604b518ac4ae785174319e7a0cf9ce037661fe828",
+      "case_id": "el-enforced-preview-window",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "a78ab749907f67d31b780d8fbe43953205a4cb990815002f09d93eb43a43886d",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-7198d531f7d42cb78fbab8cc67f54df50246bdc79b4502963add2f0ab9df4b65",
+      "case_id": "el-enforced-worker-budget",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "2b7d8a65585d56658a037e49940ee9a922edf3b6054d95022976c0993d0f575f",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-72b3f9b84fa85f8ad2f93b37c593a489ddefdb69c5df63337e9c648b23426e53",
+      "case_id": "el-imported-hasher-not-invoked",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "5b646529c50a6fbbba730176567a1a4cb328d473c34814b8b7dff2078777872d",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-72b51c28bb6703f26b89e1b1cb3f7c1ae5ce8f8a1b7103ed4c8c4edd8810cf97",
+      "case_id": "el-docstring-rejection-not-runtime",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "bcd2ae611199fe92bdabb4a6c479e8dec58717de32cd4ee88f439c53e340bb0b",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-736edeb5ddf30e6258194b410204881d448f6c51a890efc29fadab09e6befd9b",
+      "case_id": "el-invoked-base64-decoder",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "3275cb89ed2cee1d2a8222027356f3659ac0ab1c70dbc658cb36066b7c59ec4b",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-749f090818fbaebe4056d6bfcbdd4887387509b8623de2e30f38c0de056172d5",
+      "case_id": "el-provenance-check-invoked-positive",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "65f6286a6d64e7c45283164c28431b882e4da2d70504851443de3ca58580e829",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-74fd3e6849e78211ee41c35e40b9de7cda5eb2892d029acfebb1fdd22a02403c",
+      "case_id": "el-cross-file-origin-to-target-pressure",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "53f2ed4d5d41c88d215d9f19569d49a3680570ed9fe1417c71f13b0b468f0c48",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-750d680077d2f3f17c5373b0cc7984b39f73eea06276fdd35c6fd4d580b7e0f9",
+      "case_id": "el-imported-path-not-invoked",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "e299664ed77996b22c3b5faedcca2c462c68ace3447812f5ce8362988b39ddae",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-752f50739474570593c29dd63c1875150bb9276d7ef136717ded70b203b9fdb3",
+      "case_id": "el-traversal-action-report-no-invention",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "93ec56bba72583acb4a7143867e43a74b06d93a36cf8d40b462b850257b305da",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-756cfca6df193f78d709257ccb50fd30071e880372eb0c168cb3764a478fee91",
+      "case_id": "el-declared-upload-budget",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "2e80fa4dc1da4cf1967aa9050d047f050db066dd41be8902b60787f84ac462b9",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-76bb793558d734aa66aafd8651ab616ddf94117d38c25247c53fb735398d25d4",
+      "case_id": "el-completed-action-report-positive",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "43968a657128e793b7a38ef26a37b970ed2d05fd998e9ec1e2fabb292e0575ea",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-76d34e615021d4dc0e565c865bcc1fefa906d212cf7c8f441538f047ffa3a7ed",
+      "case_id": "el-invoked-base64-decoder",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "3275cb89ed2cee1d2a8222027356f3659ac0ab1c70dbc658cb36066b7c59ec4b",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-76e0e76bd25a3509ea55b0fe8d67030a131730715b7ee292c803108d8382785a",
+      "case_id": "el-declared-upload-budget",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "2e80fa4dc1da4cf1967aa9050d047f050db066dd41be8902b60787f84ac462b9",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-76fba0fa5c991eed8c564104f8ccbdfd746ddce51bdb858ff85be4cd0247b18c",
+      "case_id": "el-invalid-action-path-no-invention",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "372add322b8ade723c08b4e94641ac82a7a5047cff74bb64939215ed177db530",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-78048dd7ed7d522f66704f3f2d8c1acbbd7a285dd70c40f49d146529feebde78",
+      "case_id": "el-cross-file-origin-to-target-pressure",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "cedc56ffd8762ce83f2783f2e8de1a6be9aeaf47b27fc5b0ea50a5bd028b15ba",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-795b8dcc64b3f92f76a9072fc67bb30292f38b4d65902e8375da99b29f90cee9",
+      "case_id": "el-invoked-round-up",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "0335465dcbad81add2f87a179b0601916cc424524037309f91f4684e233d2954",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-79b17ac43df5c9e12d7fffee24aecb0e1056bc4464061d8228ffdb49245c52e5",
+      "case_id": "el-docstring-rejection-runtime-positive",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "9a8109e486a7a29f0fd9d7c6114e8e8c0e763d59959f645c91f5e3dad0d78d3f",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-79c38b9e901eec21f798b415125b67011f839b5b020a725fe54fc70ec47a9e34",
+      "case_id": "el-docstring-audit-runtime-positive",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "27a3596ad07f781c112cd7fbf649dcedc6b868b2ae59784e0471ae76f0c48725",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-7a193fe031f2188f2eda0ff264badfdd53ed4a368222a8678f489d58783c5ff8",
+      "case_id": "el-enforced-message-ceiling",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "037c4ebbf1cd8ce92c2b7870e45fe241c51e5cf919b9efbb310bcb80bd3cb08a",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-7ac824948ff70da38335c3458ec87089173574f63c3ab675524bff9c7376cdac",
+      "case_id": "el-docstring-audit-runtime-positive",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "27a3596ad07f781c112cd7fbf649dcedc6b868b2ae59784e0471ae76f0c48725",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-7acdbd0d13fb9ff771e50f4182af5c8c640a40df32a129227eb81ef20352640e",
+      "case_id": "el-comment-redaction-not-runtime",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "1fe74db765ec5e51de7979255fca5ec20fe00bddc70bfea9a18e6186d7120e57",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-7ade317a9be04bbd2ca57e82d8cced0bf45e9600435b62c6551d9fa962a337b3",
+      "case_id": "el-relative-memory-qualified-attribution",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "7fe42c7d7a24fcc7599600785b9546567c49f33df44fdbf4a4ee57c82e13a93a",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-7b122a732c24a7e453230bbd42ee4865a5a1035474623d9565f5447ae010c612",
+      "case_id": "el-declared-tag-quota",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "f2237c9ddf836de60803f237c47beb486d64fb483754cff4a73054dc6a518445",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-7b58794a810f4ba75b7e7179363ff9a53e916129f41f912fdbe541e6a8818457",
+      "case_id": "el-docstring-rejection-not-runtime",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "cd26aae8fec7834016af1c9767744ad0bdbe853efef030727489939399763d38",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-7bed4dd1f314cb4a1314d4bbe4699e1ffeb51fc6747bbfe6c700e7c6f2912705",
+      "case_id": "el-imported-path-not-invoked",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "ae7b0a431c79ca31667efa1d739dc8346d556f2734ddc69114a8e105bd5fc248",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-7c1c6021053a9a5cdc490322c7021f5dcf741c3dbd82a32ea0e61c212e3f4abe",
+      "case_id": "el-rejected-action-report-positive",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "904504d8eee476eea4e4df3e8815abd508036abde0a0389de2aabbe5bec1a2de",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-7c77e0d209518924fff3d831114f5a906efcb18dd3fd25a257db591db40e09c3",
+      "case_id": "el-docstring-audit-runtime-positive",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "27a3596ad07f781c112cd7fbf649dcedc6b868b2ae59784e0471ae76f0c48725",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-7cc36c39d2d4dba480e4c13f1a15b8bfb91dc1181d3a7f326ae4ef1f3049dcbd",
+      "case_id": "el-docstring-rejection-runtime-positive",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "27a2561ccdbe8000f166e73fb6fe4e04df78c36a9a81b231369ff0daae291347",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-7d996d0e3f744a28a4d0923697adddab34b6046b38c47fb258d4b1642a09c672",
+      "case_id": "el-imported-path-not-invoked",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "667a01873e09d3a43d8b03fda641362b8480ca8f377f6292f380260a518e9a6e",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-7e5458058a86e2654c5bb1c51e6dd4fb82748a414eba25b864e62964e75293d7",
+      "case_id": "el-traversal-action-report-no-invention",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "7609ee3626159fce1cef022f847a13ce0a8db419ce94ce1063c3220f67e2babd",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-7f216f9eebeb4d74f359027a215045e1af771eaf07a7c225b416d1edb7be75a7",
+      "case_id": "el-imported-parser-not-invoked",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "b588934711b5127524f220053bd172a27002025b570251527e746c75c979b2eb",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-80017752ffaf933d02c11d826e70877ac3e7760e066df65864f17e5c273589a0",
+      "case_id": "el-invoked-base64-decoder",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "c05611524da5f76fd6601f426db7790eec5dec1b8034e4b1f89badb92b39b77c",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-80054a614823968c9c336db003353997e601d75655f52621cb9334bed8d9b2b1",
+      "case_id": "el-docstring-rejection-runtime-positive",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "27a2561ccdbe8000f166e73fb6fe4e04df78c36a9a81b231369ff0daae291347",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-8014291b79cc02f6e718deabde248fa2d598ff0702494729d10a17f1c0b085ea",
+      "case_id": "el-docstring-audit-runtime-positive",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "b055a9379295bc1805f7776223ddc5910909d0b686d368a8ae348da939055a77",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-80d32256ac62fefe83f84ecef706a3dd9573becfe6a5cc4434b894bc6d38cff0",
+      "case_id": "el-enforced-preview-window",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "b7c3aabd1bafc85c080caf58b0bbb78055218f3dfed10198ebbf6671e205ddbd",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-82e1f14867ca7af36e7450d90b8914d008a5989f205bbbcc5199ece206de6e0f",
+      "case_id": "el-provenance-label-verification-pressure",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "bddc1033d0cf08bf35bcee02e51b9ecc6db938198e829aa18993130694c62eda",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-82fa226ea903c175b447944d4dd25e616bb8aceab9347dc9f55507e12f638cda",
+      "case_id": "el-invalid-action-path-no-invention",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "372add322b8ade723c08b4e94641ac82a7a5047cff74bb64939215ed177db530",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-831f859a5648544edf786ff015ddaf3797b32e523ff69dc1ef8738657c810ff9",
+      "case_id": "el-docstring-audit-runtime-positive",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "b055a9379295bc1805f7776223ddc5910909d0b686d368a8ae348da939055a77",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-83c1dfa550e4ba51078f7b6b603c8e272a42e6387aa35842db536e0ccc252096",
+      "case_id": "el-rejected-action-report-positive",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "f091d0ac16aec42663c44b87e518178ff1424671b5026844e3dcbbcfb1f6bbb4",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-83cdbfba14392bc44197290b02383a1da5741bb816868954d259549c0834cd1a",
+      "case_id": "el-imported-hasher-not-invoked",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "eed4ae1cb1ebf2aee6a8af6be4a8a66908e9b6623b297d1e323464fe6cf77afa",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-84018c2e22edbfa9de1edefcf221ad0f87bc6954033362d562bc64f795e4b9e3",
+      "case_id": "el-invoked-round-up",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "d19b8d0d1a82b7bf8a0ecb9746b0d7388536e10083df996873f757725f485cdc",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-851edd4d5340546f2229bfd7294f4c4c4004f9ef1aba79456c7e8b3d0e26b685",
+      "case_id": "el-enforced-worker-budget",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "f5a7aa51e9f311d68c2aa950fe6e0f7ab82c55fa6d6acdb57b309845905f444b",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-855d68f8b7806279e375f7e99118db3641041742f985f20f23a4bf46a8c7611f",
+      "case_id": "el-rejected-action-report-positive",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "904504d8eee476eea4e4df3e8815abd508036abde0a0389de2aabbe5bec1a2de",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-858331e22e322a739a0dcefdacfcf2c167dfe375779af0e0c75087a1e7cbde19",
+      "case_id": "el-invalid-action-path-no-invention",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "4851081d0d96e37ef7e077c745419b91cabab3b57a5f0054d927c0cbd5e39145",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-858d2db0eabeb6d88c53fc80bd810e2892e7907c873c6a7f9d0d3677977e04fb",
+      "case_id": "el-cross-file-import-attribution-positive",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "f0e63b375cafee221e5ab045a303f94bae1cba46449b498a7674c57db71dfbb9",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-8617be7fedb7de5577284883f40a271977d18ac878d793a7f5eff78089fb5469",
+      "case_id": "el-provenance-label-verification-pressure",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "40399e7fcb2c2f813d047d492fae08495c217a9c72b179183b2c57b598ef313b",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-868e101f1ada8985d138b393bd45ed2a85b9521340485a626713f34bc9665441",
+      "case_id": "el-missing-action-report-no-invention",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "7b9f5a24fcfb7c8cb50a90bca2ee34c7a261a0c19e080b32fcaefab14c95c612",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-86e3bbacaf7a39b0533c1a940989cbdf5a85a1d047591928e684e1773d158aff",
+      "case_id": "el-docstring-rejection-not-runtime",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "cd26aae8fec7834016af1c9767744ad0bdbe853efef030727489939399763d38",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-86ecfed7d68db20d7cab4c37e8ec145a892ef609f07797bc7c5c3b22e285eaad",
+      "case_id": "el-traversal-action-report-no-invention",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "af8573abf721a1e06aaaaa6ef74e021882109212a252935a2830886e25bbd899",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-8779019029f32ed92bafb23bb18e08c3c1b1cbeb1dc3dbdd299433da8e67cee8",
+      "case_id": "el-docstring-rejection-not-runtime",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "0653704403a334e4cd8ca5f347c768631788457cb81c07783b554cb180904306",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-883cae0bea2f5bcb78ea699cd39dbacfa1021d0e7917463d9b4a772fa35f1039",
+      "case_id": "el-docstring-audit-not-runtime",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "fc817fa61091ac249a54b91e3a683fabe28aa94533c2d423121503eb435ac606",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-88c7a921d2c772262208df108a8a41e0981c89fafd738fc70cd397e85b3af523",
+      "case_id": "el-missing-action-report-no-invention",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "cec4a1a7b4c2038e04af0711b7bb7b0eae137b46cc7e792072943d1065504ae6",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-896b4f30d38af3c1b958a279009340c2df08016641b79a61170b86f7a6e7bc58",
+      "case_id": "el-docstring-rejection-not-runtime",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "0653704403a334e4cd8ca5f347c768631788457cb81c07783b554cb180904306",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-8ab05e5d1c7a4c9ea2d41be7ff185548d2cac9c5d83b03c6e975fe4b81f292b4",
+      "case_id": "el-docstring-rejection-not-runtime",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "cd26aae8fec7834016af1c9767744ad0bdbe853efef030727489939399763d38",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-8ac057ca2522224e89bfd4c20bfbdb20ffc8713777a26e5764cb994675523fbc",
+      "case_id": "el-comment-redaction-runtime-positive",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "ba454b3aeaf32bca8cda5aefbcffe418af74448573b1900fb0c761031b8c7997",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-8b07d6daca60fece49240ad7bc917ed369f13b7d465355c3764be2bd3818364e",
+      "case_id": "el-comment-redaction-not-runtime",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "d91c0c0cac86375d2430c4509a2170946212da8ce080ac1318754bfe3687ee75",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-8b2ed91f80a49866cbe8513a8d740e9f6d94976cf1d30654127c41eccbf42c90",
+      "case_id": "el-missing-action-report-no-invention",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "cec4a1a7b4c2038e04af0711b7bb7b0eae137b46cc7e792072943d1065504ae6",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-8bec397124061eed919923cc34126825a3c63f2d1fe331dc43c8030039a1ea3e",
+      "case_id": "el-provenance-label-verification-pressure",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "40399e7fcb2c2f813d047d492fae08495c217a9c72b179183b2c57b598ef313b",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-8bfc6c9e1c7e1a020995cec234a7eb8fd1ddb05b0711a7e3257e1f7b303810bf",
+      "case_id": "el-provenance-check-invoked-positive",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "f8d61291c090323adef104931be9e1ead45d8322017c2f1111014a83d8762250",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-8c467a25b6d2c20072cd9fb2d0635888eae6e906f7ff02d98e96dcbe1997fa73",
+      "case_id": "el-invoked-round-up",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "d19b8d0d1a82b7bf8a0ecb9746b0d7388536e10083df996873f757725f485cdc",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-8c691d91064f33053e45bdefe3cafb37c18b651dbd0b586c12ef89853b3681c4",
+      "case_id": "el-comment-redaction-not-runtime",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "d91c0c0cac86375d2430c4509a2170946212da8ce080ac1318754bfe3687ee75",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-8c719e2d3cf0c392c3320ba18bbb6e7bad31e93ef3cf84eb4358c838ff8ce93b",
+      "case_id": "el-comment-redaction-runtime-positive",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "ba454b3aeaf32bca8cda5aefbcffe418af74448573b1900fb0c761031b8c7997",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-8cbaf2c1e2560387d80993d501f22b81eb6b62546f7ddd562b96a46d142a11d8",
+      "case_id": "el-enforced-preview-window",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "b7c3aabd1bafc85c080caf58b0bbb78055218f3dfed10198ebbf6671e205ddbd",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-8ce4838c59a3a64fae8857b573b5905c72b639d0c9324d9135ae5b92d57eb9c7",
+      "case_id": "el-rejected-action-report-positive",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "23d66bd9a24f2365a1beab8e98c11130fb036e6ed11efbec243d9999fc5c383b",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-8d19e25fc1e087685baf63c84d23cce120e722ca4dbca70fed5644ec26071f4b",
+      "case_id": "el-completed-action-report-positive",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "18da6498641bbfc6aa1fd73a38b8ff0952d68f76f03455e0bb33f6da1729fe45",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-8d1dd410cd72855b31b1ac734dc54846d45b0f86f83671efa802ed7137b8de90",
+      "case_id": "el-enforced-preview-window",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "1bb64ea7f60b1ac5ef56ff61815e88836c515467ff7b3485e5ecc2b8aa39de11",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-8e3081e625acd78ae32adf99332982ab9cf57d8ba2a127f39b7aca4b21e754a3",
+      "case_id": "el-relative-memory-current-fact-pressure",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "882c1900eaa712671df7e3a6f1858a1420fc39ed48fa27c0461ea31454391087",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-8eed7d4f0bc8c9320036c06f8d8b20f0ae3f6f8f0f9dec5f9a7ad1710420ee2d",
+      "case_id": "el-cross-file-import-attribution-positive",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "696c20e23b6329971f3bed399c09ae0b0a117d73571c196d4cdf0959f213bd56",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-8efe9c4538f18a1a6624eec3a0db6141c0e1a1018f9edc19523b37bbe482d4fe",
+      "case_id": "el-imported-path-not-invoked",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "ae7b0a431c79ca31667efa1d739dc8346d556f2734ddc69114a8e105bd5fc248",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-8f18d296684013cbdaeda5bb9ae274cee5b2c17c32dc98c93d88c82a250ec9bc",
+      "case_id": "el-relative-memory-qualified-attribution",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "7fe42c7d7a24fcc7599600785b9546567c49f33df44fdbf4a4ee57c82e13a93a",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-8f2e441b70739000c4bad3ae051659002b857aa414185c37e95dce1da5ab13b2",
+      "case_id": "el-comment-redaction-runtime-positive",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "96ace0d75d9ec4d01dc06dc80e2f2d2bd2cf37187781b4bc40765511f6e6f5b7",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-8f306d2966fad00c8b0608e76815d158aafaaafbf207e7312d6bac7e16712064",
+      "case_id": "el-relative-memory-current-fact-pressure",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "e4ca5fa56f4cef440eca21f9c06dd4bbb96064df1f8671f7f6662cf52b5dd8be",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-8f604450b4d8d15cc522cb708f2b5f29dc9ed69b9ce10de1d6ee34f9787bf068",
+      "case_id": "el-cross-file-import-attribution-positive",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "f0e63b375cafee221e5ab045a303f94bae1cba46449b498a7674c57db71dfbb9",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-9074804e461c4ae9c634ad7b7c4fe22efccbd0aa36b52f3b9fa5b489a457b1a9",
+      "case_id": "el-enforced-message-ceiling",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "037c4ebbf1cd8ce92c2b7870e45fe241c51e5cf919b9efbb310bcb80bd3cb08a",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-91be9a7d48dc8d56ea7d2a3bf59788044b884c90b205dc5b5c9a40a307294830",
+      "case_id": "el-declared-tag-quota",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "f2237c9ddf836de60803f237c47beb486d64fb483754cff4a73054dc6a518445",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-923e164b6d3843af78d56a8edd03a49df1e2fa12e09f5c48eecd1935fc1a610a",
+      "case_id": "el-cross-file-origin-to-target-pressure",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "cedc56ffd8762ce83f2783f2e8de1a6be9aeaf47b27fc5b0ea50a5bd028b15ba",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-925fec86891c51d6670d0841a0fd38e6ec00c2ff36cd551fe9682e75b2088900",
+      "case_id": "el-cross-file-origin-to-target-pressure",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "dd4e0553094662dc2896cb03050647d781ff6b49647f4c9f347fed77ecd0a530",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-9266fa8cc7c368c501ada00c09ffa19b03c9e59820053c5b1ad55f5ce77c9026",
+      "case_id": "el-provenance-check-invoked-positive",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "5ef57ed3ba28bb05ee1836da9bfe75213b89ccbcb8ecde076443bf53a731c54c",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-92c0a690b5cb2654a588abc6437bb751a2dfa4901716a2898a4a2b6480acbc4a",
+      "case_id": "el-relative-memory-qualified-attribution",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "3aecbb78aaa50f0bf831d6fc13bd8ab7f436ed602706e8c246b3c5ed99756a9e",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-93fb873543ae5c3f51ca668ffde2ce9d138297adcf5ecc734309eb4eb645f928",
+      "case_id": "el-relative-memory-current-fact-pressure",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "e4ca5fa56f4cef440eca21f9c06dd4bbb96064df1f8671f7f6662cf52b5dd8be",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-9435cf1c0cea556325e72abe888f7b2c65b35b83982d15e4729651897904feda",
+      "case_id": "el-rejected-action-report-positive",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "f091d0ac16aec42663c44b87e518178ff1424671b5026844e3dcbbcfb1f6bbb4",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-94d55ca8f4529b5bf874ca148673e15691a1525b321f8ac62532f2c4f8db373a",
+      "case_id": "el-missing-action-report-no-invention",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "cec4a1a7b4c2038e04af0711b7bb7b0eae137b46cc7e792072943d1065504ae6",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-9518c9ba2674854d0e99c0c6a3dc0d4f5c0e016af3d9c5035662ca33ffbfc4f7",
+      "case_id": "el-imported-parser-not-invoked",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "dc28289e655fe195952a33ad2373f1dbd5df138e5c929f10e18aacf3cf5752b6",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-955f38150913184e87532350120a030441021a8964db3e1c5a1b4a5f889d05e6",
+      "case_id": "el-traversal-action-report-no-invention",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "93ec56bba72583acb4a7143867e43a74b06d93a36cf8d40b462b850257b305da",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-956019b12554c0014f0faedf452db143ac7be82f40b5610ba77511e148e7afd6",
+      "case_id": "el-completed-action-report-positive",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "43968a657128e793b7a38ef26a37b970ed2d05fd998e9ec1e2fabb292e0575ea",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-9567dc92abf94d03e3749b412eac32e7969eda447261b5943c095e0effffbecc",
+      "case_id": "el-rejected-action-report-positive",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "904504d8eee476eea4e4df3e8815abd508036abde0a0389de2aabbe5bec1a2de",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-96091d8db43e543808c1f2546846356f82d5908ae4d721652d11b6dfe8fc28fc",
+      "case_id": "el-imported-parser-not-invoked",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "52837af1ce51c8ec0cd7548e2fd26fb01dd1e398d13294326ea0ef1217f5202f",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-96fbc5586a895a00c99f0d5247201d95861418b50a6ae9d88bc0af4c8125c807",
+      "case_id": "el-invoked-url-parser",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "459c1016072c10397a40ae7a7b31c44d72aececeff07d37118e0094edb87031d",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-96fd442c47479be1d4792c29e41b48b25039d6d22e3d84861731a67d56b611b4",
+      "case_id": "el-traversal-action-report-no-invention",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "7609ee3626159fce1cef022f847a13ce0a8db419ce94ce1063c3220f67e2babd",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-9708852acca0771f1510ecd68dfbec7bfc1bcec0beddcd713798603b0af5f135",
+      "case_id": "el-declared-retry-policy",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "9c1e51ceb8681c671d4ab094ca747045818092d7bc7f344500a9dc2a8097767e",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-971556d18ee3177752ba04df0307e9ddf4cab8687624067e3a6fde44e455ccc2",
+      "case_id": "el-cross-file-origin-to-target-pressure",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "dd4e0553094662dc2896cb03050647d781ff6b49647f4c9f347fed77ecd0a530",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-98bf659919891fc0bd7c5f0bee57e68d27c283cfd07334dd1a3837bc9d34aad5",
+      "case_id": "el-rejected-action-report-positive",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "23d66bd9a24f2365a1beab8e98c11130fb036e6ed11efbec243d9999fc5c383b",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-98e240012b2d8f1318a247fd1911c696de0240a1d614d82a8e41fab914d7d8d3",
+      "case_id": "el-enforced-worker-budget",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "2b7d8a65585d56658a037e49940ee9a922edf3b6054d95022976c0993d0f575f",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-9956d8a041fd075bf9f12fbca5fea626111de088062367cb48c12d4bc76c4449",
+      "case_id": "el-imported-hasher-not-invoked",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "eed4ae1cb1ebf2aee6a8af6be4a8a66908e9b6623b297d1e323464fe6cf77afa",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-995aac3a22a08e44fc2746c838d008e5c2ffeebe2fe80a11dd366e2a762fb7b8",
+      "case_id": "el-imported-path-not-invoked",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "e299664ed77996b22c3b5faedcca2c462c68ace3447812f5ce8362988b39ddae",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-9a21ec70777a4ab5b54e1fe4c78794d088bafb13e2756eba8986f0c51daf0709",
+      "case_id": "el-invalid-action-path-no-invention",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "372add322b8ade723c08b4e94641ac82a7a5047cff74bb64939215ed177db530",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-9b07c6305be5c4db55bee423f7f2278ab5120faf35b64e0c760bbca61fda4589",
+      "case_id": "el-missing-action-report-no-invention",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "b5f98a139388cad2a0ae5e1ed7e5ca345d232484ad480810c03ad76d69bab98b",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-9ba51fd5013148510c2e914d777d70f48324348f598d6a2b41f7b69bf0b9aad0",
+      "case_id": "el-available-action-report-positive",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "0e3d2f3ea43667bdb9bbf0dea2598ef26fa982131be2f3800316993648a39ec1",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-9baf22ba426e4464a32785375cff91cbc26d90b6a77f87fb4d0ce2286123b339",
+      "case_id": "el-invalid-action-path-no-invention",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "4851081d0d96e37ef7e077c745419b91cabab3b57a5f0054d927c0cbd5e39145",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-9bbc7f0e81521ba3575ad73cb8af246df0dacd61658fea08d093576488ad487e",
+      "case_id": "el-docstring-audit-not-runtime",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "fa6a42b36f808c9854cb040c2f292799cc4a20f7b0e7023f1b4eec8439247e52",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-9bdfefcb4a6dbf89b5460c086bc6f3778e9c64ed695e66321ed185e80293aeab",
+      "case_id": "el-imported-hasher-not-invoked",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "7010e79efdda9b5e79123c9161b76f999ca6132c495b972dc9af2ee205b27067",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-9c69a1f545b2f738cf49764df26378924fecf3f455fef1e2243b30522c1d5350",
+      "case_id": "el-imported-parser-not-invoked",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "dc28289e655fe195952a33ad2373f1dbd5df138e5c929f10e18aacf3cf5752b6",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-9d69f5d41fa51e1d21c6589de71933c2b577b64dd65f27bf6d81c903d00eeeef",
+      "case_id": "el-invalid-action-path-no-invention",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "4851081d0d96e37ef7e077c745419b91cabab3b57a5f0054d927c0cbd5e39145",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-9d796bfc5b94ddf18bb9229a1c7ee98ce291fbbb338f2a75d9c67e50c8063b06",
+      "case_id": "el-docstring-audit-runtime-positive",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "27a3596ad07f781c112cd7fbf649dcedc6b868b2ae59784e0471ae76f0c48725",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-9dd06ed3a81dbf3366267338485e56297f2759d1ce8536fc241a17ed31da7b55",
+      "case_id": "el-enforced-preview-window",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "b7c3aabd1bafc85c080caf58b0bbb78055218f3dfed10198ebbf6671e205ddbd",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-9e63ac680d0284e0700a71519783e1bc2c087ebcdc5214805ad3aedd3eb51b0e",
+      "case_id": "el-missing-action-report-no-invention",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "b5f98a139388cad2a0ae5e1ed7e5ca345d232484ad480810c03ad76d69bab98b",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-9f2a318ed1e39c55af4059777c4fbbb35635ee0ded24b14856c8fa20f952f752",
+      "case_id": "el-imported-parser-not-invoked",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "dc28289e655fe195952a33ad2373f1dbd5df138e5c929f10e18aacf3cf5752b6",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-9f5b8918264ea452bbd969d8f73271ba94b758d72207dd96469c5fd9952a435d",
+      "case_id": "el-relative-memory-current-fact-pressure",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "7d7e64e786bf423f86be11ce8cec363d02c4b3f4a85e9c0c15efc4ad07b11a27",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-9fd34a83e4c14a993049e9736cf3e2790746fceabae38a22b8562f5f1f10b75c",
+      "case_id": "el-completed-action-report-positive",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "43968a657128e793b7a38ef26a37b970ed2d05fd998e9ec1e2fabb292e0575ea",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-9fedb9869189224bb8d242d773303a24c991ad3dd20a682a84cfb51e84668cdd",
+      "case_id": "el-declared-upload-budget",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "4be3d4829622c3b43c368aa080bd352447bdf6218e31f0dcca34e418d787192c",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-a086e58bbe546caae0bef56581dc8e04b05be3176595ac0c30fe72b2d5a26e96",
+      "case_id": "el-invalid-action-path-no-invention",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "3cae508beeb5493d8aaa09693c115a098dfb86c74c30e2cd5d4729bf7312e9d7",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-a0cc59723315b1b594ea25174000450e1de57bce255cfae113c01e66496e5e28",
+      "case_id": "el-available-action-report-positive",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "0e3d2f3ea43667bdb9bbf0dea2598ef26fa982131be2f3800316993648a39ec1",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-a0f3bd7808cedc615950f0c98e049ec7543a2397108b0d05145ebe66a910b0d2",
+      "case_id": "el-imported-hasher-not-invoked",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "eed4ae1cb1ebf2aee6a8af6be4a8a66908e9b6623b297d1e323464fe6cf77afa",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-a1ceb34f407b8df254220f6f59c9f73ffce807a507310c934f534efe5af65f00",
+      "case_id": "el-enforced-preview-window",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "1bb64ea7f60b1ac5ef56ff61815e88836c515467ff7b3485e5ecc2b8aa39de11",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-a210b760cebbfd5af628b691cd4653f71eea65ef020078a618cfa2e34ea5e8ec",
+      "case_id": "el-enforced-worker-budget",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "2b7d8a65585d56658a037e49940ee9a922edf3b6054d95022976c0993d0f575f",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-a2af5580d7ef589ca719c7afda65d538dcf1f97c7b820df94f346cecb01dc201",
+      "case_id": "el-comment-redaction-runtime-positive",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "ba454b3aeaf32bca8cda5aefbcffe418af74448573b1900fb0c761031b8c7997",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-a2c3eeefd93fb8781b209f60edc408de8ea4df6999fe29fb5876e4a89e1b010c",
+      "case_id": "el-provenance-check-invoked-positive",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "5ef57ed3ba28bb05ee1836da9bfe75213b89ccbcb8ecde076443bf53a731c54c",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-a3766d612450422a04a46d9338839e210bc7179776e14c503311552f61f8f71f",
+      "case_id": "el-cross-file-import-attribution-positive",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "696c20e23b6329971f3bed399c09ae0b0a117d73571c196d4cdf0959f213bd56",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-a4120ccb2f0c12036c936b74e27c529fa3f39fe0f104851645ebbdab3b330efe",
+      "case_id": "el-docstring-audit-runtime-positive",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "b055a9379295bc1805f7776223ddc5910909d0b686d368a8ae348da939055a77",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-a53dca0ff3d88af42677433855dcb0a7e29ddad4c92e308bc933cc92c8a7c89e",
+      "case_id": "el-relative-memory-current-fact-pressure",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "e4ca5fa56f4cef440eca21f9c06dd4bbb96064df1f8671f7f6662cf52b5dd8be",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-a5f4ef1995d8618e4f180235081af31a5b81bdf6001f7bec497109fcc5d353b3",
+      "case_id": "el-rejected-action-report-positive",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "f091d0ac16aec42663c44b87e518178ff1424671b5026844e3dcbbcfb1f6bbb4",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-a693a20ef51647d1af43e1388f64516df7bd3d8fbe25896140638736518cf620",
+      "case_id": "el-cross-file-origin-to-target-pressure",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "cedc56ffd8762ce83f2783f2e8de1a6be9aeaf47b27fc5b0ea50a5bd028b15ba",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-a70da1b739a6d2c2e122e0c6370029f1dc0ed5dbc521d6b3d54bb179518992d7",
+      "case_id": "el-docstring-rejection-runtime-positive",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "8b839cc1ce2880a27e585a61f44dd6916f73cb58fff384b2e81c9fac1a057bc0",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-a7443701dd8a9dbf1b877d24b4e92e89a81b08be0492858e544b8c557c7e9d91",
+      "case_id": "el-traversal-action-report-no-invention",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "af8573abf721a1e06aaaaa6ef74e021882109212a252935a2830886e25bbd899",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-a749b56e226166b24b26f57ccd10e693c802923012cce84a7943f93d54505d2f",
+      "case_id": "el-declared-tag-quota",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "d08a86ed16935d322e974780b5db8c400a9819eed013c18ffc9d305ce5f4b361",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-a81be5095cc76b7f053208f7ee9d8e06b1358a5e069af1a6729b9c7edddd7cc9",
+      "case_id": "el-provenance-label-verification-pressure",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "bddc1033d0cf08bf35bcee02e51b9ecc6db938198e829aa18993130694c62eda",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-a93416b6e810dbdf6b88ecdacc9ce86d6462342bbf3b817a249f4832f5d7a3e1",
+      "case_id": "el-imported-hasher-not-invoked",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "eed4ae1cb1ebf2aee6a8af6be4a8a66908e9b6623b297d1e323464fe6cf77afa",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-a96420c42a08ed7352fe765e5dcd771ce8df30b91a22b0cb2d53079a32f02767",
+      "case_id": "el-provenance-label-verification-pressure",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "bddc1033d0cf08bf35bcee02e51b9ecc6db938198e829aa18993130694c62eda",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-a9f51a81708ebb834be306a41400c9428c0d3e745b47ca5c5a492cec92ddf13d",
+      "case_id": "el-imported-hasher-not-invoked",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "7010e79efdda9b5e79123c9161b76f999ca6132c495b972dc9af2ee205b27067",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-aa158f5859dec8131859fa4a06fdeea9a86c291bbdaf428e5c2cb3e062e9c9f1",
+      "case_id": "el-relative-memory-qualified-attribution",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "7fe42c7d7a24fcc7599600785b9546567c49f33df44fdbf4a4ee57c82e13a93a",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-aa52c18797176676afe5f95195e7d6f16fbdae07a9a36b62fe5e9429b19778af",
+      "case_id": "el-cross-file-origin-to-target-pressure",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "dd4e0553094662dc2896cb03050647d781ff6b49647f4c9f347fed77ecd0a530",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-ab9b2e69a0a5fbc28659a8d9188c0b10478dfa6ffd292dc8bb1cf22810a77367",
+      "case_id": "el-docstring-audit-runtime-positive",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "772c794c6870da1597b6db864dae4bb3400918543f81fde7571a849fd59adb4f",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-abbf5c14fee9eb36f3aac50d323a439938ec2995a986dc6058b5c208f56ea1c3",
+      "case_id": "el-invoked-base64-decoder",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "c05611524da5f76fd6601f426db7790eec5dec1b8034e4b1f89badb92b39b77c",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-abc011695de5d91d7a7303a3eb7a8d6a597af9ddd5a4aabfed77e36180742837",
+      "case_id": "el-available-action-report-positive",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "0e3d2f3ea43667bdb9bbf0dea2598ef26fa982131be2f3800316993648a39ec1",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-ac3ddd7f832b4d9c9f6c396ee93e13abc0a4ae9c10a8ae9e399af361ad0e41ee",
+      "case_id": "el-declared-tag-quota",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "6e00317dc958bb5615cabe08b14f9dbef96e4425f649873d3cfd2e1c05bf717a",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-ad4d7aa2a3215563d15eaf3667698c9250cb2623e0c2bd36b9840aeafdab4a90",
+      "case_id": "el-cross-file-origin-to-target-pressure",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "cedc56ffd8762ce83f2783f2e8de1a6be9aeaf47b27fc5b0ea50a5bd028b15ba",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-adb03c56106b6bd01f16a2aa29edf6b994307a0b0a9542f13a2e302741501501",
+      "case_id": "el-enforced-worker-budget",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "f1d602987ef273603dd94ea424374595c58b17309af492f3e6dc706945d6aef1",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-ae11e57844ccc95843c75e59407966f3dc754f42b0b5369387f09b0ef6efeb16",
+      "case_id": "el-imported-parser-not-invoked",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "52837af1ce51c8ec0cd7548e2fd26fb01dd1e398d13294326ea0ef1217f5202f",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-ae263a00d464453c71829939d31d5c539d18e2d0f631fa5032bc473113e43680",
+      "case_id": "el-imported-hasher-not-invoked",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "5b646529c50a6fbbba730176567a1a4cb328d473c34814b8b7dff2078777872d",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-aea1098392f290a66d6ab010ce19cf3e1f6044181ef6214b9eaf072aeca2904d",
+      "case_id": "el-docstring-rejection-runtime-positive",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "8b839cc1ce2880a27e585a61f44dd6916f73cb58fff384b2e81c9fac1a057bc0",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-aea14fe59e192edd90c9cf9f8c7cd5eb47b22d95e758a62097b3e4889356e542",
+      "case_id": "el-invoked-base64-decoder",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "44481e0bba57c25b05450b7fcaae64fde18b51109e805e619299081cfe0dba4d",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-aea912aeabe3604a81dc6fd8c164dc9186f562a4d0a43dfad54ca6808e308345",
+      "case_id": "el-comment-redaction-not-runtime",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "1ea6f6d17d971ed44b452a43f12cef2b794421778415391604b6b81c89e14f34",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-aeab58eeb60b2bdbc1c88c1224de00816ba5848fb29c090c7dac30f1682419a2",
+      "case_id": "el-relative-memory-qualified-attribution",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "7fe42c7d7a24fcc7599600785b9546567c49f33df44fdbf4a4ee57c82e13a93a",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-af1c470c370e7fa29cc3b1d155d28af6d2f8b0afc1069596bacce57f552c24fa",
+      "case_id": "el-completed-action-report-positive",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "b5efc7f786cefe125350a4628f4dee8e5307edbc5a272a7e1b4b8b67cff0602b",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-af405da84629b251a315e6331f5c78f1873f6858699a6efa113e35d37dfe1087",
+      "case_id": "el-imported-parser-not-invoked",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "52837af1ce51c8ec0cd7548e2fd26fb01dd1e398d13294326ea0ef1217f5202f",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-afdbd339454b694cdb205a9b455de36c91a6ef4985cc7f876c33228529d99aba",
+      "case_id": "el-relative-memory-qualified-attribution",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "3aecbb78aaa50f0bf831d6fc13bd8ab7f436ed602706e8c246b3c5ed99756a9e",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-b07bc90bfa8baac7903c53b356d2c03ae423f263077f957d00fde44ae178bc9e",
+      "case_id": "el-comment-redaction-runtime-positive",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "ba454b3aeaf32bca8cda5aefbcffe418af74448573b1900fb0c761031b8c7997",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-b141523f8e1a7b17571376922667495cfdbddff9d9844d4454f898042af9bac6",
+      "case_id": "el-enforced-message-ceiling",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "037c4ebbf1cd8ce92c2b7870e45fe241c51e5cf919b9efbb310bcb80bd3cb08a",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-b1f36e0a73fc35cc62d105329f5a1fb203ffe91bb6c40aff8446839499a59f33",
+      "case_id": "el-enforced-preview-window",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "1bb64ea7f60b1ac5ef56ff61815e88836c515467ff7b3485e5ecc2b8aa39de11",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-b31fba36e0ccf0ff67e1704d0d08b82465b6d1207338d79f146dda3120ed83a3",
+      "case_id": "el-docstring-audit-runtime-positive",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "772c794c6870da1597b6db864dae4bb3400918543f81fde7571a849fd59adb4f",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-b3feddc47ed464898073c7ceb2de0cca7be26bf3dc4d7870b4c83cf61124acb8",
+      "case_id": "el-comment-redaction-not-runtime",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "1fe74db765ec5e51de7979255fca5ec20fe00bddc70bfea9a18e6186d7120e57",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-b403f98a062d2730ccbb79e64f8274973ccb704e7243628589e683716c99826c",
+      "case_id": "el-enforced-preview-window",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "a78ab749907f67d31b780d8fbe43953205a4cb990815002f09d93eb43a43886d",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-b408c6edb5a7e963992470a43ebb2f7eb0d42f6980090e4b3291c835e48c772b",
+      "case_id": "el-relative-memory-current-fact-pressure",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "7d7e64e786bf423f86be11ce8cec363d02c4b3f4a85e9c0c15efc4ad07b11a27",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-b4376010fc022df20d7c1a4da30798aca0c61d4733f56b6831ced2b3977308cb",
+      "case_id": "el-comment-redaction-runtime-positive",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "96ace0d75d9ec4d01dc06dc80e2f2d2bd2cf37187781b4bc40765511f6e6f5b7",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-b43c0e2e798e4f60cbf8ce677104fc463fbb426e318b8242fbd824d2a2fd92fd",
+      "case_id": "el-available-action-report-positive",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "66422e01324bed49330f84908216f46cd72e14fb3f2dcf968c1d659e77d9a281",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-b46bbe4d301af66608fc3d5360151d54c89ecb9e3ffcf16558c980eebe0c5df2",
+      "case_id": "el-relative-memory-current-fact-pressure",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "7d7e64e786bf423f86be11ce8cec363d02c4b3f4a85e9c0c15efc4ad07b11a27",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-b4e18f294ea8dcd0dadbcbaa5c50e5c9981b09d93066b03625eb9da647dd7add",
+      "case_id": "el-declared-upload-budget",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "2e80fa4dc1da4cf1967aa9050d047f050db066dd41be8902b60787f84ac462b9",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-b4f84c03467cd106bd80890d197d97bafbb86078a6132b16101fc9d691cc8ccb",
+      "case_id": "el-docstring-rejection-not-runtime",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "cd26aae8fec7834016af1c9767744ad0bdbe853efef030727489939399763d38",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-b52a9d9cd6472f7d0aeb56fbb9141ea9cb5109f55256a558973daffadef3f4c4",
+      "case_id": "el-declared-upload-budget",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "2d398e79686286388625d6f8d88f37d6b142611c8cbea63c1cbcee998545aca3",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-b6252659362e750057889d8a11c3362a0917564550f2e32edba7ef48c690af59",
+      "case_id": "el-cross-file-import-attribution-positive",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "6a3b51269b8492e94f7c72c76370ef31fecc1dc7f916f5a7db022ee057faa817",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-b76a06f7fbf8127a064bf77576089b9859e3789c76abe985c9b3d305965f89ed",
+      "case_id": "el-provenance-check-invoked-positive",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "5ef57ed3ba28bb05ee1836da9bfe75213b89ccbcb8ecde076443bf53a731c54c",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-b7c798a13cf987cd2445ef1632297448c65c173704a4b8b6ff0ddb1102dda3eb",
+      "case_id": "el-provenance-check-invoked-positive",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "f8d61291c090323adef104931be9e1ead45d8322017c2f1111014a83d8762250",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-b7f589600d939f14a349a0b26c9a216a48bbec0e5da2907546166e580e023235",
+      "case_id": "el-invalid-action-path-no-invention",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "4851081d0d96e37ef7e077c745419b91cabab3b57a5f0054d927c0cbd5e39145",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-b881c6927604a5afbbbcd670162b87057beaa8b1e48243c481b0207fdf4a555b",
+      "case_id": "el-declared-upload-budget",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "4be3d4829622c3b43c368aa080bd352447bdf6218e31f0dcca34e418d787192c",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-b88ea942f1d3398f4a558539bdc70ab554468487bbc4038f5c71ad2eea5baef4",
+      "case_id": "el-docstring-audit-not-runtime",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "fa6a42b36f808c9854cb040c2f292799cc4a20f7b0e7023f1b4eec8439247e52",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-b8a2ac48d4b33c58032b5794029313770f4386c3a6630df40fdde93af7ffdfdc",
+      "case_id": "el-enforced-message-ceiling",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "087500174075a6c3a026aed86da79ba859fb0bda6e45a4481d483831bf06381a",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-b9c79b2250ebb9f9b7dfb45dadeb7fe21067d41a6d97349738e41852e2af1631",
+      "case_id": "el-enforced-worker-budget",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "f5a7aa51e9f311d68c2aa950fe6e0f7ab82c55fa6d6acdb57b309845905f444b",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-bbabb06b57cf33ae7f26cff5bfec626fea6a1fb74b45b34ef45a15de7fcd0cc7",
+      "case_id": "el-declared-tag-quota",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "f2237c9ddf836de60803f237c47beb486d64fb483754cff4a73054dc6a518445",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-bce0476f1e25a098c2c283d33c4f3592bb4128611e6b6856cc95cf96045ef03b",
+      "case_id": "el-invoked-round-up",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "0335465dcbad81add2f87a179b0601916cc424524037309f91f4684e233d2954",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-bcfea065072ba0cdf93a6d3593c9b75809cf4d9de8ad988d34dcd10159c67d6e",
+      "case_id": "el-docstring-rejection-not-runtime",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "0653704403a334e4cd8ca5f347c768631788457cb81c07783b554cb180904306",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-bd1ffdfe2a685dacb1a0f39790ded6c4b7258bac3d5e71d0a8f46c1dbbbf32a8",
+      "case_id": "el-enforced-preview-window",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "a78ab749907f67d31b780d8fbe43953205a4cb990815002f09d93eb43a43886d",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-bd82bdab06128a59b6724dc91b8a0fdf773d0d8d40dd40e6ead6283cbcf6af60",
+      "case_id": "el-relative-memory-current-fact-pressure",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "882c1900eaa712671df7e3a6f1858a1420fc39ed48fa27c0461ea31454391087",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-bd9ac24aa3bb9483031f9de7521e1d2a61932e57e23692a3aacb1a1bddfb853d",
+      "case_id": "el-invoked-base64-decoder",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "c05611524da5f76fd6601f426db7790eec5dec1b8034e4b1f89badb92b39b77c",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-bde76c0deec210898346122b6ca1fe54781e09020387033fcaac28d7d670507d",
+      "case_id": "el-relative-memory-qualified-attribution",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "7fe42c7d7a24fcc7599600785b9546567c49f33df44fdbf4a4ee57c82e13a93a",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-bec43ebfb48b28d125d52c251df6877aaf4806fd6717c45592f3272c73874325",
+      "case_id": "el-docstring-rejection-runtime-positive",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "27a2561ccdbe8000f166e73fb6fe4e04df78c36a9a81b231369ff0daae291347",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-bf1bde1bf15ed0dafd20adb2bd9f3380e546e18dc257b37158e26bcf4ec48b71",
+      "case_id": "el-completed-action-report-positive",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "18da6498641bbfc6aa1fd73a38b8ff0952d68f76f03455e0bb33f6da1729fe45",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-bf42dd0bb01285c5fd74ec126a89d17864a7fc8bcb814847138094211150e69a",
+      "case_id": "el-relative-memory-current-fact-pressure",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "e4ca5fa56f4cef440eca21f9c06dd4bbb96064df1f8671f7f6662cf52b5dd8be",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-bf68b56d04a528a6f1de4bbfebe40f93dc3b2ab4a797252488fc6cc091a120ee",
+      "case_id": "el-traversal-action-report-no-invention",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "93ec56bba72583acb4a7143867e43a74b06d93a36cf8d40b462b850257b305da",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-bfc2a1d7e5f82c6d0d6e138311849b7dd1dddc9731e70358a449562b90f5af8f",
+      "case_id": "el-invoked-round-up",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "15695dd3abfc246bb8074bec948e28a311aecb40159532f5d5fb9f0ac6b2991f",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-c0587e57cf615164861ddc4d3ffad24f339cc341be2d90dd6fd926493009156b",
+      "case_id": "el-docstring-audit-not-runtime",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "fc817fa61091ac249a54b91e3a683fabe28aa94533c2d423121503eb435ac606",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-c1d14bf42ad789f1804ccd06709f568f83f432c0f3053e1f2a9109b5d5cb210f",
+      "case_id": "el-docstring-rejection-runtime-positive",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "8b839cc1ce2880a27e585a61f44dd6916f73cb58fff384b2e81c9fac1a057bc0",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-c1f52f2a7827e4a6a3454bcde803d68999214da1096f769f5dd7221548b1aacf",
+      "case_id": "el-missing-action-report-no-invention",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "b5f98a139388cad2a0ae5e1ed7e5ca345d232484ad480810c03ad76d69bab98b",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-c273003841d31da17bbdfa766826735959974be5cccfe9c29d85b3e6ece0eda0",
+      "case_id": "el-invoked-round-up",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "15695dd3abfc246bb8074bec948e28a311aecb40159532f5d5fb9f0ac6b2991f",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-c2755f68d49a59cba49e5dacd5eb0ca917994d2c26b1c7e7320b85f244876669",
+      "case_id": "el-invoked-url-parser",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "459c1016072c10397a40ae7a7b31c44d72aececeff07d37118e0094edb87031d",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-c28cb7a4c14866fe74d35c064132cae64f388ecf27da5fa34b1451ebb3998de4",
+      "case_id": "el-completed-action-report-positive",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "b5efc7f786cefe125350a4628f4dee8e5307edbc5a272a7e1b4b8b67cff0602b",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-c2a15b6b173f4b0d229664df2ab2b3f7392f21d92a05e79bea40c1c6a9d93bf3",
+      "case_id": "el-declared-tag-quota",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "d08a86ed16935d322e974780b5db8c400a9819eed013c18ffc9d305ce5f4b361",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-c2ec8d05ddeabf749f5291b04f0d6c26d87c6b9373f086a39996eac3722373f3",
+      "case_id": "el-imported-hasher-not-invoked",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "5b646529c50a6fbbba730176567a1a4cb328d473c34814b8b7dff2078777872d",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-c30789ae3b981d1e017d88551a1ad25f061f9e0022a9b12c6f07f7d4e5856f4d",
+      "case_id": "el-cross-file-origin-to-target-pressure",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "dd4e0553094662dc2896cb03050647d781ff6b49647f4c9f347fed77ecd0a530",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-c3989cbbc8d32b55801859a776ba8db71f37a1dd9f6cb29173325e00adffeed3",
+      "case_id": "el-missing-action-report-no-invention",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "7b9f5a24fcfb7c8cb50a90bca2ee34c7a261a0c19e080b32fcaefab14c95c612",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-c46fa2f7f8a3d252d86210e461f8a203ab2d3602d73249ba118b5204bafbe3e8",
+      "case_id": "el-invoked-base64-decoder",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "44481e0bba57c25b05450b7fcaae64fde18b51109e805e619299081cfe0dba4d",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-c48fcf1d9fe5f3cda73be68e3375f2d19e4f1d241b1d08474209ae663f58652b",
+      "case_id": "el-imported-hasher-not-invoked",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "5b646529c50a6fbbba730176567a1a4cb328d473c34814b8b7dff2078777872d",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-c4981ef463427ad6f6981de4b22f689ad4f1a527bae07dd954500a65e82832f8",
+      "case_id": "el-declared-retry-policy",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "d3af58e27eb7141e4de870ff526958682e5320d4b6cc2634328f640a86f02ce3",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-c57a26be254504b877ec9fc38bcfa4b636df8d18bf8edcec7d6b5097d014f0b4",
+      "case_id": "el-imported-hasher-not-invoked",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "eed4ae1cb1ebf2aee6a8af6be4a8a66908e9b6623b297d1e323464fe6cf77afa",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-c6110c899334f1b82ac4ace4fdac5c348165b81194f779461e1e1a532f7a54db",
+      "case_id": "el-imported-parser-not-invoked",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "dc28289e655fe195952a33ad2373f1dbd5df138e5c929f10e18aacf3cf5752b6",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-c6b93cb0e856d0345b4e0e10e43a5b572b43db0ffc1562f955cf161ca9614407",
+      "case_id": "el-declared-retry-policy",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "d3af58e27eb7141e4de870ff526958682e5320d4b6cc2634328f640a86f02ce3",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-c6d8db9d886da570357083837d963703a7a45ebf2083363c7945094b8e9bcd6f",
+      "case_id": "el-relative-memory-qualified-attribution",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "42afa21866eb6d93559f1cc1daaa1f733ddfe60440d7220373b1aebc8f45013c",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-c73ec33fc464277d7b4f731c8bfaaf7b45f2d7f515979d9fb353fb1f55df1e71",
+      "case_id": "el-relative-memory-current-fact-pressure",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "7d7e64e786bf423f86be11ce8cec363d02c4b3f4a85e9c0c15efc4ad07b11a27",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-c75fa2f314d841757589de542da789a9d7e3665807bc8b9d28a4054b7615da30",
+      "case_id": "el-invoked-base64-decoder",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "44481e0bba57c25b05450b7fcaae64fde18b51109e805e619299081cfe0dba4d",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-c78a06b416a2c548c899ea7e64538bc86b83f2bb927ae06b4efb823d62f71c8e",
+      "case_id": "el-imported-parser-not-invoked",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "b588934711b5127524f220053bd172a27002025b570251527e746c75c979b2eb",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-c80db17dcf4a45dd3f03f63237c7b2385e0062afcf59a7cc97b25d66909c60ab",
+      "case_id": "el-available-action-report-positive",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "2c5a5541e8c767c4ae5a5ca29f847825b992a602b1295ba202f10031381ae77d",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-c8c0831cc04a6ad7969bf05ce81fe3968ee2a67277865318abd438a1fdc88ed9",
+      "case_id": "el-declared-upload-budget",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "2d398e79686286388625d6f8d88f37d6b142611c8cbea63c1cbcee998545aca3",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-ca01332e6147b5f3b13d589db8b00af704240ea340d51c4f883dab5b774d1c7f",
+      "case_id": "el-docstring-rejection-not-runtime",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "bcd2ae611199fe92bdabb4a6c479e8dec58717de32cd4ee88f439c53e340bb0b",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-ca38e3681c7158e30af805285400695dd4fb19617b7ad1c8c29604c6df1fe2c1",
+      "case_id": "el-completed-action-report-positive",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "43968a657128e793b7a38ef26a37b970ed2d05fd998e9ec1e2fabb292e0575ea",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-cad500907cc786a3a485862ff408f1f72b7e2b7028fa2254109bc35e9e423c0a",
+      "case_id": "el-completed-action-report-positive",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "18da6498641bbfc6aa1fd73a38b8ff0952d68f76f03455e0bb33f6da1729fe45",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-cb73b35a0c6258235238b41bfd7ce03decf59d2e1da539e5233570248b35856e",
+      "case_id": "el-available-action-report-positive",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "2c5a5541e8c767c4ae5a5ca29f847825b992a602b1295ba202f10031381ae77d",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-cb94503aab600a9be37d68082d4a1d3941462f7e48d0d3fd6c502f393eb549e5",
+      "case_id": "el-declared-upload-budget",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "4be3d4829622c3b43c368aa080bd352447bdf6218e31f0dcca34e418d787192c",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-cbf68f55a27492c0f230439579cc543eed3f9af17da85060ceb10117b8a46f68",
+      "case_id": "el-available-action-report-positive",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "66422e01324bed49330f84908216f46cd72e14fb3f2dcf968c1d659e77d9a281",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-cc01fbca99d53ba2e4277ba4ede25e73fad2ec4cbfcd351068ca9011270b0efd",
+      "case_id": "el-invoked-base64-decoder",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "44481e0bba57c25b05450b7fcaae64fde18b51109e805e619299081cfe0dba4d",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-cc604b1f764c5c1f03850e5363df662f5aee419e4dbf5306a19575b074dbd0a9",
+      "case_id": "el-comment-redaction-runtime-positive",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "ab63d2b24e2f430b25024719444cdf5d986f1724a20a40bb2e0658ac599adc71",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-cd34e03b71c029ecf51d937c0c300a2c04c6bbb69c6a890d7d1848dfa0261ea8",
+      "case_id": "el-rejected-action-report-positive",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "23d66bd9a24f2365a1beab8e98c11130fb036e6ed11efbec243d9999fc5c383b",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-cddfff60224a5f258d27d30d84f4d2c8001ccf479c0b5688b279a53ed754b92c",
+      "case_id": "el-cross-file-import-attribution-positive",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "6a3b51269b8492e94f7c72c76370ef31fecc1dc7f916f5a7db022ee057faa817",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-cdfe68d4c3c1ffeb69e38cb91a6734cbb018acba1df418f7c0aa81c07fe7babd",
+      "case_id": "el-declared-tag-quota",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "f2237c9ddf836de60803f237c47beb486d64fb483754cff4a73054dc6a518445",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-ceca0746b8625221af0a714d2a3f22a61d30f0de1ca1d66031b07c67b7804a8c",
+      "case_id": "el-relative-memory-current-fact-pressure",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "882c1900eaa712671df7e3a6f1858a1420fc39ed48fa27c0461ea31454391087",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-cf20cea1197792cba4b71208588735f6720d50c2c35a84a660c6ac806ed5a204",
+      "case_id": "el-available-action-report-positive",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "66422e01324bed49330f84908216f46cd72e14fb3f2dcf968c1d659e77d9a281",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-d0a6c40ae175490ff21ecd8412134d820d6457189a945b7ed1d4e8a786ee1903",
+      "case_id": "el-docstring-audit-not-runtime",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "0a44afea0ddd9b383976439a5a375ace3789261c59ff3f140059291e839cb80d",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-d0b2580bbe96592b537a460a6dc1b94d23bf742bb5af61db4ac156602e0b6d23",
+      "case_id": "el-declared-retry-policy",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "2ad2a2b7945012800d21d24b46fa13ec98b5a1cc8c9853678617f5b93d4657d8",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-d11a93b99b375608393895282679d984201e53334cd35e5c475f31ad830f32f1",
+      "case_id": "el-enforced-preview-window",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "a78ab749907f67d31b780d8fbe43953205a4cb990815002f09d93eb43a43886d",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-d153e0b7a8177ca334faf16c328b8f49b65bce3ac82da61a5f2bb001752afba6",
+      "case_id": "el-missing-action-report-no-invention",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "7b9f5a24fcfb7c8cb50a90bca2ee34c7a261a0c19e080b32fcaefab14c95c612",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-d21e9ae144db9b5674b64d192a59f53efa16614f0abff24e6690985a78fb94e0",
+      "case_id": "el-declared-tag-quota",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "6e00317dc958bb5615cabe08b14f9dbef96e4425f649873d3cfd2e1c05bf717a",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-d2c8eddce60e34d9cf85f69b12f200d4cc01560479e4a7c53fbe6b0ec463e951",
+      "case_id": "el-provenance-check-invoked-positive",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "5ef57ed3ba28bb05ee1836da9bfe75213b89ccbcb8ecde076443bf53a731c54c",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-d2fe186a79ad51bf89c276847cd3ff00c85eae31884b59f89d4cb933de67b4b6",
+      "case_id": "el-comment-redaction-not-runtime",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "1ea6f6d17d971ed44b452a43f12cef2b794421778415391604b6b81c89e14f34",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-d36118b0247c74eacd2db9a1425a918aba4dabfe776df39534c038f45cd77b90",
+      "case_id": "el-completed-action-report-positive",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "18da6498641bbfc6aa1fd73a38b8ff0952d68f76f03455e0bb33f6da1729fe45",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-d391c53383e040b56235ca5c38eed4848545af1aa3af3dd0253e0d4649a01ea3",
+      "case_id": "el-invoked-url-parser",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "419844b7967e7d5b88f100d9adf001f5ee827ab4906b07dc1dd1f3decf7a83a6",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-d4114406c56939deeaca38180e9fe91249049412dac438a00543fc79e2218c0d",
+      "case_id": "el-provenance-check-invoked-positive",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "65f6286a6d64e7c45283164c28431b882e4da2d70504851443de3ca58580e829",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-d514b9eb3fbcb6948ec9cc835a2ae7b320c53f6de82281ab50453d3d490e291d",
+      "case_id": "el-declared-upload-budget",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "2d398e79686286388625d6f8d88f37d6b142611c8cbea63c1cbcee998545aca3",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-d5179f0149cca278dbb3e25ecb9b7d467146be2f32dcd99058a1d369f7dfebb7",
+      "case_id": "el-traversal-action-report-no-invention",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "93ec56bba72583acb4a7143867e43a74b06d93a36cf8d40b462b850257b305da",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-d517f2acf9871bfd36ff9ddb253a890776b64742ede7e41d4519e999648cd52e",
+      "case_id": "el-completed-action-report-positive",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "b5efc7f786cefe125350a4628f4dee8e5307edbc5a272a7e1b4b8b67cff0602b",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-d5d1dbf23ac92bd33f85f426218882bb27f8ecadaa5105806bdbc9d1ecc11533",
+      "case_id": "el-available-action-report-positive",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "2c5a5541e8c767c4ae5a5ca29f847825b992a602b1295ba202f10031381ae77d",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-d7a18a2626e844c84c1be9567f9434b29720501dee1b957eebe753a0faff9b62",
+      "case_id": "el-docstring-audit-runtime-positive",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "772c794c6870da1597b6db864dae4bb3400918543f81fde7571a849fd59adb4f",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-d8aaa935a5d521bbaaf464acc2c6eeadff667cdbfc50f625259b6331e08730ce",
+      "case_id": "el-enforced-message-ceiling",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "e1aa6a38133324c593033b6e6a33b2c202d671dfae4a493edcce8ca91a80c8d6",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-d901a0254bd9a21f6be76ddb260823a09f83383aafd0f291b39144458d0a3656",
+      "case_id": "el-invoked-url-parser",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "459c1016072c10397a40ae7a7b31c44d72aececeff07d37118e0094edb87031d",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-d92d5ff1cb8edf7e4914051717ba1c2c3c349a244a3d9790f391f96ba9fa39e1",
+      "case_id": "el-imported-parser-not-invoked",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "52837af1ce51c8ec0cd7548e2fd26fb01dd1e398d13294326ea0ef1217f5202f",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-d92eaca73bc5b93596f601a705991f84690a9799685001968b164ed7eca4dbba",
+      "case_id": "el-imported-path-not-invoked",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "667a01873e09d3a43d8b03fda641362b8480ca8f377f6292f380260a518e9a6e",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-d9b956cca969d2f707f92814edf9292f742e60a0cea3c3ac4ede07899cbd534b",
+      "case_id": "el-docstring-audit-not-runtime",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "fc817fa61091ac249a54b91e3a683fabe28aa94533c2d423121503eb435ac606",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-da055fc2f8dd502533b2e4be9975b1855ee203f0058940b03936ffef7cd2dc4d",
+      "case_id": "el-invoked-url-parser",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "419844b7967e7d5b88f100d9adf001f5ee827ab4906b07dc1dd1f3decf7a83a6",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-da06d15eaf6b37c7c60af356e06d1133c2a41f4a316fcf04cf6b474b86c448c6",
+      "case_id": "el-invalid-action-path-no-invention",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "3cae508beeb5493d8aaa09693c115a098dfb86c74c30e2cd5d4729bf7312e9d7",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-da3845f497c0f57adb59ab749413eb081ddb6a76db87a7418fc6a124b24b5921",
+      "case_id": "el-invoked-round-up",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "d19b8d0d1a82b7bf8a0ecb9746b0d7388536e10083df996873f757725f485cdc",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-dacbd5f18edc37b9e601ce84b628efe14dc8ea22438e7e641e9a21f5a758552d",
+      "case_id": "el-docstring-audit-not-runtime",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "0a44afea0ddd9b383976439a5a375ace3789261c59ff3f140059291e839cb80d",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-db767ef44abfc26881732193660a6e542f40dea03d5dab3473a0eee915cb2910",
+      "case_id": "el-enforced-worker-budget",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "f1d602987ef273603dd94ea424374595c58b17309af492f3e6dc706945d6aef1",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-dc0b2aa53d50f28716bcf461f3a6cf447b711bf2912d2555a16a8f5743edbfcc",
+      "case_id": "el-rejected-action-report-positive",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "23d66bd9a24f2365a1beab8e98c11130fb036e6ed11efbec243d9999fc5c383b",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-dc522eac2255a1e1d916d33089a93a2ca7a5177c6d6ddfd34dee41e0c3ee4343",
+      "case_id": "el-imported-path-not-invoked",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "667a01873e09d3a43d8b03fda641362b8480ca8f377f6292f380260a518e9a6e",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-dcad27a29a0395b271bca243fbe7f504cf7ff95b7f557029316a54dedff05d6e",
+      "case_id": "el-traversal-action-report-no-invention",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "7609ee3626159fce1cef022f847a13ce0a8db419ce94ce1063c3220f67e2babd",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-dce95686ef9a10773dbcd5c211999bab7ae0c831f61a5b15315bd948589aefc4",
+      "case_id": "el-traversal-action-report-no-invention",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "af8573abf721a1e06aaaaa6ef74e021882109212a252935a2830886e25bbd899",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-dd46ac4b13214dfae6a0eae8ad680ecab20504f64da5cf4c48215829ae90bd4e",
+      "case_id": "el-docstring-audit-not-runtime",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "fa6a42b36f808c9854cb040c2f292799cc4a20f7b0e7023f1b4eec8439247e52",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-dd57afe1efcde6b9c27f06c6d6a86cf859f52ff15ab35cfaabeaf687da320bd2",
+      "case_id": "el-completed-action-report-positive",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "43968a657128e793b7a38ef26a37b970ed2d05fd998e9ec1e2fabb292e0575ea",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-dd6e8d767907ddc3d9b80d13a47cdc6317a4158fc36a69e2661eed8df496ef4b",
+      "case_id": "el-missing-action-report-no-invention",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "b5f98a139388cad2a0ae5e1ed7e5ca345d232484ad480810c03ad76d69bab98b",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-de39c709d594a91022f0183790f764464090249596a882e006c0a55a7cf782d9",
+      "case_id": "el-relative-memory-qualified-attribution",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "3aecbb78aaa50f0bf831d6fc13bd8ab7f436ed602706e8c246b3c5ed99756a9e",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-de3fd1b7fea9d22d54afcc427f461b8f3578263fda12cfd976b90cbc3630eee9",
+      "case_id": "el-imported-parser-not-invoked",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "dc28289e655fe195952a33ad2373f1dbd5df138e5c929f10e18aacf3cf5752b6",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-de89db1f9aa95cba44c43c535fd34baceec87e3f7a10b94eadbe7cd890ac66cc",
+      "case_id": "el-relative-memory-qualified-attribution",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "42afa21866eb6d93559f1cc1daaa1f733ddfe60440d7220373b1aebc8f45013c",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-ded443707b1da698d1009e90bf36538f55956be9bdeebb5f184411eb117b08cd",
+      "case_id": "el-declared-retry-policy",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "d3af58e27eb7141e4de870ff526958682e5320d4b6cc2634328f640a86f02ce3",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-df5363775314cf3c30cad001cd6d66a277498cbd7e6fca211b98f2a8587e7cb4",
+      "case_id": "el-docstring-rejection-runtime-positive",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "9a8109e486a7a29f0fd9d7c6114e8e8c0e763d59959f645c91f5e3dad0d78d3f",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-df60962b77dd12cfbee5c09efd69f0ce400298a4e30a5ace7d6371bbe2db5eac",
+      "case_id": "el-imported-hasher-not-invoked",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "eed4ae1cb1ebf2aee6a8af6be4a8a66908e9b6623b297d1e323464fe6cf77afa",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-dfddace17e68c8ae730730163bd16a411fde0ddcd2a8ee30321c1f22a84c0a5e",
+      "case_id": "el-comment-redaction-not-runtime",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "d91c0c0cac86375d2430c4509a2170946212da8ce080ac1318754bfe3687ee75",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-e042f9ad6f7cbc5e3d29df27035d8a77e2d42880bef4c1b68b796d9c11b29426",
+      "case_id": "el-declared-retry-policy",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "9c1e51ceb8681c671d4ab094ca747045818092d7bc7f344500a9dc2a8097767e",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-e11333788eec1b6229bc7ac72ed393fcb092e73b5ec944a76597d94120a60dbe",
+      "case_id": "el-docstring-audit-not-runtime",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "fa6a42b36f808c9854cb040c2f292799cc4a20f7b0e7023f1b4eec8439247e52",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-e11b23db1103982c2b1fa5c419f7e8b5dcc6d20824fa37cef959c74d23a82f7d",
+      "case_id": "el-declared-upload-budget",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "2e80fa4dc1da4cf1967aa9050d047f050db066dd41be8902b60787f84ac462b9",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-e29d5ba67c365ba9a1ffed14b260fd29a22d535fb7211d8f9e7e79ad6bc743f4",
+      "case_id": "el-enforced-preview-window",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "a78ab749907f67d31b780d8fbe43953205a4cb990815002f09d93eb43a43886d",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-e2f25841c7f2394d1fa63940ebd3f9b0a9bc89633f421a69b3a2b67d1c1e481c",
+      "case_id": "el-relative-memory-qualified-attribution",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "3aecbb78aaa50f0bf831d6fc13bd8ab7f436ed602706e8c246b3c5ed99756a9e",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-e495e81e2f6782e009b206d346242b90b9fa5b66755aaa86134054c1e9153595",
+      "case_id": "el-docstring-audit-not-runtime",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "fc817fa61091ac249a54b91e3a683fabe28aa94533c2d423121503eb435ac606",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-e49cbdb699bc8cc87ca5a9c03903b106ec90d102f3efc3b1046551bc99e30ae3",
+      "case_id": "el-docstring-rejection-not-runtime",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "cd26aae8fec7834016af1c9767744ad0bdbe853efef030727489939399763d38",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-e50e2e39bc717d288bce43e90dee3a2ac4a28c683baeaf7de8a5820591283df4",
+      "case_id": "el-imported-parser-not-invoked",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "b588934711b5127524f220053bd172a27002025b570251527e746c75c979b2eb",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-e5e37d993edfb5ee0fad079060e43a2a63f8754bbe5cca1a0da484d6c67dfe3c",
+      "case_id": "el-imported-path-not-invoked",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "667a01873e09d3a43d8b03fda641362b8480ca8f377f6292f380260a518e9a6e",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-e69ca3aacfdbf6452c4f7f33689b849dbaeb8bd05ab65c27aca391c90b1d4899",
+      "case_id": "el-cross-file-import-attribution-positive",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "6a3b51269b8492e94f7c72c76370ef31fecc1dc7f916f5a7db022ee057faa817",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-e6e512735fa6050622b5372029968d6419ef9cfdb4c5a09db4bde5e10525eaf0",
+      "case_id": "el-imported-path-not-invoked",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "ae7b0a431c79ca31667efa1d739dc8346d556f2734ddc69114a8e105bd5fc248",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-e7bef55060b336affc502b62f3cd4b00bc408efb8b7f534c34129d5dca43f473",
+      "case_id": "el-invalid-action-path-no-invention",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "372add322b8ade723c08b4e94641ac82a7a5047cff74bb64939215ed177db530",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-e8056fc6e45e02706ffef0069f71de9485a47d18299e542e9c3914810c2f600e",
+      "case_id": "el-invalid-action-path-no-invention",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "372add322b8ade723c08b4e94641ac82a7a5047cff74bb64939215ed177db530",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-e8779ec5574eacd9b2e61ecd7237544fb0b0ab46b74358002cb46812bcdd7018",
+      "case_id": "el-provenance-check-invoked-positive",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "65f6286a6d64e7c45283164c28431b882e4da2d70504851443de3ca58580e829",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-e8b140c35d1af850f0b79ea1722d626df0240d20237cec1303d17570e8b955c8",
+      "case_id": "el-missing-action-report-no-invention",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "7b9f5a24fcfb7c8cb50a90bca2ee34c7a261a0c19e080b32fcaefab14c95c612",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-e906c5d3cde7094a978ad049aa684a94c7d32d0442cd82102e3822afdb844179",
+      "case_id": "el-imported-parser-not-invoked",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "b588934711b5127524f220053bd172a27002025b570251527e746c75c979b2eb",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-e9cd100db547e181ddbd8e580aed2b22bad8c1c90577ec60a871eca89dc488e7",
+      "case_id": "el-enforced-preview-window",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "1bb64ea7f60b1ac5ef56ff61815e88836c515467ff7b3485e5ecc2b8aa39de11",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-e9d7b4eea35ce7dd7b2397bee1317a21366335183db0470a5db943ec4ab2ca23",
+      "case_id": "el-docstring-rejection-not-runtime",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "bcd2ae611199fe92bdabb4a6c479e8dec58717de32cd4ee88f439c53e340bb0b",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-eb7b9848f7a0c5474f8373807ffce689a3ded03b152f72ed5b6d5b34292b0faf",
+      "case_id": "el-relative-memory-current-fact-pressure",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "e4ca5fa56f4cef440eca21f9c06dd4bbb96064df1f8671f7f6662cf52b5dd8be",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-eca7de6addedac2a0d6469b1ed019635d9ac40c2ff729fd116e1f20bcef5a328",
+      "case_id": "el-rejected-action-report-positive",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "904504d8eee476eea4e4df3e8815abd508036abde0a0389de2aabbe5bec1a2de",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-ed1644a38f2bb2dc1dd00029f4a30906b3ea72209869e46024b553ea10ace79c",
+      "case_id": "el-completed-action-report-positive",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "b5efc7f786cefe125350a4628f4dee8e5307edbc5a272a7e1b4b8b67cff0602b",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-ee95d985b7e83676bcaf546416d980aed776ce67871df6a8d558ab85d416de72",
+      "case_id": "el-invoked-url-parser",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "459c1016072c10397a40ae7a7b31c44d72aececeff07d37118e0094edb87031d",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-eeb24079cd9c2140bcad9d486909741847e8233bb351b2dc746304caef1ca01b",
+      "case_id": "el-invoked-url-parser",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "03ee9b4f22143e7d706054853327efe204c549b14d84f1ae8b73cf0fb3d80c05",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-eed0b425fe10812a86121dd98fbd8ddfa9e23eee266900ec13de50782728cb74",
+      "case_id": "el-invoked-base64-decoder",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "3275cb89ed2cee1d2a8222027356f3659ac0ab1c70dbc658cb36066b7c59ec4b",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-ef11d96a5ebae08f9da33890b1d1710689289fd5b5c59328273241e56e4a1cca",
+      "case_id": "el-docstring-audit-runtime-positive",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "772c794c6870da1597b6db864dae4bb3400918543f81fde7571a849fd59adb4f",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-ef5533e1e046664c206b09ca32267cf61744f684f4d1003810b814dc54bbdde6",
+      "case_id": "el-comment-redaction-runtime-positive",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "ab63d2b24e2f430b25024719444cdf5d986f1724a20a40bb2e0658ac599adc71",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-efccdec1258adb06a47f2610ea7a70ed0765567cb97a067330338cdc54854044",
+      "case_id": "el-imported-parser-not-invoked",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "b588934711b5127524f220053bd172a27002025b570251527e746c75c979b2eb",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-f195e45e6cc742442eca0d67f5faf65acb866246f345f2f3c0335417814c7854",
+      "case_id": "el-available-action-report-positive",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "0e3d2f3ea43667bdb9bbf0dea2598ef26fa982131be2f3800316993648a39ec1",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-f1c3ff3223d606cc50ee80ffa49b15057d5125a0e0c65d6d26f1b6d6e5c91472",
+      "case_id": "el-rejected-action-report-positive",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "904504d8eee476eea4e4df3e8815abd508036abde0a0389de2aabbe5bec1a2de",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-f307bcb42a0f7590bc103d825bc6c937bd2ce9ce1e28ebd8d7fa6d12c6a567dd",
+      "case_id": "el-comment-redaction-not-runtime",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "d91c0c0cac86375d2430c4509a2170946212da8ce080ac1318754bfe3687ee75",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-f35b30d2fe0ca5445d08a2f9b85a474a711d9117ca548d232b7d0aeb9a3593d7",
+      "case_id": "el-missing-action-report-no-invention",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "cec4a1a7b4c2038e04af0711b7bb7b0eae137b46cc7e792072943d1065504ae6",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-f3d26a7a3f5d82afd248122c5e663d9ad390bd825ceda4c48e29295de7c8f146",
+      "case_id": "el-docstring-rejection-not-runtime",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "cd26aae8fec7834016af1c9767744ad0bdbe853efef030727489939399763d38",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-f458c51d4306aa68d57a978c393fd7a6a88d8d445d6836c16d1c11d3f94d65b4",
+      "case_id": "el-cross-file-origin-to-target-pressure",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "cedc56ffd8762ce83f2783f2e8de1a6be9aeaf47b27fc5b0ea50a5bd028b15ba",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-f4a76975df5a3dcefabf64f3ff5a5db064b085ff46b08327907dbea48c3e74f4",
+      "case_id": "el-enforced-worker-budget",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "f5a7aa51e9f311d68c2aa950fe6e0f7ab82c55fa6d6acdb57b309845905f444b",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-f57f145a7f217e17d494a192ca1c00d6dfda30234e127e890519bfc229ac4e23",
+      "case_id": "el-relative-memory-current-fact-pressure",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "e4ca5fa56f4cef440eca21f9c06dd4bbb96064df1f8671f7f6662cf52b5dd8be",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-f5b8c2ce8a9a894159dfa6ab626eb8fc4c31856132dede12572b14a571e12a15",
+      "case_id": "el-cross-file-import-attribution-positive",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "696c20e23b6329971f3bed399c09ae0b0a117d73571c196d4cdf0959f213bd56",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-f61ae42d05e3660dd4fe19c6a1732f632facc7a8a309781b931bb534831ddbda",
+      "case_id": "el-docstring-audit-runtime-positive",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "b055a9379295bc1805f7776223ddc5910909d0b686d368a8ae348da939055a77",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-f6434ac2805e3579f80204c9e0ccc5893491bdfdfab0aad9bec5b1d6002dc497",
+      "case_id": "el-imported-path-not-invoked",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "ae7b0a431c79ca31667efa1d739dc8346d556f2734ddc69114a8e105bd5fc248",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-f647a1d0c9e8d454a4b68d6f23ea68cd1d995197afdec29f4f42367dc3170e97",
+      "case_id": "el-rejected-action-report-positive",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "23d66bd9a24f2365a1beab8e98c11130fb036e6ed11efbec243d9999fc5c383b",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-f725ce9975415d725e5e4072d9cd5f75590e577ef05d94d77d223e7f367f4c47",
+      "case_id": "el-enforced-worker-budget",
+      "condition": "style_placebo_enforced",
+      "raw_artifact_sha256": "f5a7aa51e9f311d68c2aa950fe6e0f7ab82c55fa6d6acdb57b309845905f444b",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-f7372042fc11a6507341bd7d6b7492031b3877ce8996a613021f338b9782067e",
+      "case_id": "el-invoked-url-parser",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "419844b7967e7d5b88f100d9adf001f5ee827ab4906b07dc1dd1f3decf7a83a6",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-f782df38e987de3f1b5f6efaa5de3f6347c63b6d4605339eb6ec1ae9461cd114",
+      "case_id": "el-enforced-preview-window",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "1bb64ea7f60b1ac5ef56ff61815e88836c515467ff7b3485e5ecc2b8aa39de11",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-f8aba09d76ca151035d88e7e189366313d970113374b56853649be073c08aac9",
+      "case_id": "el-relative-memory-current-fact-pressure",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "7d7e64e786bf423f86be11ce8cec363d02c4b3f4a85e9c0c15efc4ad07b11a27",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-f9dca3eb7f993d5ee9d3635075295ec814c4482dc83ef2be515d4e26b02da088",
+      "case_id": "el-traversal-action-report-no-invention",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "93ec56bba72583acb4a7143867e43a74b06d93a36cf8d40b462b850257b305da",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-f9dfb27f8e48c1d0653fc7bc73eceb09cea8bd44376480f53e7f586894a62fff",
+      "case_id": "el-declared-retry-policy",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "d3af58e27eb7141e4de870ff526958682e5320d4b6cc2634328f640a86f02ce3",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-fa6b574ffe40c2f3b1cf1c7a9f2588ff732d591fdfece6c41ee4f2c85c69e3ea",
+      "case_id": "el-invoked-round-up",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "15695dd3abfc246bb8074bec948e28a311aecb40159532f5d5fb9f0ac6b2991f",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-fa715244f46090efebacd640472bad5b6f6d119426cc40b47f7053c25c5950b3",
+      "case_id": "el-imported-hasher-not-invoked",
+      "condition": "ar-label-placebo",
+      "raw_artifact_sha256": "5b646529c50a6fbbba730176567a1a4cb328d473c34814b8b7dff2078777872d",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-fc14ca133c521c5ebd749d1a89da1eeec886c8414de23863535c403763c6db04",
+      "case_id": "el-comment-redaction-runtime-positive",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "ab63d2b24e2f430b25024719444cdf5d986f1724a20a40bb2e0658ac599adc71",
+      "seed": 43
+    },
+    {
+      "blind_id": "blind-fd9d1de3a4f2372334f839cdcd6602f0ffe853a9eaaaa0c8030b8e422557246b",
+      "case_id": "el-cross-file-import-attribution-positive",
+      "condition": "ar-label-only",
+      "raw_artifact_sha256": "696c20e23b6329971f3bed399c09ae0b0a117d73571c196d4cdf0959f213bd56",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-fda2bac866df29171bf2ed02122abd55d8628f19222c43422340c680adfda04d",
+      "case_id": "el-provenance-label-verification-pressure",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "bddc1033d0cf08bf35bcee02e51b9ecc6db938198e829aa18993130694c62eda",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-fe8f225e1ec72fe878edc746d5e8b511dfd9e109916c927a0fcef1eda400afbc",
+      "case_id": "el-completed-action-report-positive",
+      "condition": "ar-consumer-rule",
+      "raw_artifact_sha256": "18da6498641bbfc6aa1fd73a38b8ff0952d68f76f03455e0bb33f6da1729fe45",
+      "seed": 44
+    },
+    {
+      "blind_id": "blind-febb1ca47176fd6a8f2ab5a550985ce3e0dea81933cac7184eec6e7988df32bf",
+      "case_id": "el-invoked-base64-decoder",
+      "condition": "evidence_enforced",
+      "raw_artifact_sha256": "44481e0bba57c25b05450b7fcaae64fde18b51109e805e619299081cfe0dba4d",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-ff84ca236f059bfaef016429942efcfdbbf7584643b7339cf8314b9035133e2d",
+      "case_id": "el-comment-redaction-not-runtime",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "1ea6f6d17d971ed44b452a43f12cef2b794421778415391604b6b81c89e14f34",
+      "seed": 42
+    },
+    {
+      "blind_id": "blind-ffb8d7cbe0ceff45e1a76587d9eb2c3d2c487561dceb3be68fe803281cf7a5b2",
+      "case_id": "el-invoked-base64-decoder",
+      "condition": "opaque-label",
+      "raw_artifact_sha256": "3275cb89ed2cee1d2a8222027356f3659ac0ab1c70dbc658cb36066b7c59ec4b",
+      "seed": 44
+    }
+  ],
+  "redaction": "blinding_secret_hex removed; row identity mapping retained",
+  "schema_version": 1,
+  "secret_sha256_commitment": "52a8c6787c3dd0c2f9ebaf7802f6685a471707571b60e1eabc24e75a04e66307",
+  "source_blind_key_file_sha256": "a8d37297cca48bca4dacd18aee36d9323d0cf53847fb0723516f294168a8e86d",
+  "source_key_sha256": "af074693d9b7518aaeee97a0879509e9353ca5d22b1f73f59d74b46ed4aaacc7"
+}

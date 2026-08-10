@@ -1,0 +1,59 @@
+{
+  "bundle_id": "songryeon-arm-public-evidence-v1",
+  "network_used": false,
+  "omitted_sensitive_or_unnecessary_sources": [
+    {
+      "aggregate_sha256": "67a550414821f9117b0f4990115d8bbae429fd07462cb1dfe081d3753ca3e6ef",
+      "count": 90,
+      "reason": "contains prompt/attempt internals and may contain hidden model reasoning; final answers are available in condition-masked blind packets",
+      "source_class": "90 raw model-call artifact files"
+    },
+    {
+      "bytes": 168416,
+      "reason": "contains blinding_secret_hex; sanitized completed mapping published as data/blind_key_public.json",
+      "source_class": "original blind key",
+      "source_sha256": "a8d37297cca48bca4dacd18aee36d9323d0cf53847fb0723516f294168a8e86d"
+    },
+    {
+      "bytes": 376039,
+      "reason": "contains absolute local provenance paths; all counts are deterministically recomputed from public rows",
+      "source_class": "upstream unblinded summary",
+      "source_sha256": "51ae979e96128d4aebacfb8645ff7c6eabffde82b14d68ee3437bddc1c375f20"
+    },
+    {
+      "bytes": 35042,
+      "reason": "contains an absolute local capture path and no semantic score rows needed for the headline claim",
+      "source_class": "upstream operational summary",
+      "source_sha256": "0ad51fdb63e9c9d64102f36c00f476a85a469f09bb36739c876aea0847269947"
+    }
+  ],
+  "publication_performed": false,
+  "row_derivation": {
+    "deterministic_order": "condition, case_id, seed",
+    "inputs": [
+      "three locked scores-chunk files",
+      "three condition-masked blind_packet files",
+      "blind_key.json identity items",
+      "adjudications.json identity set"
+    ],
+    "join_key": "blind_id",
+    "output_rows": 540,
+    "per_row_integrity": "canonical JSON SHA-256 in row_sha256",
+    "removed_fields": [
+      "blinding_secret_hex",
+      "raw prompts and attempts",
+      "hidden thinking/reasoning",
+      "reviewer reason internals from raw call artifacts",
+      "absolute local filesystem paths"
+    ],
+    "retained_fields": [
+      "case_id, condition, seed, family, polarity",
+      "eight final score metrics",
+      "raw artifact SHA-256",
+      "blind/score/packet source coordinates and hashes",
+      "whether the item was adjudicated"
+    ]
+  },
+  "schema_version": 1,
+  "transformation_date": "2026-08-10"
+}
