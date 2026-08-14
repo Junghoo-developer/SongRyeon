@@ -1,0 +1,69 @@
+{
+  "content_tree_algorithm": "sha256(canonical-json(sorted declared_files[path,bytes,sha256]))",
+  "content_tree_sha256": "1b600778c1c01ecb844f29df42411a53e25208a519038360d8db1e4709d434d5",
+  "declared_file_count": 11,
+  "declared_files": [
+    {
+      "bytes": 1669,
+      "path": "AUDIT_BOUNDARIES.json",
+      "sha256": "5f49739a1a65a16c642f5af55e71ded505792475de902ad0679ad2a06ccd2f3e"
+    },
+    {
+      "bytes": 1353,
+      "path": "CLAIM_LIMITS.md",
+      "sha256": "2640b0e3554499d6c718cf272ef25dec2f432846998ef8453f9f357acc8cf7a1"
+    },
+    {
+      "bytes": 1248,
+      "path": "DERIVATIVE_SUMMARY.json",
+      "sha256": "c359a4160c48c0efdd45783b87b7f5a43944cf5d235fc203cbf453b71e6412a1"
+    },
+    {
+      "bytes": 4348,
+      "path": "README.md",
+      "sha256": "ff52bc61dbac230d848a821df4871bee02e82806ccbab18871879115224a85a7"
+    },
+    {
+      "bytes": 2892,
+      "path": "REPORT_KO.md",
+      "sha256": "615062e4d95930a0d45666a5fb15b134590eee20b0cf618c27166f62678885d1"
+    },
+    {
+      "bytes": 3144,
+      "path": "TRANSFORMATION_PROVENANCE.json",
+      "sha256": "383e0155725a4282fe61b378420aebc9b58c692a4f3c71fefdf3f321f698b7e7"
+    },
+    {
+      "bytes": 19738,
+      "path": "build_public_derivative.py",
+      "sha256": "5812124564ae4126f8cd7019f949b321b69de88fed508ba3967458c1cde0e6c8"
+    },
+    {
+      "bytes": 17712,
+      "path": "data/mechanism_boundary_rows.jsonl",
+      "sha256": "cc55bd0ededb787447e485e17fa5ad9efc0f6311a1dfe8610677d355fa4ac933"
+    },
+    {
+      "bytes": 5575,
+      "path": "data/receipt_reconstruction_rows.jsonl",
+      "sha256": "128a4c1650accf75304aa9e3109e6f5b38f1746130e154b16320bf9c39f20e7f"
+    },
+    {
+      "bytes": 1914,
+      "path": "tests/test_verify_public.py",
+      "sha256": "beacc425ce7b243a9f91f2cf46d3e22bff4bc3aeafcbea8a561f96a19326e878"
+    },
+    {
+      "bytes": 12003,
+      "path": "verify_public.py",
+      "sha256": "b53947c817907103bb31a67ab8d6a53fac11c9ab0a22ddd26ee9211b7ca3e1d7"
+    }
+  ],
+  "exact_recursive_set_enforced_by": "verify_public.py",
+  "schema": "songryeon.public-evidence-derivative.manifest.v1",
+  "seal_file_exclusions": [
+    "MANIFEST.json",
+    "SHA256SUMS.txt"
+  ],
+  "signature_or_attestation": false
+}

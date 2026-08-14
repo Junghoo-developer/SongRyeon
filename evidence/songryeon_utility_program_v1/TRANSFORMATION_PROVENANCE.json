@@ -1,0 +1,64 @@
+{
+  "derivation_date_kst": "2026-08-14",
+  "derivative_id": "songryeon_utility_program_public_submission_v1",
+  "excluded_material": [
+    {
+      "category": "receipt source packets, reveal material, original fixture bodies, and family-coded identifiers",
+      "reason": "not needed for aggregate recomputation; source independent audit found the packet unsuitable for external blind review"
+    },
+    {
+      "category": "mechanism raw traces, candidate identifiers, receipts, and file-separated target artifacts",
+      "reason": "not needed for the two published null and boundary checks"
+    },
+    {
+      "category": "provider traces, model reasoning, credentials, concealed answer-key bytes, personal paths, and contact data",
+      "reason": "privacy and minimum-necessary public disclosure"
+    },
+    {
+      "category": "ARM exploratory artifacts",
+      "reason": "not used as primary RC6 evidence"
+    },
+    {
+      "category": "internal omnibus synthesis artifacts",
+      "reason": "internal-only synthesis is not a public byte source and its hashes are not reused for this derivative"
+    }
+  ],
+  "identity_and_information_warning": "The receipt comparison is not an equal-information formatting comparison: the linked artifact adds identifiers, links, index, authority, and digest metadata.",
+  "public_derivative_has_independent_seal": true,
+  "schema": "songryeon.public-evidence-derivative.transformation-provenance.v1",
+  "source_artifacts": [
+    {
+      "bytes": 66916,
+      "logical_path": "receipt_benchmark/RESULTS.json",
+      "sha256": "dd2e15202418d4cd153db9e701b13f8cf90b47dada9cab3fd0675cc8a78f6f61"
+    },
+    {
+      "bytes": 15614,
+      "logical_path": "receipt_benchmark_audit/INDEPENDENT_AUDIT.json",
+      "sha256": "6473459d8cdaba927ce636bd21513c6d45578ed115a230c9813b11c82c3a395e"
+    },
+    {
+      "bytes": 128432,
+      "logical_path": "imported_threads/role_a_fixed_input_causal_v1/evidence/SCORED_ROWS.jsonl",
+      "sha256": "a4abb359236330f615f08e3139a0e5412b12a13765666130e257b6f41afc6887"
+    },
+    {
+      "bytes": 11609,
+      "logical_path": "imported_threads/role_a_fixed_input_causal_v1/evidence/SCORES.json",
+      "sha256": "018b76b2dee02371fbaa5049d046542d72684e1bd75ecb9b12a0685cb0fefc6e"
+    },
+    {
+      "bytes": 11872,
+      "logical_path": "imported_threads/role_a_fixed_input_causal_v1_audit/INDEPENDENT_AUDIT.json",
+      "sha256": "a1758b276cd57d8a6c8d17bd462c442664c115f17a22b212f7f842f4bf8b8cd8"
+    }
+  ],
+  "transformations": [
+    "Pair receipt result rows by source case identity and replace source identities with neutral sequential row IDs.",
+    "Retain only audit correctness and five-field reconstruction counts for the receipt comparison.",
+    "Pair three mechanism conditions by source case identity and replace source identities with neutral sequential row IDs.",
+    "Retain only clean-label status, authored target, output, and actual-origin R-consumption booleans.",
+    "Recompute every published aggregate from the retained neutralized rows.",
+    "Copy only bounded independent-audit conclusions needed to interpret the published aggregates."
+  ]
+}

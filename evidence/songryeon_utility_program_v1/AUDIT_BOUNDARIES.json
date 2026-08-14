@@ -1,0 +1,43 @@
+{
+  "mechanism_independent_audit": {
+    "claim_ceiling": "L0 deterministic mechanism conformance plus prototype-only L1 binding behavior",
+    "current_runtime_post_state_receipt_supported": false,
+    "l2_operational_interception": "not_established",
+    "l3_human_operational_utility": "not_tested",
+    "l4_generalization": "not_tested",
+    "plain_equals_label_decision_count": "64/64 cases",
+    "semantic_target_blinding": "fail_semantic_target_visible",
+    "source_finding_ids": [
+      "P1-STAT-DEPENDENCY",
+      "P1-GOLD-VISIBLE",
+      "P1-MANIFEST-EXTRA",
+      "P1-PRODUCTION-PROVENANCE",
+      "P2-CLUSTER-LABEL",
+      "P2-ACCURACY-STRESS",
+      "P2-FULL-SUITE"
+    ],
+    "source_verifier_rejects_undeclared_recursive_addition": false,
+    "verdict": "revise"
+  },
+  "receipt_independent_audit": {
+    "auditors_and_fixtures_share_authored_contract": true,
+    "claim_ceiling": "L1_auditability_within_authored_fixture_contract",
+    "equal_after_removing_receipt_only_metadata": true,
+    "full_artifact_information_equal": false,
+    "independent_heldout_oracle": false,
+    "result": "verified_with_bounded_claim",
+    "source_finding_ids": [
+      "P1-BLIND-GOLD-LEAK",
+      "P1-MANIFEST-NONRECURSIVE",
+      "P2-AUDITOR-TYPE-CRASH",
+      "P2-UNSEALED-VERIFICATION"
+    ],
+    "source_manifest_whole_tree_sealed": false,
+    "source_packet_changed_marker_occurrences": 8,
+    "source_packet_family_prefix_occurrences": 86,
+    "source_packet_safe_for_external_blind_review": false,
+    "source_reveal_was_adjacent": true,
+    "source_unsealed_import_cache_count": 3
+  },
+  "schema": "songryeon.public-evidence-derivative.audit-boundaries.v1"
+}

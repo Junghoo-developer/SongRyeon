@@ -1,0 +1,34 @@
+{
+  "claim_ceiling": {
+    "broad_utility_proven": false,
+    "field_or_cross_domain_generalization_tested": false,
+    "human_workflow_utility_tested": false,
+    "mechanism": "L0_deterministic_mechanism_conformance",
+    "model_accuracy_improvement_proven": false,
+    "receipt": "L1_auditability_within_authored_fixture_contract"
+  },
+  "mechanism_boundaries": {
+    "authored_case_count": 64,
+    "clean_label_case_count": 32,
+    "clean_label_enforced_a_only_actual_origin_r_consumed": "0/32",
+    "clean_label_enforced_a_only_correct": "16/32",
+    "clean_label_label_only_actual_origin_r_consumed": "16/32",
+    "clean_label_label_only_correct": "16/32",
+    "plain_vs_label_only_actual_origin_r_consumption_identity": "64/64",
+    "plain_vs_label_only_output_identity": "64/64"
+  },
+  "public_recomputation": {
+    "cpu_only": true,
+    "gpu_calls": 0,
+    "model_calls": 0,
+    "network_calls": 0
+  },
+  "receipt_reconstruction": {
+    "authored_case_count": 24,
+    "linked_receipt_audit_correct": "24/24",
+    "linked_receipt_mean_reconstruction_completeness": "1.000",
+    "plain_log_audit_correct": "17/24",
+    "plain_log_mean_reconstruction_completeness": "0.925"
+  },
+  "schema": "songryeon.public-evidence-derivative.summary.v1"
+}
