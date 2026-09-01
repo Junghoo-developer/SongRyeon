@@ -1,0 +1,137 @@
+{
+  "description": "Local, advisory SongRyeon black-box capture. Records evidence without blocking or steering Codex.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -I -S -B \"$PLUGIN_ROOT/scripts/songryeon_hook.py\"",
+            "commandWindows": "python -I -S -B -c \"import os,runpy;runpy.run_path(os.path.join(os.environ['PLUGIN_ROOT'],'scripts','songryeon_hook.py'),run_name='__main__')\"",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -I -S -B \"$PLUGIN_ROOT/scripts/songryeon_hook.py\"",
+            "commandWindows": "python -I -S -B -c \"import os,runpy;runpy.run_path(os.path.join(os.environ['PLUGIN_ROOT'],'scripts','songryeon_hook.py'),run_name='__main__')\"",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -I -S -B \"$PLUGIN_ROOT/scripts/songryeon_hook.py\"",
+            "commandWindows": "python -I -S -B -c \"import os,runpy;runpy.run_path(os.path.join(os.environ['PLUGIN_ROOT'],'scripts','songryeon_hook.py'),run_name='__main__')\"",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -I -S -B \"$PLUGIN_ROOT/scripts/songryeon_hook.py\"",
+            "commandWindows": "python -I -S -B -c \"import os,runpy;runpy.run_path(os.path.join(os.environ['PLUGIN_ROOT'],'scripts','songryeon_hook.py'),run_name='__main__')\"",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -I -S -B \"$PLUGIN_ROOT/scripts/songryeon_hook.py\"",
+            "commandWindows": "python -I -S -B -c \"import os,runpy;runpy.run_path(os.path.join(os.environ['PLUGIN_ROOT'],'scripts','songryeon_hook.py'),run_name='__main__')\"",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -I -S -B \"$PLUGIN_ROOT/scripts/songryeon_hook.py\"",
+            "commandWindows": "python -I -S -B -c \"import os,runpy;runpy.run_path(os.path.join(os.environ['PLUGIN_ROOT'],'scripts','songryeon_hook.py'),run_name='__main__')\"",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -I -S -B \"$PLUGIN_ROOT/scripts/songryeon_hook.py\"",
+            "commandWindows": "python -I -S -B -c \"import os,runpy;runpy.run_path(os.path.join(os.environ['PLUGIN_ROOT'],'scripts','songryeon_hook.py'),run_name='__main__')\"",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "PostCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -I -S -B \"$PLUGIN_ROOT/scripts/songryeon_hook.py\"",
+            "commandWindows": "python -I -S -B -c \"import os,runpy;runpy.run_path(os.path.join(os.environ['PLUGIN_ROOT'],'scripts','songryeon_hook.py'),run_name='__main__')\"",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -I -S -B \"$PLUGIN_ROOT/scripts/songryeon_hook.py\"",
+            "commandWindows": "python -I -S -B -c \"import os,runpy;runpy.run_path(os.path.join(os.environ['PLUGIN_ROOT'],'scripts','songryeon_hook.py'),run_name='__main__')\"",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -I -S -B \"$PLUGIN_ROOT/scripts/songryeon_hook.py\"",
+            "commandWindows": "python -I -S -B -c \"import os,runpy;runpy.run_path(os.path.join(os.environ['PLUGIN_ROOT'],'scripts','songryeon_hook.py'),run_name='__main__')\"",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -I -S -B \"$PLUGIN_ROOT/scripts/songryeon_hook.py\"",
+            "commandWindows": "python -I -S -B -c \"import os,runpy;runpy.run_path(os.path.join(os.environ['PLUGIN_ROOT'],'scripts','songryeon_hook.py'),run_name='__main__')\"",
+            "timeout": 3
+          }
+        ]
+      }
+    ]
+  }
+}

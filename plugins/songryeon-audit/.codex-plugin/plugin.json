@@ -1,0 +1,43 @@
+{
+  "name": "songryeon-audit",
+  "version": "0.1.0",
+  "description": "Local Codex black-box logging and evidence-linked self-audit tools.",
+  "author": {
+    "name": "SongRyeon contributors"
+  },
+  "homepage": "https://github.com/Junghoo-developer/SongRyeon/tree/songryeon-audit/plugins/songryeon-audit",
+  "repository": "https://github.com/Junghoo-developer/SongRyeon",
+  "license": "MIT",
+  "keywords": [
+    "codex",
+    "audit",
+    "provenance",
+    "agent"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "SongRyeon Audit",
+    "shortDescription": "Local evidence logger; records prompt and tool content after hook trust.",
+    "longDescription": "SongRyeon Audit records selected Codex lifecycle events and prompt/tool content in a local SQLite database after explicit hook trust, exposes read-only evidence tools, and teaches Codex to reconstruct its behavior without presenting model explanations as runtime facts. Review PRIVACY.md before enabling it.",
+    "developerName": "SongRyeon contributors",
+    "category": "Productivity",
+    "capabilities": [],
+    "websiteURL": "https://github.com/Junghoo-developer/SongRyeon/tree/songryeon-audit/plugins/songryeon-audit",
+    "privacyPolicyURL": "https://github.com/Junghoo-developer/SongRyeon/blob/songryeon-audit/plugins/songryeon-audit/PRIVACY.md",
+    "defaultPrompt": [
+      "Use SongRyeon logs to explain this action with event IDs and unknowns."
+    ]
+  },
+  "mcpServers": {
+    "songryeon-audit": {
+      "command": "python",
+      "args": [
+        "-I",
+        "-S",
+        "-B",
+        "scripts/songryeon_mcp.py"
+      ],
+      "cwd": "."
+    }
+  }
+}

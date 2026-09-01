@@ -1,0 +1,20 @@
+{
+  "name": "songryeon",
+  "interface": {
+    "displayName": "SongRyeon"
+  },
+  "plugins": [
+    {
+      "name": "songryeon-audit",
+      "source": {
+        "source": "local",
+        "path": "./plugins/songryeon-audit"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

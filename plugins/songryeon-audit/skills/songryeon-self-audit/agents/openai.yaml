@@ -1,0 +1,4 @@
+interface:
+  display_name: "SongRyeon Self Audit"
+  short_description: "Explain Codex actions from local evidence"
+  default_prompt: "Use $songryeon-self-audit to state the session's SongRyeon observation status first, then explain why Codex acted this way with event IDs and unknowns."
