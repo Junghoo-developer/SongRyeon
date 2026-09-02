@@ -1,6 +1,6 @@
 {
   "name": "songryeon-audit",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Local Codex black-box logging and evidence-linked self-audit tools.",
   "author": {
     "name": "SongRyeon contributors"
@@ -17,8 +17,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "SongRyeon Audit",
-    "shortDescription": "Local evidence logger; records prompt and tool content after hook trust.",
-    "longDescription": "SongRyeon Audit records selected Codex lifecycle events and prompt/tool content in a local SQLite database after explicit hook trust, exposes read-only evidence tools, and teaches Codex to reconstruct its behavior without presenting model explanations as runtime facts. Review PRIVACY.md before enabling it.",
+    "shortDescription": "Local evidence logger with content-free collector diagnostics.",
+    "longDescription": "SongRyeon Audit records selected Codex lifecycle events and prompt/tool content in a local SQLite database after explicit hook trust, exposes read-only evidence and doctor tools, and teaches Codex to reconstruct its behavior without presenting model explanations as runtime facts. Review PRIVACY.md before enabling it.",
     "developerName": "SongRyeon contributors",
     "category": "Productivity",
     "capabilities": [],

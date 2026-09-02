@@ -9,8 +9,11 @@ model-generated relative information (R).
 from __future__ import annotations
 
 import argparse
+from datetime import datetime
+import hashlib
 import json
 import os
+import platform
 import sys
 from collections.abc import Mapping
 from pathlib import Path
@@ -23,12 +26,53 @@ if str(SCRIPT_DIR) not in sys.path:
 
 
 SERVER_NAME = "songryeon-audit"
-SERVER_VERSION = "0.1.0"
+SERVER_VERSION = "0.1.1"
 DEFAULT_PROTOCOL_VERSION = "2024-11-05"
+_MAX_HEALTH_MARKER_BYTES = 16 * 1024
+_MAX_HOOK_INPUT_BYTES = 8 * 1024 * 1024
+_HEALTH_HOOK_NAMES = {
+    "SessionStart",
+    "SessionEnd",
+    "UserPromptSubmit",
+    "PreToolUse",
+    "PermissionRequest",
+    "PostToolUse",
+    "PreCompact",
+    "PostCompact",
+    "SubagentStart",
+    "SubagentStop",
+    "Stop",
+    "Unknown",
+}
+_HEALTH_ERROR_TYPES = {
+    "input_too_large",
+    "payload_not_object",
+    "JSONDecodeError",
+    "UnicodeDecodeError",
+    "UnicodeEncodeError",
+    "OperationalError",
+    "DatabaseError",
+    "IntegrityError",
+    "ProgrammingError",
+    "InterfaceError",
+    "DataError",
+    "NotSupportedError",
+    "OSError",
+    "PermissionError",
+    "FileNotFoundError",
+    "IsADirectoryError",
+    "NotADirectoryError",
+    "ValueError",
+    "TypeError",
+    "OverflowError",
+    "RuntimeError",
+}
 
 
 class AuditStore(Protocol):
     """The read subset of ``SongRyeonStore`` used by this server."""
+
+    path: Path
 
     def get_event(self, event_id: str) -> dict[str, Any] | None: ...
 
@@ -47,7 +91,13 @@ class AuditStore(Protocol):
         depth: int = 2,
     ) -> dict[str, Any]: ...
 
-    def list_sessions(self, limit: int = 20) -> list[dict[str, Any]]: ...
+    def list_sessions(
+        self, limit: int = 20, cwd: str | None = None
+    ) -> list[dict[str, Any]]: ...
+
+    def list_sessions_scoped(
+        self, cwd: str, limit: int = 20
+    ) -> dict[str, Any]: ...
 
     def get_session_status(self, session_id: str) -> dict[str, Any]: ...
 
@@ -255,6 +305,34 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
         },
     },
     {
+        "name": "songryeon_doctor",
+        "description": (
+            "Report content-free local health metadata for the SongRyeon MCP, "
+            "collector markers, SQLite store, and optionally one exact session. "
+            "Hook trust is not observable by this plugin and remains explicit unknown."
+        ),
+        "annotations": {
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": False,
+        },
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "session_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": (
+                        "Optional exact session to include as a metadata-only "
+                        "observation receipt."
+                    ),
+                }
+            },
+            "additionalProperties": False,
+        },
+    },
+    {
         "name": "songryeon_find_gaps",
         "description": (
             "Find explicit capture, redaction, truncation, actor, and unresolved-"
@@ -297,6 +375,179 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
 
 def _json_text(value: Mapping[str, Any]) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def _display_path(path: Path) -> str:
+    """Return a useful local hint without exposing the OS account name."""
+
+    resolved = path.expanduser().resolve()
+    try:
+        relative = resolved.relative_to(Path.home().resolve())
+    except (OSError, ValueError):
+        return str(resolved)
+    return str(Path("[USER_HOME]") / relative)
+
+
+def _read_health_marker(path: Path) -> dict[str, Any] | None:
+    """Read one bounded, allowlisted collector marker without payload content."""
+
+    try:
+        if not path.is_file():
+            return None
+        size = path.stat().st_size
+        if size > _MAX_HEALTH_MARKER_BYTES:
+            return {
+                "status": "invalid_marker",
+                "error_type": "health_marker_too_large",
+                "marker_bytes": size,
+                "marker_validation": "invalid_fields",
+                "invalid_fields": ["marker_bytes"],
+            }
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(raw, Mapping):
+            raise ValueError("marker is not an object")
+        invalid_fields: list[str] = []
+
+        schema_version = raw.get("schema_version")
+        if schema_version != "1":
+            schema_version = None
+            invalid_fields.append("schema_version")
+
+        recorded_at = raw.get("recorded_at")
+        if isinstance(recorded_at, str) and len(recorded_at) <= 40:
+            try:
+                parsed_time = datetime.fromisoformat(recorded_at)
+                if parsed_time.tzinfo is None:
+                    raise ValueError("timestamp is not timezone-aware")
+                recorded_at = parsed_time.isoformat(timespec="microseconds")
+            except ValueError:
+                recorded_at = None
+                invalid_fields.append("recorded_at")
+        else:
+            recorded_at = None
+            invalid_fields.append("recorded_at")
+
+        status = raw.get("status")
+        if status not in {"ok", "error"}:
+            status = "invalid_marker"
+            invalid_fields.append("status")
+
+        hook_name = raw.get("hook_name")
+        if hook_name is not None and hook_name not in _HEALTH_HOOK_NAMES:
+            hook_name = "Unknown"
+            invalid_fields.append("hook_name")
+
+        input_bytes = raw.get("input_bytes_observed")
+        if not (
+            isinstance(input_bytes, int)
+            and not isinstance(input_bytes, bool)
+            and 0 <= input_bytes <= _MAX_HOOK_INPUT_BYTES + 1
+        ):
+            input_bytes = None
+            invalid_fields.append("input_bytes_observed")
+
+        error_type = raw.get("error_type")
+        if error_type is not None and error_type not in _HEALTH_ERROR_TYPES:
+            error_type = "OtherError"
+            invalid_fields.append("error_type")
+
+        content_recorded = raw.get("content_recorded")
+        if content_recorded is not False:
+            content_recorded = None
+            invalid_fields.append("content_recorded")
+
+        session_digest = raw.get("session_scope_digest_sha256")
+        if session_digest is not None and not (
+            isinstance(session_digest, str)
+            and len(session_digest) == 64
+            and all(character in "0123456789abcdef" for character in session_digest)
+        ):
+            session_digest = None
+            invalid_fields.append("session_scope_digest_sha256")
+
+        return {
+            "schema_version": schema_version,
+            "recorded_at": recorded_at,
+            "status": status,
+            "hook_name": hook_name,
+            "input_bytes_observed": input_bytes,
+            "error_type": error_type,
+            "content_recorded": content_recorded,
+            "session_scope_digest_sha256": session_digest,
+            "marker_validation": (
+                "valid" if not invalid_fields else "invalid_fields"
+            ),
+            "invalid_fields": invalid_fields,
+        }
+    except Exception as exc:
+        return {
+            "status": "invalid_marker",
+            "error_type": f"health_marker_{type(exc).__name__}",
+            "marker_validation": "invalid_fields",
+            "invalid_fields": ["marker_file"],
+        }
+
+
+def _collector_state(
+    success: Mapping[str, Any] | None,
+    error: Mapping[str, Any] | None,
+) -> str:
+    if any(
+        marker is not None and marker.get("marker_validation") != "valid"
+        for marker in (success, error)
+    ):
+        return "invalid_collector_health_marker"
+    success_at = success.get("recorded_at") if success else None
+    error_at = error.get("recorded_at") if error else None
+    if isinstance(error_at, str) and (
+        not isinstance(success_at, str) or error_at > success_at
+    ):
+        return "marker_indicates_latest_timestamped_error"
+    if isinstance(success_at, str):
+        return "marker_indicates_latest_timestamped_success"
+    if error is not None:
+        return "collector_error_marker_present_without_comparable_time"
+    return "no_collector_health_marker"
+
+
+def _marker_session_association(
+    marker: Mapping[str, Any] | None,
+    session_id: str | None,
+) -> str:
+    """Describe correlation only; a match does not establish full coverage."""
+
+    if marker is None:
+        return "marker_absent"
+    if session_id is None:
+        return "not_requested"
+    if marker.get("marker_validation") != "valid":
+        return "unknown_invalid_marker"
+    digest = marker.get("session_scope_digest_sha256")
+    if not isinstance(digest, str) or len(digest) != 64:
+        return "unknown_marker_not_session_bound"
+    canonical = json.dumps(
+        session_id,
+        ensure_ascii=True,
+        separators=(",", ":"),
+    ).encode("ascii")
+    expected = hashlib.sha256(canonical).hexdigest()
+    if digest == expected:
+        return "matches_exact_session_id_digest"
+    return "does_not_match_exact_session_id_digest"
+
+
+def _public_health_marker(
+    marker: Mapping[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Hide the pseudonymous session digest from ordinary diagnostic output."""
+
+    if marker is None:
+        return None
+    return {
+        key: value
+        for key, value in marker.items()
+        if key != "session_scope_digest_sha256"
+    }
 
 
 def _tool_success(payload: dict[str, Any]) -> dict[str, Any]:
@@ -470,6 +721,50 @@ SESSION_STATUS_KEYS = {
     "snapshot_last_event_id",
     "snapshot_max_sequence",
 }
+
+SCOPE_SCAN_BOUNDARIES = {
+    "recent_sequence_window_only_older_sessions_may_be_omitted",
+    "all_recorded_sequences_examined",
+}
+
+
+def _scope_scan_metadata(value: Any) -> dict[str, Any] | None:
+    if not isinstance(value, Mapping):
+        return None
+    bounded = value.get("bounded")
+    sequence_window = value.get("sequence_window")
+    latest_sequence = value.get("latest_sequence")
+    minimum_sequence = value.get("minimum_sequence_included")
+    candidate_count = value.get("candidate_sessions_examined")
+    older_excluded = value.get("older_events_excluded")
+    boundary = value.get("coverage_boundary")
+    optional_sequences_valid = all(
+        item is None
+        or (isinstance(item, int) and not isinstance(item, bool) and item >= 1)
+        for item in (latest_sequence, minimum_sequence)
+    )
+    if not (
+        bounded is True
+        and isinstance(sequence_window, int)
+        and not isinstance(sequence_window, bool)
+        and sequence_window >= 1
+        and optional_sequences_valid
+        and isinstance(candidate_count, int)
+        and not isinstance(candidate_count, bool)
+        and candidate_count >= 0
+        and isinstance(older_excluded, bool)
+        and boundary in SCOPE_SCAN_BOUNDARIES
+    ):
+        return None
+    return {
+        "bounded": True,
+        "sequence_window": sequence_window,
+        "latest_sequence": latest_sequence,
+        "minimum_sequence_included": minimum_sequence,
+        "candidate_sessions_examined": candidate_count,
+        "older_events_excluded": older_excluded,
+        "coverage_boundary": boundary,
+    }
 
 
 def _session_metadata(value: Any) -> dict[str, Any] | None:
@@ -684,19 +979,29 @@ class SongRyeonMCPServer:
                     arguments, "limit", default=20, minimum=1, maximum=200
                 )
                 cwd = _required_string(arguments, "cwd")
-                raw_sessions = self.store.list_sessions(limit=200)
+                scoped_result = self.store.list_sessions_scoped(
+                    limit=limit,
+                    cwd=cwd,
+                )
+                raw_sessions = scoped_result.get("sessions")
+                scope_scan = _scope_scan_metadata(scoped_result.get("scope_scan"))
+                if not isinstance(raw_sessions, list) or scope_scan is None:
+                    return _tool_error("store returned invalid scope scan metadata")
                 sessions: list[dict[str, Any]] = []
                 for raw_session in raw_sessions:
                     session = _session_metadata(raw_session)
                     if session is None:
                         continue
-                    if session.get("cwd") != cwd:
-                        continue
                     sessions.append(session)
                     if len(sessions) == limit:
                         break
                 return _tool_success(
-                    {"sessions": sessions, "count": len(sessions), "cwd": cwd}
+                    {
+                        "sessions": sessions,
+                        "count": len(sessions),
+                        "cwd": cwd,
+                        "scope_scan": scope_scan,
+                    }
                 )
 
             if name == "songryeon_check_session":
@@ -707,6 +1012,96 @@ class SongRyeonMCPServer:
                 if status is None or status.get("session_id") != session_id:
                     return _tool_error("store returned invalid session metadata")
                 return _tool_success(status)
+
+            if name == "songryeon_doctor":
+                _reject_extra(arguments, {"session_id"})
+                session_id = _string(arguments, "session_id", default=None)
+                raw_path = getattr(self.store, "path", None)
+                path = Path(raw_path) if raw_path is not None else None
+                success_marker = None
+                error_marker = None
+                database: dict[str, Any] = {
+                    "path": None,
+                    "exists": False,
+                    "bytes": None,
+                    "wal_bytes": None,
+                    "shm_bytes": None,
+                }
+                if path is not None:
+                    database["path"] = _display_path(path)
+                    try:
+                        database["exists"] = path.is_file()
+                        database["bytes"] = (
+                            path.stat().st_size if path.is_file() else None
+                        )
+                        wal = Path(f"{path}-wal")
+                        shm = Path(f"{path}-shm")
+                        database["wal_bytes"] = (
+                            wal.stat().st_size if wal.is_file() else 0
+                        )
+                        database["shm_bytes"] = (
+                            shm.stat().st_size if shm.is_file() else 0
+                        )
+                    except OSError as exc:
+                        database["inspection_error"] = type(exc).__name__
+                    success_marker = _read_health_marker(
+                        path.parent / "collector-last-success.json"
+                    )
+                    error_marker = _read_health_marker(
+                        path.parent / "collector-last-error.json"
+                    )
+
+                payload: dict[str, Any] = {
+                    "server": {
+                        "name": SERVER_NAME,
+                        "version": SERVER_VERSION,
+                        "mcp_connected": True,
+                    },
+                    "python": {
+                        "version": platform.python_version(),
+                        "minimum_supported": "3.10",
+                    },
+                    "database": database,
+                    "collector": {
+                        "state": _collector_state(success_marker, error_marker),
+                        "scope": "plugin_data_global_last_attempt_markers",
+                        "freshness_boundary": (
+                            "last_observed_only_no_currentness_guarantee"
+                        ),
+                        "integrity_boundary": (
+                            "plaintext_unauthenticated_best_effort_markers_not_"
+                            "proof_of_collector_action"
+                        ),
+                        "requested_session_association": {
+                            "last_success": _marker_session_association(
+                                success_marker, session_id
+                            ),
+                            "last_error": _marker_session_association(
+                                error_marker, session_id
+                            ),
+                            "boundary": (
+                                "digest_correlation_only_not_capture_completeness"
+                            ),
+                        },
+                        "last_success": _public_health_marker(success_marker),
+                        "last_error": _public_health_marker(error_marker),
+                    },
+                    "hook_trust": {
+                        "status": "unknown_not_exposed_to_plugin",
+                        "manual_review_required": True,
+                    },
+                    "diagnostic_boundary": (
+                        "Local content-free diagnostics only. MCP connectivity "
+                        "does not prove hook trust or complete runtime capture."
+                    ),
+                }
+                if session_id:
+                    raw_status = self.store.get_session_status(session_id)
+                    status = _session_status_metadata(raw_status)
+                    if status is None or status.get("session_id") != session_id:
+                        return _tool_error("store returned invalid session metadata")
+                    payload["session"] = status
+                return _tool_success(payload)
 
             if name == "songryeon_find_gaps":
                 _reject_extra(

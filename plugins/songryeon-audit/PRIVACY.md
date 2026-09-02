@@ -46,6 +46,15 @@ environment and model settings, that context may be processed outside the local
 machine even though the plugin code itself makes no network request. Do not use
 the recorder for material that must never enter the configured model context.
 
+Version 0.1.1 also writes two small diagnostic files beside the database:
+`collector-last-success.json` and `collector-last-error.json`. They do not store
+hook payload content or exception messages. They contain a timestamp, status,
+allowlisted hook name, observed input byte count, exception type, an explicit
+`content_recorded=false` marker, and—when available—a SHA-256 digest of the
+session ID for local correlation. The digest is pseudonymous metadata, not an
+authorization token. The marker files are plaintext, global to that plugin data
+directory, and follow the same operating-system access boundary as the database.
+
 ## Redaction and retention
 
 The recorder masks several common credential keys and token patterns before

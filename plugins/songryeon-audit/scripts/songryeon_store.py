@@ -37,6 +37,8 @@ MAX_COLLECTION_ITEMS = 200
 MAX_DEPTH = 12
 MAX_ATOM_BYTES = 65_536
 MAX_QUERY_LIMIT = 500
+DEFAULT_SCOPED_SEQUENCE_WINDOW = 5_000
+MAX_SCOPED_SEQUENCE_WINDOW = 50_000
 SQLITE_BUSY_TIMEOUT_MS = 1_000
 
 _SENSITIVE_KEYS = re.compile(
@@ -197,6 +199,25 @@ def _redact_string(value: str) -> tuple[str, int]:
     return redacted, count
 
 
+def _canonical_scope_cwd(
+    value: Any, *, case_insensitive: bool | None = None
+) -> str | None:
+    """Normalize a raw or already-redacted cwd for exact scope comparison."""
+    if isinstance(value, os.PathLike):
+        value = os.fspath(value)
+    if not isinstance(value, str):
+        return None
+    if case_insensitive is None:
+        case_insensitive = bool(
+            re.match(r"(?i)^[a-z]:[\\/]", value) or value.startswith("\\\\")
+        )
+    redacted, _ = _redact_string(value)
+    normalized = re.sub(r"/+", "/", redacted.replace("\\", "/"))
+    if normalized != "/":
+        normalized = normalized.rstrip("/")
+    return normalized.casefold() if case_insensitive else normalized
+
+
 def _redact_value(
     value: Any,
     path: str = "$",
@@ -315,6 +336,7 @@ def _is_songryeon_audit_tool(tool_name: str | None) -> bool:
             "list-sessions",
             "check-session",
             "find-gaps",
+            "doctor",
         )
     )
 
@@ -1242,10 +1264,19 @@ class SongRyeonStore:
                 "depth": safe_depth,
             }
 
-    def list_sessions(self, limit: int = 20) -> list[dict[str, Any]]:
+    def list_sessions(
+        self,
+        limit: int = 20,
+        cwd: str | os.PathLike[str] | None = None,
+    ) -> list[dict[str, Any]]:
         safe_limit = max(1, min(int(limit), MAX_QUERY_LIMIT))
+        if cwd is not None:
+            return self.list_sessions_scoped(
+                cwd=cwd,
+                limit=safe_limit,
+            )["sessions"]
         with self._connect() as connection:
-            rows = connection.execute(
+            cursor = connection.execute(
                 """
                 SELECT
                     e.session_id,
@@ -1293,7 +1324,8 @@ class SongRyeonStore:
                 LIMIT ?
                 """,
                 (safe_limit,),
-            ).fetchall()
+            )
+            rows = cursor.fetchall()
             return [
                 {
                     "session_id": row["session_id"],
@@ -1331,6 +1363,109 @@ class SongRyeonStore:
                 }
                 for row in rows
             ]
+
+    def list_sessions_scoped(
+        self,
+        cwd: str | os.PathLike[str],
+        limit: int = 20,
+        sequence_window: int = DEFAULT_SCOPED_SEQUENCE_WINDOW,
+    ) -> dict[str, Any]:
+        """Find recent exact-cwd sessions with an explicit bounded scan receipt."""
+
+        safe_limit = max(1, min(int(limit), MAX_QUERY_LIMIT))
+        safe_window = max(
+            1,
+            min(int(sequence_window), MAX_SCOPED_SEQUENCE_WINDOW),
+        )
+        raw_cwd = os.fspath(cwd) if isinstance(cwd, os.PathLike) else cwd
+        case_insensitive = bool(
+            re.match(r"(?i)^[a-z]:[\\/]", raw_cwd)
+            or raw_cwd.startswith("\\\\")
+        )
+        scoped_cwd = _canonical_scope_cwd(
+            raw_cwd,
+            case_insensitive=case_insensitive,
+        )
+
+        with self._connect() as connection:
+            bounds = connection.execute(
+                "SELECT MIN(seq) AS min_seq, MAX(seq) AS max_seq FROM events"
+            ).fetchone()
+            maximum_sequence = int(bounds["max_seq"] or 0)
+            minimum_recorded_sequence = (
+                int(bounds["min_seq"]) if bounds["min_seq"] is not None else None
+            )
+            minimum_included_sequence = max(
+                1,
+                maximum_sequence - safe_window + 1,
+            )
+            candidate_rows = connection.execute(
+                """
+                WITH candidate_sessions AS (
+                    SELECT session_id, MAX(seq) AS last_seq
+                    FROM events
+                    WHERE seq BETWEEN ? AND ?
+                      AND session_id IS NOT NULL
+                    GROUP BY session_id
+                )
+                SELECT
+                    candidate_sessions.session_id,
+                    candidate_sessions.last_seq,
+                    (SELECT a.value_json
+                     FROM events e2
+                     JOIN atoms a ON a.event_id = e2.event_id
+                     WHERE e2.session_id = candidate_sessions.session_id
+                       AND a.path = 'cwd'
+                     ORDER BY e2.seq DESC, a.atom_id DESC LIMIT 1)
+                        AS last_cwd_json
+                FROM candidate_sessions
+                ORDER BY candidate_sessions.last_seq DESC
+                """,
+                (minimum_included_sequence, maximum_sequence),
+            ).fetchall()
+
+        matching_session_ids: list[str] = []
+        for row in candidate_rows:
+            if row["last_cwd_json"] is None:
+                continue
+            stored_cwd = json.loads(row["last_cwd_json"])
+            if (
+                _canonical_scope_cwd(
+                    stored_cwd,
+                    case_insensitive=case_insensitive,
+                )
+                != scoped_cwd
+            ):
+                continue
+            matching_session_ids.append(row["session_id"])
+            if len(matching_session_ids) == safe_limit:
+                break
+
+        older_events_excluded = bool(
+            minimum_recorded_sequence is not None
+            and minimum_recorded_sequence < minimum_included_sequence
+        )
+        return {
+            "sessions": [
+                self.get_session_status(session_id)
+                for session_id in matching_session_ids
+            ],
+            "scope_scan": {
+                "bounded": True,
+                "sequence_window": safe_window,
+                "latest_sequence": maximum_sequence or None,
+                "minimum_sequence_included": (
+                    minimum_included_sequence if maximum_sequence else None
+                ),
+                "candidate_sessions_examined": len(candidate_rows),
+                "older_events_excluded": older_events_excluded,
+                "coverage_boundary": (
+                    "recent_sequence_window_only_older_sessions_may_be_omitted"
+                    if older_events_excluded
+                    else "all_recorded_sequences_examined"
+                ),
+            },
+        }
 
     def get_session_status(self, session_id: str) -> dict[str, Any]:
         """Return metadata-only evidence about SongRyeon observation coverage.

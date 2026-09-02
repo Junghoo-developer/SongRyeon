@@ -30,6 +30,7 @@ def test_packaged_mcp_config_uses_current_plugin_schema_and_relative_paths() -> 
     assert not (PLUGIN_ROOT / ".mcp.json").exists()
     server = manifest["mcpServers"]["songryeon-audit"]
 
+    assert manifest["version"] == mcp.SERVER_VERSION == "0.1.1"
     assert server["command"] == "python"
     assert server["args"] == ["-I", "-S", "-B", "scripts/songryeon_mcp.py"]
     assert server["cwd"] == "."
@@ -64,6 +65,7 @@ def test_public_marketplace_points_to_packaged_plugin() -> None:
 class FakeStore:
     def __init__(self) -> None:
         self.calls: list[tuple[Any, ...]] = []
+        self.path = Path("C:/songryeon-test-data/songryeon-audit.sqlite3")
         self.event = {
             "event_id": "evt-1",
             "session_id": "session-1",
@@ -134,9 +136,9 @@ class FakeStore:
             "depth": depth,
         }
 
-    def list_sessions(self, limit: int = 20):
-        self.calls.append(("list_sessions", limit))
-        return [
+    def list_sessions(self, limit: int = 20, cwd: str | None = None):
+        self.calls.append(("list_sessions", limit, cwd))
+        sessions = [
             {
                 "session_id": "session-1",
                 "event_count": 2,
@@ -159,7 +161,26 @@ class FakeStore:
                 "coverage_boundary": "hook_observation_only_not_complete_runtime_capture",
                 "events": [self.other_event],
             },
-        ][:limit]
+        ]
+        if cwd is not None:
+            sessions = [item for item in sessions if item["cwd"] == cwd]
+        return sessions[:limit]
+
+    def list_sessions_scoped(self, cwd: str, limit: int = 20):
+        sessions = self.list_sessions(limit=limit, cwd=cwd)
+        self.calls[-1] = ("list_sessions_scoped", limit, cwd)
+        return {
+            "sessions": sessions,
+            "scope_scan": {
+                "bounded": True,
+                "sequence_window": 5000,
+                "latest_sequence": 2,
+                "minimum_sequence_included": 1,
+                "candidate_sessions_examined": 2,
+                "older_events_excluded": False,
+                "coverage_boundary": "all_recorded_sequences_examined",
+            },
+        }
 
     def get_session_status(self, session_id: str):
         self.calls.append(("get_session_status", session_id))
@@ -243,6 +264,7 @@ def test_lists_exact_read_only_tool_surface() -> None:
         "songryeon_trace",
         "songryeon_list_sessions",
         "songryeon_check_session",
+        "songryeon_doctor",
         "songryeon_find_gaps",
     }
     assert not any(
@@ -445,8 +467,17 @@ def test_list_sessions_is_metadata_only_and_supports_exact_cwd_filter() -> None:
         ],
         "count": 1,
         "cwd": "C:/work/two",
+        "scope_scan": {
+            "bounded": True,
+            "sequence_window": 5000,
+            "latest_sequence": 2,
+            "minimum_sequence_included": 1,
+            "candidate_sessions_examined": 2,
+            "older_events_excluded": False,
+            "coverage_boundary": "all_recorded_sequences_examined",
+        },
     }
-    assert store.calls == [("list_sessions", 200)]
+    assert store.calls == [("list_sessions_scoped", 1, "C:/work/two")]
     assert "events" not in result["sessions"][0]
 
 
@@ -501,6 +532,126 @@ def test_check_session_returns_a_narrow_receipt_and_an_epistemic_no_record() -> 
         ("get_session_status", "session-1"),
         ("get_session_status", "missing"),
     ]
+
+
+def test_doctor_reports_content_free_health_and_optional_session(tmp_path: Path) -> None:
+    db_path = tmp_path / "songryeon-audit.sqlite3"
+    environment = os.environ.copy()
+    environment["PLUGIN_DATA"] = str(tmp_path)
+    completed = subprocess.run(
+        [sys.executable, str(PLUGIN_ROOT / "scripts" / "songryeon_hook.py")],
+        input=json.dumps(
+            {
+                "hook_event_name": "SessionStart",
+                "session_id": "doctor-session",
+                "source": "startup",
+                "cwd": "C:/work",
+            }
+        ),
+        text=True,
+        capture_output=True,
+        env=environment,
+        timeout=4,
+        check=False,
+    )
+    assert completed.returncode == 0
+    assert completed.stdout == ""
+    assert completed.stderr == ""
+    marker_path = tmp_path / "collector-last-success.json"
+    marker = json.loads(marker_path.read_text(encoding="utf-8"))
+    marker["unexpected_payload"] = "must-not-leak"
+    marker_path.write_text(
+        json.dumps(marker), encoding="utf-8"
+    )
+    store = store_module.SongRyeonStore(db_path)
+    server = mcp.SongRyeonMCPServer(store)
+
+    response = server.call_tool(
+        "songryeon_doctor", {"session_id": "doctor-session"}
+    )
+    payload = response["structuredContent"]
+
+    assert response["isError"] is False
+    assert payload["server"] == {
+        "name": "songryeon-audit",
+        "version": "0.1.1",
+        "mcp_connected": True,
+    }
+    assert payload["database"]["exists"] is True
+    assert payload["database"]["bytes"] > 0
+    assert payload["collector"]["state"] == (
+        "marker_indicates_latest_timestamped_success"
+    )
+    assert payload["collector"]["last_success"]["content_recorded"] is False
+    assert "unexpected_payload" not in payload["collector"]["last_success"]
+    assert "session_scope_digest_sha256" not in payload["collector"]["last_success"]
+    assert payload["collector"]["scope"] == (
+        "plugin_data_global_last_attempt_markers"
+    )
+    assert payload["collector"]["integrity_boundary"] == (
+        "plaintext_unauthenticated_best_effort_markers_not_proof_of_collector_action"
+    )
+    assert payload["collector"]["requested_session_association"] == {
+        "last_success": "matches_exact_session_id_digest",
+        "last_error": "marker_absent",
+        "boundary": "digest_correlation_only_not_capture_completeness",
+    }
+    assert payload["hook_trust"]["status"] == "unknown_not_exposed_to_plugin"
+    assert payload["session"]["instrumentation_status"] == (
+        "observed_from_session_start"
+    )
+
+
+def test_doctor_sanitizes_every_health_marker_value(tmp_path: Path) -> None:
+    secret = "SECRET_FROM_CORRUPTED_MARKER"
+    db_path = tmp_path / "songryeon-audit.sqlite3"
+    store = store_module.SongRyeonStore(db_path)
+    (tmp_path / "collector-last-success.json").write_text(
+        json.dumps(
+            {
+                "schema_version": secret,
+                "recorded_at": secret,
+                "status": secret,
+                "hook_name": secret,
+                "input_bytes_observed": secret,
+                "error_type": secret,
+                "content_recorded": secret,
+                "session_scope_digest_sha256": secret,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    payload = mcp.SongRyeonMCPServer(store).call_tool(
+        "songryeon_doctor", {"session_id": "doctor-session"}
+    )["structuredContent"]
+    serialized = json.dumps(payload, ensure_ascii=False)
+
+    assert secret not in serialized
+    assert payload["collector"]["state"] == "invalid_collector_health_marker"
+    assert payload["collector"]["last_success"]["hook_name"] == "Unknown"
+    assert payload["collector"]["last_success"]["error_type"] == "OtherError"
+    assert payload["collector"]["requested_session_association"][
+        "last_success"
+    ] == "unknown_invalid_marker"
+
+
+def test_doctor_does_not_claim_hook_trust_without_health_markers() -> None:
+    server = mcp.SongRyeonMCPServer(FakeStore())
+
+    payload = server.call_tool("songryeon_doctor", {})["structuredContent"]
+
+    assert payload["server"]["mcp_connected"] is True
+    assert payload["collector"]["state"] == "no_collector_health_marker"
+    assert payload["collector"]["requested_session_association"] == {
+        "last_success": "marker_absent",
+        "last_error": "marker_absent",
+        "boundary": "digest_correlation_only_not_capture_completeness",
+    }
+    assert payload["hook_trust"] == {
+        "status": "unknown_not_exposed_to_plugin",
+        "manual_review_required": True,
+    }
 
 
 def test_check_session_rejects_a_store_scope_mismatch_without_leaking_content() -> None:
@@ -731,7 +882,7 @@ def test_stdio_initialize_notification_tools_and_parse_error() -> None:
     assert responses[0]["result"]["capabilities"] == {
         "tools": {"listChanged": False}
     }
-    assert len(responses[1]["result"]["tools"]) == 6
+    assert len(responses[1]["result"]["tools"]) == 7
     assert responses[2]["error"]["code"] == -32700
 
 

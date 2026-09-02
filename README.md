@@ -32,10 +32,13 @@ local SQLite database and can enter the active model context when queried.
 In the new instrumented task:
 
 1. Ask: `SONGRYEON_TEST_한글_🧪 를 기록하고 현재 폴더를 한 번 확인해줘.`
-2. Then ask: `송련 스킬로 방금 행동을 감사하고 근거 이벤트 ID와 관측 공백을 알려줘.`
+2. Ask: `송련 doctor로 MCP 연결, Python, DB, 마지막 수집 성공·실패와 현재 세션 상태를 확인해줘.`
+3. Then ask: `송련 스킬로 방금 행동을 감사하고 근거 이벤트 ID와 관측 공백을 알려줘.`
 
-The audit should state its session observation boundary and cite recorded event
-IDs without claiming access to private reasoning.
+Version 0.1.1's doctor reports local, content-free health metadata while keeping
+hook trust explicitly unknown. The audit should state its session observation
+boundary and cite recorded event IDs without claiming access to private
+reasoning.
 
 Implementation details, limits, and optional subagent setup are documented in
 the [plugin README](plugins/songryeon-audit/README.md) and

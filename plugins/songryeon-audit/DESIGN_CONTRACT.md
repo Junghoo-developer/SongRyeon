@@ -40,7 +40,8 @@ must not be presented as hidden chain-of-thought or as an **A** fact.
 - `get_event(event_id) -> dict | None`
 - `search(query="", session_id=None, limit=50, max_sequence=None) -> list[dict]`
 - `trace(event_id, direction="both", depth=2) -> dict`
-- `list_sessions(limit=20) -> list[dict]` (internal store API)
+- `list_sessions(limit=20, cwd=None) -> list[dict]` (internal store API)
+- `list_sessions_scoped(cwd, limit=20, sequence_window=5000) -> dict`
 - `get_session_status(session_id) -> dict`
 - `find_gaps(session_id=None, limit=50, max_sequence=None) -> list[dict]`
 
@@ -51,8 +52,14 @@ search or traversal. Session listing exposes metadata only and may apply an
 exact working-directory filter.
 
 The MCP session-list tool additionally requires an exact working-directory
-scope; it does not expose an unfiltered inventory of local sessions. The status
-API and MCP status tool expose metadata only. Their states mean:
+scope; it does not expose an unfiltered inventory of local sessions. Discovery
+is bounded to a recent event-sequence window and returns a scope-scan receipt.
+When older events were excluded, older matching sessions may be omitted and the
+caller must not translate an empty list into global absence. The caller's
+working directory is privacy-normalized with the same user-home redaction used
+at capture time before exact comparison. This is a discovery scope, not an
+identity or authorization proof. The status API and MCP status tool expose
+metadata only. Their states mean:
 
 - `observed_from_session_start`: the first recorded event is `SessionStart` with
   `source=startup`; this does not guarantee every runtime path or hook was
@@ -95,8 +102,14 @@ diagnosable; they are not a tamper-proof guarantee.
 ## Read interface
 
 The local stdio MCP server exposes structured search, event, trace, session, and
-coverage-gap tools. These tools never produce a fixed human-facing verdict and
-never mutate external systems.
+coverage-gap tools plus a content-free doctor. These tools never produce a fixed
+human-facing incident verdict and never mutate external systems. The doctor can
+establish that its MCP process is running and report bounded local file and
+collector-marker metadata. Collector markers are global last attempts within
+one plugin data directory. When an exact session is requested, a SHA-256 digest
+can correlate a marker to that session without returning the raw identifier;
+match is not a completeness or freshness proof. Codex's hook-trust registry is
+outside the doctor's observation boundary and must remain unknown.
 
 Session scoping prevents accidental reads from an unrelated local task. It is
 not a multi-user ACL or a cryptographic security boundary; separate trust domains
@@ -124,3 +137,11 @@ The SQLite database is plaintext, has no built-in expiry or quota, and relies on
 the operating-system account and filesystem for access control. MCP results
 become part of the active model or subagent context; local storage therefore
 does not imply that selected audit content stays off remote model infrastructure.
+
+The hook also best-effort writes `collector-last-success.json` and
+`collector-last-error.json` beside the database. These markers contain no hook
+payload, exception message, prompt, tool content, or path. They retain only the
+recorder timestamp, status, an allowlisted hook name, observed input byte count,
+exception type, and a SHA-256 digest of the session ID when one was available.
+They are plugin-data-global diagnostic envelopes, not proof of trust,
+currentness, or that every event was captured.

@@ -36,6 +36,27 @@ already asked to continue despite that boundary, proceed without asking again.
 Never call this fallback a SongRyeon audit, and never claim that absence from one
 local store proves the plugin was not installed.
 
+## Diagnose recording health without inventing trust
+
+When the user asks whether SongRyeon is installed, recording, or healthy—or an
+expected exact session returns no record—use `songryeon_doctor` before explaining
+the boundary. The doctor may establish MCP connectivity, Python and server
+versions, a redacted database location, bounded file metadata, and the last
+content-free collector success or error marker. If an exact `session_id` is
+known, include it so the doctor can return that session's metadata receipt.
+
+The doctor cannot observe Codex's hook-trust registry. Always preserve
+`unknown_not_exposed_to_plugin`; do not translate MCP connectivity, a database
+file, or an old success marker into “the current hooks are trusted.” A user must
+still review the exact current hook definition through a supported Codex trust
+surface, then begin a new task.
+
+Treat last-success and last-error as plugin-data-global last-attempt markers.
+When an exact session is supplied, report the doctor's digest association as
+match, mismatch, or unknown, but never turn a match into proof of freshness or
+complete capture. Use the exact-session status receipt for the observed session
+boundary.
+
 ## Locate the evidence
 
 Use the available SongRyeon MCP read tools autonomously. Their logical
@@ -44,9 +65,10 @@ trace, and coverage-gap discovery.
 
 - Establish one exact session scope before reading event content. List only
   metadata for sessions matching the required exact current working directory,
-  and prefer a unique recent session whose last event is the present audit
-  request. Do not treat "most recent" alone as proof when concurrent candidates
-  exist.
+  inspect the returned scope-scan receipt, and prefer a unique recent session
+  whose last event is the present audit request. Do not treat "most recent"
+  alone as proof when concurrent candidates exist, and do not treat an empty
+  scan with older events excluded as proof of global absence.
 - Pass the selected `session_id` to every search, lookup, trace, and gap call.
   Never perform a cross-session content search.
 - Start from session, turn, tool, path, error, timestamp, or quoted-text clues in

@@ -210,7 +210,14 @@ def test_unknown_future_fields_are_omitted_instead_of_stored_wholesale(tmp_path)
     )
 
 
-def test_songryeon_mcp_content_is_not_recursively_copied(tmp_path):
+@pytest.mark.parametrize(
+    "tool_name",
+    [
+        "mcp__songryeon-audit__songryeon_get_event",
+        "mcp__songryeon-audit__songryeon_doctor",
+    ],
+)
+def test_songryeon_mcp_content_is_not_recursively_copied(tmp_path, tool_name):
     db_path = tmp_path / "audit.sqlite3"
     store = SongRyeonStore(db_path)
     secret = "retrieved-audit-content-must-not-be-duplicated"
@@ -220,7 +227,7 @@ def test_songryeon_mcp_content_is_not_recursively_copied(tmp_path):
             "hook_event_name": "PostToolUse",
             "session_id": "session-1",
             "turn_id": "turn-1",
-            "tool_name": "mcp__songryeon-audit__songryeon_get_event",
+            "tool_name": tool_name,
             "tool_use_id": "tool-audit-1",
             "tool_input": {"event_id": "sra-old", "secret": secret},
             "tool_response": {"event": {"secret": secret}},
@@ -274,6 +281,99 @@ def test_search_sessions_descendants_and_chain_order(tmp_path):
     assert store.trace("missing", "both", 2)["event"] is None
     with pytest.raises(ValueError):
         store.trace(first["event_id"], "sideways", 1)
+
+
+def test_list_sessions_scopes_raw_windows_home_to_redacted_cwd(tmp_path):
+    store = SongRyeonStore(tmp_path / "audit.sqlite3")
+    matching = store.append_hook_event(
+        {
+            "hook_event_name": "SessionStart",
+            "session_id": "matching-project",
+            "cwd": "C:\\Users\\Alice\\work\\Project-One\\",
+            "source": "startup",
+        }
+    )
+    store.append_hook_event(
+        {
+            "hook_event_name": "SessionStart",
+            "session_id": "different-project",
+            "cwd": "C:\\Users\\Alice\\work\\Project-Two",
+            "source": "startup",
+        }
+    )
+
+    assert _atoms(matching)["cwd"]["value"].startswith("[USER_HOME]")
+    assert len(store.list_sessions()) == 2
+
+    scoped = store.list_sessions(cwd="c:/users/alice/WORK/project-one")
+    assert [item["session_id"] for item in scoped] == ["matching-project"]
+    assert store.list_sessions(cwd="C:/Users/Alice/work/Project-Three") == []
+
+    serialized = json.dumps(scoped, ensure_ascii=False).casefold()
+    assert "alice" not in serialized
+    assert "c:/users/" not in serialized
+    assert "c:\\users\\" not in serialized
+
+
+def test_list_sessions_preserves_posix_cwd_case_sensitivity(tmp_path):
+    store = SongRyeonStore(tmp_path / "audit.sqlite3")
+    store.append_hook_event(
+        {
+            "hook_event_name": "SessionStart",
+            "session_id": "posix-project",
+            "cwd": "/home/alice/Project",
+            "source": "startup",
+        }
+    )
+
+    assert [
+        item["session_id"]
+        for item in store.list_sessions(cwd="/home/alice/Project")
+    ] == ["posix-project"]
+    assert store.list_sessions(cwd="/home/alice/project") == []
+
+
+def test_scoped_session_scan_is_bounded_and_reports_older_exclusion(tmp_path):
+    store = SongRyeonStore(tmp_path / "audit.sqlite3")
+    for session_id, cwd in (
+        ("old-match", "C:/work/target"),
+        ("new-other-1", "C:/work/other-1"),
+        ("new-other-2", "C:/work/other-2"),
+    ):
+        store.append_hook_event(
+            {
+                "hook_event_name": "SessionStart",
+                "session_id": session_id,
+                "cwd": cwd,
+                "source": "startup",
+            }
+        )
+
+    bounded = store.list_sessions_scoped(
+        cwd="C:/work/target",
+        sequence_window=2,
+    )
+    assert bounded["sessions"] == []
+    assert bounded["scope_scan"] == {
+        "bounded": True,
+        "sequence_window": 2,
+        "latest_sequence": 3,
+        "minimum_sequence_included": 2,
+        "candidate_sessions_examined": 2,
+        "older_events_excluded": True,
+        "coverage_boundary": (
+            "recent_sequence_window_only_older_sessions_may_be_omitted"
+        ),
+    }
+
+    complete = store.list_sessions_scoped(
+        cwd="C:/work/target",
+        sequence_window=3,
+    )
+    assert [item["session_id"] for item in complete["sessions"]] == [
+        "old-match"
+    ]
+    assert complete["scope_scan"]["older_events_excluded"] is False
 
 
 def test_session_status_distinguishes_start_partial_late_start_and_no_record(tmp_path):
@@ -517,6 +617,82 @@ def test_hook_process_is_silent_advisory_and_stop_returns_empty_json(tmp_path):
         session_id="session-1"
     )
     assert len(stored) == 2
+    success = json.loads(
+        (tmp_path / "collector-last-success.json").read_text(encoding="utf-8")
+    )
+    error = json.loads(
+        (tmp_path / "collector-last-error.json").read_text(encoding="utf-8")
+    )
+    assert success["status"] == "ok"
+    assert success["hook_name"] == "Stop"
+    assert success["content_recorded"] is False
+    assert error["status"] == "error"
+    assert error["error_type"] == "JSONDecodeError"
+    assert error["content_recorded"] is False
+    assert "not-json" not in json.dumps(error)
+
+
+def test_health_marker_rejects_arbitrary_hook_name_content(tmp_path):
+    hook = SCRIPTS / "songryeon_hook.py"
+    environment = os.environ.copy()
+    environment["PLUGIN_DATA"] = str(tmp_path)
+    secret = "PROMPT_SECRET_must_not_enter_health_marker"
+    payload = {
+        "hook_event_name": secret,
+        "session_id": "adversarial-session",
+        "prompt": "ordinary stored R content",
+    }
+
+    completed = subprocess.run(
+        [sys.executable, str(hook)],
+        input=json.dumps(payload),
+        text=True,
+        capture_output=True,
+        env=environment,
+        timeout=4,
+        check=False,
+    )
+
+    assert completed.returncode == 0
+    marker_text = (tmp_path / "collector-last-success.json").read_text(
+        encoding="utf-8"
+    )
+    marker = json.loads(marker_text)
+    assert marker["hook_name"] == "Unknown"
+    assert marker["content_recorded"] is False
+    assert secret not in marker_text
+    assert payload["prompt"] not in marker_text
+    assert len(marker["session_scope_digest_sha256"]) == 64
+
+
+def test_hook_with_lone_surrogate_session_id_stays_advisory(tmp_path):
+    hook = SCRIPTS / "songryeon_hook.py"
+    environment = os.environ.copy()
+    environment["PLUGIN_DATA"] = str(tmp_path)
+    payload = {
+        "hook_event_name": "SessionStart",
+        "session_id": "\ud800",
+        "source": "startup",
+    }
+
+    completed = subprocess.run(
+        [sys.executable, str(hook)],
+        input=json.dumps(payload).encode("ascii"),
+        capture_output=True,
+        env=environment,
+        timeout=4,
+        check=False,
+    )
+
+    assert completed.returncode == 0
+    assert completed.stdout == b""
+    assert completed.stderr == b""
+    marker = json.loads(
+        (tmp_path / "collector-last-error.json").read_text(encoding="utf-8")
+    )
+    assert marker["status"] == "error"
+    assert marker["content_recorded"] is False
+    assert marker["session_scope_digest_sha256"] is not None
 
 
 def test_busy_store_does_not_outlive_the_three_second_hook_budget(tmp_path):
@@ -550,6 +726,45 @@ def test_busy_store_does_not_outlive_the_three_second_hook_budget(tmp_path):
     assert SongRyeonStore(db_path).get_session_status("locked-session")[
         "songryeon_record_found"
     ] is False
+    error = json.loads(
+        (tmp_path / "collector-last-error.json").read_text(encoding="utf-8")
+    )
+    assert error["status"] == "error"
+    assert error["error_type"] == "OperationalError"
+    assert error["content_recorded"] is False
+
+
+def test_oversized_hook_input_records_content_free_health_error(tmp_path):
+    hook = SCRIPTS / "songryeon_hook.py"
+    environment = os.environ.copy()
+    environment["PLUGIN_DATA"] = str(tmp_path)
+
+    completed = subprocess.run(
+        [sys.executable, str(hook)],
+        input="x" * (8 * 1024 * 1024 + 1),
+        text=True,
+        capture_output=True,
+        env=environment,
+        timeout=4,
+        check=False,
+    )
+
+    assert completed.returncode == 0
+    assert completed.stdout == ""
+    assert completed.stderr == ""
+    error = json.loads(
+        (tmp_path / "collector-last-error.json").read_text(encoding="utf-8")
+    )
+    assert error == {
+        "content_recorded": False,
+        "error_type": "input_too_large",
+        "hook_name": None,
+        "input_bytes_observed": 8 * 1024 * 1024 + 1,
+        "recorded_at": error["recorded_at"],
+        "schema_version": "1",
+        "session_scope_digest_sha256": None,
+        "status": "error",
+    }
 
 
 def test_every_hook_launcher_is_isolated_and_disables_bytecode_writes():

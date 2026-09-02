@@ -27,6 +27,22 @@ trust the exact `SongRyeon Audit` hook definition. The Codex CLI exposes this
 review through `/hooks`; installing or enabling the plugin alone does not trust
 its hooks. A changed hook definition must be reviewed again.
 
+### Field-review doctor
+
+Version 0.1.1 adds the read-only `songryeon_doctor` tool. In a new task, ask:
+
+> 송련 doctor로 MCP 연결, Python, DB, 마지막 수집 성공·실패와 현재 세션 상태를 확인해줘.
+
+The doctor reports content-free local diagnostics and can include the metadata
+receipt for one exact session. Last-success and last-error markers are global to
+the plugin data directory, not automatically facts about that session. A local
+SHA-256 session correlation reports match, mismatch, or unknown without exposing
+the raw session ID; even a match does not prove complete capture or freshness.
+The doctor cannot read Codex's hook-trust registry, so
+`hook_trust.status` deliberately remains `unknown_not_exposed_to_plugin` and
+manual `/hooks` review is still required. MCP connectivity alone does not prove
+that the collector hook was trusted or that a session was captured completely.
+
 The recorder can store prompts, tool inputs, tool outputs, local paths, and
 assistant messages in a local SQLite database. Read [`PRIVACY.md`](PRIVACY.md)
 before trusting the hooks. Secret redaction is deliberately described as basic
@@ -35,8 +51,10 @@ risk reduction, not complete DLP.
 Quick smoke test in the new task:
 
 1. Submit `SONGRYEON_TEST_한글_🧪 를 기록하고 현재 폴더를 한 번 확인해줘.`
-2. Ask `송련 스킬로 방금 행동을 감사하고 근거 이벤트 ID와 관측 공백을 알려줘.`
-3. Confirm that the answer names an exact session boundary instead of claiming
+2. Run the doctor request above and confirm that the plaintext marker indicates
+   a timestamped success while hook trust remains explicitly unknown.
+3. Ask `송련 스킬로 방금 행동을 감사하고 근거 이벤트 ID와 관측 공백을 알려줘.`
+4. Confirm that the answer names an exact session boundary instead of claiming
    access to hidden reasoning.
 
 ## Prototype status
@@ -86,8 +104,10 @@ absent. There is no retroactive capture.
 
 Evidence-bearing MCP operations require one explicit `session_id`, and event
 lookup and graph traversal reject events from any other session. The skill may
-list only sessions matching one required exact working directory; recency alone
-is not proof. When candidates remain ambiguous it asks for the smallest
+list only sessions matching one required exact working directory. That discovery
+uses a bounded recent event-sequence window and returns whether older events were
+excluded; an empty truncated scan is not proof that no older match exists.
+Recency alone is not proof. When candidates remain ambiguous it asks for the smallest
 distinguishing detail before reading content. If no exact SongRyeon scope
 exists, the skill can perform ordinary reasoning over user-provided material as
 R, but must label the SongRyeon runtime path unmeasurable.
@@ -95,6 +115,9 @@ R, but must label the SongRyeon runtime path unmeasurable.
 This is accidental-cross-session protection for a single local user, not a
 multi-user authorization or cryptographic access-control system. Separate users
 or trust domains need separate plugin data stores and operating-system controls.
+Raw working-directory filters are normalized against the redacted stored scope,
+so a Windows path under `C:\Users\<name>` can match its `[USER_HOME]` receipt
+without returning the account name.
 
 ## Product boundary
 
@@ -104,6 +127,14 @@ timeout. The plugin cannot reveal hidden chain-of-thought, expand Codex
 permissions, block tool calls, or guarantee complete capture. Hash chaining
 helps diagnose local recording problems but is not a tamper-proof guarantee. See
 [`DESIGN_CONTRACT.md`](DESIGN_CONTRACT.md) for the normative v0 boundary.
+
+The collector keeps two small content-free health markers beside the database:
+the last observed success and the last observed error. They contain only a
+timestamp, allowlisted hook name, observed input byte count, status, exception
+type, and a one-way session-scope digest when a session ID was supplied. They
+help distinguish a collector failure from an empty store, but they are global
+last-attempt markers and do not prove hook trust, currentness, full coverage, or
+the truth of recorded content.
 
 For a scoped audit, the skill delegates raw-log reading to one read-only custom
 agent named `songryeon` when it is available. The parent selects the session and
